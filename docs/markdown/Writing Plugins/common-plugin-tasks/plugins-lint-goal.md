@@ -6,99 +6,103 @@ hidden: false
 createdAt: "2020-07-01T04:51:55.583Z"
 updatedAt: "2022-04-07T14:48:36.791Z"
 ---
-In Pants, every formatter is (typically) also a linter, meaning that if you can run a tool with `./pants fmt`, you can run the same tool in check-only mode with `./pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work. 
+This guide assumes that you are running a linter that already exists outside of Pants as a stand-alone binary, such as running Shellcheck, Pylint, Checkstyle, or ESLint. 
 
-This guide assumes that you are running a formatter that already exists outside of Pants as a stand-alone binary, such as running Black or Prettier.
+If you are instead writing your own linting logic inline, you can skip Step 1. In Step 3, you will not need to use `Process`. You may find Pants's [`regex-lint` implementation](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/project_info/regex_lint.py) helpful for how to integrate custom linting logic into Pants.
 
-If you are instead writing your own formatting logic inline, you can skip Step 1. In Step 4, you will not need to use `Process`.
+1. Install your linter
+----------------------
 
-1. Install your formatter
--------------------------
+There are several ways for Pants to install your linter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for Shellcheck.
 
-There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
-
-You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options using class attributes which are instances of the types defined in `pants.option.option_types`.
+You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shellcheck"` or `"eslint"`. Finally, add options from `pants.option.option_types`.
 
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import file_option, shell_str
+from pants.option.option_types import ArgsListOption, SkipOption
 
 
-class Shfmt(ExternalTool):
-    """An autoformatter for shell scripts (https://github.com/mvdan/sh)."""
+class Shellcheck(ExternalTool):
+    """A linter for shell scripts."""
 
-    options_scope = "shfmt"
-    default_version = "v3.2.4"
+    options_scope = "shellcheck"
+    default_version = "v0.8.0"
     default_known_versions = [
-        "v3.2.4|macos_arm64 |e70fc42e69debe3e400347d4f918630cdf4bf2537277d672bbc43490387508ec|2998546",
-        "v3.2.4|macos_x86_64|43a0461a1b54070ddc04fbbf1b78f7861ee39a65a61f5466d15a39c4aba4f917|2980208",
-        "v3.2.4|linux_arm64 |6474d9cc08a1c9fe2ef4be7a004951998e3067d46cf55a011ddd5ff7bfab3de6|2752512",
-        "v3.2.4|linux_x86_64|3f5a47f8fec27fae3e06d611559a2063f5d27e4b9501171dde9959b8c60a3538|2797568",
+        "v0.8.0|macos_arm64 |e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634|4049756",
+        "v0.8.0|macos_x86_64|e065d4afb2620cc8c1d420a9b3e6243c84ff1a693c1ff0e38f279c8f31e86634|4049756",
+        "v0.8.0|linux_arm64 |9f47bbff5624babfa712eb9d64ece14c6c46327122d0c54983f627ae3a30a4ac|2996468",
+        "v0.8.0|linux_x86_64|ab6ee1b178f014d1b86d1e24da20d1139656c8b0ed34d2867fbb834dad02bf0a|1403852",
     ]
 
-    # We set this because we need the mapping for both `generate_exe` and `generate_url`.
-    platform_mapping = {
-        "macos_arm64": "darwin_arm64",
-        "macos_x86_64": "darwin_amd64",
-        "linux_arm64": "linux_arm64",
-        "linux_x86_64": "linux_amd64",
-    }
-
-    skip = SkipOption("shfmt", "fmt", "lint")
-    args = ArgsListOption(example="-i 2")
-    config = FileOption(
-        advanced=True,
-        help="Path to `.editorconfig` file. This must be relative to the build root.",
-    )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="-e SC20529")
 
     def generate_url(self, plat: Platform) -> str:
-        plat_str = self.platform_mapping[plat.value]
+        plat_str = {
+            "macos_arm64": "darwin.x86_64",
+            "macos_x86_64": "darwin.x86_64",
+            "linux_arm64": "linux.aarch64",
+            "linux_x86_64": "linux.x86_64",
+        }[plat.value]
         return (
-            f"https://github.com/mvdan/sh/releases/download/{self.version}/"
-            f"shfmt_{self.version}_{plat_str}"
+            f"https://github.com/koalaman/shellcheck/releases/download/{self.version}/"
+            f"shellcheck-{self.version}.{plat_str}.tar.xz"
         )
 
-    def generate_exe(self, plat: Platform) -> str:
-        plat_str = self.platform_mapping[plat.value]
-        return f"./shfmt_{self.version}_{plat_str}"
+    def generate_exe(self, _: Platform) -> str:
+        return f"./shellcheck-{self.version}/shellcheck"
+
 ```
 
-3. Set up a `FieldSet` and `FmtRequest`/`LintTargetsRequest`
-------------------------------------------------------------
+Lastly, register your Subsystem with the engine:
+
+```python
+from pants.engine.rules import collect_rules
+
+...
+
+def rules():
+    return collect_rules()
+```
+
+2. Set up a `FieldSet` and `LintRequest`
+----------------------------------------
 
 As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
-Usually, you should add a subclass of `SourcesField` to the class property `required_fields`, such as `ShellSourceField` or `PythonSourceField`. This means that your linter will run on any target with that sources field or a subclass of it.
+Usually, you should add a subclass of the `Sources` field to the class property `required_fields`, such as `BashSources` or `PythonSources`. This means that your linter will run on any target with that sources field or a subclass of it.
 
 Create a new dataclass that subclasses `FieldSet`:
 
 ```python
 from dataclasses import dataclass
 
-from pants.engine.target import FieldSet
+from pants.engine.target import Dependencies, FieldSet
 
 ...
 
 @dataclass(frozen=True)
-class ShfmtFieldSet(FieldSet):
-    required_fields = (ShellSourceField,)
+class ShellcheckFieldSet(FieldSet):
+    required_fields = (BashSources,)
 
-    sources: ShellSourceField
+    sources: BashSources
+    dependencies: Dependencies
 ```
 
-Then, hook this up to a new subclass of both `LintTargetsRequest` and `FmtRequest`.
+Then, hook this up to a new subclass of `LintTargetsRequest`:
 
 ```python
-from pants.core.goals.fmt import FmtRequest
 from pants.core.goals.lint import LintTargetsRequest
 
-class ShfmtRequest(FmtRequest, LintRequest):
-    field_set_type = ShfmtFieldSet
-    name = "shfmt"
+...
+
+class ShellcheckRequest(LintTargetsRequest):
+    field_set_type = ShellcheckFieldSet
+    name = "shellcheck"
 ```
 
-Finally, register your new `LintTargetsRequest`/`FmtRequest` with two [`UnionRule`s](doc:rules-api-unions) so that Pants knows your formatter exists:
+Finally, register your new `LintTargetsRequest ` with a [`UnionRule`](doc:rules-api-unions) so that Pants knows your linter exists:
 
 ```python
 from pants.engine.unions import UnionRule
@@ -108,152 +112,145 @@ from pants.engine.unions import UnionRule
 def rules():
     return [
       	*collect_rules(),
-        UnionRule(FmtRequest, ShfmtRequest),
-        UnionRule(LintTargetsRequest, ShfmtRequest),
+        UnionRule(LintTargetsRequest, ShellcheckRequest),
     ]
 ```
 
-4. Create `fmt` and `lint` rules
---------------------------------
+3. Create a rule for your linter logic
+--------------------------------------
 
-You will need rules for both `fmt` and `lint`. Both rules should take the `LintTargetsRequest`/`FmtRequest` from step 3  (e.g. `ShfmtRequest`) as a parameter. The `fmt` rule should return `FmtResult`, and the `lint` rule should return `LintResults`.
-
-```python
-@rule(desc="Format with shfmt")
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    ...
-    return FmtResult(..., formatter_name=request.name)
-
-
-@rule(desc="Lint with shfmt")
-async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
-    ...
-    return LintResults([], linter_name=request.name)
-```
-
-The `fmt` and `lint` rules will be very similar, except that a) the `argv` to your `Process` will be different, b) for `lint`, you should use `await Get(FallibleProcessResult, Process)` so that you tolerate failures, whereas `fmt` should use `await Get(ProcessResult, Process)`. To avoid duplication between the `fmt` and `lint` rules, you should set up a helper `setup` rule, along with dataclasses for `SetupRequest` and `Setup`.
+Your rule should take as a parameter the `LintRequest` from step 2 and the `Subsystem` (or `ExternalTool`) from step 1. It should return `LintResults`:
 
 ```python
-@dataclass(frozen=True)
-class SetupRequest:
-    request: ShfmtRequest
-    check_only: bool
+from pants.engine.rules import rule
+from pants.core.goals.lint import LintTargetsRequest, LintResult, LintResults
 
+...
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_digest: Digest
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
-    download_shfmt_get = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        shfmt.get_request(Platform.current),
-    )
-
-    # If the user specified `--shfmt-config`, we must search for the file they specified with
-    # `PathGlobs` to include it in the `input_digest`. We error if the file cannot be found.
-    config_digest_get = Get(
-        Digest,
-        PathGlobs(
-            globs=[shfmt.config] if shfmt.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--shfmt-config`",
-        ),
-    )
-
-    source_files_get= Get(
-        SourceFiles,
-        SourceFilesRequest(
-            field_set.source for field_set in setup_request.request.field_sets
-        ),
-    )
-
-    downloaded_shfmt, config_digest, source_files = await MultiGet(
-        download_shfmt_get, config_digest_get, source_files_get
-    )
-
-    # If we were given an input digest from a previous formatter for the source files, then we
-    # should use that input digest instead of the one we read from the filesystem.
-    source_files_snapshot = (
-        source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
-    )
-
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
-            (source_files_snapshot.digest, downloaded_shfmt.digest, config_digest)
-        ),
-    )
-
-    argv = [
-        downloaded_shfmt.exe,
-        "-d" if setup_request.check_only else "-w",
-        *shfmt.args,
-        *source_files_snapshot.files,
-    ]
-    process = Process(
-        argv=argv,
-        input_digest=input_digest,
-        output_files=source_files_snapshot.files,
-        description=f"Run shfmt on {pluralize(len(setup_request.request.field_sets), 'file')}.",
-        level=LogLevel.DEBUG,
-    )
-    return Setup(process, original_digest=source_files_snapshot.digest)
-
-
-@rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    if shfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
-    result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name=request.name
-    )
-
-
-@rule(desc="Lint with shfmt", level=LogLevel.DEBUG)
-async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
-    if shfmt.skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults(
-        [LintResult.from_fallible_process_result(result)], linter_name=request.name
-    )
+@rule
+async def run_shellcheck(
+    request: ShellcheckRequest, shellcheck: Shellcheck
+) -> LintResults:
+    return LintResults(linter_name=request.name)
 ```
 
-The `FmtRequest`/`LintRequest` has a property called `.field_sets`, which stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances. 
+The `LintTargetsRequest ` has a property called `.field_sets`, which stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `LintRequest.field_sets` to have 1-n `FieldSet` instances. 
 
-If you have a `--skip` option, you should check if it was used at the beginning of your `fmt` and `lint` rules and, if so, to early return an empty `LintResults()` and return `FmtResult.skip()`.
+The rule should return `LintResults`, which is a collection of multiple `LintResult` objects. Normally, you will only have one single `LintResult`. Sometimes, however, you may want to group your targets in a certain way and return a `LintResult` for each group, such as grouping Python targets by their interpreter compatibility.
 
-Use `Get(SourceFiles, SourceFilesRequest)` to get all the sources you want to run your linter on. However, you should check if the `FmtRequest.prior_formatter_result` is set, and if so, use that value instead. This ensures that the result of any previous formatters is used, rather than the original source files. 
+If you have a `--skip` option, you should check if it was used at the beginning of your rule and, if so, to early return an empty `LintResults()`.
 
-If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` in the `setup` rule to install the tool.
+If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to install the tool.
+
+Typically, you will use `Get(SourceFiles, SourceFilesRequest)` to get all the sources you want to run your linter on.
 
 If you have a `--config` option, you should use `Get(Digest, PathGlobs)` to find the config file and include it in the `input_digest`.
 
 Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files, config file, and downloaded tool.
 
-Finally, update your plugin's `register.py` to activate this file's rules. Note that we must register the rules added in Step 2, as well.
+Usually, you will use `Get(FallibleProcessResult, Process)` to run a subprocess (see [Processes](doc:rules-api-process)). We use `Fallible` because Pants should not throw an exception if the linter returns a non-zero exit code. Then, you can use `LintResult.from_fallible_process_result()` to convert this into a `LintResult`.
 
-```python pants-plugins/shell/register.py
-from shell import shell_formatters, shfmt
+```python
+from pants.core.goals.lint import LintTargetsRequest, LintResult, LintResults
+from pants.core.util_rules.source_files import (
+    SourceFilesRequest,
+    SourceFiles,
+)
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalTool,
+    ExternalToolRequest,
+)
+from pants.engine.fs import (
+    Digest,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
+from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import Get, MultiGet, rule
+from pants.util.logging import LogLevel
+from pants.util.strutil import pluralize
+
+...
+
+@rule
+async def run_shellcheck(
+    request: ShellcheckRequest, shellcheck: Shellcheck
+) -> LintResults:
+    if shellcheck.skip:
+        return LintResults([], linter_name=request.name)
+
+    download_shellcheck_request = Get(
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        shellcheck.get_request(Platform.current),
+    )
+
+    sources_request = Get(
+        SourceFiles,
+        SourceFilesRequest(field_set.sources for field_set in request.field_sets),
+    )
+
+    # If the user specified `--shellcheck-config`, we must search for the file they specified with
+    # `PathGlobs` to include it in the `input_digest`. We error if the file cannot be found.
+    config_digest_request = Get(
+        Digest,
+        PathGlobs(
+            globs=[shellcheck.config] if shellcheck.config else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `[shellcheck].config`",
+        ),
+    )
+
+    downloaded_shellcheck, sources, config_digest = await MultiGet(
+        download_shellcheck_request, sources_request, config_digest_request
+    )
+
+    # The Process needs one single `Digest`, so we merge everything together.
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                downloaded_shellcheck.digest,
+                sources.snapshot.digest,
+                config_digest,
+            )
+        ),
+    )
+
+    process_result = await Get(
+        FallibleProcessResult,
+        Process(
+            argv=[
+                downloaded_shellcheck.exe,
+                *shellcheck.args,
+                *sources.snapshot.files,
+            ],
+            input_digest=input_digest,
+            description=f"Run Shellcheck on {pluralize(len(request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    result = LintResult.from_fallible_process_result(process_result)
+    return LintResults([result], linter_name=request.name)
+
+```
+
+Finally, update your plugin's `register.py` to activate this file's rules.
+
+```python pants-plugins/bash/register.py
+from bash import shellcheck
 
 
 def rules():
-    return [*shell_formatters.rules(), *shfmt.rules()]
+    return [*shellcheck.rules()]
 ```
 
-Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run. 
+Now, when you run `./pants lint ::`, your new linter should run.
 
-5. Add tests (optional)
+4. Add tests (optional)
 -----------------------
 
 Refer to [Testing rules](doc:rules-api-testing).
