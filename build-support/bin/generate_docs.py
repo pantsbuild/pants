@@ -26,7 +26,6 @@ import pkgutil
 import re
 import subprocess
 import textwrap
-import time
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
@@ -635,5 +634,4 @@ class ReferenceGenerator:
 
 
 if __name__ == "__main__":
-    time.sleep(30)
-    print("bye")
+    main()
