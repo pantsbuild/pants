@@ -54,6 +54,14 @@ docker_image(
 )
 ```
 
+You may also provide a registry specific value for the repository, see next section for more details.
+```toml pants.toml
+[docker.registries.company-registry3]
+address = "reg3.company.internal"
+repository = "{parent_directory}/{name}"
+```
+
+
 Setting a repository name
 -------------------------
 
@@ -67,10 +75,16 @@ docker_image(
     repository="example/demo",
 )
 ```
-
 ```shell
 $ ./pants package src/example:demo
 # Will build the image: example/demo:latest
+```
+
+To use a repository only for a specific registry, provide a `repository` value in the registry configuration, and this can contain placeholders in curly braces that will be interpolated for each image name.
+```toml pants.toml
+[docker.registries.demo]
+address = "reg.company.internal"
+repository = "example/{name}"
 ```
 
 You can also specify a default repository name in config, and this name can contain placeholders in curly braces that will be interpolated for each `docker_image`:
@@ -91,10 +105,16 @@ The default placeholders are:
 - `{parent_directory}`: The parent directory of `{directory}`.
 - `{name}`: The name of the docker_image target.
 - `{build_args.ARG_NAME}`: Each defined Docker build arg is available for interpolation under the `build_args.` prefix.
+- `{default_repository}`: The default repository from configuration.
+- `{target_repository}`: The repository on the `docker_image` if provided, otherwise the default repository.
 
-Since repository names often conform to patterns like these, this can save you on some boilerplate by allowing you to omit the `repository` field on each `docker_image`. But you can always override this field on specific `docker_image` targets, of course. In fact, you can use these placeholders in the `repository` field as well, if you find that helpful.
+Since repository names often conform to patterns like these, this can save you on some boilerplate
+by allowing you to omit the `repository` field on each `docker_image`. But you can always override
+this field on specific `docker_image` targets, of course. In fact, you can use these placeholders in
+the `repository` field as well, if you find that helpful.
 
 See [String interpolation using placeholder values](doc:tagging-docker-images#string-interpolation-using-placeholder-values) for more information.
+
 
 Tagging images
 --------------

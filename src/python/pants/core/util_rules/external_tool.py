@@ -59,6 +59,22 @@ class DownloadedExternalTool:
     exe: str
 
 
+@dataclass(frozen=True)
+class ExternalToolVersion:
+    version: str
+    platform: str
+    sha256: str
+    filesize: int
+
+    def encode(self) -> str:
+        return "|".join([self.version, self.platform, self.sha256, str(self.filesize)])
+
+    @classmethod
+    def decode(cls, version_str: str) -> ExternalToolVersion:
+        version, platform, sha256, filesize = [x.strip() for x in version_str.split("|")]
+        return cls(version, platform, sha256, int(filesize))
+
+
 class ExternalTool(Subsystem, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
@@ -185,23 +201,27 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
         for known_version in self.known_versions:
-            ver, plat_val, sha256, length = self.split_known_version_str(known_version)
-            if plat.value == plat_val and ver == self.version:
-                return self.get_request_for(plat_val, sha256, length)
+            version = self.decode_known_version(known_version)
+            if plat.value == version.platform and version.version == self.version:
+                return self.get_request_for(version.platform, version.sha256, version.filesize)
         raise UnknownVersion(
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
 
     @classmethod
-    def split_known_version_str(cls, known_version: str) -> tuple[str, str, str, int]:
+    def decode_known_version(cls, known_version: str) -> ExternalToolVersion:
         try:
-            ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
+            return ExternalToolVersion.decode(known_version)
         except ValueError:
             raise ExternalToolError(
                 f"Bad value for [{cls.options_scope}].known_versions: {known_version}"
             )
-        return ver, plat_val, sha256, int(length)
+
+    @classmethod
+    def split_known_version_str(cls, known_version: str) -> tuple[str, str, str, int]:
+        version = cls.decode_known_version(known_version)
+        return version.version, version.platform, version.sha256, version.filesize
 
     def get_request_for(self, plat_val: str, sha256: str, length: int) -> ExternalToolRequest:
         """Generate a request for this tool from the given info."""

@@ -63,8 +63,6 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
-use_deprecated_directory_cli_args_semantics = false
-
 unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
@@ -269,3 +267,4 @@ master = "src/python/pants/notes/master.rst"
 "2.11.x" = "src/python/pants/notes/2.11.x.md"
 "2.12.x" = "src/python/pants/notes/2.12.x.md"
 "2.13.x" = "src/python/pants/notes/2.13.x.md"
+"2.14.x" = "src/python/pants/notes/2.14.x.md"

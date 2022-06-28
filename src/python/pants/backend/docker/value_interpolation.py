@@ -77,8 +77,18 @@ class DockerInterpolationContext(FrozenDict[str, Union[str, DockerInterpolationV
     def format(
         self, text: str, *, source: TextSource, error_cls: type[ErrorT] | None = None
     ) -> str:
+        stack = [text]
         try:
-            return text.format(**self)
+            while "{" in stack[-1] and "}" in stack[-1]:
+                if len(stack) >= 5:
+                    raise DockerInterpolationError(
+                        "The formatted placeholders recurse too deep.\n"
+                        + " => ".join(map(repr, stack))
+                    )
+                stack.append(stack[-1].format(**self))
+                if stack[-1] == stack[-2]:
+                    break
+            return stack[-1]
         except (KeyError, DockerInterpolationError) as e:
             default_error_cls = DockerInterpolationError
             msg = f"Invalid value for the {source}: {text!r}.\n\n"

@@ -88,3 +88,11 @@ def test_extra_image_tags() -> None:
     reg1, reg2 = registries.get("@reg1", "@reg2")
     assert reg1.extra_image_tags == ()
     assert reg2.extra_image_tags == ("latest", "v{build_args.VERSION}")
+
+
+def test_repository() -> None:
+    registries = DockerRegistries.from_dict(
+        {"reg1": {"address": "registry1", "repository": "{name}/foo"}}
+    )
+    (reg1,) = registries.get("@reg1")
+    assert reg1.repository == "{name}/foo"
