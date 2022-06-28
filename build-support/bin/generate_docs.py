@@ -42,7 +42,6 @@ from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
 
-
 DOC_URL_RE = re.compile(
     r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)(?P<anchor>#[a-zA-Z0-9_-]+)?"
 )
