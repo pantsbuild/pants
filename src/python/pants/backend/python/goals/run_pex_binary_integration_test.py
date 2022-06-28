@@ -269,11 +269,5 @@ def test_filename_spec_ambiutity(use_new_semantics_args) -> None:
         ]
         result = run_pants(args)
         file = result.stdout.strip()
-        if use_new_semantics_args:
-            # The python_source was chosen
-            assert file.endswith("src/app.py")
-            assert ".pants.d/tmp" in file
-        else:
-            # The pex_binary was chosen
-            assert file.endswith("app.py")
-            assert ".pants.d/tmp" not in file
+        assert file.endswith("src/app.py")
+        assert ".pants.d/tmp" in file
