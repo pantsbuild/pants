@@ -1085,6 +1085,7 @@ dependencies = [
  "http",
  "hyper",
  "itertools",
+ "lazy_static",
  "parking_lot 0.11.2",
  "pin-project 1.0.8",
  "prost",
