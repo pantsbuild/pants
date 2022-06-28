@@ -1,5 +1,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""Fetch versions of Terraform and format them for use in known_versions."""
+
 import csv
 import itertools
 import logging
@@ -21,6 +23,12 @@ logging.basicConfig(level=logging.INFO)
 
 
 def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, List]:
+    """Split an Iterable into two lists based on a predicate.
+
+    >>> l = [0,1,2,3,4,5,6]
+    >>> partition(lambda i: i % 2 == 0, l)
+    ([0, 2, 4, 6], [1, 3, 5])
+    """
     where_true, where_false = [], []
     for item in items:
         if predicate(item):
@@ -31,15 +39,28 @@ def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, 
 
 
 def flatten(list_of_lists: Iterable[Iterable[Any]]) -> Generator[Any, None, None]:
+    """Flatten a list of lists into a generator.
+
+    >>> l = [[1,2,3], ['a', 'b', 'c']]
+    >>> g = flatten(l)
+    >>> type(g)
+    <class 'generator'>
+    >>> list(g)
+    [1, 2, 3, 'a', 'b', 'c']
+    """
     return (item for sublist in list_of_lists for item in sublist)
 
 
 class GPGVerifier:
+    """Easily verify GPG signatures."""
+
     def __init__(self, keydata):
         self.gpg = gnupg.GPG(gnupghome=".")
         self.gpg.import_keys(keydata)  # TODO: handle import error
 
     def validate_signature(self, signatures: bytes, content: bytes) -> gnupg.Verify:
+        """Verify GPG signature from the common pattern of a file for the signature and a file for
+        the content."""
         with tempfile.NamedTemporaryFile() as signature_file:
             signature_file.write(signatures)
             signature_file.flush()
@@ -57,11 +78,13 @@ Links = List[Link]
 
 
 def get_tf_page(url) -> BeautifulSoup:
+    """Get a page from the Terraform website."""
     logging.info(f"fetch url={url}")
     return BeautifulSoup(requests.get(url).text, "html.parser")
 
 
 def get_tf_links(page: BeautifulSoup) -> Links:
+    """Extract the links from a Terraform webpage."""
     items = page.html.body.ul.find_all("li")
     links = [
         Link(li.text.strip(), li.a.get("href"))
@@ -146,6 +169,7 @@ def parse_download_url(url: str) -> Tuple[str, str]:
 
 
 def is_prerelease(version_slug: str) -> bool:
+    """Determine if a Terraform version is a prerelease version (alpha, beta, or rc)"""
     return any((x in version_slug for x in {"alpha", "beta", "rc"}))
 
 
@@ -155,6 +179,7 @@ def fetch_platforms_for_version(
     version_slug: str,
     version_infos: TFVersionInfo,
 ) -> Optional[List[ExternalToolVersion]]:
+    """Fetch platform binary information for a particular Terraform version."""
     logging.info(
         f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
     )
