@@ -37,6 +37,7 @@ impl NetworkMetricsLayer {
   }
 }
 
+#[derive(Clone)]
 pub struct NetworkMetrics<S> {
   inner: S,
   metric_for_path: Arc<HashMap<String, ObservationMetric>>,
@@ -114,5 +115,63 @@ where
       inner: self.inner.call(req),
       metric_data,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::collections::HashMap;
+  use std::convert::Infallible;
+  use std::sync::Arc;
+
+  use hyper::{Body, Request, Response};
+  use tower::{ServiceBuilder, ServiceExt};
+  use workunit_store::{Level, ObservationMetric, WorkunitStore};
+
+  use super::NetworkMetricsLayer;
+
+  async fn handler(_: Request<Body>) -> Result<Response<Body>, Infallible> {
+    Ok(Response::new(Body::empty()))
+  }
+
+  #[tokio::test]
+  async fn collects_network_metrics() {
+    let ws = WorkunitStore::new(true, Level::Debug);
+    ws.init_thread_state(None);
+
+    let metric_for_path: Arc<HashMap<String, ObservationMetric>> = {
+      let mut m = HashMap::new();
+      m.insert(
+        "/this-is-a-metric-path".to_string(),
+        ObservationMetric::TestObservation,
+      );
+      Arc::new(m)
+    };
+
+    let svc = ServiceBuilder::new()
+      .layer(NetworkMetricsLayer::new(&metric_for_path))
+      .service_fn(handler);
+
+    let req = Request::builder()
+      .uri("/not-a-metric-path")
+      .body(Body::empty())
+      .unwrap();
+
+    let _ = svc.clone().oneshot(req).await.unwrap();
+    let observations = ws.encode_observations().unwrap();
+    assert_eq!(observations.len(), 0); // there should be no observations for `/not-a-metric-path`
+
+    let req = Request::builder()
+      .uri("/this-is-a-metric-path")
+      .body(Body::empty())
+      .unwrap();
+
+    let _ = svc.clone().oneshot(req).await.unwrap();
+    let observations = ws.encode_observations().unwrap();
+    assert_eq!(observations.len(), 1); // there should be an observation for `/this-is-a-metric-path`
+    assert_eq!(
+      observations.into_keys().collect::<Vec<_>>(),
+      vec!["test_observation"]
+    );
   }
 }
