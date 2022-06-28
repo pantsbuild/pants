@@ -1,12 +1,13 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import csv
+import itertools
 import logging
 import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import gnupg
@@ -29,8 +30,8 @@ def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, 
     return where_true, where_false
 
 
-def flatten(list_of_lists: Sequence[Sequence[Any]]) -> List[Any]:
-    return [item for sublist in list_of_lists for item in sublist]
+def flatten(list_of_lists: Iterable[Iterable[Any]]) -> Generator[Any, None, None]:
+    return (item for sublist in list_of_lists for item in sublist)
 
 
 class GPGVerifier:
@@ -153,7 +154,7 @@ def fetch_platforms_for_version(
     inverse_platform_mapping: Dict[str, str],
     version_slug: str,
     version_infos: TFVersionInfo,
-):
+) -> Optional[List[ExternalToolVersion]]:
     logging.info(
         f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
     )
@@ -194,32 +195,34 @@ def fetch_platforms_for_version(
     return out
 
 
-def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]:
+def fetch_versions(
+    url: str, verifier: GPGVerifier
+) -> Generator[List[ExternalToolVersion], None, None]:
     """Crawl the Terraform version site and identify all supported Terraform binaries."""
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
-    platform_version_links = {
-        x.text: get_info_for_version(urljoin(url, x.link)) for x in version_links[:5]
-    }
+    platform_version_links = (
+        (x.text, get_info_for_version(urljoin(url, x.link))) for x in version_links
+    )
 
     inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}
 
-    out = []
-    for version_slug, version_infos in platform_version_links.items():
+    for version_slug, version_infos in platform_version_links:
         found_versions = fetch_platforms_for_version(
             verifier, inverse_platform_mapping, version_slug, version_infos
         )
         if found_versions:
-            out.append(found_versions)
-
-    return flatten(out)
+            yield found_versions
 
 
 if __name__ == "__main__":
     versions_url = "https://releases.hashicorp.com/terraform/"
+    number_of_supported_versions = 20
 
     keydata = requests.get("https://keybase.io/hashicorp/pgp_keys.asc").content
     verifier = GPGVerifier(keydata)
 
-    versions = fetch_versions(versions_url, verifier)
-    print([v.encode() for v in versions])
+    versions = itertools.islice(
+        fetch_versions(versions_url, verifier), number_of_supported_versions
+    )
+    print([v.encode() for v in flatten(versions)])
