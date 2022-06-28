@@ -43,7 +43,7 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
     }
 
     color = BoolOption(
-        "--color", default=False, help="Enforce printing colored output even stdout is not a tty."
+        "--color", default=False, help="Enforce printing colored output even if stdout is not a tty."
     )
 
     output_type = EnumOption(
