@@ -80,4 +80,6 @@ pub enum ObservationMetric {
   /// The time saved (in milliseconds) thanks to a remote cache hit instead of running the process
   /// directly.
   RemoteCacheTimeSavedMs,
+  /// Remote cache timing (in microseconds) for GetActionResult calls.
+  RemoteCacheGetActionResultTimeMicros,
 }
