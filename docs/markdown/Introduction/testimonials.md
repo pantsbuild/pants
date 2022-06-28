@@ -44,7 +44,7 @@ We have rolled out Pants across the organization now replacing Conda based workf
 		<h3><a href="https://vicarasolutions.com/">Vicara Solutions</a></h3>
 	</figcaption>
 <blockquote>
-<p>I just wanted to write a quick appreciation message for a) Pants itself, and b) all the plugin help I've received <a href="https://pantsbuild.slack.com">on the Slack community</a>.
+<p>I just wanted to write a quick appreciation message for a) Pants itself, and b) all the plugin help I've received <a href="https://www.pantsbuild.org/docs/getting-help">on the Slack community</a>.
 <p>I just finished re-writing the entire build/deployment process for a multi-year legacy project using Pants + some custom plugins, and I was able to gut a slapdash set of bash scripts, Dockerfiles, build containers, and who knows what else - in favour of a handful of BUILD files of like 15 lines of code each.
 <p>I handed over the project today and this is essentially how it went:
 <p><i>Me: "Okay, so to deploy, we have to generate the protobufs, cythonize our core libs, embed the protobufs and core libs in some of our sub-repos, Dockerize the API gateway and microservices, package our system services, and then deploy all of that to our server and then run e2e testing."</i>
