@@ -54,13 +54,16 @@ Alternatively, if you only want to install the plugin for certain tests, you can
 ```text requirements.txt
 pytest-django==3.10.0
 ```
+```python BUILD
+python_requirements(name="reqs")
+```
 ```python helloworld/util/BUILD
 python_tests(
    name="tests",
    # Normally, Pants infers dependencies based on imports.
    # Here, we don't actually import our plugin, though, so
    # we need to explicitly list it.
-   dependencies=["//:pytest-django"],
+   dependencies=["//:reqs#pytest-django"],
 )
 ```
 
