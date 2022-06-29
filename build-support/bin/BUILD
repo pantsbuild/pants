@@ -20,6 +20,6 @@ python_tests(
 )
 
 pex_binary(
-    name="tool_versions",
+    name="terraform_tool_versions",
     entry_point="terraform_tool_versions.py",
 )
