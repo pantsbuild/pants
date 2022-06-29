@@ -54,12 +54,44 @@ impl CommandRunner {
       metadata,
     }
   }
+}
 
-  async fn cache_lookup(
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("cache::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
+  }
+}
+
+#[async_trait]
+impl crate::CommandRunner for CommandRunner {
+  async fn cache_store(&self, process: &Process, result: &FallibleProcessResultWithPlatform) {
+    let write_failures_to_cache = process.cache_scope == ProcessCacheScope::Always;
+    let key = CacheKey {
+      digest: Some(crate::digest(&process, &self.metadata).into()),
+      key_type: CacheKeyType::Process.into(),
+    };
+    if result.exit_code == 0 || write_failures_to_cache {
+      let result = result.clone();
+      in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
+        if let Err(err) = self.store(&key, &result).await {
+          warn!(
+            "Error storing process execution result to local cache: {} - ignoring and continuing",
+            err
+          );
+          workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
+        }
+      });
+    }
+  }
+
+  async fn run(
     &self,
-    context: &Context,
-    req: &Process,
-  ) -> Result<FallibleProcessResultWithPlatform, ()> {
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
@@ -69,7 +101,7 @@ impl CommandRunner {
 
     let context2 = context.clone();
     let key2 = key.clone();
-    in_workunit!(
+    let cache_read_result = in_workunit!(
       "local_cache_read",
       Level::Trace,
       desc = Some(format!("Local cache lookup: {}", req.description)),
@@ -120,32 +152,16 @@ impl CommandRunner {
         }
       }
     )
-    .await
-  }
+    .await;
 
-  async fn cache_store(&self, process: &Process, result: &FallibleProcessResultWithPlatform) {
-    let write_failures_to_cache = process.cache_scope == ProcessCacheScope::Always;
-    let key = CacheKey {
-      digest: Some(crate::digest(&process, &self.metadata).into()),
-      key_type: CacheKeyType::Process.into(),
-    };
-    if result.exit_code == 0 || write_failures_to_cache {
-      let result = result.clone();
-      in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
-        if let Err(err) = self.store(&key, &result).await {
-          warn!(
-            "Error storing process execution result to local cache: {} - ignoring and continuing",
-            err
-          );
-          workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
-        }
-      });
+    if let Ok(result) = cache_read_result {
+      return Ok(result);
     }
-  }
-}
 
-#[async_trait]
-impl crate::CommandRunner for CommandRunner {
+    self.cache_store(&req, &result).await;
+    OK(result);
+  }
+
   async fn run_coalesced_batch(
     &self,
     context: Context,
@@ -207,26 +223,6 @@ impl crate::CommandRunner for CommandRunner {
       }
       Ok(result)
     }
-  }
-
-  async fn run(
-    &self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-    req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let cache_read_result = self.cache_lookup(&context, &req).await;
-
-    if let Ok(result) = cache_read_result {
-      return Ok(result);
-    }
-
-    let result = self
-      .underlying
-      .run(context.clone(), workunit, req.clone())
-      .await?;
-    self.cache_store(&req, &result).await;
-    Ok(result)
   }
 }
 
