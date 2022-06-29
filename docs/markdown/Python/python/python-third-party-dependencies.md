@@ -228,8 +228,11 @@ Then, use `./pants generate-lockfiles` to generate the lockfile.
 > 
 > As explained at the top of these docs, Pants only uses the subset of the "universe" of your dependencies that is actually needed for a build, such as running tests and packaging a wheel file. This gives fine-grained caching and has other benefits like built packages (e.g. PEX binaries) only including their true dependencies. However, naively, this would mean that you need to resolve dependencies multiple times, which can be slow.
 > 
-> If you use Pex-generated lockfiles (see below), Pants will only install the subset of the lockfile you need for a task. If you use Poetry-generated lockfiles, Pants will first install the entire lockfile and then it will [extract](https://blog.pantsbuild.org/introducing-pants-2-5/) the exact subset needed. 
-> 
+> If you use the default of Pex-generated lockfiles (see below), Pants will only install the
+> subset of the lockfile you need for a task. If you instead use Poetry-generated lockfiles,
+> Pants will first install the entire lockfile and then it
+> will [extract](https://blog.pantsbuild.org/introducing-pants-2-5/) the exact subset needed.
+>
 > This greatly speeds up performance and improves caching for goals like `test`, `run`, `package`, and `repl`.
 
 #### Multiple lockfiles
@@ -347,9 +350,11 @@ To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for t
 
 ### Pex vs. Poetry for lockfile generation
 
-You should set `[python].lockfile_generator` to either `"pex"` or `"poetry"` in `pants.toml`. The default of `poetry` will change in Pants 2.12.
+Pants defaults to using [Pex](https://pex.readthedocs.io/) to generate lockfiles, but you can
+instead use [Poetry](https://python-poetry.org) by setting `[python].lockfile_generator = "poetry"`
+in `pants.toml`.
 
-We generally recommend using Pex, which has several benefits:
+We generally recommend using the default of Pex, which has several benefits:
 
 1. Supports `[python-repos]` if you have a custom index or repository other than PyPI.
 2. Supports `[GLOBAL].ca_certs_path`.
@@ -557,20 +562,25 @@ Indexes are assumed to have a nested structure (like <http://pypi.org/simple>), 
 
 #### Authenticating to custom repos
 
-To authenticate to these custom repos you may need to provide credentials (such as a username and password) in the URL, that you don't want to expose in your checked-in pants.toml file.  Instead you can do one of the following:
+To authenticate to custom repos, you may need to provide credentials 
+(such as a username and password) in the URL. 
 
-Create a private (not checked-in) [.pants.rc file](doc:options#pantsrc-file) in each user's Pants repo, that sets this config for the user:
+You can use [config file `@(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation)
+to load the values via environment variables. This avoids checking in sensitive information to
+version control.
+
+```toml pants.toml
+[python-repos]
+indexes.add = ["http://%(env.INDEX_USERNAME)s:%(INDEX_PASSWORD)s@my.custom.repo/index"]
+```
+
+Alternatively, you can hardcode the value in a private (not checked-in)
+[.pants.rc file](doc:options#pantsrc-file) in each user's Pants repo, that sets this config for
+the user:
 
 ```toml .pants.rc
 [python-repos]
 indexes.add = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
-```
-
-Or, set the `indexes` or `repos` config in an environment variable:
-
-```shell
-$ export PANTS_PYTHON_REPOS_INDEXES='+["http://$USERNAME:$PASSWORD@my.custom.repo/index"]'
-$ ./pants package ::
 ```
 
 Tip: use `./pants export` to create a virtual environment for IDEs
