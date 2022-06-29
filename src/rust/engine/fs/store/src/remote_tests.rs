@@ -307,6 +307,63 @@ async fn list_missing_digests_error() {
   );
 }
 
+#[tokio::test]
+async fn load_via_each_api() {
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::empty();
+
+  let data = TestData::roland();
+  {
+    let mut blobs = cas.blobs.lock();
+    blobs.insert(data.fingerprint(), data.bytes());
+  }
+
+  let store = new_byte_store(&cas);
+  let result_batch = store
+    .load_bytes_with_batch(data.digest(), |b| Ok(b))
+    .await
+    .unwrap()
+    .unwrap();
+  let result_stream = store
+    .load_bytes_with_stream(data.digest(), |b| Ok(b))
+    .await
+    .unwrap()
+    .unwrap();
+  assert_eq!(result_batch, data.bytes());
+  assert_eq!(result_stream, data.bytes());
+}
+
+#[tokio::test]
+async fn store_via_each_api() {
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::empty();
+
+  let data = TestData::roland();
+  let store = new_byte_store(&cas);
+
+  let bytes = data.bytes();
+  let _ = store
+    .store_bytes_source_batch(data.digest(), move |r| bytes.slice(r))
+    .await
+    .unwrap();
+  {
+    let mut blobs = cas.blobs.lock();
+    assert_eq!(*blobs.get(&data.digest().hash).unwrap(), data.bytes());
+    blobs.clear();
+  }
+
+  let bytes = data.bytes();
+  let _ = store
+    .store_bytes_source_stream(data.digest(), move |r| bytes.slice(r))
+    .await
+    .unwrap();
+  {
+    let mut blobs = cas.blobs.lock();
+    assert_eq!(*blobs.get(&data.digest().hash).unwrap(), data.bytes());
+    blobs.clear();
+  }
+}
+
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
     &cas.address(),
