@@ -38,19 +38,6 @@ def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, 
     return where_true, where_false
 
 
-def flatten(list_of_lists: Iterable[Iterable[Any]]) -> Generator[Any, None, None]:
-    """Flatten a list of lists into a generator.
-
-    >>> l = [[1,2,3], ['a', 'b', 'c']]
-    >>> g = flatten(l)
-    >>> type(g)
-    <class 'generator'>
-    >>> list(g)
-    [1, 2, 3, 'a', 'b', 'c']
-    """
-    return (item for sublist in list_of_lists for item in sublist)
-
-
 class GPGVerifier:
     """Easily verify GPG signatures."""
 
@@ -250,4 +237,4 @@ if __name__ == "__main__":
     versions = itertools.islice(
         fetch_versions(versions_url, verifier), number_of_supported_versions
     )
-    print([v.encode() for v in flatten(versions)])
+    print([v.encode() for v in itertools.chain.from_iterable(versions)])
