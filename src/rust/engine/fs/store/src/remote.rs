@@ -18,8 +18,8 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
   capabilities_client::CapabilitiesClient,
-  content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
-  ServerCapabilities,
+  content_addressable_storage_client::ContentAddressableStorageClient, BatchReadBlobsRequest,
+  BatchUpdateBlobsRequest, ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
@@ -203,16 +203,7 @@ impl ByteStore {
     })
   }
 
-  async fn store_bytes_source<ByteSource>(
-    &self,
-    digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
-  where
-    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
-  {
-    let len = digest.size_bytes;
-
+  async fn len_is_allowed_for_batch_api(&self, len: usize) -> Result<bool, ByteStoreError> {
     let max_batch_total_size_bytes = {
       let capabilities = self.get_capabilities().await?;
 
@@ -226,14 +217,25 @@ impl ByteStore {
     let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
     let batch_api_allowed_by_server_config =
       max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
-    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+    Ok(batch_api_allowed_by_local_config && batch_api_allowed_by_server_config)
+  }
+
+  async fn store_bytes_source<ByteSource>(
+    &self,
+    digest: Digest,
+    bytes: ByteSource,
+  ) -> Result<(), ByteStoreError>
+  where
+    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
+  {
+    if self.len_is_allowed_for_batch_api(digest.size_bytes).await? {
       self.store_bytes_source_batch(digest, bytes).await
     } else {
       self.store_bytes_source_stream(digest, bytes).await
     }
   }
 
-  async fn store_bytes_source_batch<ByteSource>(
+  pub(crate) async fn store_bytes_source_batch<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
@@ -257,7 +259,7 @@ impl ByteStore {
     Ok(())
   }
 
-  async fn store_bytes_source_stream<ByteSource>(
+  pub(crate) async fn store_bytes_source_stream<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
@@ -333,6 +335,62 @@ impl ByteStore {
   }
 
   pub async fn load_bytes_with<
+    T: Send + 'static,
+    F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
+  >(
+    &self,
+    digest: Digest,
+    f: F,
+  ) -> Result<Option<T>, ByteStoreError> {
+    if self.len_is_allowed_for_batch_api(digest.size_bytes).await? {
+      self.load_bytes_with_batch(digest, f).await
+    } else {
+      self.load_bytes_with_stream(digest, f).await
+    }
+  }
+
+  pub(crate) async fn load_bytes_with_batch<
+    T: Send + 'static,
+    F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
+  >(
+    &self,
+    digest: Digest,
+    f: F,
+  ) -> Result<Option<T>, ByteStoreError> {
+    let request = BatchReadBlobsRequest {
+      instance_name: self.instance_name.clone().unwrap_or_default(),
+      digests: vec![digest.into()],
+    };
+    let mut client = self.cas_client.as_ref().clone();
+    let response = client
+      .batch_read_blobs(request)
+      .await
+      .map_err(ByteStoreError::Grpc)?;
+
+    let response = response.into_inner();
+    if response.responses.len() != 1 {
+      return Err(ByteStoreError::Other(
+        format!(
+          "Response from remote store for BatchReadBlobs API had inconsistent number of responses (got {}, expected 1)",
+          response.responses.len()
+        )
+      ));
+    }
+
+    let blob_response = response.responses.into_iter().next().unwrap();
+    let rpc_status = blob_response.status.unwrap_or_default();
+    let status = Status::from(rpc_status);
+    match status.code() {
+      Code::Ok => {
+        let result = f(blob_response.data);
+        result.map(Some).map_err(ByteStoreError::Other)
+      }
+      Code::NotFound => Ok(None),
+      _ => Err(ByteStoreError::Grpc(status)),
+    }
+  }
+
+  pub(crate) async fn load_bytes_with_stream<
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
   >(

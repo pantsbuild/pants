@@ -10,6 +10,7 @@ use std::fmt;
 
 use lazy_static::lazy_static;
 use pyo3::exceptions::PyException;
+use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{FromPyObject, ToPyObject};
@@ -30,6 +31,19 @@ pub mod scheduler;
 mod stdio;
 pub mod testutil;
 pub mod workunits;
+
+pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+  m.add_class::<PyFailure>()?;
+  Ok(())
+}
+
+#[derive(Clone)]
+#[pyclass]
+pub struct PyFailure(pub Failure);
+
+// TODO: We import this exception type because `pyo3` doesn't support declaring exceptions with
+// additional fields. See https://github.com/PyO3/pyo3/issues/295
+import_exception!(pants.base.exceptions, NativeEngineFailure);
 
 pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   // NB: Although it does not precisely align with Python's definition of equality, we ban matches
