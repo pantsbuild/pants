@@ -21,5 +21,5 @@ python_tests(
 
 pex_binary(
     name="tool_versions",
-    entry_point="tool_versions.py",
+    entry_point="terraform_tool_versions.py",
 )
