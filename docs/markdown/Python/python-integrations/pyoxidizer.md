@@ -93,10 +93,11 @@ Launching myproject.myapp from __main__
 Hello, world!
 ```
 
-Step 4: Run `package`
----------------------
+Step 4: Run `package` or `run` goals
+------------------------------------
 
-Finally, run `./pants package` on your `pyoxidizer_binary` target to create a directory including your binary.
+Finally, run `./pants package $address` on your `pyoxidizer_binary` target to create a directory
+including your binary, or `./pants run $address` to launch the binary.
 
 For example:
 
@@ -105,8 +106,13 @@ For example:
 14:15:31.18 [INFO] Completed: Building src.py.project:bin with PyOxidizer
 14:15:31.23 [INFO] Wrote dist/src.py.project/bin/aarch64-apple-darwin/debug/install/bin
 ```
+```
+❯ ./pants run src/py/project:bin
+14:15:31.18 [INFO] Completed: Building src.py.project:bin with PyOxidizer
+Hello, world!
+```
 
-By default, Pants will write the package using this scheme: `dist/{path.to.tgt_dir}/{tgt_name}/{platform}/{debug,release}/install/{tgt_name}`. You can change the first part of this path by setting the `output_path` field, although you risk name collisions with other `pyoxidizer_binary` targets in your project. See [pyoxidizer_binary](doc:reference-pyoxidizer_binary) for more info.
+By default, with the `package` goal, Pants will write the package using this scheme: `dist/{path.to.tgt_dir}/{tgt_name}/{platform}/{debug,release}/install/{tgt_name}`. You can change the first part of this path by setting the `output_path` field, although you risk name collisions with other `pyoxidizer_binary` targets in your project. See [pyoxidizer_binary](doc:reference-pyoxidizer_binary) for more info.
 
 > 🚧 `debug` vs `release` builds
 > 
@@ -118,10 +124,6 @@ By default, Pants will write the package using this scheme: `dist/{path.to.tgt_d
 > ```
 > 
 > Or by using the command line flag `./pants --pyoxidizer-args='--release' package path/to:tgt`.
-
-> 📘 `run` support is upcoming
-> 
-> This will allow you to use `./pants run` to directly start your binary, without having to run from `dist/`. See <https://github.com/pantsbuild/pants/pull/14646>.
 
 Advanced use cases
 ------------------
