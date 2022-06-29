@@ -6,12 +6,12 @@ hidden: false
 createdAt: "2020-03-16T16:19:56.071Z"
 updatedAt: "2022-05-12T05:33:10.060Z"
 ---
-Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both. 
+Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
 
 > 👍 Benefit of Pants: runs each file in parallel
-> 
+>
 > Each file gets run as a separate process, which gives you fine-grained caching and better parallelism. Given enough cores, Pants will be able to run all your tests at the same time.
-> 
+>
 > This also gives you fine-grained invalidation. If you run `./pants test ::`, and then you only change one file, then only tests that depended on that changed file will need to rerun.
 
 Examples
@@ -25,10 +25,10 @@ Examples
 ❯ ./pants test helloworld/util:
 
 # Run just the tests in this file.
-❯ ./pants test helloworld/util/lang_test.py  
+❯ ./pants test helloworld/util/lang_test.py
 
  # Run just one test.
-❯ ./pants test helloworld/util/lang_test.py -- -k test_language_translator 
+❯ ./pants test helloworld/util/lang_test.py -- -k test_language_translator
 ```
 
 Pytest version and plugins
@@ -60,15 +60,15 @@ python_requirements(name="reqs")
 ```python helloworld/util/BUILD
 python_tests(
    name="tests",
-   # Normally, Pants infers dependencies based on imports. 
-   # Here, we don't actually import our plugin, though, so 
+   # Normally, Pants infers dependencies based on imports.
+   # Here, we don't actually import our plugin, though, so
    # we need to explicitly list it.
    dependencies=["//:reqs#pytest-django"],
 )
 ```
 
 > 🚧 Avoid the `pytest-xdist` plugin
-> 
+>
 > We do not recommend using this plugin because its concurrency conflicts with Pants' own parallelism. Using Pants will bring you similar benefits to `pytest-xdist` already: Pants will run each test target in parallel.
 
 Controlling output
@@ -84,17 +84,17 @@ output = "all"
 ```
 
 > 📘 Tip: Use Pytest options to make output more or less verbose
-> 
+>
 > See ["Passing arguments to Pytest"](doc:test#passing-arguments-to-pytest).
-> 
+>
 > For example:
-> 
+>
 > ```bash
 > ❯ ./pants test project/app_test.py -- -q
 > ```
-> 
+>
 > You may want to permanently set the Pytest option `--no-header` to avoid printing the Pytest version for each test run:
-> 
+>
 > ```toml
 > [pytest]
 > args = ["--no-header"]
@@ -117,15 +117,15 @@ args = ["-vv"]
 ```
 
 > 📘 Tip: some useful Pytest arguments
-> 
+>
 > See <https://docs.pytest.org/en/latest/usage.html> for more information.
-> 
+>
 > - `-k expression`: only run tests matching the expression.
 > - `-v`: verbose mode.
 > - `-s`: always print the stdout and stderr of your code, even if a test passes.
 
 > 🚧 How to use Pytest's `--pdb` option
-> 
+>
 > You must run `./pants test --debug` for this to work properly. See the section "Running tests interactively" for more information.
 
 Config files
@@ -136,7 +136,7 @@ Pants will automatically include any relevant config files in the process's sand
 `conftest.py`
 -------------
 
-Pytest uses [`conftest.py` files](https://docs.pytest.org/en/stable/fixture.html#conftest-py-sharing-fixture-functions) to share fixtures and config across multiple distinct test files. 
+Pytest uses [`conftest.py` files](https://docs.pytest.org/en/stable/fixture.html#conftest-py-sharing-fixture-functions) to share fixtures and config across multiple distinct test files.
 
 The default `sources` value for the `python_test_utils` target includes `conftest.py`. You can run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automatically add this target:
 
@@ -155,7 +155,7 @@ Setting environment variables
 
 Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
-To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `python_test` / `python_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic. 
+To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `python_test` / `python_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
 With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
 
@@ -166,7 +166,7 @@ extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
 ```python project/BUILD
 python_tests(
     name="tests",
-    # Adds to all generated `python_test` targets, 
+    # Adds to all generated `python_test` targets,
     # i.e. each file in the `sources` field.
     extra_env_vars=["VAR3", "VAR4=hardcoded"],
     # Even better, use `overrides` to be more granular.
@@ -185,7 +185,7 @@ To force your tests to run again, rather than reading from the cache, run `./pan
 Running tests interactively
 ---------------------------
 
-Because Pants runs multiple test targets in parallel, you will not see your test results appear on the screen until the test has completely finished. This means that you cannot use debuggers normally; the breakpoint will never show up on your screen and the test will hang indefinitely (or timeout, if timeouts are enabled). 
+Because Pants runs multiple test targets in parallel, you will not see your test results appear on the screen until the test has completely finished. This means that you cannot use debuggers normally; the breakpoint will never show up on your screen and the test will hang indefinitely (or timeout, if timeouts are enabled).
 
 Instead, if you want to run a test interactively—such as to use a debugger like `pdb`—run your tests with `./pants test --debug`. For example:
 
@@ -214,43 +214,52 @@ test_debug_example.py
 If you use multiple files with `test --debug`, they will run sequentially rather than in parallel.
 
 > 📘 Tip: using `ipdb` in tests
-> 
+>
 > [`ipdb`](https://github.com/gotcha/ipdb) integrates IPython with the normal `pdb` debugger for enhanced features like autocomplete and improved syntax highlighting. `ipdb` is very helpful when debugging tests.
-> 
+>
 > To be able to access `ipdb` when running tests, add this to your `pants.toml`:
-> 
+>
 > ```toml
 > [pytest]
 > extra_requirements.add = ["ipdb"]
 > ```
-> 
+>
 > Then, you can use `import ipdb; ipdb.set_trace()` in your tests.
-> 
-> To run the tests you will need to add `-- -s` to the test call since ipdb will need stdin and pytest will capture it. 
-> 
+>
+> To run the tests you will need to add `-- -s` to the test call since ipdb will need stdin and pytest will capture it.
+>
 > ```bash
 > ❯ ./pants test --debug  <target>   -- -s
 > ```
 
+> 📘 Tip: using the VS Code (or any [DAP](https://microsoft.github.io/debug-adapter-protocol/)-compliant editor) remote debugger in tests
+>
+>
+> 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
+> 2. Run your test with `./pants test --debug-adapter`.
+> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
+
+> Run your test with `./pants test --debug` as usual.
+
 > 📘 Tip: using the IntelliJ/PyCharm remote debugger in tests
-> 
+>
 > First, add this to your `pants.toml`:
-> 
+>
 > ```toml
 > [pytest]
 > extra_requirements.add = ["pydevd-pycharm==203.5419.8"]  # Or whatever version you choose.
 > ```
-> 
+>
 > Now, use the remote debugger as usual:
-> 
+>
 > 1. Start a Python remote debugging session in PyCharm, say on port 5000.
 > 2. Add the following code at the point where you want execution to pause and connect to the debugger:
-> 
+>
 > ```python
 > import pydevd_pycharm
 > pydevd_pycharm.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)
 > ```
-> 
+>
 > Run your test with `./pants test --debug` as usual.
 
 Timeouts
@@ -287,9 +296,9 @@ timeout_maximum = 600
 If a target sets its `timeout` higher than `[pytest].timeout_maximum`, Pants will use the value in `[pytest].timeout_maximum`.
 
 > 📘 Tip: temporarily ignoring timeouts
-> 
+>
 > When debugging locally, such as with `pdb`, you might want to temporarily disable timeouts. To do this, set `--no-pytest-timeouts`:
-> 
+>
 > ```bash
 > $ ./pants test project/app_test.py --no-pytest-timeouts
 > ```
@@ -299,18 +308,18 @@ Test utilities and resources
 
 ### Test utilities
 
-Use the target type `python_source` for test utilities, rather than `python_test`. 
+Use the target type `python_source` for test utilities, rather than `python_test`.
 
 To reduce boilerplate, you can use either the [`python_sources`](doc:reference-python_sources) or [`python_test_utils`](doc:reference-python_test_utils) targets to generate `python_source` targets. These behave the same, except that `python_test_utils` has a different default `sources` to include `conftest.py` and type stubs for tests (like `test_foo.pyi`). Use [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate both these targets automatically.
 
 For example:
 
 ```python helloworld/BUILD
-# The default `sources` includes all files other than 
+# The default `sources` includes all files other than
 # `!*_test.py`, `!test_*.py`, and `tests.py`, and `conftest.py`.
 python_sources(name="lib")
 
-# We leave off the `dependencies` field because Pants will infer 
+# We leave off the `dependencies` field because Pants will infer
 # it based on import statements.
 python_tests(name="tests")
 ```
@@ -335,7 +344,7 @@ def test_app() -> None:
 
 Refer to [Assets](doc:assets) for how to include asset files in your tests by adding to the `dependencies` field.
 
-It's often most convenient to use  `file` / `files` and `relocated_files` targets in your test code, although you can also use `resource` / `resources` targets.  
+It's often most convenient to use  `file` / `files` and `relocated_files` targets in your test code, although you can also use `resource` / `resources` targets.
 
 Testing your packaging pipeline
 -------------------------------
@@ -389,27 +398,27 @@ use_coverage = true
 ```
 
 > 🚧 Failure to parse files?
-> 
+>
 > Coverage defaults to running with Python 3.6+ when generating a report, which means it may fail to parse Python 2 syntax and Python 3.8+ syntax. You can fix this by changing the interpreter constraints for running Coverage:
-> 
+>
 > ```toml
 > # pants.toml
 > [coverage-py]
 > interpreter_constraints = [">=3.8"]
 > ```
-> 
+>
 > However, if your repository has some Python 2-only code and some Python 3-only code, you will not be able to choose an interpreter that works with both versions. So, you will need to set up a `.coveragerc` config file and set `ignore_errors = True` under `[report]`, like this:
-> 
+>
 > ```
 > # .coveragerc
 > [report]
 > ignore_errors = True
 > ```
-> 
+>
 > `ignore_errors = True` means that those files will simply be left off of the final coverage report.
-> 
+>
 > (Pants should autodiscover the config file `.coveragerc`. See [coverage-py](https://www.pantsbuild.org/docs/reference-coverage-py#section-config-discovery).)
-> 
+>
 > There's a proposal for Pants to fix this by generating multiple reports when necessary: <https://github.com/pantsbuild/pants/issues/11137>. We'd appreciate your feedback.
 
 Coverage will report data on any files encountered during the tests. You can filter down the results by using the option `--coverage-py-filter` and passing the name(s) of modules you want coverage data for. Each module name is recursive, meaning submodules will be included. For example:
@@ -420,18 +429,18 @@ Coverage will report data on any files encountered during the tests. You can fil
 ```
 
 > 📘 Set `global_report` to include un-encountered files
-> 
+>
 > By default, coverage.py will only report on files encountered during the tests' run. This means
 > that your coverage score may be misleading; even with a score of 100%, you may have files
 > without any tests.
-> 
+>
 > Instead, you can set `global_report = true`:
-> 
+>
 > ```toml pants.toml
 > [coverage-py]
 > global_report = true
 > ```
-> 
+>
 > Coverage.py will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html),
 > i.e. files at the root of the tree, or in directories with a `__init__.py` file. It may still omit
 > files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `__init__.py` files.
