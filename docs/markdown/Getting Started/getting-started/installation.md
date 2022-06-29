@@ -10,10 +10,10 @@ Creating the launch script
 
 Pants is invoked via a launch script named `./pants` , saved at the root of the repository. This script will install Pants and handle upgrades.
 
-First, set up a minimal `pants.toml` config file to instruct the script to download the latest 2.11 release:
+First, set up a minimal `pants.toml` config file to instruct the script to download the latest 2.12 release:
 
 ```bash
-printf '[GLOBAL]\npants_version = "2.11.0"\n' > pants.toml
+printf '[GLOBAL]\npants_version = "2.12.0"\n' > pants.toml
 ```
 
 Then, download the script:
