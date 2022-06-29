@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import textwrap
-from typing import List
+from typing import List, NewType
 
 import pytest
 
@@ -9,14 +9,36 @@ from pants.backend.terraform import style, tool
 from pants.backend.terraform.lint.tffmt import tffmt
 from pants.backend.terraform.lint.tffmt.tffmt import TffmtRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
+from pants.backend.terraform.tool import TerraformTool
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules.external_tool import ExternalToolVersion
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+RuleRunnerOptions = NewType("RuleRunnerOptions", List[str])
+
+
+tf_versions = ["1.0.7", "1.2.3"]
+tf_versions = list(
+    {ExternalToolVersion.decode(v).version for v in TerraformTool.default_known_versions}
+)  # uncomment to run against *all* terraform versions
+
+
+@pytest.fixture(params=tf_versions)
+def rule_runner_options(request) -> RuleRunnerOptions:
+    tf_version = request.param
+    return RuleRunnerOptions(
+        [
+            "--backend-packages=pants.backend.experimental.terraform",
+            "--backend-packages=pants.backend.experimental.terraform.lint.tffmt",
+            f"--download-terraform-version={tf_version}",
+        ]
+    )
 
 
 @pytest.fixture()
@@ -92,16 +114,9 @@ def make_target(
 def run_tffmt(
     rule_runner: RuleRunner,
     targets: List[Target],
-    *,
-    skip: bool = False,
+    options: RuleRunnerOptions,
 ) -> FmtResult:
-    args = [
-        "--backend-packages=pants.backend.experimental.terraform",
-        "--backend-packages=pants.backend.experimental.terraform.lint.tffmt",
-    ]
-    if skip:
-        args.append("--terraform-fmt-skip")
-    rule_runner.set_options(args)
+    rule_runner.set_options(options)
     field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     input_sources = rule_runner.request(
         SourceFiles,
@@ -127,17 +142,17 @@ def get_snapshot(rule_runner: RuleRunner, source_files: List[FileContent]) -> Sn
     return rule_runner.request(Snapshot, [digest])
 
 
-def test_passing_source(rule_runner: RuleRunner) -> None:
+def test_passing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE])
-    fmt_result = run_tffmt(rule_runner, [target])
+    fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
 
 
-def test_failing_source(rule_runner: RuleRunner) -> None:
+def test_failing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    fmt_result = run_tffmt(rule_runner, [target])
+    fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
     contents = get_content(rule_runner, fmt_result.output.digest)
     print(f">>>{contents[0].content.decode()}<<<")
     assert fmt_result.stderr == ""
@@ -145,25 +160,28 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_mixed_sources(rule_runner: RuleRunner) -> None:
+def test_mixed_sources(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
-    fmt_result = run_tffmt(rule_runner, [target])
+    fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     targets = [
         make_target(rule_runner, [GOOD_SOURCE], target_name="tgt_good"),
         make_target(rule_runner, [BAD_SOURCE], target_name="tgt_bad"),
     ]
-    fmt_result = run_tffmt(rule_runner, targets)
+    fmt_result = run_tffmt(rule_runner, targets, rule_runner_options)
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
-    fmt_result = run_tffmt(rule_runner, [target], skip=True)
+
+    rule_runner_options.append("--terraform-fmt-skip")  # skips running terraform
+
+    fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False
