@@ -43,7 +43,9 @@ class GPGVerifier:
 
     def __init__(self, keydata):
         self.gpg = gnupg.GPG(gnupghome=".")
-        self.gpg.import_keys(keydata)  # TODO: handle import error
+        import_results = self.gpg.import_keys(keydata)
+        if not self.check_import_results(import_results):
+            raise ValueError(f"Could not import GPG key, stderr: {import_results.stderr}")
 
     def validate_signature(self, signatures: bytes, content: bytes) -> gnupg.Verify:
         """Verify GPG signature from the common pattern of a file for the signature and a file for
@@ -53,6 +55,16 @@ class GPGVerifier:
             signature_file.flush()
             verify = self.gpg.verify_data(signature_file.name, content)
         return verify
+
+    @staticmethod
+    def check_import_results(import_results: gnupg.ImportResult):
+        """Check that our import of the key was successful.
+
+        Looks the import results for one which has an "ok" status. We can't use the number of keys
+        imported because a re-import of a key results in 0 keys imported.
+        """
+        has_ok = any(("ok" in r for r in import_results.results))
+        return has_ok
 
 
 @dataclass(frozen=True)
