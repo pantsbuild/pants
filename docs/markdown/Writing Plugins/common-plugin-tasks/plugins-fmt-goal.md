@@ -22,7 +22,7 @@ You will also likely want to register some options, like `--config`, `--skip`, a
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class Shfmt(ExternalTool):
