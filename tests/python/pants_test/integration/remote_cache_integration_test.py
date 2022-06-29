@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import time
 
-from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, FileEntry
+from pants.core.util_rules import distdir
+from pants.core.util_rules.distdir import DistDir
+from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, FileEntry, Workspace
+from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PyExecutor, PyStubCAS
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, rule
+from pants.engine.rules import Get, SubsystemRule, goal_rule, rule
 from pants.option.global_options import RemoteCacheWarningsBehavior
 from pants.testutil.pants_integration_test import run_pants
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 
 
@@ -99,8 +102,8 @@ async def entries_from_process(process_result: ProcessResult) -> ProcessOutputEn
     return ProcessOutputEntries(await Get(DigestEntries, Digest, process_result.output_digest))
 
 
-@logging
-def test_lazy_fetch_backtracking() -> None:
+def test_async_backtracking() -> None:
+    """Tests that we backtrack when a MissingDigest error occurs at a `@rule` (async) boundary."""
     executor = PyExecutor(core_threads=2, max_threads=4)
     cas = PyStubCAS.builder().build(executor)
 
@@ -145,6 +148,75 @@ def test_lazy_fetch_backtracking() -> None:
     assert cas.remove(file_digest1)
     file_digest2, metrics2 = run()
     assert file_digest1 == file_digest2
+    # Validate both that we hit the cache, and that we backtracked to actually run the process.
+    assert metrics2["remote_cache_requests"] == 1
+    assert metrics2["remote_cache_requests_cached"] == 1
+    assert metrics2["backtrack_attempts"] == 1
+
+
+class MockRunSubsystem(GoalSubsystem):
+    name = "mock-run"
+    help = "Run a simple process and write its output to the dist dir."
+
+
+class MockRun(Goal):
+    subsystem_cls = MockRunSubsystem
+
+
+@goal_rule
+async def mock_run(workspace: Workspace, dist_dir: DistDir, mock_run: MockRunSubsystem) -> MockRun:
+    result = await Get(
+        ProcessResult,
+        Process(
+            ["/bin/bash", "-c", "sleep 1 ; echo content > file.txt"],
+            description="Create file.txt",
+            output_files=["file.txt"],
+            level=LogLevel.INFO,
+        ),
+    )
+    workspace.write_digest(
+        result.output_digest,
+        path_prefix=str(dist_dir.relpath),
+        side_effecting=False,
+    )
+    return MockRun(exit_code=0)
+
+
+def test_sync_backtracking() -> None:
+    """Tests that we backtrack when a MissingDigest error occurs synchronously (in write_digest)."""
+    executor = PyExecutor(core_threads=2, max_threads=4)
+    cas = PyStubCAS.builder().build(executor)
+
+    def run() -> dict[str, int]:
+        # Use an isolated store to ensure that the only content is in the remote/stub cache.
+        rule_runner = RuleRunner(
+            rules=[mock_run, *distdir.rules(), SubsystemRule(MockRunSubsystem)],
+            isolated_local_store=True,
+            bootstrap_args=[
+                "--no-remote-cache-eager-fetch",
+                "--no-local-cache",
+                *remote_cache_args(cas.address),
+            ],
+        )
+        result = rule_runner.run_goal_rule(MockRun, args=[])
+        assert result.exit_code == 0
+
+        # Wait for any async cache writes to complete.
+        time.sleep(1)
+        return rule_runner.scheduler.get_metrics()
+
+    # Run once to populate the remote cache, and validate that there is one entry afterwards.
+    assert cas.action_cache_len() == 0
+    metrics1 = run()
+    assert cas.action_cache_len() == 1
+    assert metrics1["remote_cache_requests"] == 1
+    assert metrics1["remote_cache_requests_uncached"] == 1
+
+    # Then, remove the content from the remote store and run again.
+    assert cas.remove(
+        FileDigest("434728a410a78f56fc1b5899c3593436e61ab0c731e9072d95e96db290205e53", 8)
+    )
+    metrics2 = run()
     # Validate both that we hit the cache, and that we backtracked to actually run the process.
     assert metrics2["remote_cache_requests"] == 1
     assert metrics2["remote_cache_requests_cached"] == 1
