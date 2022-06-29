@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
-use crate::python::Failure;
+use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
@@ -720,7 +720,11 @@ impl Context {
 
     if candidate_roots.is_empty() {
       // We did not identify any roots to invalidate: allow the Node to fail.
-      return result;
+      return result.map_err(|e| {
+        throw(format!(
+          "Could not identify a process to backtrack to for: {e}"
+        ))
+      });
     }
 
     // Attempt to trigger backtrack attempts for the matched Nodes. It's possible that we are not

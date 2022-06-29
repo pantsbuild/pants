@@ -479,7 +479,7 @@ impl fmt::Display for Failure {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
       Failure::MissingDigest(s, d) => {
-        write!(f, "Could not recover from missing digest: {s}: {d:?}")
+        write!(f, "Missing digest: {s}: {d:?}")
       }
       Failure::Throw { val, .. } => {
         let repr = Python::with_gil(|py| {
