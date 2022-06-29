@@ -16,7 +16,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
   CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
-  Process, ProcessError
+  Process, ProcessError,
 };
 
 #[cfg(test)]

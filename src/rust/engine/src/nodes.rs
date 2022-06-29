@@ -1621,7 +1621,7 @@ impl Node for NodeKey {
             n.run_wrapped_node(context, workunit)
               .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
               .await
-          },
+          }
           NodeKey::ExecuteProcess(n) => {
             let backtrack_level = context.maybe_start_backtracking(&n);
             n.run_node(context, workunit, backtrack_level)

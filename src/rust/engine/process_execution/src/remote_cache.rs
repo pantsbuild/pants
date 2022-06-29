@@ -24,7 +24,7 @@ use workunit_store::{
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
   CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, Platform, Process,
-  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource
+  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
