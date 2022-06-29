@@ -22,6 +22,7 @@ from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
+    has_python_version,
     skip_unless_python27_and_python3_present,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -187,6 +188,9 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
+@pytest.mark.skipif(
+    not (has_python_version("3.6") or has_python_version("3.7")), reason="Missing requisite Python"
+)
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

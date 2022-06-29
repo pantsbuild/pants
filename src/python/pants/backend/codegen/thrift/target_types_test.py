@@ -12,7 +12,7 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourceTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import SingleSourceField, Tags
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -21,7 +21,7 @@ def test_generate_source_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[ThriftSourcesGeneratorTarget],
     )
@@ -50,7 +50,12 @@ def test_generate_source_targets() -> None:
         )
 
     generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/thrift", target_name="lib")]
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("src/thrift", target_name="lib"), description_of_origin="tests"
+            )
+        ],
     ).parametrizations
     assert set(generated.values()) == {
         gen_tgt("f1.thrift", tags=["overridden"]),

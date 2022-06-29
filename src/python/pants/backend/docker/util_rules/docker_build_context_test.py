@@ -223,6 +223,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="image",
                   repository="upstream/{name}",
+                  image_tags=["1.0"],
                   instructions=["FROM alpine"],
                 )
                 """
@@ -244,12 +245,41 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {
-                "baseimage": "latest",
-                "stage0": "latest",
+                "baseimage": "1.0",
+                "stage0": "1.0",
             },
             "build_args": {
-                "BASE_IMAGE": "upstream/image:latest",
+                "BASE_IMAGE": "upstream/image:1.0",
             },
+        },
+    )
+
+
+def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/image/BUILD": "docker_image()",
+            "test/image/Dockerfile": dedent(
+                """\
+                ARG PYTHON_VERSION="python:3.10.2-slim"
+                FROM $PYTHON_VERSION
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("test/image", target_name="image"),
+        expected_files=["test/image/Dockerfile"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "3.10.2-slim",
+                "stage0": "3.10.2-slim",
+            },
+            # PYTHON_VERSION will be treated like any other build ARG.
+            "build_args": {},
         },
     )
 
@@ -595,12 +625,10 @@ def test_create_docker_build_context() -> None:
             address=Address("test"),
             digest=EMPTY_DIGEST,
             source="test/Dockerfile",
-            from_image_addresses=(),
-            copy_source_paths=(),
-            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
             build_args=DockerBuildArgs.from_strings(),
-            from_image_build_arg_names=(),
-            copy_sources=(),
+            copy_source_paths=(),
+            from_image_build_args=DockerBuildArgs.from_strings(),
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
         ),
     )
     assert list(context.build_args) == ["ARGNAME=value1"]

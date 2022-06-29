@@ -78,7 +78,7 @@ class MyPy(PythonToolBase):
     name = "MyPy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.950"
+    default_version = "mypy==0.961"
     default_main = ConsoleScript("mypy")
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
@@ -172,15 +172,23 @@ class MyPy(PythonToolBase):
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
+        return UnparsedAddressInputs(
+            self._source_plugins,
+            owning_address=None,
+            description_of_origin=f"the option `[{self.options_scope}].source_plugins`",
+        )
 
     def check_and_warn_if_python_version_configured(self, config: FileContent | None) -> bool:
         """Determine if we can dynamically set `--python-version` and warn if not."""
         configured = []
         if config and b"python_version" in config.content:
             configured.append(
-                f"`python_version` in {config.path} (which is used because of either config "
-                "discovery or the `[mypy].config` option)"
+                softwrap(
+                    f"""
+                    `python_version` in {config.path} (which is used because of either config
+                    discovery or the `[mypy].config` option)
+                    """
+                )
             )
         if "--py2" in self.args:
             configured.append("`--py2` in the `--mypy-args` option")
@@ -189,13 +197,18 @@ class MyPy(PythonToolBase):
         if configured:
             formatted_configured = " and you set ".join(configured)
             logger.warning(
-                f"You set {formatted_configured}. Normally, Pants would automatically set this "
-                "for you based on your code's interpreter constraints "
-                f"({doc_url('python-interpreter-compatibility')}). Instead, it will "
-                "use what you set.\n\n"
-                "(Automatically setting the option allows Pants to partition your targets by their "
-                "constraints, so that, for example, you can run MyPy on Python 2-only code and "
-                "Python 3-only code at the same time. This feature may no longer work.)"
+                softwrap(
+                    f"""
+                    You set {formatted_configured}. Normally, Pants would automatically set this
+                    for you based on your code's interpreter constraints
+                    ({doc_url('python-interpreter-compatibility')}). Instead, it will
+                    use what you set.
+
+                    (Automatically setting the option allows Pants to partition your targets by their
+                    constraints, so that, for example, you can run MyPy on Python 2-only code and
+                    Python 3-only code at the same time. This feature may no longer work.)
+                    """
+                )
             )
         return bool(configured)
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
+from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
+from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -21,8 +24,9 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    parse_requirements_file,
 )
-from pants.base.specs import AncestorGlobSpec, Specs
+from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -30,7 +34,7 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
     group_by_dir,
 )
-from pants.engine.fs import DigestContents, PathGlobs, Paths
+from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
@@ -38,6 +42,8 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -94,7 +100,7 @@ async def find_putative_targets(
 
     if python_setup.tailor_source_targets:
         # Find library/test/test_util targets.
-        all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
+        all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
         all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
         unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
         classified_unowned_py_files = classify_source_files(unowned_py_files)
@@ -126,15 +132,28 @@ async def find_putative_targets(
             all_pipenv_lockfile_files,
             all_pyproject_toml_contents,
         ) = await MultiGet(
-            Get(Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")),
-            Get(Paths, PathGlobs, req.search_paths.path_globs("Pipfile.lock")),
-            Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
+            Get(DigestContents, PathGlobs, req.path_globs("*requirements*.txt")),
+            Get(DigestContents, PathGlobs, req.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
         )
 
-        def add_req_targets(files: Iterable[str], alias: str, target_name: str) -> None:
-            unowned_files = set(files) - set(all_owned_sources)
+        def add_req_targets(files: Iterable[FileContent], alias: str, target_name: str) -> None:
+            contents = {i.path: i.content for i in files}
+            unowned_files = set(contents) - set(all_owned_sources)
             for fp in unowned_files:
                 path, name = os.path.split(fp)
+
+                try:
+                    validate(fp, contents[fp], alias)
+                except Exception as e:
+                    logger.warning(
+                        f"An error occurred when validating `{fp}`: {e}.\n\n"
+                        "You'll need to create targets for its contents manually.\n"
+                        "To silence this error in future, see "
+                        "https://www.pantsbuild.org/docs/reference-tailor#section-ignore-paths \n"
+                    )
+                    continue
+
                 pts.append(
                     PutativeTarget(
                         path=path,
@@ -150,10 +169,29 @@ async def find_putative_targets(
                     )
                 )
 
-        add_req_targets(all_requirements_files.files, "python_requirements", "reqs")
-        add_req_targets(all_pipenv_lockfile_files.files, "pipenv_requirements", "pipenv")
+        def validate(path: str, contents: bytes, alias: str) -> None:
+            if alias == "python_requirements":
+                return validate_python_requirements(path, contents)
+            elif alias == "pipenv_requirements":
+                return validate_pipenv_requirements(contents)
+            elif alias == "poetry_requirements":
+                return validate_poetry_requirements(contents)
+
+        def validate_python_requirements(path: str, contents: bytes) -> None:
+            for _ in parse_requirements_file(contents.decode(), rel_path=path):
+                pass
+
+        def validate_pipenv_requirements(contents: bytes) -> None:
+            parse_pipenv_requirements(contents)
+
+        def validate_poetry_requirements(contents: bytes) -> None:
+            p = PyProjectToml(PurePath(), PurePath(), contents.decode())
+            parse_pyproject_toml(p)
+
+        add_req_targets(all_requirements_files, "python_requirements", "reqs")
+        add_req_targets(all_pipenv_lockfile_files, "pipenv_requirements", "pipenv")
         add_req_targets(
-            {fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
+            {fc for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
             "poetry_requirements",
             "poetry",
         )
@@ -163,7 +201,7 @@ async def find_putative_targets(
 
         # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
-        all_main_py = await Get(Paths, PathGlobs, req.search_paths.path_globs("__main__.py"))
+        all_main_py = await Get(Paths, PathGlobs, req.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents
@@ -186,7 +224,10 @@ async def find_putative_targets(
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
         possible_existing_binary_targets = await Get(
             UnexpandedTargets,
-            Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs)),
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs),
+                description_of_origin="the `pex_binary` tailor rule",
+            ),
         )
         possible_existing_binary_entry_points = await MultiGet(
             Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))

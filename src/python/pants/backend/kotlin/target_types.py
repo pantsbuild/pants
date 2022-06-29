@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -16,6 +17,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -90,6 +92,9 @@ class KotlinSourceTarget(Target):
 
 class KotlinSourcesGeneratorSourcesField(KotlinGeneratorSourcesField):
     default = ("*.kt",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.kt', 'New*.kt', '!OldIgnore.kt']`"
+    )
 
 
 class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
@@ -139,6 +144,9 @@ class KotlinJunitTestTarget(Target):
 
 class KotlinJunitTestsGeneratorSourcesField(KotlinGeneratorSourcesField):
     default = ("*Test.kt",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.kt', '!TestIgnore.kt']`"
+    )
 
 
 class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
@@ -164,9 +172,10 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class KotlincPluginArtifactField(StringField):
+class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
+    value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `kotlinc`."
 
 

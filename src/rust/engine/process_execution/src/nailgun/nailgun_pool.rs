@@ -13,16 +13,19 @@ use std::time::{Duration, Instant};
 
 use async_lock::{Mutex, MutexGuardArc};
 use futures::future;
-use hashing::Fingerprint;
 use lazy_static::lazy_static;
 use log::{debug, info};
 use regex::Regex;
+use tempfile::TempDir;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
+use hashing::Fingerprint;
 use store::Store;
 use task_executor::Executor;
-use tempfile::TempDir;
+use workunit_store::{in_workunit, Level};
 
 use crate::local::prepare_workdir;
-use crate::{ImmutableInputs, NamedCaches, Process, ProcessMetadata};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessError, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -52,14 +55,11 @@ pub type Port = u16;
 /// Mutations of the Vec are protected by a Mutex, but each NailgunProcess is also protected by its
 /// own Mutex, which is used to track when the process is in use.
 ///
-/// NB: This pool expects to be used under a semaphore with size equal to the pool size. Because of
-/// this, it never actually waits for a pool entry to complete, and can instead assume that at
-/// least one pool slot is always idle when `acquire` is entered.
-///
 #[derive(Clone)]
 pub struct NailgunPool {
   workdir_base: PathBuf,
   size: usize,
+  sema: Arc<Semaphore>,
   store: Store,
   executor: Executor,
   processes: Arc<Mutex<Vec<PoolEntry>>>,
@@ -70,6 +70,7 @@ impl NailgunPool {
     NailgunPool {
       workdir_base,
       size,
+      sema: Arc::new(Semaphore::new(size)),
       store,
       executor,
       processes: Arc::default(),
@@ -88,23 +89,37 @@ impl NailgunPool {
     server_process: Process,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
-  ) -> Result<BorrowedNailgunProcess, String> {
+  ) -> Result<BorrowedNailgunProcess, ProcessError> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
+    let semaphore_acquisition = self.sema.clone().acquire_owned();
+    let permit = in_workunit!(
+      "acquire_nailgun_process",
+      // TODO: See also `acquire_command_runner_slot` in `bounded::CommandRunner`.
+      // https://github.com/pantsbuild/pants/issues/14680
+      Level::Debug,
+      |workunit| async move {
+        let _blocking_token = workunit.blocking();
+        semaphore_acquisition
+          .await
+          .expect("Semaphore should not have been closed.")
+      }
+    )
+    .await;
+
     let mut process_ref = {
       let mut processes = self.processes.lock().await;
 
       // Start by seeing whether there are any idle processes with a matching fingerprint.
       if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
-        return Ok(BorrowedNailgunProcess::new(process));
+        return Ok(BorrowedNailgunProcess::new(process, permit));
       }
 
       // There wasn't a matching, valid, available process. We need to start one.
       if processes.len() >= self.size {
         // Find the oldest idle non-matching process and remove it.
         let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
-          // NB: See the method docs: the pool assumes that it is running under a semaphore, so this
-          // should be impossible.
+          // NB: We've acquired a semaphore permit, so this should be impossible.
           "No idle slots in nailgun pool.".to_owned()
         })?;
 
@@ -137,7 +152,7 @@ impl NailgunPool {
       .await?,
     );
 
-    Ok(BorrowedNailgunProcess::new(process_ref))
+    Ok(BorrowedNailgunProcess::new(process_ref, permit))
   }
 
   ///
@@ -340,9 +355,9 @@ impl NailgunProcess {
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
-  ) -> Result<NailgunProcess, String> {
+  ) -> Result<NailgunProcess, ProcessError> {
     let workdir = tempfile::Builder::new()
-      .prefix("process-execution")
+      .prefix("pants-sandbox-")
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
@@ -422,12 +437,12 @@ impl NailgunProcessFingerprint {
 /// A wrapper around a NailgunProcess checked out from the pool. If `release` is not called, the
 /// guard assumes cancellation, and kills the underlying process.
 ///
-pub struct BorrowedNailgunProcess(Option<NailgunProcessRef>);
+pub struct BorrowedNailgunProcess(Option<NailgunProcessRef>, OwnedSemaphorePermit);
 
 impl BorrowedNailgunProcess {
-  fn new(process: NailgunProcessRef) -> Self {
+  fn new(process: NailgunProcessRef, permit: OwnedSemaphorePermit) -> Self {
     assert!(process.is_some());
-    Self(Some(process))
+    Self(Some(process), permit)
   }
 
   pub fn name(&self) -> &str {
@@ -492,7 +507,7 @@ async fn clear_workdir(
 ) -> Result<(), String> {
   // Move all content into a temporary directory.
   let garbage_dir = tempfile::Builder::new()
-    .prefix("process-execution")
+    .prefix("pants-sandbox-")
     .tempdir_in(workdir.parent().unwrap())
     .map_err(|err| {
       format!(

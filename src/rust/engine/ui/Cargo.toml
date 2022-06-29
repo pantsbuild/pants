@@ -10,7 +10,7 @@ path = "src/console_ui.rs"
 [dependencies]
 console = "0.15.0"
 futures = "0.3"
-indexmap = "1.8"
+indexmap = "1.9"
 indicatif = "0.16.2"
 logging = { path = "../logging" }
 parking_lot = "0.12"
@@ -19,5 +19,5 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messa
 stdio = { path = "../stdio" }
 terminal_size = "0.1.15"
 task_executor = { path = "../task_executor" }
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.1", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }

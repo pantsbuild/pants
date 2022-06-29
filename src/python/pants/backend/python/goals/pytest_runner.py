@@ -4,15 +4,17 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
@@ -25,12 +27,14 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
     TestResult,
     TestSubsystem,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -54,7 +58,13 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -110,7 +120,9 @@ class AllPytestPluginSetupsRequest:
 async def run_all_setup_plugins(
     request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
 ) -> AllPytestPluginSetups:
-    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    )
     applicable_setup_request_types = tuple(
         request
         for request in union_membership.get(PytestPluginSetupRequest)
@@ -138,6 +150,9 @@ _EXTRA_OUTPUT_DIR = "extra-output"
 class TestSetupRequest:
     field_set: PythonTestFieldSet
     is_debug: bool
+    main: Optional[MainSpecification] = None  # Defaults to pytest.main
+    prepend_argv: Tuple[str, ...] = ()
+    additional_pexes: Tuple[Pex, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -227,9 +242,9 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            main=pytest.main,
+            main=request.main or pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=[*request.additional_pexes, pytest_pex, requirements_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(
@@ -314,7 +329,12 @@ async def setup_pytest_for_target(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=(*pytest.args, *coverage_args, *field_set_source_files.files),
+            argv=(
+                *request.prepend_argv,
+                *pytest.args,
+                *coverage_args,
+                *field_set_source_files.files,
+            ),
             extra_env=extra_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
@@ -375,6 +395,32 @@ async def run_python_test(
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
+    )
+
+
+@rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
+async def debugpy_python_test(
+    field_set: PythonTestFieldSet,
+    debugpy: DebugPy,
+    debug_adapter: DebugAdapterSubsystem,
+    pytest: PyTest,
+) -> TestDebugAdapterRequest:
+    debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
+
+    setup = await Get(
+        TestSetup,
+        TestSetupRequest(
+            field_set,
+            is_debug=True,
+            main=debugpy.main,
+            prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
+            additional_pexes=(debugpy_pex,),
+        ),
+    )
+    return TestDebugAdapterRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
         )

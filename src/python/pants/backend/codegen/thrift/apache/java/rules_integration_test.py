@@ -6,6 +6,10 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.thrift.apache.java.rules import GenerateJavaFromThriftRequest
 from pants.backend.codegen.thrift.apache.java.rules import rules as apache_thrift_java_rules
 from pants.backend.codegen.thrift.apache.rules import rules as apache_thrift_rules
@@ -17,46 +21,28 @@ from pants.backend.codegen.thrift.target_types import (
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.internals import graph
-from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, logging
+from pants.testutil.skip_utils import requires_thrift
 
-LIBTHRIFT_RESOLVE = TestCoursierWrapper.new(
-    entries=(
-        CoursierLockfileEntry(
-            coord=Coordinate(
-                group="org.apache.thrift",
-                artifact="libthrift",
-                version="0.15.0",
-            ),
-            file_name="libthrift-0.15.0.jar",
-            direct_dependencies=Coordinates([]),
-            dependencies=Coordinates([]),
-            file_digest=FileDigest(
-                "e9c47420147cbb87a6df08bc36da04e2be1561967b5ef82d2f3ef9ec090d85d0",
-                305670,
-            ),
-        ),
-        # Note: The transitive dependencies of libthrift have been intentionally omitted from this resolve.
-    ),
-).serialize(
-    [
-        ArtifactRequirement(
-            Coordinate(
-                group="org.apache.thrift",
-                artifact="libthrift",
-                version="0.15.0",
-            )
-        )
-    ]
-)
+
+@pytest.fixture
+def libthrift_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "libthrift.test.lock",
+        ["org.apache.thrift:libthrift:0.15.0"],
+    )
+
+
+@pytest.fixture
+def libthrift_lockfile(
+    libthrift_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return libthrift_lockfile_def.load(request)
 
 
 @pytest.fixture
@@ -100,7 +86,8 @@ def assert_files_generated(
 
 
 @logging
-def test_generates_python(rule_runner: RuleRunner) -> None:
+@requires_thrift
+def test_generates_python(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Thrift files can import other thrift files, and those can import others
@@ -148,18 +135,8 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 """
             ),
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
-            "3rdparty/jvm/default.lock": LIBTHRIFT_RESOLVE,
-            "3rdparty/BUILD": dedent(
-                """\
-                jvm_artifact(
-                  name="org.apache.thrift_libthrift",
-                  group="org.apache.thrift",
-                  artifact="libthrift",
-                  version="0.15.0",
-                  resolve="jvm-default",
-                )
-                """
-            ),
+            "3rdparty/jvm/default.lock": libthrift_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": libthrift_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
 

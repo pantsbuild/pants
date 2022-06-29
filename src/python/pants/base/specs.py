@@ -41,7 +41,11 @@ class AddressLiteralSpec(Spec):
     def __str__(self) -> str:
         tgt = f":{self.target_component}" if self.target_component else ""
         generated = f"#{self.generated_component}" if self.generated_component else ""
-        return f"{self.path_component}{tgt}{generated}"
+        params = ""
+        if self.parameters:
+            rhs = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+            params = f"@{rhs}"
+        return f"{self.path_component}{tgt}{generated}{params}"
 
     @property
     def is_directory_shorthand(self) -> bool:
@@ -200,7 +204,10 @@ class AncestorGlobSpec(Spec):
 
 
 def _create_path_globs(
-    globs: Iterable[str], unmatched_glob_behavior: GlobMatchErrorBehavior
+    globs: Iterable[str],
+    unmatched_glob_behavior: GlobMatchErrorBehavior,
+    *,
+    description_of_origin: str,
 ) -> PathGlobs:
     return PathGlobs(
         globs=globs,
@@ -208,13 +215,26 @@ def _create_path_globs(
         # We validate that _every_ glob is valid.
         conjunction=GlobExpansionConjunction.all_match,
         description_of_origin=(
-            None if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore else "CLI arguments"
+            None
+            if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
+            else description_of_origin
         ),
     )
 
 
 @dataclass(frozen=True)
-class Specs:
+class RawSpecs:
+    """Convert the specs into matching targets and files.
+
+    Unlike `Specs`, this does not consider include vs. ignore specs. It simply matches all relevant
+    targets/files.
+
+    When you want to operate on what the user specified, use `Specs`. Otherwise, you can use
+    either `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
+    """
+
+    description_of_origin: str
+
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
@@ -232,11 +252,12 @@ class Specs:
         cls,
         specs: Iterable[Spec],
         *,
+        description_of_origin: str,
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
         filter_by_global_options: bool = False,
         from_change_detection: bool = False,
-    ) -> Specs:
+    ) -> RawSpecs:
         """Create from a heterogeneous iterable of Spec objects.
 
         If the `Spec` objects are already separated by type, prefer using the class's constructor
@@ -269,14 +290,15 @@ class Specs:
                 ancestor_globs.append(spec)
             else:
                 raise AssertionError(f"Unexpected type of Spec: {repr(spec)}")
-        return Specs(
-            tuple(address_literals),
-            tuple(file_literals),
-            tuple(file_globs),
-            tuple(dir_literals),
-            tuple(dir_globs),
-            tuple(recursive_globs),
-            tuple(ancestor_globs),
+        return RawSpecs(
+            address_literals=tuple(address_literals),
+            file_literals=tuple(file_literals),
+            file_globs=tuple(file_globs),
+            dir_literals=tuple(dir_literals),
+            dir_globs=tuple(dir_globs),
+            recursive_globs=tuple(recursive_globs),
+            ancestor_globs=tuple(ancestor_globs),
+            description_of_origin=description_of_origin,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=filter_by_global_options,
             from_change_detection=from_change_detection,
@@ -293,27 +315,7 @@ class Specs:
             or self.ancestor_globs
         )
 
-    def arguments_provided_description(self) -> str | None:
-        """A description of what the user specified, e.g. 'target arguments'."""
-        specs_descriptions = []
-        if self.address_literals:
-            specs_descriptions.append("target")
-        if self.file_literals or self.file_globs:
-            specs_descriptions.append("file")
-        if self.dir_literals:
-            specs_descriptions.append("directory")
-        if self.dir_globs or self.recursive_globs or self.ancestor_globs:
-            specs_descriptions.append("glob")
-
-        if not specs_descriptions:
-            return None
-        if len(specs_descriptions) == 1:
-            return f"{specs_descriptions[0]} arguments"
-        if len(specs_descriptions) == 2:
-            return " and ".join(specs_descriptions) + " arguments"
-        return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
-
-    def to_specs_snapshot_path_globs(self) -> PathGlobs:
+    def to_specs_paths_path_globs(self) -> PathGlobs:
         """`PathGlobs` to find all files from the specs, independent of targets."""
         relevant_specs: Iterable[
             FileLiteralSpec | FileGlobSpec | DirLiteralSpec | DirGlobSpec | RecursiveGlobSpec
@@ -325,17 +327,25 @@ class Specs:
             *self.recursive_globs,
         )
         return _create_path_globs(
-            (spec.to_glob() for spec in relevant_specs), self.unmatched_glob_behavior
+            (spec.to_glob() for spec in relevant_specs),
+            (
+                GlobMatchErrorBehavior.ignore
+                if self.from_change_detection
+                else self.unmatched_glob_behavior
+            ),
+            description_of_origin=self.description_of_origin,
         )
 
 
 @dataclass(frozen=True)
-class SpecsWithoutFileOwners:
-    """The subset of `Specs` that do not use the `Owners` rule to match targets.
+class RawSpecsWithoutFileOwners:
+    """The subset of `RawSpecs` that do not use the `Owners` rule to match targets.
 
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, Specs)`, which will result in this rule being used.
+    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
+
+    description_of_origin: str
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     dir_literals: tuple[DirLiteralSpec, ...] = ()
@@ -347,13 +357,14 @@ class SpecsWithoutFileOwners:
     filter_by_global_options: bool = False
 
     @classmethod
-    def from_specs(cls, specs: Specs) -> SpecsWithoutFileOwners:
-        return SpecsWithoutFileOwners(
-            specs.address_literals,
-            specs.dir_literals,
-            specs.dir_globs,
-            specs.recursive_globs,
-            specs.ancestor_globs,
+    def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithoutFileOwners:
+        return RawSpecsWithoutFileOwners(
+            address_literals=specs.address_literals,
+            dir_literals=specs.dir_literals,
+            dir_globs=specs.dir_globs,
+            recursive_globs=specs.recursive_globs,
+            ancestor_globs=specs.ancestor_globs,
+            description_of_origin=specs.description_of_origin,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,
             filter_by_global_options=specs.filter_by_global_options,
         )
@@ -404,18 +415,24 @@ class SpecsWithoutFileOwners:
         validation_path_globs = (
             PathGlobs(())
             if self.unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
-            else _create_path_globs((*validation_includes, *ignores), self.unmatched_glob_behavior)
+            else _create_path_globs(
+                (*validation_includes, *ignores),
+                self.unmatched_glob_behavior,
+                description_of_origin=self.description_of_origin,
+            )
         )
         return build_path_globs, validation_path_globs
 
 
 @dataclass(frozen=True)
-class SpecsWithOnlyFileOwners:
-    """The subset of `Specs` that require using the `Owners` rule to match targets.
+class RawSpecsWithOnlyFileOwners:
+    """The subset of `RawSpecs` that require using the `Owners` rule to match targets.
 
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, Specs)`, which will result in this rule being used.
+    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
+
+    description_of_origin: str
 
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
@@ -425,10 +442,11 @@ class SpecsWithOnlyFileOwners:
     from_change_detection: bool = False
 
     @classmethod
-    def from_specs(cls, specs: Specs) -> SpecsWithOnlyFileOwners:
-        return SpecsWithOnlyFileOwners(
-            specs.file_literals,
-            specs.file_globs,
+    def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithOnlyFileOwners:
+        return RawSpecsWithOnlyFileOwners(
+            description_of_origin=specs.description_of_origin,
+            file_literals=specs.file_literals,
+            file_globs=specs.file_globs,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,
             filter_by_global_options=specs.filter_by_global_options,
             from_change_detection=specs.from_change_detection,
@@ -441,7 +459,11 @@ class SpecsWithOnlyFileOwners:
             if self.from_change_detection
             else self.unmatched_glob_behavior
         )
-        return _create_path_globs((spec.to_glob(),), unmatched_glob_behavior)
+        return _create_path_globs(
+            (spec.to_glob(),),
+            unmatched_glob_behavior,
+            description_of_origin=self.description_of_origin,
+        )
 
     def all_specs(self) -> Iterator[FileLiteralSpec | FileGlobSpec]:
         yield from self.file_literals
@@ -449,3 +471,59 @@ class SpecsWithOnlyFileOwners:
 
     def __bool__(self) -> bool:
         return bool(self.file_literals or self.file_globs)
+
+
+@dataclass(frozen=True)
+class Specs:
+    """The specs provided by the user for what to run on.
+
+    The `ignores` will filter out all relevant `includes`.
+
+    If your rule does not need to consider includes vs. ignores, e.g. to find all targets in a
+    directory,  you can directly use `RawSpecs`.
+    """
+
+    includes: RawSpecs
+    ignores: RawSpecs
+
+    def __bool__(self) -> bool:
+        return bool(self.includes) or bool(self.ignores)
+
+    @classmethod
+    def empty(self) -> Specs:
+        return Specs(
+            RawSpecs(description_of_origin="<not used>"),
+            RawSpecs(description_of_origin="<not used>"),
+        )
+
+    def arguments_provided_description(self) -> str | None:
+        """A description of what the user specified, e.g. 'target arguments'."""
+        specs_descriptions = []
+        if self.includes.address_literals or self.ignores.address_literals:
+            specs_descriptions.append("target")
+        if (
+            self.includes.file_literals
+            or self.includes.file_globs
+            or self.ignores.file_literals
+            or self.ignores.file_globs
+        ):
+            specs_descriptions.append("file")
+        if self.includes.dir_literals or self.ignores.dir_literals:
+            specs_descriptions.append("directory")
+        if (
+            self.includes.dir_globs
+            or self.includes.recursive_globs
+            or self.includes.ancestor_globs
+            or self.ignores.dir_globs
+            or self.ignores.recursive_globs
+            or self.ignores.ancestor_globs
+        ):
+            specs_descriptions.append("glob")
+
+        if not specs_descriptions:
+            return None
+        if len(specs_descriptions) == 1:
+            return f"{specs_descriptions[0]} arguments"
+        if len(specs_descriptions) == 2:
+            return " and ".join(specs_descriptions) + " arguments"
+        return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"

@@ -9,8 +9,10 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.subsystems.scalac import Scalac
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
-from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -24,12 +26,15 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -65,9 +70,25 @@ class ScalaImport:
 
 
 @dataclass(frozen=True)
+class ScalaProvidedSymbol:
+    name: str
+    recursive: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], recursive=data["recursive"])
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "recursive": self.recursive,
+        }
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    provided_symbols: FrozenOrderedSet[str]
-    provided_symbols_encoded: FrozenOrderedSet[str]
+    provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
+    provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
     scopes: FrozenOrderedSet[str]
@@ -123,8 +144,12 @@ class ScalaSourceDependencyAnalysis:
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            provided_symbols=FrozenOrderedSet(d["providedSymbols"]),
-            provided_symbols_encoded=FrozenOrderedSet(d["providedSymbolsEncoded"]),
+            provided_symbols=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbols"]
+            ),
+            provided_symbols_encoded=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbolsEncoded"]
+            ),
             imports_by_scope=FrozenDict(
                 {
                     key: tuple(ScalaImport.from_json_dict(v) for v in values)
@@ -142,8 +167,10 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_symbols": list(self.provided_symbols),
-            "provided_symbols_encoded": list(self.provided_symbols_encoded),
+            "provided_symbols": [v.to_debug_json_dict() for v in self.provided_symbols],
+            "provided_symbols_encoded": [
+                v.to_debug_json_dict() for v in self.provided_symbols_encoded
+            ],
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()
@@ -164,12 +191,45 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
     pass
 
 
+@dataclass(frozen=True)
+class AnalyzeScalaSourceRequest:
+    source_files: SourceFiles
+    scala_version: str
+    source3: bool
+
+
+@rule(level=LogLevel.DEBUG)
+async def create_analyze_scala_source_request(
+    scala_subsystem: ScalaSubsystem, jvm: JvmSubsystem, scalac: Scalac, request: SourceFilesRequest
+) -> AnalyzeScalaSourceRequest:
+    address = request.sources_fields[0].address
+
+    wrapped_tgt, source_files = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                address, description_of_origin="<the Scala analyze request setup rule>"
+            ),
+        ),
+        Get(SourceFiles, SourceFilesRequest, request),
+    )
+
+    tgt = wrapped_tgt.target
+    resolve = tgt[JvmResolveField].normalized_value(jvm)
+    scala_version = scala_subsystem.version_for_resolve(resolve)
+    source3 = "-Xsource:3" in scalac.args
+
+    return AnalyzeScalaSourceRequest(source_files, scala_version, source3)
+
+
 @rule(level=LogLevel.DEBUG)
 async def analyze_scala_source_dependencies(
     jdk: InternalJdk,
     processor_classfiles: ScalaParserCompiledClassfiles,
-    source_files: SourceFiles,
+    request: AnalyzeScalaSourceRequest,
 ) -> FallibleScalaSourceDependencyAnalysisResult:
+    source_files = request.source_files
+
     if len(source_files.files) > 1:
         raise ValueError(
             f"analyze_scala_source_dependencies expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
@@ -214,6 +274,8 @@ async def analyze_scala_source_dependencies(
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
+                request.scala_version,
+                str(request.source3),
             ],
             input_digest=prefixed_source_files_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,

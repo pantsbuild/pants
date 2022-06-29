@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -20,6 +20,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
@@ -69,6 +70,13 @@ class RunRequest:
         self.extra_env = FrozenDict(extra_env or {})
 
 
+class RunDebugAdapterRequest(RunRequest):
+    """Like RunRequest, but launches the process using the relevant Debug Adapter server.
+
+    The process should be launched waiting for the client to connect.
+    """
+
+
 class RunSubsystem(GoalSubsystem):
     name = "run"
     help = softwrap(
@@ -96,8 +104,30 @@ class RunSubsystem(GoalSubsystem):
     cleanup = BoolOption(
         "--cleanup",
         default=True,
-        help="Whether to clean up the temporary directory in which the binary is chrooted. "
-        "Set to false to retain the directory, e.g., for debugging.",
+        help=softwrap(
+            """
+            Whether to clean up the temporary directory in which the binary is chrooted.
+            Set this to false to retain the directory, e.g., for debugging.
+
+            Note that setting the global --process-cleanup option to false will also conserve
+            this directory, along with those of all other processes that Pants executes.
+            This option is more selective and controls just the target binary's directory.
+            """
+        ),
+    )
+    # See also `test.py`'s same option
+    debug_adapter = BoolOption(
+        "--debug-adapter",
+        default=False,
+        help=softwrap(
+            """
+            Run the interactive process using a Debug Adapter
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
+
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
+            """
+        ),
     )
 
 
@@ -108,6 +138,7 @@ class Run(Goal):
 @goal_rule
 async def run(
     run_subsystem: RunSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
@@ -123,14 +154,20 @@ async def run(
         ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, RunFieldSet, field_set)
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
+    request = await (
+        Get(RunRequest, RunFieldSet, field_set)
+        if not run_subsystem.debug_adapter
+        else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
+    )
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
+    )
     restartable = wrapped_target.target.get(RestartableField).value
+    # Cleanup is the default, so we want to preserve the chroot if either option is off.
+    cleanup = run_subsystem.cleanup and global_options.process_cleanup
 
-    with temporary_dir(
-        root_dir=global_options.pants_workdir, cleanup=run_subsystem.cleanup
-    ) as tmpdir:
-        if not run_subsystem.cleanup:
+    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=cleanup) as tmpdir:
+        if not cleanup:
             logger.info(f"Preserving running binary chroot {tmpdir}")
         workspace.write_digest(
             request.digest,
@@ -142,6 +179,16 @@ async def run(
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
+        if run_subsystem.debug_adapter:
+            logger.info(
+                softwrap(
+                    f"""
+                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                    which will wait for a client connection...
+                    """
+                )
+            )
+
         result = await Effect(
             InteractiveProcessResult,
             InteractiveProcess(

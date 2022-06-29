@@ -25,7 +25,8 @@ from pants.engine.internals.graph import (
     _DependencyMappingRequest,
     _TargetParametrizations,
 )
-from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.native_engine import AddressParseException
+from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
@@ -80,6 +81,10 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
+class ResolveField(StringField):
+    alias = "resolve"
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
@@ -87,14 +92,11 @@ class MockTarget(Target):
         MultipleSourcesField,
         SpecialCasedDeps1,
         SpecialCasedDeps2,
+        ResolveField,
         Tags,
     )
     deprecated_alias = "deprecated_target"
     deprecated_alias_removal_version = "9.9.9.dev0"
-
-
-class ResolveField(StringField):
-    alias = "resolve"
 
 
 class MockGeneratedTarget(Target):
@@ -121,6 +123,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
     )
 
 
@@ -519,6 +522,54 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
     }
 
 
+def test_name_explicitly_set(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "dir1/f.txt": "",
+            "dir1/BUILD": dedent(
+                """\
+                generator(sources=['f.txt'])
+                generator(name='nombre', sources=['f.txt'])
+                """
+            ),
+            "dir2/BUILD": dedent(
+                """\
+                target()
+                target(name='nombre')
+                """
+            ),
+            "dir3/BUILD": dedent(
+                """\
+                target(resolve=parametrize('r1', 'r2'))
+                target(name='nombre', resolve=parametrize('r1', 'r2'))
+                """
+            ),
+            "same_name/BUILD": "target(name='same_name')",
+        }
+    )
+
+    def assert_is_set(addr: Address, expected: bool) -> None:
+        tgt = transitive_targets_rule_runner.get_target(addr)
+        assert tgt.name_explicitly_set is expected
+
+    assert_is_set(Address("dir1"), False)
+    assert_is_set(Address("dir1", target_name="nombre"), True)
+
+    # We don't bother with generated targets.
+    assert_is_set(Address("dir1", relative_file_path="f.txt"), True)
+    assert_is_set(Address("dir1", target_name="nombre", relative_file_path="f.txt"), True)
+
+    assert_is_set(Address("dir2"), False)
+    assert_is_set(Address("dir2", target_name="nombre"), True)
+
+    for r in ("r1", "r2"):
+        assert_is_set(Address("dir3", parameters={"resolve": r}), False)
+        assert_is_set(Address("dir3", target_name="nombre", parameters={"resolve": r}), True)
+
+    # Even if the name is the same as the default, we should recognize when it's explicitly set.
+    assert_is_set(Address("same_name"), True)
+
+
 def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
     transitive_targets_rule_runner.write_files({"BUILD": "target(name='t', deprecated_field=[])"})
     transitive_targets_rule_runner.get_target(Address("", target_name="t"))
@@ -768,7 +819,7 @@ def generated_targets_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -790,7 +841,10 @@ def assert_generated(
             **{os.path.join(address.spec_path, f): "" for f in files},
         }
     )
-    parametrizations = rule_runner.request(_TargetParametrizations, [address])
+    parametrizations = rule_runner.request(
+        _TargetParametrizations,
+        [_TargetParametrizationsRequest(address, description_of_origin="tests")],
+    )
     assert expected == {
         t for parametrization in parametrizations for t in parametrization.parametrization.values()
     }
@@ -799,7 +853,7 @@ def assert_generated(
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
         #   see https://github.com/pantsbuild/pants/issues/11270
         specs = SpecsParser(rule_runner.build_root).parse_specs(
-            ["::"], convert_dir_literal_to_address_literal=False
+            ["::"], convert_dir_literal_to_address_literal=False, description_of_origin="tests"
         )
         addresses = rule_runner.request(Addresses, [specs])
         dependency_mapping = rule_runner.request(
@@ -1590,7 +1644,8 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
         file_content.content.decode().splitlines() for file_content in digest_contents
     )
     resolved = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(line)) for line in all_lines
+        Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
+        for line in all_lines
     )
     return InferredDependencies(resolved)
 
@@ -1872,15 +1927,26 @@ def test_resolve_unparsed_address_inputs() -> None:
             )
         }
     )
-    addresses = rule_runner.request(
-        Addresses,
-        [
-            UnparsedAddressInputs(
-                ["project:t1", ":t2"], owning_address=Address("project", target_name="t3")
+
+    def resolve(addresses: list[str], skip_invalid_addresses: bool = False) -> set[Address]:
+        return set(
+            rule_runner.request(
+                Addresses,
+                [
+                    UnparsedAddressInputs(
+                        addresses,
+                        owning_address=Address("project", target_name="t3"),
+                        description_of_origin="from my tests",
+                        skip_invalid_addresses=skip_invalid_addresses,
+                    )
+                ],
             )
-        ],
-    )
-    assert set(addresses) == {
-        Address("project", target_name="t1"),
-        Address("project", target_name="t2"),
-    }
+        )
+
+    t1 = Address("project", target_name="t1")
+    assert resolve(["project:t1", ":t2"]) == {t1, Address("project", target_name="t2")}
+
+    invalid_addresses = ["project:t1", "bad::", "project/fake.txt:tgt"]
+    assert resolve(invalid_addresses, skip_invalid_addresses=True) == {t1}
+    with engine_error(AddressParseException, contains="from my tests"):
+        resolve(invalid_addresses)

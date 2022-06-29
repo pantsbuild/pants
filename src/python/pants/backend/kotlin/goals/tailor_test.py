@@ -6,12 +6,7 @@ import pytest
 from pants.backend.kotlin.goals import tailor
 from pants.backend.kotlin.goals.tailor import PutativeKotlinTargetsRequest
 from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -38,7 +33,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeKotlinTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeKotlinTargetsRequest(("src/kotlin/owned", "src/kotlin/unowned")),
             AllOwnedSources(["src/kotlin/owned/OwnedFile.kt"]),
         ],
     )

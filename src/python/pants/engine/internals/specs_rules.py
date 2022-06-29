@@ -8,7 +8,6 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
@@ -17,18 +16,21 @@ from pants.base.specs import (
     AncestorGlobSpec,
     DirGlobSpec,
     DirLiteralSpec,
-    FileLiteralSpec,
+    RawSpecs,
+    RawSpecsWithOnlyFileOwners,
+    RawSpecsWithoutFileOwners,
     RecursiveGlobSpec,
     Specs,
-    SpecsWithOnlyFileOwners,
-    SpecsWithoutFileOwners,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
-from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
-from pants.engine.internals.parametrize import _TargetParametrizations
+from pants.engine.internals.parametrize import (
+    _TargetParametrizations,
+    _TargetParametrizationsRequest,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -47,9 +49,10 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import GlobalOptions
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -60,13 +63,13 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithoutFileOwners -> Targets
+# RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule_helper
-async def _determine_literal_addresses_from_specs(
-    literal_specs: tuple[AddressLiteralSpec, ...]
+async def _determine_literal_addresses_from_raw_specs(
+    literal_specs: tuple[AddressLiteralSpec, ...], *, description_of_origin: str
 ) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
         Get(
@@ -74,8 +77,9 @@ async def _determine_literal_addresses_from_specs(
             AddressInput(
                 spec.path_component,
                 spec.target_component,
-                spec.generated_component,
-                spec.parameters,
+                generated_component=spec.generated_component,
+                parameters=spec.parameters,
+                description_of_origin=description_of_origin,
             ),
         )
         for spec in literal_specs
@@ -87,7 +91,13 @@ async def _determine_literal_addresses_from_specs(
     #  - dir:tgt@k=v -> (dir:tgt@k=v,another=a, dir:tgt@k=v,another=b), but not anything
     #       where @k=v is not true.
     literal_parametrizations = await MultiGet(
-        Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+        Get(
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                address.maybe_convert_to_target_generator(),
+                description_of_origin=description_of_origin,
+            ),
+        )
         for address in literal_addresses
     )
 
@@ -100,19 +110,24 @@ async def _determine_literal_addresses_from_specs(
 
     # We eagerly call the `WrappedTarget` rule because it will validate that every final address
     # actually exists, such as with generated target addresses.
-    return await MultiGet(Get(WrappedTarget, Address, addr) for addr in all_candidate_addresses)
+    return await MultiGet(
+        Get(WrappedTarget, WrappedTargetRequest(addr, description_of_origin=description_of_origin))
+        for addr in all_candidate_addresses
+    )
 
 
 @rule
-async def addresses_from_specs_without_file_owners(
-    specs: SpecsWithoutFileOwners,
+async def addresses_from_raw_specs_without_file_owners(
+    specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
 
-    literal_wrapped_targets = await _determine_literal_addresses_from_specs(specs.address_literals)
+    literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
+        specs.address_literals, description_of_origin=specs.description_of_origin
+    )
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
@@ -140,7 +155,13 @@ async def addresses_from_specs_without_file_owners(
     )
 
     target_parametrizations_list = await MultiGet(
-        Get(_TargetParametrizations, Address, base_address) for base_address in base_addresses
+        Get(
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                base_address, description_of_origin=specs.description_of_origin
+            ),
+        )
+        for base_address in base_addresses
     )
     residence_dir_to_targets = defaultdict(list)
     for target_parametrizations in target_parametrizations_list:
@@ -168,60 +189,52 @@ async def addresses_from_specs_without_file_owners(
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithOnlyFileOwners -> Targets
+# RawSpecsWithOnlyFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return global_options.owners_not_found_behavior
-
-
-@rule
-async def addresses_from_specs_with_only_file_owners(
-    specs: SpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
+async def addresses_from_raw_specs_with_only_file_owners(
+    specs: RawSpecsWithOnlyFileOwners,
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
     )
-    owners_per_include = await MultiGet(
-        Get(
-            Owners,
-            OwnersRequest(paths.files, filter_by_global_options=specs.filter_by_global_options),
-        )
-        for paths in paths_per_include
+    all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
+    owners = await Get(
+        Owners,
+        OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
     )
-    addresses: set[Address] = set()
-    for spec, owners in zip(specs.all_specs(), owners_per_include):
-        if (
-            not specs.from_change_detection
-            and owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
-            _log_or_raise_unmatched_owners(
-                [PurePath(str(spec))],
-                owners_not_found_behavior,
-                ignore_option="--owners-not-found-behavior=ignore",
-            )
-        addresses.update(owners)
-    return Addresses(sorted(addresses))
+    return Addresses(sorted(owners))
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> Targets
+# RawSpecs & Specs -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
+async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     without_file_owners, with_file_owners = await MultiGet(
-        Get(Addresses, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(specs)),
-        Get(Addresses, SpecsWithOnlyFileOwners, SpecsWithOnlyFileOwners.from_specs(specs)),
+        Get(Addresses, RawSpecsWithoutFileOwners, RawSpecsWithoutFileOwners.from_raw_specs(specs)),
+        Get(
+            Addresses, RawSpecsWithOnlyFileOwners, RawSpecsWithOnlyFileOwners.from_raw_specs(specs)
+        ),
     )
     # Use a set to dedupe.
     return Addresses(sorted({*without_file_owners, *with_file_owners}))
+
+
+@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
+    includes, ignores = await MultiGet(
+        Get(Addresses, RawSpecs, specs.includes),
+        Get(Addresses, RawSpecs, specs.ignores),
+    )
+    # No matter what, ignores win out over includes. This avoids "specificity wars" and keeps our
+    # semantics simple/predictable.
+    return Addresses(FrozenOrderedSet(includes) - FrozenOrderedSet(ignores))
 
 
 @rule
@@ -235,12 +248,7 @@ def setup_specs_filter(
     filter_subsystem: FilterSubsystem,
     registered_target_types: RegisteredTargetTypes,
 ) -> SpecsFilter:
-    return SpecsFilter.create(
-        filter_subsystem,
-        registered_target_types,
-        tags=global_options.tag,
-        exclude_target_regexps=global_options.exclude_target_regexp,
-    )
+    return SpecsFilter.create(filter_subsystem, registered_target_types, tags=global_options.tag)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -255,40 +263,58 @@ async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
     also match against all their files, regardless of if a target owns them.
 
-    If a file is owned by a target that gets filtered out (e.g. via `--tag`), then we make sure
-    the file is not added back via filesystem specs, per
-    https://github.com/pantsbuild/pants/issues/15478.
+    Ignores win out over includes, with these edge cases:
+
+    * Ignored paths: the resolved paths should be excluded.
+    * Ignored targets: their `sources` should be excluded.
+    * File owned by a target that gets filtered out, e.g. via `--tag`. See
+      https://github.com/pantsbuild/pants/issues/15478.
     """
 
-    unfiltered_targets = await Get(
-        Targets, Specs, dataclasses.replace(specs, filter_by_global_options=False)
+    unfiltered_include_targets, ignore_targets, include_paths, ignore_paths = await MultiGet(
+        Get(Targets, RawSpecs, dataclasses.replace(specs.includes, filter_by_global_options=False)),
+        Get(Targets, RawSpecs, specs.ignores),
+        Get(Paths, PathGlobs, specs.includes.to_specs_paths_path_globs()),
+        Get(Paths, PathGlobs, specs.ignores.to_specs_paths_path_globs()),
     )
-    filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
-    all_sources_paths = await MultiGet(
+
+    filtered_include_targets = await Get(FilteredTargets, Targets, unfiltered_include_targets)
+    include_targets_sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
-        for tgt in filtered_targets
+        for tgt in filtered_include_targets
+        if tgt.has_field(SourcesField)
+    )
+
+    ignore_targets_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
+        for tgt in ignore_targets
         if tgt.has_field(SourcesField)
     )
 
     result_paths = OrderedSet(
-        itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
+        itertools.chain.from_iterable(paths.files for paths in include_targets_sources_paths),
     )
+    result_paths.update(include_paths.files)
+    result_paths.difference_update(
+        itertools.chain.from_iterable(paths.files for paths in ignore_targets_sources_paths)
+    )
+    result_paths.difference_update(ignore_paths.files)
 
-    specs_snapshot_path_globs = specs.to_specs_snapshot_path_globs()
-    if specs_snapshot_path_globs.globs:
-        target_less_paths = await Get(Paths, PathGlobs, specs_snapshot_path_globs)
-        result_paths.update(target_less_paths.files)
-
-        filtered_out_targets = FrozenOrderedSet(unfiltered_targets).difference(
-            FrozenOrderedSet(filtered_targets)
+    # If include paths were given, we need to also remove any paths from filtered out targets
+    # (e.g. via `--tag`), per https://github.com/pantsbuild/pants/issues/15478.
+    if include_paths.files:
+        filtered_out_include_targets = FrozenOrderedSet(unfiltered_include_targets).difference(
+            FrozenOrderedSet(filtered_include_targets)
         )
-        filtered_sources_paths = await MultiGet(
+        filtered_include_targets_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
-            for tgt in filtered_out_targets
+            for tgt in filtered_out_include_targets
             if tgt.has_field(SourcesField)
         )
         result_paths.difference_update(
-            itertools.chain.from_iterable(paths.files for paths in filtered_sources_paths)
+            itertools.chain.from_iterable(
+                paths.files for paths in filtered_include_targets_sources_paths
+            )
         )
 
     dirs = OrderedSet(
@@ -298,7 +324,7 @@ async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> FieldSets
+# RawSpecs -> FieldSets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -349,17 +375,14 @@ class NoApplicableTargetsException(Exception):
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
         )
         pants_filter_command = (
-            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
+            f"{bin_name()} --filter-target-type={','.join(applicable_target_aliases)}"
         )
         remedy = (
-            f"Please specify relevant file and/or target arguments. Run `{pants_filter_command}` to "
-            "find all applicable targets in your project"
+            f"Please specify relevant file and/or target arguments. Run `{pants_filter_command} "
+            f"list ::` to find all applicable targets in your project"
         )
         if filedeps_goal_works:
-            remedy += (
-                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
-                "applicable files."
-            )
+            remedy += f", or run `{pants_filter_command} filedeps ::` to find all applicable files."
         else:
             remedy += "."
         msg += remedy
@@ -453,11 +476,17 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
+
         # We squelch the warning if the specs came from change detection or only from globs,
         # since in that case we interpret the user's intent as "if there are relevant matching
         # targets, act on them". But we still want to warn if the specs were literal, or empty.
-        empty_ok = specs.from_change_detection or (
-            specs and not specs.address_literals and not specs.file_literals
+        #
+        # No need to check `specs.ignores` here, as change detection will not set that. Likewise,
+        # we don't want an ignore spec to trigger this warning, even if it was a literal.
+        empty_ok = specs.includes.from_change_detection or (
+            specs.includes
+            and not specs.includes.address_literals
+            and not specs.includes.file_literals
         )
         if (
             request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn

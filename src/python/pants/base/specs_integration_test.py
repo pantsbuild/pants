@@ -6,6 +6,7 @@ from __future__ import annotations
 from textwrap import dedent
 
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 
 SOURCES = {
     # NB: This uses recursive globs for the `python_sources` and `python_tests` target generators,
@@ -67,6 +68,7 @@ def run(args: list[str]) -> PantsResult:
     return result
 
 
+@skip_unless_python39_present
 def test_address_literal() -> None:
     """Semantics:
 
@@ -83,6 +85,7 @@ def test_address_literal() -> None:
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_sibling_addresses() -> None:
     """Semantics:
 
@@ -118,6 +121,7 @@ def test_sibling_addresses() -> None:
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_descendent_addresses() -> None:
     """Semantics are the same as sibling addreses, only recursive."""
     with setup_tmpdir(SOURCES) as tmpdir:
@@ -138,6 +142,7 @@ def test_descendent_addresses() -> None:
         assert f"{tmpdir}/py:tests" not in test_result
 
 
+@skip_unless_python39_present
 def test_file_arg() -> None:
     """Semantics: find the 'owning' target, using generated target rather than target generator
     when possible (regardless of project introspection vs. "build" goal).

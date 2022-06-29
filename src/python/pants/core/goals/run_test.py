@@ -2,12 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import sys
 from typing import cast
 
 import pytest
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
+from pants.core.goals.run import (
+    Run,
+    RunDebugAdapterRequest,
+    RunFieldSet,
+    RunRequest,
+    RunSubsystem,
+    run,
+)
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -16,6 +25,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
@@ -41,6 +51,12 @@ def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> Run
     return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
 
 
+def create_mock_run_debug_adapter_request(
+    rule_runner: RuleRunner, program_text: bytes
+) -> RunDebugAdapterRequest:
+    return cast(RunDebugAdapterRequest, create_mock_run_request(rule_runner, program_text))
+
+
 def single_target_run(
     rule_runner: RuleRunner,
     address: Address,
@@ -63,8 +79,15 @@ def single_target_run(
         res = run_rule_with_mocks(
             run,
             rule_args=[
-                create_goal_subsystem(RunSubsystem, args=[], cleanup=True),
-                create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
+                create_goal_subsystem(RunSubsystem, args=[], cleanup=True, debug_adapter=False),
+                create_subsystem(
+                    DebugAdapterSubsystem,
+                    host="127.0.0.1",
+                    port="5678",
+                ),
+                create_subsystem(
+                    GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
+                ),
                 workspace,
                 BuildRoot(),
                 rule_runner.environment,
@@ -77,13 +100,18 @@ def single_target_run(
                 ),
                 MockGet(
                     output_type=WrappedTarget,
-                    input_type=Address,
+                    input_type=WrappedTargetRequest,
                     mock=lambda _: WrappedTarget(target),
                 ),
                 MockGet(
                     output_type=RunRequest,
                     input_type=TestRunFieldSet,
                     mock=lambda _: create_mock_run_request(rule_runner, program_text),
+                ),
+                MockGet(
+                    output_type=RunDebugAdapterRequest,
+                    input_type=TestRunFieldSet,
+                    mock=lambda _: create_mock_run_debug_adapter_request(rule_runner, program_text),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
@@ -96,7 +124,7 @@ def single_target_run(
 
 
 def test_normal_run(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nprint("hello")'
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     res = single_target_run(
         rule_runner,
         Address("some/addr"),
@@ -106,7 +134,7 @@ def test_normal_run(rule_runner: RuleRunner) -> None:
 
 
 def test_materialize_input_files(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nprint("hello")'
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     binary = create_mock_run_request(rule_runner, program_text)
     with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_interactive_process(
@@ -120,6 +148,6 @@ def test_materialize_input_files(rule_runner: RuleRunner) -> None:
 
 
 def test_failed_run(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
+    program_text = f'#!{sys.executable}\nraise RuntimeError("foo")'.encode()
     res = single_target_run(rule_runner, Address("some/addr"), program_text=program_text)
     assert res.exit_code == 1

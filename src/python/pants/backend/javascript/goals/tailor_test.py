@@ -6,12 +6,7 @@ import pytest
 from pants.backend.javascript.goals import tailor
 from pants.backend.javascript.goals.tailor import PutativeJSTargetsRequest
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -39,7 +34,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeJSTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeJSTargetsRequest(("src/owned", "src/unowned")),
             AllOwnedSources(["src/owned/OwnedFile.js"]),
         ],
     )

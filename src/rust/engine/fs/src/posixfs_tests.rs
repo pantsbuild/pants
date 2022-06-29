@@ -115,9 +115,12 @@ async fn stat_symlink_oblivious() {
 
 #[tokio::test]
 async fn stat_other() {
-  new_posixfs("/dev")
-    .stat_sync(PathBuf::from("null"))
-    .expect_err("Want error");
+  assert_eq!(
+    new_posixfs("/dev")
+      .stat_sync(PathBuf::from("null"))
+      .unwrap(),
+    None,
+  );
 }
 
 #[tokio::test]

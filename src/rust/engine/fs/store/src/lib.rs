@@ -35,13 +35,14 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fmt::Debug;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
+use std::future::Future;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
@@ -101,6 +102,40 @@ impl Default for LocalOptions {
   }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum StoreError {
+  /// A Digest was not present in either of the local or remote Stores.
+  MissingDigest(String, Digest),
+  /// All other error types.
+  Unclassified(String),
+}
+
+impl StoreError {
+  pub fn enrich(self, prefix: &str) -> Self {
+    match self {
+      Self::MissingDigest(s, d) => Self::MissingDigest(format!("{prefix}: {s}"), d),
+      Self::Unclassified(s) => Self::Unclassified(format!("{prefix}: {s}")),
+    }
+  }
+}
+
+impl Display for StoreError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::MissingDigest(s, d) => {
+        write!(f, "{s}: {d:?}")
+      }
+      Self::Unclassified(s) => write!(f, "{s}"),
+    }
+  }
+}
+
+impl From<String> for StoreError {
+  fn from(err: String) -> Self {
+    Self::Unclassified(err)
+  }
+}
+
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
 // uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
@@ -114,35 +149,78 @@ pub struct UploadSummary {
   pub upload_wall_time: Duration,
 }
 
+///
+/// Wraps a `remote::ByteStore` with state to help avoid uploading common blobs multiple times.
+///
+/// If a blob is generated that many downstream actions depend on, we would otherwise get an
+/// expanded set of digests from each of those actions that includes the new blob. If those actions
+/// all execute in a time window smaller than the time taken to upload the blob, the effort would be
+/// duplicated leading to both wasted resources locally buffering up the blob as well as wasted
+/// effort on the remote server depending on its handling of this.
+///
 #[derive(Clone, Debug)]
 struct RemoteStore {
   store: remote::ByteStore,
-  in_flight_uploads: Arc<parking_lot::Mutex<HashSet<Digest>>>,
+  in_flight_uploads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
+  in_flight_downloads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
 }
 
 impl RemoteStore {
   fn new(store: remote::ByteStore) -> Self {
     Self {
       store,
-      in_flight_uploads: Arc::new(parking_lot::Mutex::new(HashSet::new())),
+      in_flight_uploads: Arc::default(),
+      in_flight_downloads: Arc::default(),
     }
   }
 
-  fn reserve_uploads(&self, candidates: HashSet<Digest>) -> HashSet<Digest> {
-    let mut active_uploads = self.in_flight_uploads.lock();
-    let to_upload = candidates
-      .difference(&active_uploads)
-      .cloned()
-      .collect::<HashSet<_>>();
-    active_uploads.extend(&to_upload);
-    to_upload
+  ///
+  /// Returns a strongly held cell from a map of weakly held cells, creating it if necessary.
+  ///
+  fn cell_from(
+    cells: &Mutex<HashMap<Digest, Weak<OnceCell<()>>>>,
+    digest: Digest,
+  ) -> Arc<OnceCell<()>> {
+    let mut cells = cells.lock();
+    if let Some(cell) = cells.get(&digest).and_then(|weak_cell| weak_cell.upgrade()) {
+      cell
+    } else {
+      let cell = Arc::new(OnceCell::new());
+      cells.insert(digest, Arc::downgrade(&cell));
+      cell
+    }
   }
 
-  fn release_uploads(&self, uploads: HashSet<Digest>) {
-    self
-      .in_flight_uploads
-      .lock()
-      .retain(|d| !uploads.contains(d));
+  ///
+  /// Guards an attempt to upload the given `Digest`, skipping the upload if another attempt has
+  /// been successful. Will not return until either an attempt has succeed, or this attempt has
+  /// failed.
+  ///
+  async fn maybe_upload<E>(
+    &self,
+    digest: Digest,
+    upload: impl Future<Output = Result<(), E>>,
+  ) -> Result<(), E> {
+    Self::cell_from(&self.in_flight_uploads, digest)
+      .get_or_try_init(upload)
+      .await
+      .map(|&()| ())
+  }
+
+  ///
+  /// Guards an attempt to download the given `Digest`, skipping the download if another attempt
+  /// has been successful. Will not return until either an attempt has succeed, or this attempt has
+  /// failed.
+  ///
+  async fn maybe_download<E>(
+    &self,
+    digest: Digest,
+    upload: impl Future<Output = Result<(), E>>,
+  ) -> Result<(), E> {
+    Self::cell_from(&self.in_flight_downloads, digest)
+      .get_or_try_init(upload)
+      .await
+      .map(|&()| ())
   }
 }
 
@@ -352,23 +430,19 @@ impl Store {
   ///
   pub async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(&[u8]) -> T + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, String> {
-    // No transformation or verification is needed for files, so we pass in a pair of functions
-    // which always succeed, whether the underlying bytes are coming from a local or remote store.
-    // Unfortunately, we need to be a little verbose to do this.
-    let f_local = Arc::new(f);
-    let f_remote = f_local.clone();
+  ) -> Result<T, StoreError> {
+    // No transformation or verification is needed for files.
     self
       .load_bytes_with(
         EntryType::File,
         digest,
-        move |v: &[u8]| Ok(f_local(v)),
-        move |v: Bytes| Ok(f_remote(&v)),
+        move |v: &[u8]| Ok(f(v)),
+        |_: Bytes| Ok(()),
       )
       .await
   }
@@ -434,7 +508,7 @@ impl Store {
   /// TODO: Add a native implementation that skips creating PathStats and directly produces
   /// a DigestTrie.
   ///
-  pub async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+  pub async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, StoreError> {
     if let Some(tree) = digest.tree {
       // The DigestTrie is already loaded.
       return Ok(tree);
@@ -472,11 +546,14 @@ impl Store {
     let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
     let computed_digest = tree.compute_root_digest();
     if digest.as_digest() != computed_digest {
-      return Err(format!(
-        "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
-        digest.as_digest(),
-        computed_digest
-      ));
+      return Err(
+        format!(
+          "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
+          digest.as_digest(),
+          computed_digest
+        )
+        .into(),
+      );
     }
 
     Ok(tree)
@@ -489,7 +566,7 @@ impl Store {
   /// In general, DirectoryDigests should be consumed lazily to avoid fetching from a remote
   /// store unnecessarily, so this method is primarily useful for tests and benchmarks.
   ///
-  pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, String> {
+  pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, StoreError> {
     Ok(DirectoryDigest::new(
       digest,
       self
@@ -501,11 +578,11 @@ impl Store {
   ///
   /// Loads a directory proto from the local store, back-filling from remote if necessary.
   ///
-  /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
-  /// fingerprint exactly matches that which is requested. Will return an Err if it would return a
-  /// non-canonical Directory.
+  /// Guarantees that if an Ok value is returned, it is valid, and canonical, and its fingerprint
+  /// exactly matches that which is requested. Will return an Err if it would return a non-canonical
+  /// Directory.
   ///
-  pub async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
+  pub async fn load_directory(&self, digest: Digest) -> Result<remexec::Directory, StoreError> {
     self
       .load_bytes_with(
         EntryType::Directory,
@@ -534,7 +611,7 @@ impl Store {
             )
           })?;
           protos::verify_directory_canonical(digest, &directory)?;
-          Ok(directory)
+          Ok(())
         },
       )
       .await
@@ -549,7 +626,7 @@ impl Store {
   pub async fn ensure_directory_digest_persisted(
     &self,
     digest: DirectoryDigest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let tree = self.load_digest_trie(digest).await?;
     let _ = self.record_digest_trie(tree, true).await?;
     Ok(())
@@ -562,30 +639,39 @@ impl Store {
   ///
   async fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
-    FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
+    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f_local: FLocal,
     f_remote: FRemote,
-  ) -> Result<Option<T>, String> {
+  ) -> Result<T, StoreError> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
-    let maybe_local_value = self
-      .local
-      .load_bytes_with(entry_type, digest, f_local)
-      .await?;
 
-    match (maybe_local_value, maybe_remote) {
-      (Some(value_result), _) => value_result.map(Some),
-      (None, None) => Ok(None),
-      (None, Some(remote_store)) => {
-        let remote = remote_store.store.clone();
-        let maybe_bytes = retry_call(
-          remote,
-          |remote| async move { remote.load_bytes_with(digest, Ok).await },
+    if let Some(bytes_res) = self
+      .local
+      .load_bytes_with(entry_type, digest, f_local.clone())
+      .await?
+    {
+      return Ok(bytes_res?);
+    }
+
+    let remote = maybe_remote.ok_or_else(|| {
+      StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
+    })?;
+    let remote_store = remote.store.clone();
+
+    remote
+      .maybe_download(digest, async move {
+        // TODO: Now that we always copy from the remote store to the local store before executing
+        // the caller's logic against the local store, `remote::ByteStore::load_bytes_with` no
+        // longer needs to accept a function.
+        let bytes = retry_call(
+          remote_store,
+          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
           |err| match err {
             ByteStoreError::Grpc(status) => status_is_retryable(status),
             _ => false,
@@ -595,25 +681,36 @@ impl Store {
         .map_err(|err| match err {
           ByteStoreError::Grpc(status) => status_to_str(status),
           ByteStoreError::Other(msg) => msg,
+        })?
+        .ok_or_else(|| {
+          StoreError::MissingDigest(
+            "Was not present in either the local or remote store".to_owned(),
+            digest,
+          )
         })?;
 
-        match maybe_bytes {
-          Some(bytes) => {
-            let value = f_remote(bytes.clone())?;
-            let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
-            if digest == stored_digest {
-              Ok(Some(value))
-            } else {
-              Err(format!(
-                "CAS gave wrong digest: expected {:?}, got {:?}",
-                digest, stored_digest
-              ))
-            }
-          }
-          None => Ok(None),
+        f_remote(bytes.clone())?;
+        let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
+        if digest == stored_digest {
+          Ok(())
+        } else {
+          Err(StoreError::Unclassified(format!(
+            "CAS gave wrong digest: expected {:?}, got {:?}",
+            digest, stored_digest
+          )))
         }
-      }
-    }
+      })
+      .await?;
+
+    Ok(
+      self
+        .local
+        .load_bytes_with(entry_type, digest, f_local)
+        .await?
+        .ok_or_else(|| {
+          format!("After downloading {digest:?}, the local store claimed that it was not present.")
+        })??,
+    )
   }
 
   ///
@@ -628,14 +725,18 @@ impl Store {
   pub fn ensure_remote_has_recursive(
     &self,
     digests: Vec<Digest>,
-  ) -> BoxFuture<'static, Result<UploadSummary, String>> {
+  ) -> BoxFuture<'static, Result<UploadSummary, StoreError>> {
     let start_time = Instant::now();
 
     let remote_store = if let Some(ref remote) = self.remote {
       remote.clone()
     } else {
-      return futures::future::err("Cannot ensure remote has blobs without a remote".to_owned())
-        .boxed();
+      return futures::future::err(
+        "Cannot ensure remote has blobs without a remote"
+          .to_owned()
+          .into(),
+      )
+      .boxed();
     };
 
     let store = self.clone();
@@ -652,45 +753,30 @@ impl Store {
           remote.list_missing_digests(request).await?
         };
 
-      let uploaded_digests = {
-        // Here we best-effort avoid uploading common blobs multiple times. If a blob is generated
-        // that many downstream actions depend on, we would otherwise get an expanded set of digests
-        // from each of those actions that includes the new blob. If those actions all execute in a
-        // time window smaller than the time taken to upload the blob, the effort would be
-        // duplicated leading to both wasted resources locally buffering up the blob as well as
-        // wasted effort on the remote server depending on its handling of this.
-        let to_upload = remote_store.reserve_uploads(digests_to_upload);
-        let uploaded_digests_result = future::try_join_all(
-          to_upload
-            .clone()
-            .into_iter()
-            .map(|digest| {
-              let entry_type = ingested_digests[&digest];
-              let local = store.local.clone();
-              let remote = remote.clone();
-              async move {
-                // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
-                // to disk to be independent of the remote store wire chunk size.
-                if digest.size_bytes > remote.chunk_size_bytes() {
-                  Self::store_large_blob_remote(local, remote, entry_type, digest).await
-                } else {
-                  Self::store_small_blob_remote(local, remote, entry_type, digest).await
-                }
+      future::try_join_all(
+        digests_to_upload
+          .iter()
+          .cloned()
+          .map(|digest| {
+            let entry_type = ingested_digests[&digest];
+            let local = store.local.clone();
+            let remote = remote.clone();
+            remote_store.maybe_upload(digest, async move {
+              // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
+              // to disk to be independent of the remote store wire chunk size.
+              if digest.size_bytes > remote.chunk_size_bytes() {
+                Self::store_large_blob_remote(local, remote, entry_type, digest).await
+              } else {
+                Self::store_small_blob_remote(local, remote, entry_type, digest).await
               }
-              .map_ok(move |()| digest)
             })
-            .collect::<Vec<_>>(),
-        )
-        .await;
-        // We release the uploads whether or not they actually succeeded. Future checks for large
-        // uploads will issue `find_missing_blobs_request`s that will eventually reconcile our
-        // accounting. In the mean-time we error on the side of at least once semantics.
-        remote_store.release_uploads(to_upload);
-        uploaded_digests_result?
-      };
+          })
+          .collect::<Vec<_>>(),
+      )
+      .await?;
 
       let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
-      let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.size_bytes);
+      let uploaded_file_sizes = digests_to_upload.iter().map(|digest| digest.size_bytes);
 
       Ok(UploadSummary {
         ingested_file_count: ingested_file_sizes.len(),
@@ -708,7 +794,7 @@ impl Store {
     remote: remote::ByteStore,
     entry_type: EntryType,
     digest: Digest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     // We need to copy the bytes into memory so that they may be used safely in an async
     // future. While this unfortunately increases memory consumption, we prioritize
     // being able to run `remote.store_bytes()` as async.
@@ -721,11 +807,13 @@ impl Store {
       })
       .await?;
     match maybe_bytes {
-      Some(bytes) => remote.store_bytes(bytes).await,
-      None => Err(format!(
-        "Failed to upload {entry_type:?} {digest:?}: Not found in local store.",
-        entry_type = entry_type,
-        digest = digest
+      Some(bytes) => Ok(remote.store_bytes(bytes).await?),
+      None => Err(StoreError::MissingDigest(
+        format!(
+          "Failed to upload {entry_type:?}: Not found in local store",
+          entry_type = entry_type,
+        ),
+        digest,
       )),
     }
   }
@@ -735,7 +823,7 @@ impl Store {
     remote: remote::ByteStore,
     entry_type: EntryType,
     digest: Digest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     remote
       .store_buffered(digest, |mut buffer| async {
         let result = local
@@ -751,12 +839,14 @@ impl Store {
           })
           .await?;
         match result {
-          None => Err(format!(
-            "Failed to upload {entry_type:?} {digest:?}: Not found in local store.",
-            entry_type = entry_type,
-            digest = digest
+          None => Err(StoreError::MissingDigest(
+            format!(
+              "Failed to upload {entry_type:?}: Not found in local store",
+              entry_type = entry_type,
+            ),
+            digest,
           )),
-          Some(Err(err)) => Err(err),
+          Some(Err(err)) => Err(err.into()),
           Some(Ok(())) => Ok(()),
         }
       })
@@ -770,7 +860,7 @@ impl Store {
   pub async fn ensure_local_has_recursive_directory(
     &self,
     dir_digest: DirectoryDigest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let mut file_digests = Vec::new();
     self
       .load_digest_trie(dir_digest)
@@ -792,24 +882,23 @@ impl Store {
 
   /// Ensure that a file is locally loadable, which will download it from the Remote store as
   /// a side effect (if one is configured). Called only with the Digest of a File.
-  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), String> {
-    let result = self
+  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), StoreError> {
+    if let Err(e) = self
       .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-      .await?;
-    match result {
-      Some(_) => Ok(()),
-      None => {
-        log::debug!("Missing file digest from remote store: {:?}", file_digest);
-        in_workunit!(
-          "missing_file_counter",
-          Level::Trace,
-          |workunit| async move {
-            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-          },
-        )
-        .await;
-        Err("File did not exist in the remote store.".to_owned())
-      }
+      .await
+    {
+      log::debug!("Missing file digest from remote store: {:?}", file_digest);
+      in_workunit!(
+        "missing_file_counter",
+        Level::Trace,
+        |workunit| async move {
+          workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+        },
+      )
+      .await;
+      Err(e)
+    } else {
+      Ok(())
     }
   }
 
@@ -867,14 +956,15 @@ impl Store {
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
     &self,
     digests: Ds,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let reachable_digests_and_types = self
       .expand_digests(digests, LocalMissingBehavior::Ignore)
       .await?;
     self
       .local
       .lease_all(reachable_digests_and_types.into_iter())
-      .await
+      .await?;
+    Ok(())
   }
 
   pub fn garbage_collect(
@@ -931,7 +1021,7 @@ impl Store {
     &self,
     digests: Ds,
     missing_behavior: LocalMissingBehavior,
-  ) -> Result<HashMap<Digest, EntryType>, String> {
+  ) -> Result<HashMap<Digest, EntryType>, StoreError> {
     // Expand each digest into either a single file digest, or a collection of recursive digests
     // below a directory.
     let expanded_digests = future::try_join_all(
@@ -939,7 +1029,7 @@ impl Store {
         .map(|digest| {
           let store = self.clone();
           async move {
-            match store.local.entry_type(digest.hash).await {
+            let res: Result<_, StoreError> = match store.local.entry_type(digest.hash).await {
               Ok(Some(EntryType::File)) => Ok(Either::Left(*digest)),
               Ok(Some(EntryType::Directory)) => {
                 let store_for_expanding = match missing_behavior {
@@ -953,12 +1043,13 @@ impl Store {
               }
               Ok(None) => match missing_behavior {
                 LocalMissingBehavior::Ignore => Ok(Either::Right(HashMap::new())),
-                LocalMissingBehavior::Fetch | LocalMissingBehavior::Error => {
-                  Err(format!("Failed to expand digest {:?}: Not found", digest))
-                }
+                LocalMissingBehavior::Fetch | LocalMissingBehavior::Error => Err(
+                  StoreError::MissingDigest("Failed to expand digest".to_owned(), *digest),
+                ),
               },
-              Err(err) => Err(format!("Failed to expand digest {:?}: {:?}", digest, err)),
-            }
+              Err(err) => Err(format!("Failed to expand digest {:?}: {:?}", digest, err).into()),
+            };
+            res
           }
         })
         .collect::<Vec<_>>(),
@@ -982,7 +1073,7 @@ impl Store {
   pub fn expand_directory(
     &self,
     digest: Digest,
-  ) -> BoxFuture<'static, Result<HashMap<Digest, EntryType>, String>> {
+  ) -> BoxFuture<'static, Result<HashMap<Digest, EntryType>, StoreError>> {
     self
       .walk(digest, |_, _, digest, directory| {
         let mut digest_types = vec![(digest, EntryType::Directory)];
@@ -1015,7 +1106,7 @@ impl Store {
     destination: PathBuf,
     digest: DirectoryDigest,
     perms: Permissions,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
@@ -1042,7 +1133,7 @@ impl Store {
     is_root: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     perms: Permissions,
-  ) -> BoxFuture<'a, Result<(), String>> {
+  ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
     async move {
       let destination2 = destination.clone();
@@ -1113,8 +1204,8 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     mode: u32,
-  ) -> Result<(), String> {
-    let write_result = self
+  ) -> Result<(), StoreError> {
+    self
       .load_file_bytes_with(digest, move |bytes| {
         let mut f = OpenOptions::new()
           .create(true)
@@ -1133,12 +1224,7 @@ impl Store {
           .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
         Ok(())
       })
-      .await?;
-    match write_result {
-      Some(Ok(())) => Ok(()),
-      Some(Err(e)) => Err(e),
-      None => Err(format!("File with digest {:?} not found", digest)),
-    }
+      .await?
   }
 
   ///
@@ -1147,7 +1233,7 @@ impl Store {
   pub async fn contents_for_directory(
     &self,
     digest: DirectoryDigest,
-  ) -> Result<Vec<FileContent>, String> {
+  ) -> Result<Vec<FileContent>, StoreError> {
     let mut files = Vec::new();
     self
       .load_digest_trie(digest)
@@ -1160,16 +1246,15 @@ impl Store {
     future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
       let store = self.clone();
       async move {
-        let maybe_bytes = store
+        let content = store
           .load_file_bytes_with(digest, Bytes::copy_from_slice)
-          .await?;
-        maybe_bytes
-          .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-          .map(|content| FileContent {
-            path,
-            content,
-            is_executable,
-          })
+          .await
+          .map_err(|e| e.enrich(&format!("Couldn't find file contents for {:?}", path)))?;
+        Ok(FileContent {
+          path,
+          content,
+          is_executable,
+        })
       }
     }))
     .await
@@ -1181,7 +1266,7 @@ impl Store {
   pub async fn entries_for_directory(
     &self,
     digest: DirectoryDigest,
-  ) -> Result<Vec<DigestEntry>, String> {
+  ) -> Result<Vec<DigestEntry>, StoreError> {
     if digest == *EMPTY_DIRECTORY_DIGEST {
       return Ok(vec![]);
     }
@@ -1232,7 +1317,7 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
-  ) -> BoxFuture<'static, Result<Vec<T>, String>> {
+  ) -> BoxFuture<'static, Result<Vec<T>, StoreError>> {
     let f = Arc::new(f);
     let accumulator = Arc::new(Mutex::new(Vec::new()));
     self
@@ -1264,35 +1349,32 @@ impl Store {
     path_so_far: PathBuf,
     f: Arc<F>,
     accumulator: Arc<Mutex<Vec<T>>>,
-  ) -> BoxFuture<'static, Result<(), String>> {
+  ) -> BoxFuture<'static, Result<(), StoreError>> {
     let store = self.clone();
     let res = async move {
-      let maybe_directory = store.load_directory(digest).await?;
-      match maybe_directory {
-        Some(directory) => {
-          let result_for_directory = f(&store, &path_so_far, digest, &directory).await?;
-          {
-            let mut accumulator = accumulator.lock();
-            accumulator.push(result_for_directory);
-          }
-          future::try_join_all(
-            directory
-              .directories
-              .iter()
-              .map(move |dir_node| {
-                let subdir_digest = try_future!(require_digest(dir_node.digest.as_ref()));
-                let path = path_so_far.join(dir_node.name.clone());
-                store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
-              })
-              .collect::<Vec<_>>(),
-          )
-          .await?;
-          Ok(())
-        }
-        None => Err(format!(
-          "Could not walk unknown directory at {path_so_far:?}: {digest:?}"
-        )),
+      let directory = store.load_directory(digest).await.map_err(|e| {
+        e.enrich(&format!(
+          "Could not walk unknown directory at {path_so_far:?}"
+        ))
+      })?;
+      let result_for_directory = f(&store, &path_so_far, digest, &directory).await?;
+      {
+        let mut accumulator = accumulator.lock();
+        accumulator.push(result_for_directory);
       }
+      future::try_join_all(
+        directory
+          .directories
+          .iter()
+          .map(move |dir_node| {
+            let subdir_digest = try_future!(require_digest(dir_node.digest.as_ref()));
+            let path = path_so_far.join(dir_node.name.clone());
+            store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
+          })
+          .collect::<Vec<_>>(),
+      )
+      .await?;
+      Ok(())
     };
     res.boxed()
   }
@@ -1315,32 +1397,21 @@ pub enum LocalMissingBehavior {
 
 #[async_trait]
 impl SnapshotOps for Store {
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  type Error = StoreError;
+
+  async fn load_file_bytes_with<
+    T: Send + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
+  >(
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, String> {
+  ) -> Result<T, StoreError> {
     Store::load_file_bytes_with(self, digest, f).await
   }
 
-  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, StoreError> {
     Store::load_digest_trie(self, digest).await
-  }
-
-  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
-    Store::load_directory(self, digest).await
-  }
-
-  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
-    Snapshot::get_directory_or_err(self.clone(), digest).await
-  }
-
-  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String> {
-    Store::record_digest_trie(self, tree, true).await
-  }
-
-  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {
-    Store::record_directory(self, directory, true).await
   }
 }
 

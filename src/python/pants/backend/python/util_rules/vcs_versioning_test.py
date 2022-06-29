@@ -93,7 +93,7 @@ def test_vcs_versioning(
         GIT_WORK_TREE=str(worktree),
         GIT_CONFIG_GLOBAL="/dev/null",
     ):
-        subprocess.check_call(["git", "init", "--initial-branch=main"])
+        subprocess.check_call(["git", "init"])
         subprocess.check_call(["git", "config", "user.email", "you@example.com"])
         subprocess.check_call(["git", "config", "user.name", "Your Name"])
         subprocess.check_call(["git", "add", "."])

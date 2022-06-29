@@ -18,13 +18,14 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class IPython(PythonToolBase):
     options_scope = "ipython"
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
-    default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
+    default_version = "ipython>=7.34,<8"  # ipython 8 does not support Python 3.7.
     default_main = ConsoleScript("ipython")
 
     register_lockfile = True
@@ -36,12 +37,18 @@ class IPython(PythonToolBase):
         "--ignore-cwd",
         advanced=True,
         default=True,
-        help="Whether to tell IPython not to put the CWD on the import path.\n\n"
-        "Normally you want this to be True, so that imports come from the hermetic "
-        "environment Pants creates.\n\nHowever IPython<7.13.0 doesn't support this option, "
-        "so if you're using an earlier version (e.g., because you have Python 2.7 code) "
-        "then you will need to set this to False, and you may have issues with imports "
-        "from your CWD shading the hermetic environment.",
+        help=softwrap(
+            """
+            Whether to tell IPython not to put the CWD on the import path.
+
+            Normally you want this to be True, so that imports come from the hermetic
+            environment Pants creates.
+
+            However IPython<7.13.0 doesn't support this option, so if you're using an earlier
+            version (e.g., because you have Python 2.7 code) then you will need to set this to False,
+            and you may have issues with imports from your CWD shading the hermetic environment.
+            """
+        ),
     )
 
 
@@ -50,9 +57,11 @@ class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by iPython in your project (for lockfile "
-        "generation)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by iPython in your project
+        (for lockfile generation)
+        """
     ),
     level=LogLevel.DEBUG,
 )

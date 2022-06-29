@@ -14,6 +14,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 
 CC_FILE_EXTENSIONS = (".c", ".h", ".cc", ".cpp", ".hpp")
@@ -58,6 +59,9 @@ class CCSourceTarget(Target):
 
 class CCSourcesGeneratorSourcesField(CCGeneratorSourcesField):
     default = tuple(f"*{ext}" for ext in CC_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.cpp', 'new_*.cc', '!old_ignore.cc']`"
+    )
 
 
 class CCSourcesGeneratorTarget(TargetFilesGenerator):

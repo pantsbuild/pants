@@ -341,19 +341,29 @@ async def prepare_coursier_resolve_info(
         excludes_digest = await Get(Digest, CreateDigest([excludes_file_content]))
         extra_args += ["--local-exclude-file", LOCAL_EXCLUDE_FILE]
 
-    jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
-    jar_file_paths = jar_files.snapshot.files
+    jar_file_sources = await MultiGet(
+        Get(SourceFiles, SourceFilesRequest([jar_source_field])) for _, jar_source_field in jars
+    )
+    jar_file_paths = [jar_file_source.snapshot.files[0] for jar_file_source in jar_file_sources]
 
     resolvable_jar_requirements = [
         dataclasses.replace(
             req, jar=None, url=f"file:{Coursier.working_directory_placeholder}/{path}"
         )
-        for req, path in zip((i[0] for i in jars), jar_file_paths)
+        for (req, _), path in zip(jars, jar_file_paths)
     ]
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
-    digest = await Get(Digest, MergeDigests([jar_files.snapshot.digest, excludes_digest]))
+    digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                *(jar_file_source.snapshot.digest for jar_file_source in jar_file_sources),
+                excludes_digest,
+            ]
+        ),
+    )
 
     return CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
@@ -540,7 +550,12 @@ async def coursier_fetch_one_coord(
     req: ArtifactRequirement
     if request.pants_address:
         targets = await Get(
-            Targets, UnparsedAddressInputs([request.pants_address], owning_address=None)
+            Targets,
+            UnparsedAddressInputs(
+                [request.pants_address],
+                owning_address=None,
+                description_of_origin="<infallible - coursier fetch>",
+            ),
         )
         req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
     else:

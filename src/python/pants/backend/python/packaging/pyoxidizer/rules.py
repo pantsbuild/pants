@@ -23,7 +23,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -49,6 +49,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +113,14 @@ async def package_pyoxidizer_binary(
     ]
     if not wheel_paths:
         raise InvalidTargetException(
-            f"The `{PyOxidizerTarget.alias}` target {field_set.address} must include "
-            "in its `dependencies` field at least one `python_distribution` target that produces a "
-            f"`.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure "
-            f"`{WheelField.alias}=True`. See {doc_url('python-distributions')}."
+            softwrap(
+                f"""
+                The `{PyOxidizerTarget.alias}` target {field_set.address} must include
+                in its `dependencies` field at least one `python_distribution` target that produces a
+                `.whl` file. For example, if using `{GenerateSetupField.alias}=True`, then make sure
+                `{WheelField.alias}=True`. See {doc_url('python-distributions')}.
+                """
+            )
         )
 
     config_template = None
@@ -213,16 +218,27 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
         artifact for artifact in binary.artifacts if is_executable_binary(artifact.relpath)
     ]
 
-    assert len(executable_binaries) == 1, (
-        "More than one executable binary discovered in the `install` directory, "
-        "which is a bug in the PyOxidizer plugin. "
-        "Please file a bug report at https://github.com/pantsbuild/pants/issues/new. "
-        f"Enumerated executable binaries: {executable_binaries}"
+    assert len(executable_binaries) == 1, softwrap(
+        f"""
+        More than one executable binary discovered in the `install` directory,
+        which is a bug in the PyOxidizer plugin.
+        Please file a bug report at https://github.com/pantsbuild/pants/issues/new.
+        Enumerated executable binaries: {executable_binaries}
+        """
     )
 
     artifact = executable_binaries[0]
     assert artifact.relpath is not None
     return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),))
+
+
+@rule
+async def run_pyoxidizer_debug_adapter_binary(
+    field_set: PyOxidizerFieldSet,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError(
+        "Debugging a PyOxidizer binary using a debug adapter has not yet been implemented."
+    )
 
 
 def rules():

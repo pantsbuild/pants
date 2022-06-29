@@ -91,6 +91,14 @@ class SourcesItem:
     sources: tuple[SourceItem, ...]
     roots: tuple[Uri, ...] | None
 
+    @classmethod
+    def from_json_dict(cls, d: Any):
+        return cls(
+            target=BuildTargetIdentifier.from_json_dict(d["target"]),
+            sources=tuple(SourceItem.from_json_dict(i) for i in d["sources"]),
+            roots=tuple(d.get("sources", ())),
+        )
+
     def to_json_dict(self):
         result = {
             "target": self.target.to_json_dict(),
@@ -104,6 +112,12 @@ class SourcesItem:
 @dataclass(frozen=True)
 class SourcesResult:
     items: tuple[SourcesItem, ...]
+
+    @classmethod
+    def from_json_dict(cls, d: Any):
+        return cls(
+            items=tuple(SourcesItem.from_json_dict(i) for i in d["items"]),
+        )
 
     def to_json_dict(self):
         return {"items": [item.to_json_dict() for item in self.items]}

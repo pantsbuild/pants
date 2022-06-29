@@ -1,16 +1,20 @@
 Active Maintainers
 ==================
 
+* A. Alonso Dominguez
+* Alexey Tereshenkov
 * Andreas Stenius
 * Benjy Weinberger
+* Carina C. Zona
+* Christopher Neugebauer
 * Daniel McClanahan
 * Daniel Wagner-Hall
 * Eric Arellano
-* Greg Shuflin
 * Henry Fuller
 * Ity Kaul
 * Patrick Lawson
 * John Sirois
+* Joshua Cannon
 * Kris Wilson
 * Nora Howard
 * Stu Hood
@@ -28,6 +32,7 @@ Emeritus
 * Eric Ayers
 * Fedor Korotkov
 * Garrett Malmquist
+* Greg Shuflin
 * Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen

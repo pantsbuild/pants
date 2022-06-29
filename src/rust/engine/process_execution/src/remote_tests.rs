@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -15,16 +15,16 @@ use protos::gen::google::longrunning::Operation;
 use remexec::ExecutedActionMetadata;
 use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use store::{SnapshotOps, Store};
+use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunId, WorkunitStore};
 
-use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
+use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessMetadata,
+  Platform, Process, ProcessCacheScope, ProcessError, ProcessMetadata,
 };
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
@@ -36,8 +36,6 @@ const RETRY_INTERVAL: Duration = Duration::from_micros(0);
 const STORE_CONCURRENCY_LIMIT: usize = 256;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
-const CACHE_CONCURRENCY_LIMIT: usize = 256;
-const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -571,7 +569,7 @@ async fn make_execute_request_using_immutable_inputs() {
       map.insert(prefix.clone(), input_directory.directory_digest());
       map
     },
-    vec![],
+    BTreeSet::new(),
   )
   .await
   .unwrap();
@@ -662,32 +660,25 @@ async fn successful_with_only_call_to_execute() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
-    let action_digest = digest(&action).unwrap();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("")),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ]),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ]),
+      }]),
       None,
     )
   };
@@ -710,19 +701,14 @@ async fn successful_after_reconnect_with_wait_execution() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
-    let action_digest = digest(&action).unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
         ExpectedAPICall::Execute {
           execute_request,
           stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
@@ -760,7 +746,7 @@ async fn successful_after_reconnect_from_retryable_error() {
   let op_name_2 = "gimme-bar".to_string();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
@@ -768,14 +754,8 @@ async fn successful_after_reconnect_from_retryable_error() {
 
     let execute_request_2 = execute_request.clone();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
         ExpectedAPICall::Execute {
           execute_request,
           stream_responses: Ok(vec![
@@ -812,82 +792,29 @@ async fn successful_after_reconnect_from_retryable_error() {
 }
 
 #[tokio::test]
-async fn successful_served_from_action_cache() {
-  WorkunitStore::setup_for_tests();
-  let execute_request = echo_foo_request();
-
-  let mock_server = {
-    let (action, _, _) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
-
-    let action_digest = digest(&action).unwrap();
-
-    let action_result = make_action_result(
-      StdoutType::Raw("foo".to_owned()),
-      StderrType::Raw("".to_owned()),
-      0,
-      None,
-    );
-
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
-        action_digest,
-        response: Ok(action_result),
-      }]),
-      None,
-    )
-  };
-
-  let result = run_command_remote(mock_server.address(), execute_request)
-    .await
-    .unwrap();
-
-  assert_eq!(result.stdout_bytes, "foo".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_cancellation_requests(&mock_server, vec![]);
-}
-
-#[tokio::test]
 async fn server_rejecting_execute_request_gives_error() {
   WorkunitStore::setup_for_tests();
 
   let execute_request = echo_foo_request();
 
   let mock_server = mock::execution_server::TestServer::new(
-    mock::execution_server::MockExecution::new(vec![
-      ExpectedAPICall::GetActionResult {
-        action_digest: hashing::Digest::new(
-          hashing::Fingerprint::from_hex_string(
-            "bf10cd168ad711602f7a241cbcbc9a3d32497fdd1465d8a01d4549ee7d8ebc08",
-          )
-          .unwrap(),
-          142,
-        ),
-        response: Err(Status::not_found("")),
-      },
-      ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-          ProcessMetadata::default(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Err(Status::invalid_argument("".to_owned())),
-      },
-    ]),
+    mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+      execute_request: crate::remote::make_execute_request(
+        &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
+        ProcessMetadata::default(),
+      )
+      .unwrap()
+      .2,
+      stream_responses: Err(Status::invalid_argument("".to_owned())),
+    }]),
     None,
   );
 
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error).contains("InvalidArgument");
-  assert_that(&error).contains("Did not expect this request");
+  assert_that(&error.to_string()).contains("InvalidArgument");
+  assert_that(&error.to_string()).contains("Did not expect this request");
 }
 
 #[tokio::test]
@@ -897,25 +824,17 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Err(Status::deadline_exceeded("")),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Err(Status::deadline_exceeded("")),
+      }]),
       None,
     )
   };
@@ -934,33 +853,25 @@ async fn sends_headers() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ]),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ]),
+      }]),
       None,
     )
   };
@@ -985,7 +896,6 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     btreemap! {
@@ -997,8 +907,6 @@ async fn sends_headers() {
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
-    CACHE_CONCURRENCY_LIMIT,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1017,7 +925,7 @@ async fn sends_headers() {
     .iter()
     .map(|received_message| received_message.headers.clone())
     .collect();
-  assert_that!(message_headers).has_length(2);
+  assert_that!(message_headers).has_length(1);
   for headers in message_headers {
     {
       let want_key = "google.devtools.remoteexecution.v1test.requestmetadata-bin";
@@ -1137,33 +1045,25 @@ async fn ensure_inline_stdio_is_stored() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &echo_roland_request().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name.clone(),
-              StdoutType::Raw(test_stdout.string()),
-              StderrType::Raw(test_stderr.string()),
-              0,
-            ),
-          ]),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        ]),
+      }]),
       None,
     )
   };
@@ -1190,7 +1090,6 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
-    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -1199,8 +1098,6 @@ async fn ensure_inline_stdio_is_stored() {
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
-    CACHE_CONCURRENCY_LIMIT,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1221,7 +1118,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stdout.bytes()
     );
@@ -1229,7 +1125,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stderr.bytes()
     );
@@ -1285,38 +1180,30 @@ async fn initial_response_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![MockOperation::new({
-            Operation {
-              name: op_name.to_string(),
-              done: true,
-              result: Some(protos::gen::google::longrunning::operation::Result::Error(
-                protos::gen::google::rpc::Status {
-                  code: Code::Internal as i32,
-                  message: "Something went wrong".to_string(),
-                  ..Default::default()
-                },
-              )),
-              ..Default::default()
-            }
-          })]),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![MockOperation::new({
+          Operation {
+            name: op_name.to_string(),
+            done: true,
+            result: Some(protos::gen::google::longrunning::operation::Result::Error(
+              protos::gen::google::rpc::Status {
+                code: Code::Internal as i32,
+                message: "Something went wrong".to_string(),
+                ..Default::default()
+              },
+            )),
+            ..Default::default()
+          }
+        })]),
+      }]),
       None,
     )
   };
@@ -1325,7 +1212,7 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Internal: Something went wrong");
+  assert_eq!(result.to_string(), "Internal: Something went wrong");
 }
 
 #[tokio::test]
@@ -1335,31 +1222,23 @@ async fn initial_response_missing_response_and_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![MockOperation::new({
-            Operation {
-              name: op_name.to_string(),
-              done: true,
-              ..Default::default()
-            }
-          })]),
-        },
-      ]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![MockOperation::new({
+          Operation {
+            name: op_name.to_string(),
+            done: true,
+            ..Default::default()
+          }
+        })]),
+      }]),
       None,
     )
   };
@@ -1368,7 +1247,10 @@ async fn initial_response_missing_response_and_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Operation finished but no response supplied");
+  assert_eq!(
+    result.to_string(),
+    "Operation finished but no response supplied"
+  );
 }
 
 #[tokio::test]
@@ -1377,20 +1259,14 @@ async fn fails_after_retry_limit_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
         ExpectedAPICall::Execute {
           execute_request: execute_request.clone(),
           stream_responses: Ok(vec![make_retryable_operation_failure()]),
@@ -1425,7 +1301,7 @@ async fn fails_after_retry_limit_exceeded() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last error was: the bot running the task appears to be lost"
   );
 }
@@ -1437,20 +1313,14 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
 
   let mock_server = {
     let op_name = "foo-bar".to_owned();
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
         ExpectedAPICall::Execute {
           execute_request: execute_request.clone(),
           stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
@@ -1485,7 +1355,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last event was the server disconnecting with no error given."
   );
 }
@@ -1500,20 +1370,14 @@ async fn execute_missing_file_uploads_if_known() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (action, _, execute_request) = crate::remote::make_execute_request(
+    let (_, _, execute_request) = crate::remote::make_execute_request(
       &cat_roland_request().try_into().unwrap(),
       ProcessMetadata::default(),
     )
     .unwrap();
 
-    let action_digest = digest(&action).unwrap();
-
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::GetActionResult {
-          action_digest,
-          response: Err(Status::not_found("".to_owned())),
-        },
         ExpectedAPICall::Execute {
           execute_request,
           stream_responses: Ok(vec![
@@ -1574,7 +1438,6 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -1583,8 +1446,6 @@ async fn execute_missing_file_uploads_if_known() {
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
-    CACHE_CONCURRENCY_LIMIT,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1611,16 +1472,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
-        action_digest: hashing::Digest::new(
-          hashing::Fingerprint::from_hex_string(
-            "3174d44cc8d68ec5047f2da24a4db150ab0264a9d6558872081585696a98b410",
-          )
-          .unwrap(),
-          144,
-        ),
-        response: Err(Status::not_found("".to_owned())),
-      }]),
+      mock::execution_server::MockExecution::new(vec![]),
       None,
     )
   };
@@ -1646,7 +1498,6 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
-    &mock_server.address(),
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -1655,8 +1506,6 @@ async fn execute_missing_file_errors_if_unknown() {
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
-    CACHE_CONCURRENCY_LIMIT,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1665,7 +1514,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .run(Context::default(), &mut workunit, cat_roland_request())
     .await
     .expect_err("Want error");
-  assert_contains(&error, &format!("{}", missing_digest.hash));
+  assert_contains(&error.to_string(), &format!("{}", missing_digest.hash));
 }
 
 #[tokio::test]
@@ -1759,7 +1608,7 @@ async fn extract_execute_response_missing_digests() {
 
   assert_eq!(
     extract_execute_response(operation, Platform::Linux_x86_64).await,
-    Err(ExecutionError::MissingDigests(missing_files))
+    Err(ExecutionError::MissingRemoteDigests(missing_files))
   );
 }
 
@@ -1780,7 +1629,7 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1798,7 +1647,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1813,7 +1662,9 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
+    Err(ExecutionError::Fatal(err)) => {
+      assert_contains(&err.to_string().to_lowercase(), "precondition")
+    }
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1839,7 +1690,7 @@ async fn extract_execute_response_other_status() {
   };
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1860,9 +1711,9 @@ async fn remote_workunits_are_stored() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let action_cache = mock::StubActionCache::new().unwrap();
-  let (command_runner, _store) =
-    create_command_runner(action_cache.address(), &cas, Platform::Linux_x86_64);
+  // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
+  // address rather than an Execution address.
+  let (command_runner, _store) = create_command_runner(cas.address(), &cas, Platform::Linux_x86_64);
 
   command_runner
     .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
@@ -2291,19 +2142,17 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   request: Process,
   command_runner: R,
   store: Store,
-) -> Result<RemoteTestResult, String> {
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2312,7 +2161,7 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
 }
 
 fn create_command_runner(
-  address: String,
+  execution_address: String,
   cas: &mock::StubCAS,
   platform: Platform,
 ) -> (CommandRunner, Store) {
@@ -2320,8 +2169,7 @@ fn create_command_runner(
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
-    &address,
-    &address,
+    &execution_address,
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -2330,34 +2178,34 @@ fn create_command_runner(
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
-    CACHE_CONCURRENCY_LIMIT,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
 }
 
-async fn run_command_remote(address: String, request: Process) -> Result<RemoteTestResult, String> {
+async fn run_command_remote(
+  execution_address: String,
+  request: Process,
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .tree(&TestTree::roland_at_root())
     .build();
-  let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux_x86_64);
+  let (command_runner, store) =
+    create_command_runner(execution_address, &cas, Platform::Linux_x86_64);
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
 
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2391,14 +2239,13 @@ async fn extract_execute_response(
   operation: Operation,
   remote_platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
-  let action_cache = mock::StubActionCache::new().expect("failed to create action cache");
-
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let (command_runner, store) =
-    create_command_runner(action_cache.address(), &cas, remote_platform);
+  // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
+  // address rather than an Execution address.
+  let (command_runner, store) = create_command_runner(cas.address(), &cas, remote_platform);
 
   let original = command_runner
     .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
@@ -2407,13 +2254,11 @@ async fn extract_execute_response(
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   let stderr_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   Ok(RemoteTestResult {
@@ -2425,7 +2270,7 @@ async fn extract_execute_response(
 
 async fn extract_output_files_from_response(
   execute_response: &remexec::ExecuteResponse,
-) -> Result<Digest, String> {
+) -> Result<Digest, StoreError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())

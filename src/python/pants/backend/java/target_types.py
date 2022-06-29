@@ -14,6 +14,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -69,6 +70,9 @@ class JunitTestTarget(Target):
 
 class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.java', '!TestIgnore.java']`"
+    )
 
 
 class JunitTestsGeneratorTarget(TargetFilesGenerator):
@@ -108,6 +112,9 @@ class JavaSourceTarget(Target):
 
 class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.java', 'New*.java', '!OldExample.java']`"
+    )
 
 
 class JavaSourcesGeneratorTarget(TargetFilesGenerator):

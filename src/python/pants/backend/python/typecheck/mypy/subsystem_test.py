@@ -22,8 +22,10 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
+from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -88,10 +90,12 @@ def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> N
     maybe_assert_configured(
         has_config=True,
         args=["--py2", "--python-version=3.6"],
-        warning=(
-            "You set `python_version` in mypy.ini (which is used because of either config "
-            "discovery or the `[mypy].config` option) and you set `--py2` in the `--mypy-args` "
-            "option and you set `--python-version` in the `--mypy-args` option."
+        warning=softwrap(
+            """
+            You set `python_version` in mypy.ini (which is used because of either config
+            discovery or the `[mypy].config` option) and you set `--py2` in the `--mypy-args`
+            option and you set `--python-version` in the `--mypy-args` option.
+            """
         ),
     )
     maybe_assert_configured(has_config=False, args=[])
@@ -142,6 +146,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     assert first_party_plugins.source_roots == ("mypy-plugins",)
 
 
+@skip_unless_python39_present
 def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
     global_constraint = "==3.9.*"
 

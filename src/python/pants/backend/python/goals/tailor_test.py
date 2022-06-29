@@ -20,12 +20,7 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -70,7 +65,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--no-python-tailor-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
-            "3rdparty/Pipfile.lock": "",
+            "3rdparty/Pipfile.lock": "{}",
             "3rdparty/pyproject.toml": "[tool.poetry]",
             "3rdparty/requirements-test.txt": "",
             "already_owned/requirements.txt": "",
@@ -95,7 +90,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("3rdparty", "already_owned", "no_match", "src/python/foo", "src/python/foo/bar")
+            ),
             AllOwnedSources(
                 [
                     "already_owned/requirements.txt",
@@ -156,6 +153,61 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_skip_invalid_requirements(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--no-python-tailor-ignore-solitary-init-files"])
+    rule_runner.write_files(
+        {
+            "3rdparty/requirements-valid.txt": b"FooProject >= 1.2",
+            "3rdparty/requirements-invalid.txt": b"FooProject LOLOLOLOL 1.2",
+            "pipfile-valid/Pipfile.lock": b"{}",
+            "pipfile-invalid/Pipfile.lock": b"FNARB",
+            "poetry-valid/pyproject.toml": b"[tool.poetry]",
+            "poetry-invalid/pyproject.toml": b"FNARB",
+        }
+    )
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(
+                (
+                    "3rdparty",
+                    "pipfile-valid",
+                    "pipfile-invalid",
+                    "poetry-valid",
+                    "poetry-invalid",
+                )
+            ),
+            AllOwnedSources([]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="3rdparty",
+                    name="reqs",
+                    triggering_sources=["3rdparty/requirements-valid.txt"],
+                    kwargs={"source": "requirements-valid.txt"},
+                ),
+                PutativeTarget.for_target_type(
+                    PipenvRequirementsTargetGenerator,
+                    path="pipfile-valid",
+                    name="pipenv",
+                    triggering_sources=["pipfile-valid/Pipfile.lock"],
+                ),
+                PutativeTarget.for_target_type(
+                    PoetryRequirementsTargetGenerator,
+                    path="poetry-valid",
+                    name="poetry",
+                    triggering_sources=["poetry-valid/pyproject.toml"],
+                ),
+            ]
+        )
+        == pts
+    )
+
+
 def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -174,9 +226,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(
-                PutativeTargetsSearchPaths(("src/python/foo/bar", "src/python/foo/qux"))
-            ),
+            PutativePythonTargetsRequest(("src/python/foo/bar", "src/python/foo/qux")),
             AllOwnedSources(["src/python/foo/bar/__init__.py", "src/python/foo/bar/bar.py"]),
         ],
     )
@@ -204,18 +254,20 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
         {
             f"src/python/foo/{name}": textwrap.dedent(
                 """
-            if __name__ == "__main__":
-                main()
-            """
+                if __name__ == "__main__":
+                    main()
+                """
             )
             for name in mains
         }
     )
     rule_runner.write_files(
         {
-            "src/python/foo/BUILD": (
-                "pex_binary(name='main1', entry_point='main1.py')\n"
-                "pex_binary(name='main2', entry_point='foo.main2')\n"
+            "src/python/foo/BUILD": textwrap.dedent(
+                """\
+                pex_binary(name='main1', entry_point='main1.py')
+                pex_binary(name='main2', entry_point='foo.main2')
+                """
             ),
             "src/python/foo/__main__.py": "",
         }
@@ -223,7 +275,7 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(("src/python/foo",)),
             AllOwnedSources(
                 [f"src/python/foo/{name}" for name in mains] + ["src/python/foo/__main__.py"]
             ),
@@ -268,7 +320,9 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("src/python/foo", "src/python/foo/bar", "src/python/foo/baz", "src/python/foo/qux")
+            ),
             AllOwnedSources([]),
         ],
     )
@@ -294,60 +348,60 @@ def test_is_entry_point_true() -> None:
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note single quotes.
-    if __name__ == '__main__':
-        main()
-    """
+            # Note single quotes.
+            if __name__ == '__main__':
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note double quotes.
-    if __name__ == "__main__":
-        main()
-    """
+            # Note double quotes.
+            if __name__ == "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note weird extra spaces.
-    if __name__  ==    "__main__":
-        main()
-    """
+            # Note weird extra spaces.
+            if __name__  ==    "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__": # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__": # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":# Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":# Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":        # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":        # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
@@ -356,28 +410,28 @@ def test_is_entry_point_false() -> None:
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note commented out.
-    # if __name__ == "__main__":
-    #    main()
-    """
+            # Note commented out.
+            # if __name__ == "__main__":
+            #    main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note weird indent.
-     if __name__ == "__main__":
-         main()
-    """
+            # Note weird indent.
+             if __name__ == "__main__":
+                 main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note some nonsense, as a soundness check.
-     print(__name__)
-    """
+            # Note some nonsense, as a soundness check.
+            print(__name__)
+            """
         ).encode()
     )

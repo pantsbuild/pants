@@ -3,17 +3,41 @@
 
 from __future__ import annotations
 
+import pytest
+
 from pants.base.specs import (
+    AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
     DirLiteralSpec,
+    RawSpecsWithoutFileOwners,
     RecursiveGlobSpec,
-    SpecsWithoutFileOwners,
 )
+from pants.util.frozendict import FrozenDict
+
+
+@pytest.mark.parametrize(
+    "spec,expected",
+    [
+        (AddressLiteralSpec("dir"), "dir"),
+        (AddressLiteralSpec("dir/f.txt"), "dir/f.txt"),
+        (AddressLiteralSpec("dir", "tgt"), "dir:tgt"),
+        (AddressLiteralSpec("dir", None, "gen"), "dir#gen"),
+        (AddressLiteralSpec("dir", "tgt", "gen"), "dir:tgt#gen"),
+        (
+            AddressLiteralSpec("dir", None, None, FrozenDict({"k1": "v1", "k2": "v2"})),
+            "dir@k1=v1,k2=v1",
+        ),
+        (AddressLiteralSpec("dir", "tgt", None, FrozenDict({"k": "v"})), "dir:tgt@k=v"),
+        (AddressLiteralSpec("dir", "tgt", "gen", FrozenDict({"k": "v"})), "dir:tgt#gen@k=v"),
+    ],
+)
+def address_literal_str(spec: AddressLiteralSpec, expected: str) -> None:
+    assert str(spec) == expected
 
 
 def assert_build_file_globs(
-    specs: SpecsWithoutFileOwners,
+    specs: RawSpecsWithoutFileOwners,
     *,
     expected_build_globs: set[str],
     expected_validation_globs: set[str],
@@ -34,7 +58,7 @@ def test_dir_literal() -> None:
     assert spec.matches_target_residence_dir("dir/subdir/nested") is False
     assert spec.matches_target_residence_dir("another/subdir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(dir_literals=(spec,)),
+        RawSpecsWithoutFileOwners(dir_literals=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD", "dir/BUILD", "dir/subdir/BUILD"},
         expected_validation_globs={"dir/subdir/*"},
     )
@@ -44,7 +68,7 @@ def test_dir_literal() -> None:
     assert spec.matches_target_residence_dir("") is True
     assert spec.matches_target_residence_dir("dir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(dir_literals=(spec,)),
+        RawSpecsWithoutFileOwners(dir_literals=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD"},
         expected_validation_globs={"*"},
     )
@@ -59,7 +83,7 @@ def test_dir_glob() -> None:
     assert spec.matches_target_residence_dir("dir/subdir/nested") is False
     assert spec.matches_target_residence_dir("another/subdir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(dir_globs=(spec,)),
+        RawSpecsWithoutFileOwners(dir_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD", "dir/BUILD", "dir/subdir/BUILD"},
         expected_validation_globs={"dir/subdir/*"},
     )
@@ -69,7 +93,7 @@ def test_dir_glob() -> None:
     assert spec.matches_target_residence_dir("") is True
     assert spec.matches_target_residence_dir("dir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(dir_globs=(spec,)),
+        RawSpecsWithoutFileOwners(dir_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD"},
         expected_validation_globs={"*"},
     )
@@ -85,7 +109,7 @@ def test_recursive_glob() -> None:
     assert spec.matches_target_residence_dir("dir/subdir/nested/again") is True
     assert spec.matches_target_residence_dir("another/subdir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(recursive_globs=(spec,)),
+        RawSpecsWithoutFileOwners(recursive_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD", "dir/BUILD", "dir/subdir/BUILD", "dir/subdir/**/BUILD"},
         expected_validation_globs={"dir/subdir/**"},
     )
@@ -96,7 +120,7 @@ def test_recursive_glob() -> None:
     assert spec.matches_target_residence_dir("dir") is True
     assert spec.matches_target_residence_dir("another_dir") is True
     assert_build_file_globs(
-        SpecsWithoutFileOwners(recursive_globs=(spec,)),
+        RawSpecsWithoutFileOwners(recursive_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD", "**/BUILD"},
         expected_validation_globs={"**"},
     )
@@ -110,7 +134,7 @@ def test_ancestor_glob() -> None:
     assert spec.matches_target_residence_dir("dir/subdir/nested") is False
     assert spec.matches_target_residence_dir("another/subdir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(ancestor_globs=(spec,)),
+        RawSpecsWithoutFileOwners(ancestor_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD", "dir/BUILD", "dir/subdir/BUILD"},
         expected_validation_globs={"dir/subdir/*"},
     )
@@ -119,7 +143,7 @@ def test_ancestor_glob() -> None:
     assert spec.matches_target_residence_dir("") is True
     assert spec.matches_target_residence_dir("dir") is False
     assert_build_file_globs(
-        SpecsWithoutFileOwners(ancestor_globs=(spec,)),
+        RawSpecsWithoutFileOwners(ancestor_globs=(spec,), description_of_origin="tests"),
         expected_build_globs={"BUILD"},
         expected_validation_globs={"*"},
     )

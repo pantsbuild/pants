@@ -18,7 +18,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 use crate::{
   local, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
-  RelativePath,
+  ProcessError, RelativePath,
 };
 
 #[derive(PartialEq, Debug)]
@@ -127,8 +127,8 @@ async fn binary_not_found() {
   let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
     .expect_err("Want Err");
-  assert!(err_string.contains("Failed to execute"));
-  assert!(err_string.contains("echo"));
+  assert!(err_string.to_string().contains("Failed to execute"));
+  assert!(err_string.to_string().contains("echo"));
 }
 
 #[tokio::test]
@@ -452,7 +452,7 @@ async fn test_directory_preservation() {
   let subdirs = testutil::file::list_dir(&preserved_work_root);
   assert_eq!(subdirs.len(), 1);
 
-  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland.ext`
+  // Then look for a file like e.g. `/tmp/abc1234/pants-sandbox-7zt4pH/roland.ext`
   let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
   assert!(&rolands_path.exists());
 
@@ -669,7 +669,7 @@ async fn immutable_inputs() {
       );
       map
     },
-    vec![],
+    BTreeSet::default(),
   )
   .await
   .unwrap();
@@ -734,7 +734,7 @@ async fn prepare_workdir_exclusive_relative() {
     &store,
     TestDirectory::recursive().directory_digest(),
     BTreeMap::new(),
-    vec![],
+    BTreeSet::new(),
   )
   .await
   .unwrap();
@@ -766,7 +766,7 @@ fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, Imm
   )
 }
 
-async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
+async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
@@ -780,7 +780,7 @@ async fn run_command_locally_in_dir(
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<LocalTestResult, String> {
+) -> Result<LocalTestResult, ProcessError> {
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
@@ -798,12 +798,10 @@ async fn run_command_locally_in_dir(
   let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(LocalTestResult {
     original,
     stdout_bytes,

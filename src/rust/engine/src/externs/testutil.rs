@@ -8,8 +8,10 @@ use pyo3::exceptions::PyAssertionError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use crate::externs::scheduler::PyExecutor;
 use testutil_mock::{StubCAS, StubCASBuilder};
+
+use crate::externs::fs::PyFileDigest;
+use crate::externs::scheduler::PyExecutor;
 
 pub fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyStubCAS>()?;
@@ -22,12 +24,20 @@ struct PyStubCASBuilder(Arc<Mutex<Option<StubCASBuilder>>>);
 
 #[pymethods]
 impl PyStubCASBuilder {
-  fn always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
+  fn ac_always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
     let mut builder_opt = self.0.lock();
     let builder = builder_opt
       .take()
       .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
-    *builder_opt = Some(builder.always_errors());
+    *builder_opt = Some(builder.ac_always_errors());
+    Ok(PyStubCASBuilder(self.0.clone()))
+  }
+  fn cas_always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
+    let mut builder_opt = self.0.lock();
+    let builder = builder_opt
+      .take()
+      .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
+    *builder_opt = Some(builder.cas_always_errors());
     Ok(PyStubCASBuilder(self.0.clone()))
   }
 
@@ -55,5 +65,13 @@ impl PyStubCAS {
   #[getter]
   fn address(&self) -> String {
     self.0.address()
+  }
+
+  fn remove(&self, digest: PyFileDigest) -> bool {
+    self.0.remove(digest.0.hash)
+  }
+
+  fn action_cache_len(&self) -> usize {
+    self.0.action_cache.len()
   }
 }

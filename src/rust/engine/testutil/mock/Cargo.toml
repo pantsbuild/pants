@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 async-stream = "0.3"
-protos = { path = "../../protos" }
 bytes = "1.0"
 futures = "0.3"
 grpc_util = { path = "../../grpc_util" }
@@ -17,6 +16,7 @@ log = "0.4"
 parking_lot = "0.12"
 prost = "0.9"
 prost-types = "0.9"
+protos = { path = "../../protos" }
 testutil = { path = ".." }
 tokio = { version = "1.16", features = ["time"] }
 tonic = { version = "0.6" }

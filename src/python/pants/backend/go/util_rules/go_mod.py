@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs import AncestorGlobSpec, Specs
+from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
@@ -21,6 +21,7 @@ from pants.engine.target import (
     InvalidTargetException,
     UnexpandedTargets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
 
@@ -44,7 +45,11 @@ class OwningGoMod:
 async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     # We don't expect `go_mod` targets to be generated, so we can use UnexpandedTargets.
     candidate_targets = await Get(
-        UnexpandedTargets, Specs(ancestor_globs=(AncestorGlobSpec(request.address.spec_path),))
+        UnexpandedTargets,
+        RawSpecs(
+            ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
+            description_of_origin="the `OwningGoMod` rule",
+        ),
     )
 
     # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
@@ -88,7 +93,10 @@ async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     if isinstance(request.source, Address):
-        wrapped_target = await Get(WrappedTarget, Address, request.source)
+        wrapped_target = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(request.source, description_of_origin="<go mod info rule>"),
+        )
         sources_field = wrapped_target.target[GoModSourcesField]
     else:
         sources_field = request.source

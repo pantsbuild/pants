@@ -11,7 +11,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, Spec, Specs
+from pants.base.deprecated import warn_or_error
+from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -22,6 +23,7 @@ from pants.engine.fs import (
     FileContent,
     PathGlobs,
     Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -39,6 +41,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.docutil import bin_name, doc_url
@@ -52,15 +55,34 @@ from pants.util.strutil import softwrap
 @union
 @dataclass(frozen=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
-    search_paths: PutativeTargetsSearchPaths
+    dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
+
+    def path_globs(self, *filename_globs: str) -> PathGlobs:
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, glob) for d in self.dirs for glob in filename_globs),
+                *(
+                    os.path.join(d, "**", glob)
+                    for d in self.deprecated_recursive_dirs
+                    for glob in filename_globs
+                ),
+            )
+        )
 
 
 @dataclass(frozen=True)
 class PutativeTargetsSearchPaths:
     dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
 
     def path_globs(self, filename_glob: str) -> PathGlobs:
-        return PathGlobs([os.path.join(d, "**", filename_glob) for d in self.dirs])
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, filename_glob) for d in self.dirs),
+                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+            )
+        )
 
 
 @memoized
@@ -241,7 +263,14 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = "Auto-generate BUILD file targets for new source files."
+    help = softwrap(
+        """
+        Auto-generate BUILD file targets for new source files.
+
+        Each specific `tailor` implementation may be disabled through language-specific options,
+        e.g. `[python].tailor_pex_binary_targets` and `[shell-setup].tailor`.
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -454,7 +483,10 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
         UnexpandedTargets,
-        Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
+        RawSpecs(
+            ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
+            description_of_origin="the `tailor` goal",
+        ),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
@@ -543,7 +575,7 @@ async def edit_build_files(
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
-def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
+def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
     """Extract cmd-line specs that look like directories.
 
     Error on all other specs.
@@ -566,9 +598,25 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
             other_specs.append(spec)
     if other_specs:
         raise ValueError(
-            "The tailor goal only accepts literal directories as arguments, but you "
-            f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
-            "specify no arguments to run against the entire repository."
+            softwrap(
+                f"""
+                The global option `use_deprecated_cli_args_semantics` is set to `true`, so the
+                tailor goal is using deprecated semantics for CLI arguments. In this mode, the
+                tailor goal only accepts literal directories as arguments, which it will run
+                recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
+
+                To fix, either use the default value of `use_deprecated_cli_args_semantics` of
+                false, or rerun with
+                specifying only literal directories, e.g. `{bin_name()} tailor dir1 dir2`. If
+                changing `use_deprecated_cli_args_semantics` to false, you should specify which
+                directories to run on when using `tailor`:
+
+                  * `{bin_name()} tailor ::` to run on everything
+                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                  * `{bin_name()} tailor dir` to run on `dir`
+                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
+                """
+            )
         )
     # No specs at all means search the entire repo.
     return tuple(dir_specs) or ("",)
@@ -582,12 +630,44 @@ async def tailor(
     union_membership: UnionMembership,
     specs: Specs,
     build_file_options: BuildFileOptions,
+    global_options: GlobalOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
-    search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
+    dir_search_paths: tuple[str, ...] = ()
+    recursive_search_paths: tuple[str, ...] = ()
+    if specs:
+        if global_options.use_deprecated_directory_cli_args_semantics:
+            recursive_search_paths = specs_to_dirs(specs.includes)
+        else:
+            specs_paths = await Get(SpecsPaths, Specs, specs)
+            dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+    else:
+        warn_or_error(
+            "2.14.0.dev1",
+            f"running `{bin_name()} tailor` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} tailor` without arguments will run against
+                every file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `{bin_name()} tailor ::` to run on everything
+                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                  * `{bin_name()} tailor dir` to run on `dir`
+                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
+                """
+            ),
+        )
+        recursive_search_paths = ("",)
+
     putative_targets_results = await MultiGet(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
+        Get(
+            PutativeTargets,
+            PutativeTargetsRequest,
+            req_type(dir_search_paths, recursive_search_paths),
+        )
         for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)

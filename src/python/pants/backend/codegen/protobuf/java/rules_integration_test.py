@@ -7,6 +7,10 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -17,6 +21,8 @@ from pants.backend.codegen.protobuf.target_types import rules as target_types_ru
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GRPC_PROTO_STANZA = """
@@ -43,16 +49,32 @@ message HelloReply {
 
 
 @pytest.fixture
+def protobuf_java_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protobuf-java.test.lock",
+        ["com.google.protobuf:protobuf-java:3.19.4"],
+    )
+
+
+@pytest.fixture
+def protobuf_java_lockfile(
+    protobuf_java_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return protobuf_java_lockfile_def.load(request)
+
+
+@pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *artifact_mapper.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget],
+        target_types=[ProtobufSourcesGeneratorTarget, JvmArtifactTarget],
     )
 
 
@@ -77,7 +99,9 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
-def test_generates_java(rule_runner: RuleRunner) -> None:
+def test_generates_java(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Protobuf files can import other protobuf files, and those can import others
@@ -129,6 +153,8 @@ def test_generates_java(rule_runner: RuleRunner) -> None:
             "tests/protobuf/test_protos/BUILD": (
                 "protobuf_sources(dependencies=['src/protobuf/dir2'])"
             ),
+            "3rdparty/jvm/default.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
 

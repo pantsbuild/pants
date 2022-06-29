@@ -16,7 +16,7 @@ use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
-use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
+use crate::{EntryType, FileContent, Store, StoreError, UploadSummary, MEGABYTES};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -55,7 +55,7 @@ pub fn extra_big_file_bytes() -> Bytes {
   bytes.freeze()
 }
 
-pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
+pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
   store
     .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
     .await
@@ -120,7 +120,7 @@ async fn load_file_prefers_local() {
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
+    Ok(testdata.bytes())
   );
   assert_eq!(0, cas.read_request_count());
 }
@@ -141,7 +141,6 @@ async fn load_directory_prefers_local() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
       .unwrap(),
     testdir.directory()
   );
@@ -157,7 +156,7 @@ async fn load_file_falls_back_and_backfills() {
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes())),
+    Ok(testdata.bytes()),
     "Read from CAS"
   );
   assert_eq!(1, cas.read_request_count());
@@ -184,7 +183,6 @@ async fn load_directory_falls_back_and_backfills() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
       .unwrap(),
     testdir.directory()
   );
@@ -227,17 +225,16 @@ async fn load_recursive_directory() {
 
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), roland.digest()).await,
-    Ok(Some(roland.bytes()))
+    Ok(roland.bytes())
   );
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
+    Ok(catnip.bytes())
   );
   assert_eq!(
     new_local_store(dir.path())
       .load_directory(testdir_digest,)
       .await
-      .unwrap()
       .unwrap(),
     testdir_directory
   );
@@ -245,7 +242,6 @@ async fn load_recursive_directory() {
     new_local_store(dir.path())
       .load_directory(recursive_testdir_digest.as_digest())
       .await
-      .unwrap()
       .unwrap(),
     recursive_testdir_directory
   );
@@ -256,28 +252,24 @@ async fn load_file_missing_is_none() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_empty_cas();
-  assert_eq!(
-    load_file_bytes(
-      &new_store(dir.path(), &cas.address()),
-      TestData::roland().digest()
-    )
-    .await,
-    Ok(None)
-  );
+  let result = load_file_bytes(
+    &new_store(dir.path(), &cas.address()),
+    TestData::roland().digest(),
+  )
+  .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
 #[tokio::test]
-async fn load_directory_missing_is_none() {
+async fn load_directory_missing_errors() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_empty_cas();
-  assert_eq!(
-    new_store(dir.path(), &cas.address())
-      .load_directory(TestDirectory::containing_roland().digest(),)
-      .await,
-    Ok(None)
-  );
+  let result = new_store(dir.path(), &cas.address())
+    .load_directory(TestDirectory::containing_roland().digest())
+    .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
@@ -286,7 +278,7 @@ async fn load_file_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
   let error = load_file_bytes(
     &new_store(dir.path(), &cas.address()),
     TestData::roland().digest(),
@@ -299,7 +291,9 @@ async fn load_file_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -309,7 +303,7 @@ async fn load_directory_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
   let error = new_store(dir.path(), &cas.address())
     .load_directory(TestData::roland().digest())
     .await
@@ -320,7 +314,9 @@ async fn load_directory_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -523,8 +519,8 @@ async fn expand_missing_directory() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!("{:?}", digest)),
-    "Bad error message: {}",
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
     error
   );
 }
@@ -545,10 +541,7 @@ async fn expand_directory_missing_subdir() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!(
-      "{}",
-      TestDirectory::containing_roland().fingerprint()
-    )),
+    matches!(error, StoreError::MissingDigest { .. }),
     "Bad error message: {}",
     error
   );
@@ -752,9 +745,10 @@ async fn upload_missing_files() {
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!("Failed to expand digest {:?}: Not found", testdata.digest())
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 
@@ -777,13 +771,10 @@ async fn upload_missing_file_in_directory() {
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!(
-      "Failed to upload File {:?}: Not found in local store.",
-      TestData::roland().digest()
-    ),
-    "Bad error message"
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 
@@ -886,7 +877,6 @@ async fn instance_name_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
       .unwrap(),
     TestData::roland().bytes()
   )
@@ -971,7 +961,6 @@ async fn auth_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
       .unwrap(),
     TestData::roland().bytes()
   )

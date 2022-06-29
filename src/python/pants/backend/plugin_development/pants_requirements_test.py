@@ -16,7 +16,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -37,7 +37,7 @@ def test_target_generator() -> None:
     rule_runner = RuleRunner(
         rules=(
             *pants_requirements.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ),
         target_types=[PantsRequirementsTargetGenerator],
     )
@@ -54,7 +54,12 @@ def test_target_generator() -> None:
     )
 
     result = rule_runner.request(
-        _TargetParametrizations, [Address("", target_name="default")]
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="default"), description_of_origin="tests"
+            )
+        ],
     ).parametrizations
     assert len(result) == 2
     pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild.pants")
@@ -73,7 +78,12 @@ def test_target_generator() -> None:
         assert not t[PythonRequirementResolveField].value
 
     result = rule_runner.request(
-        _TargetParametrizations, [Address("", target_name="no_testutil")]
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="no_testutil"), description_of_origin="tests"
+            )
+        ],
     ).parametrizations
     assert len(result) == 1
     assert next(iter(result.keys())).generated_name == "pantsbuild.pants"

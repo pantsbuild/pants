@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Debug};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +16,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
   CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
-  Process,
+  Process, ProcessError
 };
 
 #[cfg(test)]
@@ -110,6 +111,14 @@ impl CommandRunner {
   }
 }
 
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("nailgun::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
+  }
+}
+
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
   async fn run_coalesced_batch(
@@ -126,7 +135,7 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     if req.input_digests.use_nailgun.is_empty() {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;
@@ -150,7 +159,8 @@ impl super::CommandRunner for CommandRunner {
           client_args,
           client_main_class,
           ..
-        } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
+        } = ParsedJVMCommandLines::parse_command_lines(&req.argv)
+          .map_err(ProcessError::Unclassified)?;
 
         let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
         let (client_input_digests, server_input_digests) =
@@ -174,7 +184,7 @@ impl super::CommandRunner for CommandRunner {
             self.inner.immutable_inputs(),
           )
           .await
-          .map_err(|e| format!("Failed to connect to nailgun! {}", e))?;
+          .map_err(|e| e.enrich("Failed to connect to nailgun"))?;
 
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
@@ -205,7 +215,7 @@ impl super::CommandRunner for CommandRunner {
         // release, it assumes that it has been canceled and kills the server.
         nailgun_process.release().await?;
 
-        res
+        Ok(res?)
       }
     )
     .await

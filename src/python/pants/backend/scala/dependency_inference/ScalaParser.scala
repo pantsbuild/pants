@@ -25,18 +25,21 @@ case class AnImport(
 )
 
 case class Analysis(
-    providedSymbols: Vector[String],
-    providedSymbolsEncoded: Vector[String],
+    providedSymbols: Vector[Analysis.ProvidedSymbol],
+    providedSymbolsEncoded: Vector[Analysis.ProvidedSymbol],
     importsByScope: HashMap[String, ArrayBuffer[AnImport]],
     consumedSymbolsByScope: HashMap[String, HashSet[String]],
     scopes: Vector[String]
 )
+object Analysis {
+  case class ProvidedSymbol(name: String, recursive: Boolean)
+}
 
-case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
+case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean, recursive: Boolean)
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
-  var skipProvidedNames = false
+  var skipProvidedNames = false  
 
   val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
@@ -111,7 +114,8 @@ class SourceAnalysisTraverser extends Traverser {
       symbolName: String,
       sawClass: Boolean = false,
       sawTrait: Boolean = false,
-      sawObject: Boolean = false
+      sawObject: Boolean = false,
+      recursive: Boolean = false
   ): Unit = {
     if (!skipProvidedNames) {
       val fullPackageName = nameParts.mkString(".")
@@ -125,14 +129,16 @@ class SourceAnalysisTraverser extends Traverser {
         val newSymbol = ProvidedSymbol(
           sawClass = existingSymbol.sawClass || sawClass,
           sawTrait = existingSymbol.sawTrait || sawTrait,
-          sawObject = existingSymbol.sawObject || sawObject
+          sawObject = existingSymbol.sawObject || sawObject,
+          recursive = existingSymbol.recursive || recursive
         )
         providedSymbols(symbolName) = newSymbol
       } else {
         providedSymbols(symbolName) = ProvidedSymbol(
           sawClass = sawClass,
           sawTrait = sawTrait,
-          sawObject = sawObject
+          sawObject = sawObject,
+          recursive = recursive
         )
       }
     }
@@ -186,7 +192,8 @@ class SourceAnalysisTraverser extends Traverser {
 
   def visitMods(mods: List[Mod]): Unit = {
     mods.foreach({
-      case Mod.Annot(init) => apply(init) // rely on `Init` extraction in main parsing match code
+      case Mod.Annot(init) =>        
+        apply(init) // rely on `Init` extraction in main parsing match code        
       case _               => ()
     })
   }
@@ -206,31 +213,44 @@ class SourceAnalysisTraverser extends Traverser {
       visitTemplate(templ, name)
     }
 
-    case Defn.Class(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Class(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 
-    case Defn.Trait(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Trait(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawTrait = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 
     case Defn.Object(mods, nameNode, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
-      recordProvidedName(name, sawObject = true)
-      visitTemplate(templ, name)
+
+      // TODO: should object already be recursive?
+      // an object is recursive if extends another type because we cannot figure out the provided types
+      // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
+      val recursive = !templ.inits.isEmpty
+      recordProvidedName(name, sawObject = true, recursive = recursive)
+      
+      // If the object is recursive, no need to provide the symbols inside
+      if (recursive)
+        withSuppressProvidedNames(() => visitTemplate(templ, name))
+      else
+        visitTemplate(templ, name)
     }
 
-    case Defn.Type(mods, nameNode, _tparams, _body) => {
+    case Defn.Type(mods, nameNode, _tparams, body) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name)
+      extractNamesFromTypeTree(body).foreach(recordConsumedSymbol(_))
     }
 
     case Defn.Val(mods, pats, decltpe, rhs) => {
@@ -240,7 +260,7 @@ class SourceAnalysisTraverser extends Traverser {
         recordProvidedName(name)
       })
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -271,6 +291,22 @@ class SourceAnalysisTraverser extends Traverser {
       withSuppressProvidedNames(() => apply(body))
     }
 
+    case Decl.Def(mods, _nameNode, _tparams, params, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      params.foreach(param => apply(param))
+    }
+
+    case Decl.Val(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
+    case Decl.Var(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
     case Import(importers) => {
       importers.foreach({ case Importer(ref, importees) =>
         val baseName = extractName(ref)
@@ -296,8 +332,9 @@ class SourceAnalysisTraverser extends Traverser {
       })
     }
 
-    case Init(tpe, _name, _argss) => {
-      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+    case Init(tpe, _name, argss) => {
+      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))      
+      argss.foreach(_.foreach(apply))
     }
 
     case Term.Param(mods, _name, decltpe, _default) => {
@@ -325,7 +362,7 @@ class SourceAnalysisTraverser extends Traverser {
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
       recordConsumedSymbol(name)
-      super.apply(node.qual)
+      apply(node.qual)
     }
 
     case node @ Term.Name(_) => {
@@ -336,30 +373,30 @@ class SourceAnalysisTraverser extends Traverser {
     case node => super.apply(node)
   }
 
-  def gatherProvidedSymbols(): Vector[String] = {
+  def gatherProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
-        symbolsForScope.keys.map(symbolName => s"${scopeName}.${symbolName}").toVector
+        symbolsForScope.map { case(symbolName, symbol) => Analysis.ProvidedSymbol(s"${scopeName}.${symbolName}", symbol.recursive)}.toVector
       })
       .toVector
   }
 
-  def gatherEncodedProvidedSymbols(): Vector[String] = {
+  def gatherEncodedProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         val encodedSymbolsForScope = symbolsForScope.flatMap({
           case (symbolName, symbol) => {
             val encodedSymbolName = NameTransformer.encode(symbolName)
-            val result = ArrayBuffer[String](encodedSymbolName)
+            val result = ArrayBuffer[Analysis.ProvidedSymbol](Analysis.ProvidedSymbol(encodedSymbolName, symbol.recursive))
             if (symbol.sawObject) {
-              result.append(encodedSymbolName + "$")
-              result.append(encodedSymbolName + "$.MODULE$")
+              result.append(Analysis.ProvidedSymbol(encodedSymbolName + "$", symbol.recursive))
+              result.append(Analysis.ProvidedSymbol(encodedSymbolName + "$.MODULE$", symbol.recursive))
             }
             result.toVector
           }
         })
 
-        encodedSymbolsForScope.map(symbolName => s"${scopeName}.${symbolName}")
+        encodedSymbolsForScope.map(symbol => symbol.copy(name = s"${scopeName}.${symbol.name}"))
       })
       .toVector
   }
@@ -376,11 +413,26 @@ class SourceAnalysisTraverser extends Traverser {
 }
 
 object ScalaParser {
-  def analyze(pathStr: String): Analysis = {
+  def analyze(pathStr: String, scalaVersion: String, source3: Boolean): Analysis = {
     val path = java.nio.file.Paths.get(pathStr)
     val bytes = java.nio.file.Files.readAllBytes(path)
     val text = new String(bytes, "UTF-8")
-    val input = Input.VirtualFile(path.toString, text)
+
+    val dialect =
+      scalaVersion.take(4) match {
+        case "2.10"            => dialects.Scala210
+        case "2.11"            => dialects.Scala211
+        case "2.12" if source3 => dialects.Scala212Source3
+        case "2.12"            => dialects.Scala212
+        case "2.13" if source3 => dialects.Scala213Source3
+        case "2.13"            => dialects.Scala213
+        case "3.0"             => dialects.Scala3
+        case _ =>
+          if (scalaVersion.take(2) == "3.") dialects.Scala3
+          else dialects.Scala213
+      }
+
+    val input = dialect(Input.VirtualFile(path.toString, text))
 
     val tree = input.parse[Source].get
 
@@ -391,7 +443,10 @@ object ScalaParser {
 
   def main(args: Array[String]): Unit = {
     val outputPath = java.nio.file.Paths.get(args(0))
-    val analysis = analyze(args(1))
+    val pathStr = args(1)
+    val scalaVersion = args(2)
+    val source3 = args(3).toBoolean
+    val analysis = analyze(pathStr, scalaVersion, source3)
 
     val json = analysis.asJson.noSpaces
     java.nio.file.Files.write(

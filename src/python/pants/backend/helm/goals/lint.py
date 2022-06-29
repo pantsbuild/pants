@@ -7,7 +7,11 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartLintStrictField
+from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
+    HelmChartLintStrictField,
+    HelmSkipLintField,
+)
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
@@ -23,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class HelmLintFieldSet(HelmChartFieldSet):
     lint_strict: HelmChartLintStrictField
+    skip_lint: HelmSkipLintField
 
 
 class HelmLintRequest(LintTargetsRequest):
@@ -33,7 +38,9 @@ class HelmLintRequest(LintTargetsRequest):
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem) -> LintResults:
     charts = await MultiGet(
-        Get(HelmChart, HelmChartRequest(field_set)) for field_set in request.field_sets
+        Get(HelmChart, HelmChartRequest(field_set))
+        for field_set in request.field_sets
+        if not field_set.skip_lint.value
     )
     logger.debug(f"Linting {pluralize(len(charts), 'chart')}...")
 

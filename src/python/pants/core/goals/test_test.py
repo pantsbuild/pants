@@ -25,6 +25,7 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -33,6 +34,7 @@ from pants.core.goals.test import (
     build_runtime_package_dependencies,
     run_tests,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -54,7 +56,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
@@ -157,6 +159,7 @@ def run_test_rule(
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
+        debug_adapter=False,
         use_coverage=use_coverage,
         report=report,
         report_dir=report_dir,
@@ -164,6 +167,11 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
+    )
+    debug_adapter_subsystem = create_subsystem(
+        DebugAdapterSubsystem,
+        host="127.0.0.1",
+        port="5678",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
@@ -183,6 +191,11 @@ def run_test_rule(
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
+    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
+        return TestDebugAdapterRequest(
+            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
+        )
+
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
     ) -> CoverageReports:
@@ -200,6 +213,7 @@ def run_test_rule(
             rule_args=[
                 console,
                 test_subsystem,
+                debug_adapter_subsystem,
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -220,6 +234,11 @@ def run_test_rule(
                     output_type=TestDebugRequest,
                     input_type=TestFieldSet,
                     mock=mock_debug_request,
+                ),
+                MockGet(
+                    output_type=TestDebugAdapterRequest,
+                    input_type=TestFieldSet,
+                    mock=mock_debug_adapter_request,
                 ),
                 # Merge XML results.
                 MockGet(

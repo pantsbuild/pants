@@ -11,7 +11,7 @@ from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
-from pants.base.specs import RecursiveGlobSpec, Specs
+from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
 from pants.engine.rules import QueryRule
@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *distdir.rules(),
-            QueryRule(Targets, [Specs]),
+            QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
         target_types=[PythonRequirementTarget],
@@ -63,7 +63,12 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
             env_inherit={"PATH", "PYENV_ROOT"},
         )
         targets = rule_runner.request(
-            Targets, [Specs(recursive_globs=(RecursiveGlobSpec("src/foo"),))]
+            Targets,
+            [
+                RawSpecs(
+                    recursive_globs=(RecursiveGlobSpec("src/foo"),), description_of_origin="tests"
+                )
+            ],
         )
         all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 

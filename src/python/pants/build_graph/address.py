@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
+from pants.base.exceptions import MappingError
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (  # noqa: F401
@@ -15,7 +17,8 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 )
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import strip_prefix
+from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list, softwrap, strip_prefix
 
 # `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
@@ -23,27 +26,28 @@ BANNED_CHARS_IN_GENERATED_NAME = frozenset(r":#!@?=")
 BANNED_CHARS_IN_PARAMETERS = frozenset(r":#!@?=, ")
 
 
-class InvalidAddress(ValueError):
+class InvalidAddressError(AddressParseException):
     pass
 
 
-class InvalidSpecPath(InvalidAddress):
+class InvalidSpecPathError(InvalidAddressError):
     """Indicate an invalid spec path for `Address`."""
 
 
-class InvalidTargetName(InvalidAddress):
+class InvalidTargetNameError(InvalidAddressError):
     """Indicate an invalid target name for `Address`."""
 
 
-class InvalidParameters(InvalidAddress):
+class InvalidParametersError(InvalidAddressError):
     """Indicate invalid parameter values for `Address`."""
 
 
-class UnsupportedWildcard(InvalidAddress):
+class UnsupportedWildcardError(InvalidAddressError):
     """Indicate that an address wildcard was used."""
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
 
@@ -52,47 +56,105 @@ class AddressInput:
     """
 
     path_component: str
-    target_component: str | None = None
-    generated_component: str | None = None
-    parameters: FrozenDict[str, str] = FrozenDict()
+    target_component: str | None
+    generated_component: str | None
+    parameters: FrozenDict[str, str]
+    description_of_origin: str
 
-    def __post_init__(self):
-        if self.target_component is not None or self.path_component == "":
-            if not self.target_component:
-                raise InvalidTargetName(
-                    f"Address spec {self.path_component}:{self.target_component} has no name part."
+    def __init__(
+        self,
+        path_component: str,
+        target_component: str | None = None,
+        *,
+        generated_component: str | None = None,
+        parameters: Mapping[str, str] = FrozenDict(),
+        description_of_origin: str,
+    ) -> None:
+        self.path_component = path_component
+        self.target_component = target_component
+        self.generated_component = generated_component
+        self.parameters = FrozenDict(parameters)
+        self.description_of_origin = description_of_origin
+
+        if not self.target_component:
+            if self.target_component is not None:
+                raise InvalidTargetNameError(
+                    softwrap(
+                        f"""
+                        Address `{self.spec}` from {self.description_of_origin} sets
+                        the name component to the empty string, which is not legal.
+                        """
+                    )
+                )
+            if self.path_component == "":
+                raise InvalidTargetNameError(
+                    softwrap(
+                        f"""
+                        Address `{self.spec}` from {self.description_of_origin} has no name part,
+                        but it's necessary because the path is the build root.
+                        """
+                    )
                 )
 
         if self.path_component != "":
-            components = self.path_component.split(os.sep)
-            if any(component in (".", "..", "") for component in components):
-                raise InvalidSpecPath(
-                    f"Address spec has un-normalized path part '{self.path_component}'"
-                )
             if os.path.isabs(self.path_component):
-                raise InvalidSpecPath(
-                    f"Address spec has absolute path {self.path_component}; expected a path relative "
-                    "to the build root."
+                raise InvalidSpecPathError(
+                    softwrap(
+                        f"""
+                        Invalid address {self.spec} from {self.description_of_origin}. Cannot use
+                        absolute paths.
+                        """
+                    )
+                )
+
+            invalid_component = next(
+                (
+                    component
+                    for component in self.path_component.split(os.sep)
+                    if component in (".", "..", "")
+                ),
+                None,
+            )
+            if invalid_component is not None:
+                raise InvalidSpecPathError(
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has an
+                        un-normalized path part: '{os.sep}{invalid_component}'.
+                        """
+                    )
                 )
 
         for k, v in self.parameters.items():
-            key_banned = BANNED_CHARS_IN_PARAMETERS & set(k)
+            key_banned = set(BANNED_CHARS_IN_PARAMETERS & set(k))
             if key_banned:
-                raise InvalidParameters(
-                    f"Address spec has illegal characters in parameter keys: `{key_banned}` in `{k}={v}`."
+                raise InvalidParametersError(
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has
+                        illegal characters in parameter keys: `{key_banned}` in `{k}={v}`.
+                        """
+                    )
                 )
-            val_banned = BANNED_CHARS_IN_PARAMETERS & set(v)
+            val_banned = set(BANNED_CHARS_IN_PARAMETERS & set(v))
             if val_banned:
-                raise InvalidParameters(
-                    f"Address spec has illegal characters in parameter values: `{val_banned}` in `{k}={v}`."
+                raise InvalidParametersError(
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has
+                        illegal characters in parameter values: `{val_banned}` in `{k}={v}`.
+                        """
+                    )
                 )
 
     @classmethod
     def parse(
         cls,
         spec: str,
+        *,
         relative_to: str | None = None,
         subproject_roots: Sequence[str] | None = None,
+        description_of_origin: str,
     ) -> AddressInput:
         """Parse a string into an AddressInput.
 
@@ -101,6 +163,8 @@ class AddressInput:
           interprets the missing spec_path part as `relative_to`.
         :param subproject_roots: Paths that correspond with embedded build roots under
           the current build root.
+        :param description_of_origin: where the AddressInput comes from, e.g. "CLI arguments" or
+          "the option `--paths-from`". This is used for better error messages.
 
         For example:
 
@@ -163,8 +227,13 @@ class AddressInput:
         ) = native_engine.address_spec_parse(spec)
 
         if wildcard:
-            raise UnsupportedWildcard(
-                f"The address `{spec}` included a wildcard (`{wildcard}`), which is not supported."
+            raise UnsupportedWildcardError(
+                softwrap(
+                    f"""
+                    The address `{spec}` from {description_of_origin} ended in a wildcard
+                    (`{wildcard}`), which is not supported.
+                    """
+                )
             )
 
         normalized_relative_to = None
@@ -180,7 +249,11 @@ class AddressInput:
         path_component = prefix_subproject(strip_prefix(path_component, "//"))
 
         return cls(
-            path_component, target_component, generated_component, FrozenDict(sorted(parameters))
+            path_component,
+            target_component,
+            generated_component=generated_component,
+            parameters=FrozenDict(sorted(parameters)),
+            description_of_origin=description_of_origin,
         )
 
     def file_to_address(self) -> Address:
@@ -192,10 +265,15 @@ class AddressInput:
             # AddressSpec constructor because we weren't sure if the path_spec referred to a file
             # vs. a directory.
             if not spec_path:
-                raise InvalidTargetName(
-                    "Top-level file specs must include which target they come from, such as "
-                    f"`{self.path_component}:original_target`, but {self.path_component} did not "
-                    f"have an address."
+                raise InvalidTargetNameError(
+                    softwrap(
+                        f"""
+                        Addresses for generated first-party targets in the build root must include
+                        which target generator they come from, such as
+                        `{self.path_component}:original_target`. However, `{self.spec}`
+                        from {self.description_of_origin} did not have a target name.
+                        """
+                    )
                 )
             return Address(
                 spec_path=spec_path,
@@ -217,20 +295,31 @@ class AddressInput:
 
         expected_prefix = f"..{os.path.sep}" * parent_count
         if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
-            raise InvalidTargetName(
-                "A target may only be defined in a directory containing a file that it owns in "
-                f"the filesystem: `{self.target_component}` is not at-or-above the file "
-                f"`{self.path_component}`."
+            raise InvalidTargetNameError(
+                softwrap(
+                    f"""
+                    Invalid address `{self.spec}` from {self.description_of_origin}. The target
+                    name portion of the address must refer to a target defined in the same
+                    directory or a parent directory of the file path `{self.path_component}`, but
+                    the value `{self.target_component}` is a subdirectory.
+                    """
+                )
             )
 
         # Split the path_component into a spec_path and relative_file_path at the appropriate
         # position.
         path_components = self.path_component.split(os.path.sep)
         if len(path_components) <= parent_count:
-            raise InvalidTargetName(
-                "Targets are addressed relative to the files that they own: "
-                f"`{self.target_component}` is too far above the file `{self.path_component}` to "
-                "be valid."
+            raise InvalidTargetNameError(
+                softwrap(
+                    f"""
+                    Invalid address `{self.spec}` from {self.description_of_origin}. The target
+                    name portion of the address `{self.target_component}` has too many `../`, which
+                    means it refers to a directory above the file path `{self.path_component}`.
+                    Expected no more than {len(path_components) -1 } instances of `../` in
+                    `{self.target_component}`, but found {parent_count} instances.
+                    """
+                )
             )
         offset = -1 * (parent_count + 1)
         spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
@@ -251,6 +340,18 @@ class AddressInput:
             generated_name=self.generated_component,
             parameters=self.parameters,
         )
+
+    @property
+    def spec(self) -> str:
+        rep = self.path_component or "//"
+        if self.generated_component:
+            rep += f"#{self.generated_component}"
+        if self.target_component:
+            rep += f":{self.target_component}"
+        if self.parameters:
+            params_vals = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+            rep += f"@{params_vals}"
+        return rep
 
 
 class Address(EngineAwareParameter):
@@ -295,7 +396,7 @@ class Address(EngineAwareParameter):
                 )
             banned_chars = BANNED_CHARS_IN_GENERATED_NAME & set(generated_name)
             if banned_chars:
-                raise InvalidTargetName(
+                raise InvalidTargetNameError(
                     f"The generated name `{generated_name}` (defined in directory "
                     f"{self.spec_path}, the part after `#`) contains banned characters "
                     f"(`{'`,`'.join(banned_chars)}`). Please replace "
@@ -307,7 +408,7 @@ class Address(EngineAwareParameter):
         if target_name and target_name != os.path.basename(self.spec_path):
             banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(target_name)
             if banned_chars:
-                raise InvalidTargetName(
+                raise InvalidTargetNameError(
                     f"The target name {target_name} (defined in directory {self.spec_path}) "
                     f"contains banned characters (`{'`,`'.join(banned_chars)}`). Please replace "
                     "these characters with another separator character like `_` or `-`."
@@ -318,7 +419,7 @@ class Address(EngineAwareParameter):
             (self.spec_path, self._target_name, self.generated_name, self._relative_file_path)
         )
         if PurePath(spec_path).name.startswith("BUILD"):
-            raise InvalidSpecPath(
+            raise InvalidSpecPathError(
                 f"The address {self.spec} has {PurePath(spec_path).name} as the last part of its "
                 f"path, but BUILD is a reserved name. Please make sure that you did not name any "
                 f"directories BUILD."
@@ -331,14 +432,6 @@ class Address(EngineAwareParameter):
     @property
     def is_file_target(self) -> bool:
         return self._relative_file_path is not None
-
-    @property
-    def is_default_target(self) -> bool:
-        """True if this is address refers to the "default" target in the spec_path.
-
-        The default target has a target name equal to the directory name.
-        """
-        return self._target_name is None
 
     @property
     def is_parametrized(self) -> bool:
@@ -518,12 +611,61 @@ class Address(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class BuildFileAddress:
-    """Represents the address of a type materialized from a BUILD file.
-
-    TODO: This type should likely be removed in favor of storing this information on Target.
-    """
+class BuildFileAddressRequest(EngineAwareParameter):
+    """A request to find the BUILD file path for an address."""
 
     address: Address
-    # The relative path of the BUILD file this Address came from.
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+
+@dataclass(frozen=True)
+class BuildFileAddress:
+    """An address, along with the relative file path of its BUILD file."""
+
+    address: Address
     rel_path: str
+
+
+class ResolveError(MappingError):
+    """Indicates an error resolving targets."""
+
+    @classmethod
+    def did_you_mean(
+        cls,
+        bad_address: Address,
+        *,
+        description_of_origin: str,
+        known_names: Iterable[str],
+        namespace: str,
+    ) -> ResolveError:
+        return cls(
+            softwrap(
+                f"""
+                The address {bad_address} from {description_of_origin} does not exist.
+
+                The target name ':{bad_address.target_name}' is not defined in the directory
+                {namespace}. Did you mean one of these target names?\n
+                """
+                + bullet_list(f":{name}" for name in known_names)
+            )
+        )
+
+
+@dataclass(frozen=True)
+class MaybeAddress:
+    """A target address, or an error if it could not be created.
+
+    Use `Get(MaybeAddress, AddressInput)`, rather than the fallible variant
+    `Get(Address, AddressInput)`.
+
+    Note that this does not validate the address's target actually exists. It only validates that
+    the address is well-formed and that its spec_path exists.
+
+    Reminder: you may need to catch errors when creating the input `AddressInput` if the address is
+    not well-formed.
+    """
+
+    val: Address | ResolveError

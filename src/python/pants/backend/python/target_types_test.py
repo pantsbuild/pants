@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os.path
 from textwrap import dedent
 from typing import Iterable
 
@@ -28,11 +27,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
-    PythonSourceTarget,
-    PythonTestsGeneratorTarget,
     PythonTestsTimeoutField,
-    PythonTestTarget,
-    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
@@ -47,19 +42,19 @@ from pants.backend.python.target_types_rules import (
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
-    SingleSourceField,
     Tags,
 )
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 def test_pex_binary_validation() -> None:
@@ -285,9 +280,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
@@ -314,9 +314,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
@@ -346,9 +351,14 @@ def test_requirements_field() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
-        f"field for the target demo:"
-    ) in str(exc.value)
+        softwrap(
+            f"""
+            Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}'
+            field for the target demo:
+            """
+        )
+        in str(exc.value)
+    )
 
 
 def test_parse_requirements_file() -> None:
@@ -356,6 +366,7 @@ def test_parse_requirements_file() -> None:
         r"""\
         # Comment.
         --find-links=https://duckduckgo.com
+        -r more_reqs.txt
         ansicolors>=1.18.0
         Django==3.2 ; python_version>'3'
         Un-Normalized-PROJECT  # Inline comment.
@@ -530,9 +541,14 @@ def test_unrecognized_resolve_names_error(
             unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
         )
     assert (
-        f"Unrecognized resolve {name_str} from foo: "
-        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
-    ) in str(exc.value)
+        softwrap(
+            f"""
+            Unrecognized resolve {name_str} from foo:
+            {bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']
+            """
+        )
+        in str(exc.value)
+    )
 
 
 @pytest.mark.parametrize(
@@ -554,43 +570,20 @@ def test_normalize_module_mapping(
 # -----------------------------------------------------------------------------------------------
 
 
-def test_generate_source_and_test_targets() -> None:
+def test_pex_binary_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
-        target_types=[
-            PythonTestsGeneratorTarget,
-            PythonSourcesGeneratorTarget,
-            PythonTestUtilsGeneratorTarget,
-            PexBinariesGeneratorTarget,
-        ],
+        target_types=[PexBinariesGeneratorTarget],
     )
     rule_runner.write_files(
         {
             "src/py/BUILD": dedent(
                 """\
-                python_sources(
-                    name='lib',
-                    sources=['**/*.py', '!**/*_test.py', '!**/conftest.py'],
-                    overrides={'f1.py': {'tags': ['overridden']}},
-                )
-
-                python_tests(
-                    name='tests',
-                    sources=['**/*_test.py'],
-                    overrides={'f1_test.py': {'tags': ['overridden']}},
-                )
-
-                python_test_utils(
-                    name='test_utils',
-                    sources=['**/conftest.py'],
-                    overrides={'conftest.py': {'tags': ['overridden']}},
-                )
-
                 pex_binaries(
                     name="pexes",
                     entry_points=[
@@ -606,32 +599,8 @@ def test_generate_source_and_test_targets() -> None:
                 )
                 """
             ),
-            "src/py/f1.py": "",
-            "src/py/f1_test.py": "",
-            "src/py/conftest.py": "",
-            "src/py/f2.py": "",
-            "src/py/f2_test.py": "",
-            "src/py/subdir/f.py": "",
-            "src/py/subdir/f_test.py": "",
-            "src/py/subdir/conftest.py": "",
         }
     )
-
-    def gen_source_tgt(
-        rel_fp: str, tags: list[str] | None = None, *, tgt_name: str
-    ) -> PythonSourceTarget:
-        return PythonSourceTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/py", target_name=tgt_name, relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
-        )
-
-    def gen_test_tgt(rel_fp: str, tags: list[str] | None = None) -> PythonTestTarget:
-        return PythonTestTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("src/py", target_name="tests", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("src/py", rel_fp)),
-        )
 
     def gen_pex_binary_tgt(entry_point: str, tags: list[str] | None = None) -> PexBinary:
         return PexBinary(
@@ -640,35 +609,15 @@ def test_generate_source_and_test_targets() -> None:
             residence_dir="src/py",
         )
 
-    sources_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="lib")]
-    ).parametrizations
-    tests_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="tests")]
-    ).parametrizations
-    test_utils_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="test_utils")]
-    ).parametrizations
-    pex_binaries_generated = rule_runner.request(
-        _TargetParametrizations, [Address("src/py", target_name="pexes")]
-    ).parametrizations
-
-    assert set(sources_generated.values()) == {
-        gen_source_tgt("f1.py", tags=["overridden"], tgt_name="lib"),
-        gen_source_tgt("f2.py", tgt_name="lib"),
-        gen_source_tgt("subdir/f.py", tgt_name="lib"),
-    }
-    assert set(tests_generated.values()) == {
-        gen_test_tgt("f1_test.py", tags=["overridden"]),
-        gen_test_tgt("f2_test.py"),
-        gen_test_tgt("subdir/f_test.py"),
-    }
-
-    assert set(test_utils_generated.values()) == {
-        gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
-        gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
-    }
-    assert set(pex_binaries_generated.values()) == {
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("src/py", target_name="pexes"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations.values()
+    assert set(result) == {
         gen_pex_binary_tgt("f1.py"),
         gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
         gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),

@@ -4,6 +4,8 @@
 import collections.abc
 from typing import Any, Dict, List, Union
 
+from pants.util.strutil import softwrap
+
 
 def _normalize_entry_points(
     all_entry_points: Dict[str, Union[List[str], Dict[str, str]]]
@@ -11,8 +13,12 @@ def _normalize_entry_points(
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
     if not isinstance(all_entry_points, collections.abc.Mapping):
         raise ValueError(
-            f"The `entry_points` in `setup_py()` must be a dictionary, "
-            f"but was {all_entry_points!r} with type {type(all_entry_points).__name__}."
+            softwrap(
+                f"""
+                The `entry_points` in `setup_py()` must be a dictionary,
+                but was {all_entry_points!r} with type {type(all_entry_points).__name__}.
+                """
+            )
         )
 
     def _values_to_entry_points(values):
@@ -22,15 +28,23 @@ def _normalize_entry_points(
             for entry_point in values:
                 if not isinstance(entry_point, str) or "=" not in entry_point:
                     raise ValueError(
-                        f"Invalid `entry_point`, expected `<name> = <entry point>`, "
-                        f"but got {entry_point!r}."
+                        softwrap(
+                            f"""
+                            Invalid `entry_point`, expected `<name> = <entry point>`,
+                            but got {entry_point!r}.
+                            """
+                        )
                     )
 
             return dict(tuple(map(str.strip, entry_point.split("=", 1))) for entry_point in values)
         raise ValueError(
-            f"The values of the `entry_points` dictionary in `setup_py()` must be "
-            f"a list of strings or a dictionary of string to string, "
-            f"but got {values!r} of type {type(values).__name__}."
+            softwrap(
+                f"""
+                The values of the `entry_points` dictionary in `setup_py()` must be
+                a list of strings or a dictionary of string to string,
+                but got {values!r} of type {type(values).__name__}.
+                """
+            )
         )
 
     return {
@@ -51,8 +65,12 @@ class PythonArtifact:
         name = kwargs["name"]
         if not isinstance(name, str):
             raise ValueError(
-                f"The `name` in `setup_py()` must be a string, but was {repr(name)} with type "
-                f"{type(name)}."
+                softwrap(
+                    f"""
+                    The `name` in `setup_py()` must be a string, but was {repr(name)} with type
+                    {type(name)}.
+                    """
+                )
             )
 
         if "entry_points" in kwargs:

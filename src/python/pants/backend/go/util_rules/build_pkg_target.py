@@ -40,6 +40,7 @@ from pants.engine.target import (
     Target,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
@@ -112,7 +113,10 @@ def maybe_get_codegen_request_type(
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest, union_membership: UnionMembership
 ) -> FallibleBuildGoPackageRequest:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(request.address, description_of_origin="<build_pkg_target.py>"),
+    )
     target = wrapped_target.target
 
     codegen_request = maybe_get_codegen_request_type(target, union_membership)
@@ -185,6 +189,7 @@ async def setup_build_go_package_target_request(
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
+        embed_config = _third_party_pkg_info.embed_config
 
     else:
         raise AssertionError(

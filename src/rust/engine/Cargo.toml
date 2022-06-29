@@ -124,11 +124,12 @@ futures-core = "^0.3.0"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-indexmap = "1.8"
+humansize = "1.1"
+indexmap = "1.9"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
-libc = "0.2.125"
+libc = "0.2.126"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }

@@ -37,7 +37,7 @@ class PythonLockfileMetadata(LockfileMetadata):
     def new(
         valid_for_interpreter_constraints: InterpreterConstraints,
         requirements: set[PipRequirement],
-    ) -> LockfileMetadata:
+    ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
 

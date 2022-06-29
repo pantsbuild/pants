@@ -42,9 +42,10 @@ use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
+  WorkunitStoreHandle,
 };
 
-use crate::externs::fs::PyFileDigest;
+use crate::externs::fs::{todo_possible_store_missing_digest, PyFileDigest};
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -73,6 +74,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<PySessionCancellationLatch>()?;
   m.add_class::<PyStdioDestination>()?;
   m.add_class::<PyTasks>()?;
+  m.add_class::<PyThreadLocals>()?;
   m.add_class::<PyTypes>()?;
 
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
@@ -227,7 +229,7 @@ impl PyTypes {
 struct PyScheduler(Scheduler);
 
 #[pyclass]
-struct PyStdioDestination(Arc<stdio::Destination>);
+struct PyStdioDestination(PyThreadLocals);
 
 /// Represents configuration related to process execution strategies.
 ///
@@ -250,6 +252,7 @@ impl PyExecutionStrategyOptions {
     remote_cache_write: bool,
     child_default_memory: usize,
     child_max_memory: usize,
+    graceful_shutdown_timeout: usize,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -261,6 +264,7 @@ impl PyExecutionStrategyOptions {
       remote_cache_write,
       child_default_memory,
       child_max_memory,
+      graceful_shutdown_timeout: Duration::from_secs(graceful_shutdown_timeout.try_into().unwrap()),
     })
   }
 }
@@ -475,7 +479,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
     },
     Err(f) => {
       let (val, python_traceback, engine_traceback) = match f {
-        f @ Failure::Invalidated => {
+        f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
           let msg = format!("{}", f);
           let python_traceback = Failure::native_traceback(&msg);
           (
@@ -497,6 +501,30 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
         engine_traceback,
       }
     }
+  }
+}
+
+#[pyclass]
+struct PyThreadLocals(Arc<stdio::Destination>, Option<WorkunitStoreHandle>);
+
+impl PyThreadLocals {
+  fn get() -> Self {
+    let stdio_dest = stdio::get_destination();
+    let workunit_store_handle = workunit_store::get_workunit_store_handle();
+    Self(stdio_dest, workunit_store_handle)
+  }
+}
+
+#[pymethods]
+impl PyThreadLocals {
+  #[classmethod]
+  fn get_for_current_thread(_cls: &PyType) -> Self {
+    Self::get()
+  }
+
+  fn set_for_current_thread(&self) {
+    stdio::set_thread_destination(self.0.clone());
+    workunit_store::set_thread_workunit_store_handle(self.1.clone());
   }
 }
 
@@ -784,7 +812,7 @@ async fn workunit_to_py_value(
           })?;
         let snapshot = store::Snapshot::from_digest(store, digest.clone())
           .await
-          .map_err(PyException::new_err)?;
+          .map_err(todo_possible_store_missing_digest)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -1402,7 +1430,7 @@ fn lease_files_in_graph(
         .executor
         .block_on(core.store().lease_all_recursively(digests.iter()))
     })
-    .map_err(PyException::new_err)
+    .map_err(todo_possible_store_missing_digest)
   })
 }
 
@@ -1489,7 +1517,7 @@ fn ensure_remote_has_recursive(
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
     })
-    .map_err(PyException::new_err)?;
+    .map_err(todo_possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1509,7 +1537,7 @@ fn ensure_directory_digest_persisted(
         .executor
         .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
-    .map_err(PyException::new_err)?;
+    .map_err(todo_possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1532,17 +1560,13 @@ fn single_file_digests_to_bytes<'py>(
             externs::store_bytes(py, bytes)
           })
           .await
-          .and_then(|maybe_bytes| {
-            maybe_bytes
-              .ok_or_else(|| format!("Error loading bytes from digest: {:?}", py_file_digest.0))
-          })
       }
     });
 
     let bytes_values: Vec<PyObject> = py
       .allow_threads(|| core.executor.block_on(future::try_join_all(digest_futures)))
       .map(|values| values.into_iter().map(|val| val.into()).collect())
-      .map_err(PyException::new_err)?;
+      .map_err(todo_possible_store_missing_digest)?;
 
     let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
@@ -1579,7 +1603,7 @@ fn write_digest(
         )
         .await
     })
-    .map_err(PyValueError::new_err)
+    .map_err(todo_possible_store_missing_digest)
   })
 }
 
@@ -1645,15 +1669,18 @@ fn stdio_thread_console_clear() {
   stdio::get_destination().console_clear();
 }
 
+// TODO: Deprecated, but without easy access to the decorator. Use
+// `PyThreadLocals::get_for_current_thread` instead. Remove in Pants 2.17.0.dev0.
 #[pyfunction]
 fn stdio_thread_get_destination() -> PyStdioDestination {
-  let dest = stdio::get_destination();
-  PyStdioDestination(dest)
+  PyStdioDestination(PyThreadLocals::get())
 }
 
+// TODO: Deprecated, but without easy access to the decorator. Use
+// `PyThreadLocals::set_for_current_thread` instead. Remove in Pants 2.17.0.dev0.
 #[pyfunction]
 fn stdio_thread_set_destination(stdio_destination: &PyStdioDestination) {
-  stdio::set_thread_destination(stdio_destination.0.clone());
+  stdio_destination.0.set_for_current_thread();
 }
 
 // TODO: Needs to be thread-local / associated with the Console.

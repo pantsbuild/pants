@@ -22,6 +22,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -52,7 +53,9 @@ async def infer_kotlin_dependencies_via_source_analysis(
         return InferredDependencies([])
 
     address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    )
     tgt = wrapped_tgt.target
     explicitly_provided_deps, analysis = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
@@ -138,7 +141,12 @@ async def inject_kotlin_stdlib_dependency(
     request: InjectKotlinRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):

@@ -42,7 +42,7 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use store::Store;
+use store::{Store, StoreError};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
 use tokio_stream::wrappers::SignalStream;
@@ -196,7 +196,7 @@ impl BuildResultFS {
           .runtime
           .block_on(async move { store.load_file_bytes_with(digest, |_| ()).await })
         {
-          Ok(Some(())) => {
+          Ok(()) => {
             let executable_inode = self.next_inode;
             self.next_inode += 1;
             let non_executable_inode = self.next_inode;
@@ -224,8 +224,8 @@ impl BuildResultFS {
               non_executable_inode
             }))
           }
-          Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(StoreError::MissingDigest { .. }) => Ok(None),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
@@ -240,7 +240,7 @@ impl BuildResultFS {
           .runtime
           .block_on(async move { store.load_directory(digest).await })
         {
-          Ok(Some(_)) => {
+          Ok(_) => {
             // TODO: Kick off some background futures to pre-load the contents of this Directory into
             // an in-memory cache. Keep a background CPU pool driving those Futures.
             let inode = self.next_inode;
@@ -256,8 +256,8 @@ impl BuildResultFS {
             );
             Ok(Some(inode))
           }
-          Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(StoreError::MissingDigest { .. }) => Ok(None),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
@@ -335,7 +335,7 @@ impl BuildResultFS {
             .block_on(async move { store.load_directory(digest).await });
 
           match maybe_directory {
-            Ok(Some(directory)) => {
+            Ok(directory) => {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
@@ -396,7 +396,7 @@ impl BuildResultFS {
 
               Ok(entries)
             }
-            Ok(None) => Err(libc::ENOENT),
+            Err(StoreError::MissingDigest { .. }) => Err(libc::ENOENT),
             Err(err) => {
               error!("Error loading directory {:?}: {}", digest, err);
               Err(libc::EINVAL)
@@ -477,14 +477,18 @@ impl fuser::Filesystem for BuildResultFS {
             .and_then(|cache_entry| {
               let store = self.store.clone();
               let parent_digest = cache_entry.digest;
-              self
+              let directory = self
                 .runtime
                 .block_on(async move { store.load_directory(parent_digest).await })
-                .map_err(|err| {
-                  error!("Error reading directory {:?}: {}", parent_digest, err);
-                  libc::EINVAL
-                })?
-                .and_then(|directory| self.node_for_digest(&directory, filename))
+                .map_err(|err| match err {
+                  StoreError::MissingDigest { .. } => libc::ENOENT,
+                  err => {
+                    error!("Error reading directory {:?}: {}", parent_digest, err);
+                    libc::EINVAL
+                  }
+                })?;
+              self
+                .node_for_digest(&directory, filename)
                 .ok_or(libc::ENOENT)
             })
             .and_then(|node| match node {
@@ -583,19 +587,20 @@ impl fuser::Filesystem for BuildResultFS {
                 })
                 .await
             })
-            .map(|v| {
-              if v.is_none() {
-                let maybe_reply = reply2.lock().take();
-                if let Some(reply) = maybe_reply {
-                  reply.error(libc::ENOENT);
-                }
-              }
-            })
             .or_else(|err| {
-              error!("Error loading bytes for {:?}: {}", digest, err);
               let maybe_reply = reply2.lock().take();
-              if let Some(reply) = maybe_reply {
-                reply.error(libc::EINVAL);
+              match err {
+                StoreError::MissingDigest { .. } => {
+                  if let Some(reply) = maybe_reply {
+                    reply.error(libc::ENOENT);
+                  }
+                }
+                err => {
+                  error!("Error loading bytes for {:?}: {}", digest, err);
+                  if let Some(reply) = maybe_reply {
+                    reply.error(libc::EINVAL);
+                  }
+                }
               }
               Ok(())
             });

@@ -204,3 +204,11 @@ def test_help_provided_target_plugin_field() -> None:
         )
         in pants_run.stdout
     )
+
+
+def test_help_ignore_specs() -> None:
+    pants_run = run_pants(
+        ["test", "src/python/pants/bsp/protocol_test.py", "--help"],
+    )
+    pants_run.assert_success()
+    assert "`test` goal options" in pants_run.stdout

@@ -43,7 +43,6 @@ from pants.option.errors import (
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
-    OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
     PassthroughType,
@@ -396,11 +395,10 @@ class Parser:
 
         if not args:
             error(NoOptionNames)
-        # validate args.
+        # Validate args.
         for arg in args:
-            if not arg.startswith("-"):
-                error(OptionNameDash, arg_name=arg)
-            if not arg.startswith("--") and len(arg) > 2:
+            # We ban short args like `-x`, except for special casing the global option `-l`.
+            if not arg.startswith("--") and not (self.scope == GLOBAL_SCOPE and arg == "-l"):
                 error(OptionNameDoubleDash, arg_name=arg)
 
         # Validate kwargs.
@@ -503,12 +501,13 @@ class Parser:
         except ValueError as error:
             raise ParseError(str(error))
 
-    def to_value_type(self, val_str, type_arg, member_type, dest):
+    @classmethod
+    def to_value_type(cls, val_str, type_arg, member_type, dest):
         """Convert a string to a value of the option's type."""
         if val_str is None:
             return None
         if type_arg == bool:
-            return self.ensure_bool(val_str)
+            return cls.ensure_bool(val_str)
         try:
             if type_arg == list:
                 return ListValueComponent.create(val_str, member_type=member_type)

@@ -25,6 +25,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -93,7 +94,9 @@ async def infer_chart_dependencies_via_metadata(
     subsystem: HelmSubsystem,
 ) -> InferredDependencies:
     original_addr = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, original_addr)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(original_addr, description_of_origin="<infallible>")
+    )
     tgt = wrapped_tgt.target
 
     # Parse Chart.yaml for explicitly set dependencies.

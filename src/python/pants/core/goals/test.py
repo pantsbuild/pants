@@ -12,6 +12,7 @@ from pathlib import PurePath
 from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -28,7 +29,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -176,10 +177,17 @@ class ShowOutput(Enum):
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    process: InteractiveProcess | None
+    process: InteractiveProcess
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+
+class TestDebugAdapterRequest(TestDebugRequest):
+    """Like TestDebugRequest, but launches the test process using the relevant Debug Adapter server.
+
+    The process should be launched waiting for the client to connect.
+    """
 
 
 @union
@@ -311,6 +319,22 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    # See also `run.py`'s same option
+    debug_adapter = BoolOption(
+        "--debug-adapter",
+        default=False,
+        help=softwrap(
+            """
+            Run tests sequentially in an interactive process, using a Debug Adapter
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
+
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
+
+            This option implies --debug.
+            """
+        ),
+    )
     force = BoolOption(
         "--force",
         default=False,
@@ -388,39 +412,61 @@ class Test(Goal):
     __test__ = False
 
 
+@rule_helper
+async def _run_debug_tests(
+    test_subsystem: TestSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
+) -> Test:
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            TestFieldSet,
+            goal_description=(
+                "`test --debug-adapter`" if test_subsystem.debug_adapter else "`test --debug`"
+            ),
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        ),
+    )
+    debug_requests = await MultiGet(
+        (
+            Get(TestDebugRequest, TestFieldSet, field_set)
+            if not test_subsystem.debug_adapter
+            else Get(TestDebugAdapterRequest, TestFieldSet, field_set)
+        )
+        for field_set in targets_to_valid_field_sets.field_sets
+    )
+    exit_code = 0
+    for debug_request in debug_requests:
+        if test_subsystem.debug_adapter:
+            logger.info(
+                softwrap(
+                    f"""
+                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                    which will wait for a client connection...
+                    """
+                )
+            )
+
+        debug_result = await Effect(
+            InteractiveProcessResult, InteractiveProcess, debug_request.process
+        )
+        if debug_result.exit_code != 0:
+            exit_code = debug_result.exit_code
+    return Test(exit_code)
+
+
 @goal_rule
 async def run_tests(
     console: Console,
     test_subsystem: TestSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
     distdir: DistDir,
     run_id: RunId,
 ) -> Test:
-    if test_subsystem.debug:
-        targets_to_valid_field_sets = await Get(
-            TargetRootsToFieldSets,
-            TargetRootsToFieldSetsRequest(
-                TestFieldSet,
-                goal_description="`test --debug`",
-                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            ),
-        )
-        debug_requests = await MultiGet(
-            Get(TestDebugRequest, TestFieldSet, field_set)
-            for field_set in targets_to_valid_field_sets.field_sets
-        )
-        exit_code = 0
-        for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
-            if debug_request.process is None:
-                logger.debug(f"Skipping tests for {field_set.address}")
-                continue
-            debug_result = await Effect(
-                InteractiveProcessResult, InteractiveProcess, debug_request.process
-            )
-            if debug_result.exit_code != 0:
-                exit_code = debug_result.exit_code
-        return Test(exit_code)
+    if test_subsystem.debug or test_subsystem.debug_adapter:
+        return await _run_debug_tests(test_subsystem, debug_adapter)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(

@@ -3,9 +3,23 @@
 
 from __future__ import annotations
 
+import dataclasses
+from dataclasses import dataclass
 from typing import Any
 
 from typing_extensions import final
+
+from pants.build_graph.address import Address
+from pants.engine.engine_aware import EngineAwareParameter
+
+
+@dataclass(frozen=True)
+class TargetAdaptorRequest(EngineAwareParameter):
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @final
@@ -13,7 +27,7 @@ class TargetAdaptor:
     """A light-weight object to store target information before being converted into the Target
     API."""
 
-    def __init__(self, type_alias: str, name: str, **kwargs: Any) -> None:
+    def __init__(self, type_alias: str, name: str | None, **kwargs: Any) -> None:
         self.type_alias = type_alias
         self.name = name
         self.kwargs = kwargs
@@ -29,3 +43,7 @@ class TargetAdaptor:
             and self.name == other.name
             and self.kwargs == other.kwargs
         )
+
+    @property
+    def name_explicitly_set(self) -> bool:
+        return self.name is not None

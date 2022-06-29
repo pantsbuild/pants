@@ -23,6 +23,7 @@ from pants.engine.target import (
     InferredDependencies,
     SourcesField,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -71,7 +72,9 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
 
     address = request.source.address
 
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    )
     tgt = wrapped_tgt.target
     source_files = await Get(SourceFiles, SourceFilesRequest([tgt[JavaSourceField]]))
 

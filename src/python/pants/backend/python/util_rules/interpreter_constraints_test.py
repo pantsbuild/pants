@@ -20,6 +20,7 @@ from pants.engine.target import FieldSet
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -149,9 +150,11 @@ def test_merge_interpreter_constraints() -> None:
     def assert_impossible(constraints, expected_msg):
         with pytest.raises(ValueError) as excinfo:
             print(InterpreterConstraints.merge_constraint_sets(constraints))
-        assert str(excinfo.value) == (
-            "These interpreter constraints cannot be merged, as they require conflicting "
-            f"interpreter types: {expected_msg}"
+        assert str(excinfo.value) == softwrap(
+            f"""
+            These interpreter constraints cannot be merged, as they require conflicting
+            interpreter types: {expected_msg}
+            """
         )
 
     assert_impossible([["CPython==3.7.*"], ["PyPy==43.0"]], "(CPython==3.7.*) AND (PyPy==43.0)")

@@ -25,6 +25,7 @@ from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.build_graph.address import Address
 from pants.core.target_types import GenericTarget
+from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -44,6 +45,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@skip_unless_all_pythons_present("3.8", "3.9")
 def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

@@ -10,7 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, Specs
+from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -20,7 +20,6 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    PutativeTargetsSearchPaths,
     TailorGoal,
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
@@ -42,8 +41,9 @@ from pants.testutil.rule_runner import RuleRunner
 
 
 class MockPutativeTargetsRequest:
-    def __init__(self, search_paths: PutativeTargetsSearchPaths):
-        assert search_paths.dirs == ("",)
+    def __init__(self, dirs: tuple[str, ...], deprecated_recursive_dirs: tuple[str, ...]):
+        assert dirs == ("",)
+        assert not deprecated_recursive_dirs
 
 
 class FortranSources(MultipleSourcesField):
@@ -76,7 +76,7 @@ class PutativeFortranTargetsRequest(PutativeTargetsRequest):
 async def find_fortran_targets(
     req: PutativeFortranTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_fortran_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.f90"))
+    all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
     tests_filespec = Filespec(includes=list(FortranTestsSources.default))
@@ -434,36 +434,49 @@ def test_group_by_dir() -> None:
 
 
 def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(Specs()) == ("",)
-    assert specs_to_dirs(Specs(address_literals=(AddressLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
-    assert specs_to_dirs(Specs(dir_literals=(DirLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
+    assert specs_to_dirs(RawSpecs(description_of_origin="tests")) == ("",)
     assert specs_to_dirs(
-        Specs(
+        RawSpecs(
+            address_literals=(AddressLiteralSpec("src/python/foo"),), description_of_origin="tests"
+        )
+    ) == ("src/python/foo",)
+    assert specs_to_dirs(
+        RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),), description_of_origin="tests")
+    ) == ("src/python/foo",)
+    assert specs_to_dirs(
+        RawSpecs(
             address_literals=(
                 AddressLiteralSpec("src/python/foo"),
                 AddressLiteralSpec("src/python/bar"),
-            )
+            ),
+            description_of_origin="tests",
         )
     ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
-        specs_to_dirs(Specs(file_literals=(FileLiteralSpec("src/python/foo.py"),)))
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(Specs(address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),)))
+        specs_to_dirs(
+            RawSpecs(
+                file_literals=(FileLiteralSpec("src/python/foo.py"),), description_of_origin="tests"
+            )
+        )
 
     with pytest.raises(ValueError):
         specs_to_dirs(
-            Specs(
+            RawSpecs(
+                address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),),
+                description_of_origin="tests",
+            )
+        )
+
+    with pytest.raises(ValueError):
+        specs_to_dirs(
+            RawSpecs(
                 address_literals=(
                     AddressLiteralSpec(
                         "src/python/bar", target_component=None, generated_component="gen"
                     ),
-                )
+                ),
+                description_of_origin="tests",
             )
         )
 
@@ -560,8 +573,7 @@ def test_all_owned_sources(rule_runner: RuleRunner) -> None:
 
 def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
-        PutativeTargets,
-        [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
+        PutativeTargets, [MockPutativeFortranModuleRequest(("dir",))]
     )
     assert putative_targets == PutativeTargets(
         [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]

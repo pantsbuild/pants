@@ -27,13 +27,13 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
-from pants.engine.target import AllTargets, Target, WrappedTarget
+from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
@@ -135,6 +135,11 @@ def engine_error(
                 f"expected: {contains}\n\n"
                 f"exception: {underlying}"
             )
+    else:
+        raise AssertionError(
+            "DID NOT RAISE ExecutionError with underlying exception type "
+            f"{expected_underlying_exception}."
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -174,6 +179,8 @@ class GoalRuleResult:
 class RuleRunner:
     build_root: str
     options_bootstrapper: OptionsBootstrapper
+    extra_session_values: dict[Any, Any]
+    max_workunit_verbosity: LogLevel
     build_config: BuildConfiguration
     scheduler: SchedulerSession
 
@@ -215,7 +222,7 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            QueryRule(WrappedTarget, [Address]),
+            QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
@@ -231,6 +238,8 @@ class RuleRunner:
 
         self.environment = CompleteEnvironment({})
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
+        self.extra_session_values = extra_session_values or {}
+        self.max_workunit_verbosity = max_workunit_verbosity
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
@@ -248,35 +257,41 @@ class RuleRunner:
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
-        graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
-                self.build_root, global_options
-            ),
-            use_gitignore=False,
-            local_store_options=local_store_options,
-            local_execution_root_dir=local_execution_root_dir,
-            named_caches_dir=named_caches_dir,
-            build_root=self.build_root,
-            build_configuration=self.build_config,
-            executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
-            ca_certs_path=ca_certs_path,
-            engine_visualize_to=None,
-        ).new_session(
+        self._set_new_session(
+            EngineInitializer.setup_graph_extended(
+                pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
+                    self.build_root, global_options
+                ),
+                use_gitignore=False,
+                local_store_options=local_store_options,
+                local_execution_root_dir=local_execution_root_dir,
+                named_caches_dir=named_caches_dir,
+                build_root=self.build_root,
+                build_configuration=self.build_config,
+                executor=_EXECUTOR,
+                execution_options=ExecutionOptions.from_options(
+                    global_options, dynamic_remote_options
+                ),
+                ca_certs_path=ca_certs_path,
+                engine_visualize_to=None,
+            ).scheduler
+        )
+
+    def __repr__(self) -> str:
+        return f"RuleRunner(build_root={self.build_root})"
+
+    def _set_new_session(self, scheduler: Scheduler) -> None:
+        self.scheduler = scheduler.new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironment: self.environment,
-                    **(extra_session_values or {}),
+                    **self.extra_session_values,
                 }
             ),
-            max_workunit_level=max_workunit_verbosity,
+            max_workunit_level=self.max_workunit_verbosity,
         )
-        self.scheduler = graph_session.scheduler_session
-
-    def __repr__(self) -> str:
-        return f"RuleRunner(build_root={self.build_root})"
 
     @property
     def pants_workdir(self) -> str:
@@ -321,7 +336,9 @@ class RuleRunner:
             [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(
-            raw_specs, convert_dir_literal_to_address_literal=True
+            raw_specs,
+            convert_dir_literal_to_address_literal=True,
+            description_of_origin="RuleRunner.run_goal_rule()",
         )
 
         stdout, stderr = StringIO(), StringIO()
@@ -364,15 +381,15 @@ class RuleRunner:
         }
         self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironment(env)
-        self.scheduler = self.scheduler.scheduler.new_session(
-            build_id="buildid_for_test",
-            session_values=SessionValues(
-                {
-                    OptionsBootstrapper: self.options_bootstrapper,
-                    CompleteEnvironment: self.environment,
-                }
-            ),
-        )
+        self._set_new_session(self.scheduler.scheduler)
+
+    def set_session_values(
+        self,
+        extra_session_values: dict[Any, Any],
+    ) -> None:
+        """Update the engine Session with new session_values."""
+        self.extra_session_values = extra_session_values
+        self._set_new_session(self.scheduler.scheduler)
 
     def _invalidate_for(self, *relpaths: str):
         """Invalidates all files from the relpath, recursively up to the root.
@@ -464,7 +481,10 @@ class RuleRunner:
 
         :API: public
         """
-        return self.request(WrappedTarget, [address]).target
+        return self.request(
+            WrappedTarget,
+            [WrappedTargetRequest(address, description_of_origin="RuleRunner.get_target()")],
+        ).target
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the test's build root.
@@ -548,20 +568,24 @@ def run_rule_with_mocks(
     """
 
     task_rule = getattr(rule, "rule", None)
-    if task_rule is None:
-        raise TypeError(f"Expected to receive a decorated `@rule`; got: {rule}")
+    rule_helper = getattr(rule, "rule_helper", None)
+    if task_rule is None and rule_helper is None:
+        raise TypeError(f"Expected to receive a decorated `@rule` or `@rule_helper`; got: {rule}")
 
-    if len(rule_args) != len(task_rule.input_selectors):
-        raise ValueError(
-            f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
-        )
+    # Perform additional validation on `@rule` that the correct args are provided. We don't have
+    # an easy way to do this for `@rule_helper` yet.
+    if task_rule:
+        if len(rule_args) != len(task_rule.input_selectors):
+            raise ValueError(
+                f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
+            )
 
-    if len(mock_gets) != len(task_rule.input_gets):
-        raise ValueError(
-            f"Rule expected to receive Get providers for:\n"
-            f"{pformat(task_rule.input_gets)}\ngot:\n"
-            f"{pformat(mock_gets)}"
-        )
+        if len(mock_gets) != len(task_rule.input_gets):
+            raise ValueError(
+                f"Rule expected to receive Get providers for:\n"
+                f"{pformat(task_rule.input_gets)}\ngot:\n"
+                f"{pformat(mock_gets)}"
+            )
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):

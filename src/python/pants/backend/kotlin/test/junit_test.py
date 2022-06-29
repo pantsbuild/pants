@@ -7,7 +7,10 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.kotlin.compile import kotlinc, kotlinc_plugins
@@ -34,14 +37,22 @@ from pants.jvm.test.junit_test import run_junit_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
-kotlin_test_jvm_lockfile = pytest.mark.jvm_lockfile(
-    path="kotlin-test.test.lock",
-    requirements=[
-        "junit:junit:4.13.2",
-        f"org.jetbrains.kotlin:kotlin-test-junit:{DEFAULT_KOTLIN_VERSION}",
-        *KOTLIN_STDLIB_REQUIREMENTS,
-    ],
-)
+
+@pytest.fixture
+def jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "kotlin-test.test.lock",
+        [
+            "junit:junit:4.13.2",
+            f"org.jetbrains.kotlin:kotlin-test-junit:{DEFAULT_KOTLIN_VERSION}",
+            *KOTLIN_STDLIB_REQUIREMENTS,
+        ],
+    )
+
+
+@pytest.fixture
+def jvm_lockfile(jvm_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVMLockfileFixture:
+    return jvm_lockfile_def.load(request)
 
 
 @pytest.fixture
@@ -84,7 +95,6 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@kotlin_test_jvm_lockfile
 def test_vintage_kotlin_simple_success(
     rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
 ) -> None:

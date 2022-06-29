@@ -1,7 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_tests(sources=["test_*.py"], dependencies=["//BUILD_ROOT:files"])
+python_tests(
+    sources=["test_*.py"],
+    overrides={
+        "test_process_manager.py": {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+            ],
+        },
+        "test_pants_daemon_core.py": {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+                "src/python/pants/bin:plugins",
+            ]
+        },
+    },
+)
 
 python_sources(
     name="pantsd_integration_test_base",

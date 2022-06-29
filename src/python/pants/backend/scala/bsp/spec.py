@@ -109,6 +109,15 @@ class ScalacOptionsItem:
     # The output directory for classfiles produced by this target
     class_directory: Uri
 
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            target=BuildTargetIdentifier.from_json_dict(d["target"]),
+            options=tuple(d["options"]),
+            classpath=tuple(d["classpath"]),
+            class_directory=d["classDirectory"],
+        )
+
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "target": self.target.to_json_dict(),
@@ -121,6 +130,12 @@ class ScalacOptionsItem:
 @dataclass(frozen=True)
 class ScalacOptionsResult:
     items: tuple[ScalacOptionsItem, ...]
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            items=tuple(ScalacOptionsItem.from_json_dict(x) for x in d["items"]),
+        )
 
     def to_json_dict(self):
         return {"items": [item.to_json_dict() for item in self.items]}
