@@ -427,6 +427,16 @@ impl Failure {
   }
 
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
+    // If this is a wrapped Failure, return it immediately.
+    if let Ok(n_e_failure) = py_err.value(py).downcast::<externs::NativeEngineFailure>() {
+      let failure = n_e_failure
+        .getattr("failure")
+        .unwrap()
+        .extract::<externs::PyFailure>()
+        .unwrap();
+      return failure.0;
+    }
+
     let maybe_ptraceback = py_err
       .traceback(py)
       .map(|traceback| traceback.to_object(py));
@@ -497,6 +507,12 @@ impl From<StoreError> for Failure {
       StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
       StoreError::Unclassified(s) => throw(s),
     }
+  }
+}
+
+impl From<Failure> for PyErr {
+  fn from(err: Failure) -> Self {
+    externs::NativeEngineFailure::new_err((err.to_string(), externs::PyFailure(err)))
   }
 }
 
