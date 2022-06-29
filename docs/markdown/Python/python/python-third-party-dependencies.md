@@ -474,31 +474,22 @@ mongomock
 
 ### Version control and local requirements
 
-You might be used to using pip's proprietary VCS-style requirements for this, like `git+https://github.com/django/django.git#egg=django`. However, this proprietary format does not work with Pants.
+You can install requirements from version control using two styles:
 
-Instead of pip VCS-style requirements:
-
-```
-git+https://github.com/django/django.git#egg=Django
-git+https://github.com/django/django.git@stable/2.1.x#egg=Django
-git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=Django
-```
-
-Use direct references from [PEP 440](https://www.python.org/dev/peps/pep-0440/#direct-references):
-
-```
-Django@ git+https://github.com/django/django.git
-Django@ git+https://github.com/django/django.git@stable/2.1.x
-Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8
-```
+- pip's proprietary VCS-style requirements, e.g.
+  - `git+https://github.com/django/django.git#egg=Django`
+  - `git+https://github.com/django/django.git@stable/2.1.x#egg=Django`
+  - `git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=Django`
+- direct references from [PEP 440](https://www.python.org/dev/peps/pep-0440/#direct-references), e.g.
+  - `Django@ git+https://github.com/django/django.git`
+  - `Django@ git+https://github.com/django/django.git@stable/2.1.x`
+  - `Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8`
 
 You can also install from local files using [PEP 440 direct references](https://www.python.org/dev/peps/pep-0440/#direct-references). You must use an absolute path to the file, and you should ensure that the file exists on your machine.
 
 ```
 Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl
 ```
-
-Pip still works with these PEP 440-compliant formats, so you won't be losing any functionality by switching to using them.
 
 > 🚧 Local file requirements do not yet work with lockfiles
 > 
