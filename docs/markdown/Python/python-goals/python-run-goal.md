@@ -50,7 +50,7 @@ Running a `pex_binary` is equivalent to `package`-ing the target followed by exe
 from the repo root.
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your
-code in an ephemeral sandbox (sometimes referred to as the "chroot") with your firstparty code and
+code in an ephemeral sandbox (temporary directory) with your firstparty code and
 Pants-generated files (such as a `relocated_files` or `archive`) copied inside.
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to
