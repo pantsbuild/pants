@@ -1703,8 +1703,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 "the option --use-deprecated-pex-binary-run-semantics defaulting to true",
                 softwrap(
                     f"""
-                    In Pants 2.14, by default, running a `pex_binary` will actually package the PEX
-                    and run it, as if you ran `package` followed by executing the built PEX.
+                    Currently, running a `pex_binary` by default will not include the source files
+                    in the PEX, and will instead put them in a temporary sandbox.
+
+                    In Pants 2.14, the default will change to instead build the PEX like you had run
+                    the `package` goal, and then execute that PEX. This is more consistent and
+                    intuitive behavior.
 
                     To fix this deprecation, explictly set `use_deprecated_pex_binary_run_semantics`
                     in the `[GLOBAL]` section of `pants.toml`.
