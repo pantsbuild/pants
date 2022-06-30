@@ -550,7 +550,13 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
             "foo/BUILD": textwrap.dedent(
                 """
                 go_mod(name='mod')
-                go_package()
+                go_package(
+                    test_extra_env_vars=(
+                        "GO_PACKAGE_VAR_WITHOUT_VALUE",
+                        "GO_PACKAGE_VAR_WITH_VALUE=go_package_var_with_value",
+                        "GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR=go_package_override_with_value_var_override",
+                    )
+                )
                 """
             ),
             "foo/go.mod": "module foo",
@@ -574,6 +580,15 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
                   if !envIs("ARG_WITHOUT_VALUE_VAR", "arg_without_value_var") {
                       t.Fail()
                   }
+                  if !envIs("GO_PACKAGE_VAR_WITH_VALUE", "go_package_var_with_value") {
+                      t.Fail()
+                  }
+                  if !envIs("GO_PACKAGE_VAR_WITHOUT_VALUE", "go_package_var_without_value") {
+                      t.Fail()
+                  }
+                  if !envIs("GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR", "go_package_override_with_value_var_override") {
+                      t.Fail()
+                  }
                 }
                 """
             ),
@@ -583,10 +598,12 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         args=[
             "--go-test-args=-v -bench=.",
-            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR"]',
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "GO_PACKAGE_OVERRIDE_ARG_WITH_VALUE_VAR"]',
         ],
         env={
             "ARG_WITHOUT_VALUE_VAR": "arg_without_value_var",
+            "GO_PACKAGE_VAR_WITHOUT_VALUE": "go_package_var_without_value",
+            "GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR": "go_package_override_with_value_var",
         },
         env_inherit={"PATH"},
     )

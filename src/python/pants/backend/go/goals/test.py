@@ -10,6 +10,7 @@ from typing import Sequence
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
     GoPackageSourcesField,
+    GoTestExtraEnvVarsField,
     GoTestTimeoutField,
     SkipGoTestsField,
 )
@@ -38,6 +39,7 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -86,6 +88,7 @@ class GoTestFieldSet(TestFieldSet):
     sources: GoPackageSourcesField
     dependencies: Dependencies
     timeout: GoTestTimeoutField
+    extra_env_vars: GoTestExtraEnvVarsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -293,7 +296,10 @@ async def run_go_tests(
     # This allows tests to open dependencies on `file` targets regardless of where they are
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
-    binary_with_prefix, files_sources = await MultiGet(
+    field_set_extra_env_get = Get(
+        Environment, EnvironmentRequest(field_set.extra_env_vars.value or ())
+    )
+    binary_with_prefix, files_sources, field_set_extra_env = await MultiGet(
         Get(Digest, AddPrefix(binary.digest, working_dir)),
         Get(
             SourceFiles,
@@ -303,6 +309,7 @@ async def run_go_tests(
                 enable_codegen=True,
             ),
         ),
+        field_set_extra_env_get,
     )
     test_input_digest = await Get(
         Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
@@ -312,6 +319,7 @@ async def run_go_tests(
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
         # `go_package`.
+        **field_set_extra_env,
     }
 
     cache_scope = (
