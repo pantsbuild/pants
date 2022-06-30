@@ -20,6 +20,9 @@ Enable the Python [backend](doc:enabling-backends) like this:
 backend_packages = [
   "pants.backend.python"
 ]
+
+[python]
+# This will become the default in Pants 2.15.
 tailor_pex_binary_targets = false
 ```
 
