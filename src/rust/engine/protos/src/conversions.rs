@@ -1,5 +1,3 @@
-use tonic::{Code, Status};
-
 impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: &'a hashing::Digest) -> Self {
     Self {
@@ -51,11 +49,5 @@ pub fn require_digest<
   match digest_opt.into() {
     Some(digest) => hashing::Digest::try_from(digest),
     None => Err("Protocol violation: Digest missing from a Remote Execution API protobuf.".into()),
-  }
-}
-
-impl From<crate::gen::google::rpc::Status> for Status {
-  fn from(rpc_status: crate::gen::google::rpc::Status) -> Self {
-    Status::new(Code::from_i32(rpc_status.code), rpc_status.message)
   }
 }
