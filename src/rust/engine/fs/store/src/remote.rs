@@ -235,7 +235,7 @@ impl ByteStore {
     }
   }
 
-  pub(crate) async fn store_bytes_source_batch<ByteSource>(
+  async fn store_bytes_source_batch<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
@@ -259,7 +259,7 @@ impl ByteStore {
     Ok(())
   }
 
-  pub(crate) async fn store_bytes_source_stream<ByteSource>(
+  async fn store_bytes_source_stream<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
@@ -349,7 +349,7 @@ impl ByteStore {
     }
   }
 
-  pub(crate) async fn load_bytes_with_batch<
+  async fn load_bytes_with_batch<
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
   >(
@@ -390,7 +390,7 @@ impl ByteStore {
     }
   }
 
-  pub(crate) async fn load_bytes_with_stream<
+  async fn load_bytes_with_stream<
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
   >(
