@@ -6,7 +6,8 @@ hidden: false
 createdAt: "2020-03-16T16:19:56.403Z"
 updatedAt: "2022-01-29T16:45:29.511Z"
 ---
-To run an executable/script, use `./pants run` on any of the following target types:
+To run an executable/script, use `./pants run` on one of the following target types:
+
 * [`pex_binary`](doc:reference-pex_binary)
 * [`python_source`](doc:reference-python_source)
 
@@ -49,7 +50,7 @@ Running a `pex_binary` is equivalent to `package`-ing the target followed by exe
 from the repo root.
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your
-code in an ephemeral sandbox (sometimes referred to as the "chroot") with your firstparty code and
+code in an ephemeral sandbox (temporary directory) with your firstparty code and and
 Pants-generated files (such as a `relocated_files` or `archive`) copied inside. If you are using
 generated files like this, you may need to set the `run_goal_use_sandbox` to `True` for file loading
 to work properly.
