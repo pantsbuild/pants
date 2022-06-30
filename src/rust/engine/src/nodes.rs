@@ -1056,23 +1056,23 @@ impl Task {
     entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
-    let mut input = {
-      let gil = Python::acquire_gil();
-      Value::from(gil.python().None())
-    };
+    let mut input: Option<Value> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
+      let response = Python::with_gil(|py| {
+        let input = input.unwrap_or_else(|| Value::from(py.None()));
+        externs::generator_send(py, &generator, &input)
+      })?;
       match response {
         externs::GeneratorResponse::Get(get) => {
           let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = values.into_iter().next().unwrap();
+          input = Some(values.into_iter().next().unwrap());
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
           let gil = Python::acquire_gil();
-          input = externs::store_tuple(gil.python(), values);
+          input = Some(externs::store_tuple(gil.python(), values));
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));

@@ -144,6 +144,30 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
+class PythonRunGoalUseSandboxField(BoolField):
+    alias = "run_goal_use_sandbox"
+    default = True
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal will copy the needed first-party sources
+        into a temporary sandbox and run from there.
+
+        If false, runs of this target with the `run` goal will use the in-repo sources
+        directly.
+
+        The former mode is more hermetic, and is closer to building and running the source as it
+        were packaged in a `pex_binary`. Additionally, it may be necessary if your sources depend
+        transitively on "generated" files which will be materialized in the sandbox in a source
+        root, but are not in-repo.
+
+        The latter mode is similar to creating, activating, and using a virtual environment when
+        running your files. It may also be necessary if the source being run writes files into the
+        repo and computes their location relative to the executed files. Django's makemigrations
+        command is an example of such a process.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Target generation support
 # -----------------------------------------------------------------------------------------------
@@ -258,6 +282,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
+# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
@@ -568,25 +593,6 @@ class PexIncludeToolsField(BoolField):
     )
 
 
-class RunInSandboxField(BoolField):
-    alias = "run_in_sandbox"
-    default = True
-    help = softwrap(
-        """
-        If true, runs of this target with the `run` goal will copy the needed first-party sources
-        into a temporary chroot and run from there.
-        If false, runs of this target with the `run` goal will use the in-repo sources directly.
-
-        The former mode is more hermetic, and is closer to building and running a standalone binary.
-
-        The latter mode may be necessary if the binary being run writes files into the repo and
-        computes their location relative to the executed files. Django's makemigrations command
-        is an example of such a process.  It may also have lower latency, since no files need
-        to be copied into a chroot.
-        """
-    )
-
-
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -603,7 +609,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexExecutionModeField,
     PexIncludeRequirementsField,
     PexIncludeToolsField,
-    RunInSandboxField,
     RestartableField,
 )
 
@@ -829,6 +834,7 @@ class SkipPythonTestsField(BoolField):
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
     PythonResolveField,
+    PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
@@ -926,6 +932,7 @@ class PythonSourceTarget(Target):
         InterpreterConstraintsField,
         Dependencies,
         PythonResolveField,
+        PythonRunGoalUseSandboxField,
         PythonSourceField,
     )
     help = "A single Python source file."
@@ -972,7 +979,12 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
+    moved_fields = (
+        PythonResolveField,
+        PythonRunGoalUseSandboxField,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
         """
@@ -998,7 +1010,12 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
+    moved_fields = (
+        PythonResolveField,
+        PythonRunGoalUseSandboxField,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
         """
