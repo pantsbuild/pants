@@ -627,7 +627,6 @@ def build_pants_wheels() -> None:
 
     args = (
         "./pants",
-        "-ldebug",
         # TODO(#9924).
         "--no-dynamic-ui",
         # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
