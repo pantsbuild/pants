@@ -6,6 +6,17 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-04-27T20:02:17.695Z"
 ---
+2.12
+----
+
+See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.12.x.md> for the changelog.
+
+### Unified formatters
+
+Formatters no longer need to be installed in both the `FmtRequest` and `LintTargetsRequest` `@unions`: instead, installing in the `FmtRequest` union is sufficient to act as both a linter and formatter.
+
+See [Add a formatter](doc:plugins-fmt-goal) for more information.
+
 2.11
 ----
 

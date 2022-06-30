@@ -26,22 +26,28 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
+use std::sync::Arc;
 
-use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use either::Either;
 use http::header::{HeaderName, USER_AGENT};
 use http::{HeaderMap, HeaderValue};
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
 use tower::ServiceBuilder;
+use workunit_store::ObservationMetric;
+
+use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
+use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
 
 pub mod headers;
 pub mod hyper;
+pub mod metrics;
 pub mod prost;
 pub mod retry;
 pub mod tls;
@@ -49,7 +55,7 @@ pub mod tls;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<Channel>>;
+pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<Channel>>>;
 
 pub fn layered_service(
   channel: Channel,
@@ -59,7 +65,19 @@ pub fn layered_service(
   ServiceBuilder::new()
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
+    .layer(NetworkMetricsLayer::new(&METRIC_FOR_REAPI_PATH))
     .service(channel)
+}
+
+lazy_static! {
+  static ref METRIC_FOR_REAPI_PATH: Arc<HashMap<String, ObservationMetric>> = {
+    let mut m = HashMap::new();
+    m.insert(
+      "/build.bazel.remote.execution.v2.ActionCache/GetActionResult".to_string(),
+      ObservationMetric::RemoteCacheGetActionResultNetworkTimeMicros,
+    );
+    Arc::new(m)
+  };
 }
 
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.

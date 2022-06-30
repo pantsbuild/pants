@@ -493,7 +493,7 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
         }
     )
     result = rule_runner.run_goal_rule(
-        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}"]
+        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}", "::"]
     )
     assert result.exit_code == 0
     assert result.stdout == dedent(
@@ -537,7 +537,7 @@ def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
         {"foo/bar1_test.f90": "", "foo/BUILD": "fortran_library()", "baz/qux1.f90": ""}
     )
     result = rule_runner.run_goal_rule(
-        TailorGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+        TailorGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check", "::"]
     )
     assert result.exit_code == 1
     assert result.stdout == dedent(
