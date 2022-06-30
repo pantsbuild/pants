@@ -51,7 +51,8 @@ from the repo root.
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your
 code in an ephemeral sandbox (temporary directory) with your firstparty code and
-Pants-generated files (such as a `relocated_files` or `archive`) copied inside.
+Pants-generated files (such as code generated from `protobuf_source`,
+or `archive` targets) copied inside.
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to
 running the source directly (a la `python ...`) with the set of third-party dependencies exposed to
