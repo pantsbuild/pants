@@ -31,6 +31,7 @@ from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, Genera
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
+    TestExtraEnv,
     TestFieldSet,
     TestResult,
     TestSubsystem,
@@ -148,7 +149,10 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
-    field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
+    field_set: GoTestFieldSet,
+    test_subsystem: TestSubsystem,
+    go_test_subsystem: GoTestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestResult:
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
@@ -304,6 +308,12 @@ async def run_go_tests(
         Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
     )
 
+    extra_env = {
+        **test_extra_env.env,
+        # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
+        # `go_package`.
+    }
+
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
@@ -315,6 +325,7 @@ async def run_go_tests(
                 "./test_runner",
                 *transform_test_args(go_test_subsystem.args, field_set.timeout.value),
             ],
+            env=extra_env,
             input_digest=test_input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
