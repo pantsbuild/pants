@@ -6,15 +6,22 @@ hidden: false
 createdAt: "2020-03-16T16:19:56.403Z"
 updatedAt: "2022-01-29T16:45:29.511Z"
 ---
-To run an executable/script, use `./pants run` on a [`pex_binary`](doc:reference-pex_binary) target. (See [package](doc:python-package-goal) for more on the `pex_binary` target.)
+To run an executable/script, use `./pants run` on one of the following target types:
+
+* [`pex_binary`](doc:reference-pex_binary)
+* [`python_source`](doc:reference-python_source)
+
+(See [package](doc:python-package-goal) for more on the `pex_binary` target.)
 
 ```bash
+# A python_source target (usually referred to by the filename)
 $ ./pants run project/app.py
 ```
 
 or
 
 ```bash
+# A pex_binary target (must be referred to by target name)
 $ ./pants run project:app
 ```
 
@@ -35,6 +42,26 @@ The program will have access to the same environment used by the parent `./pants
 > 🚧 Issues finding files?
 >
 > Run `./pants dependencies --transitive path/to/binary.py` to ensure that all the files you need are showing up, including for any [assets](doc:assets) you intend to use.
+
+Execution Semantics
+-------------------
+
+Running a `pex_binary` is equivalent to `package`-ing the target followed by executing the built PEX
+from the repo root.
+
+Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your
+code in an ephemeral sandbox (temporary directory) with your firstparty code and and
+Pants-generated files (such as a `relocated_files` or `archive`) copied inside. If you are using
+generated files like this, you may need to set the `run_goal_use_sandbox` to `True` for file loading
+to work properly.
+
+Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to
+running the source directly (a la `python ...`) with the set of third-party dependencies exposed to
+the interpreter. This is comparable to using a virtual environment or Poetry to run your script
+(E.g. `venv/bin/python ...` or `poetry run python ...`). When scripts write in-repo files—such as
+Django's `manage.py makemigrations` - it is often necessary to set `run_goal_use_sandbox` to `False`
+so that the file is written into the expected location.
+
 
 Watching the filesystem
 -----------------------
