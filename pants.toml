@@ -72,6 +72,8 @@ remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 # See https://github.com/pantsbuild/pants/issues/11331.
 remote_cache_eager_fetch = false
 
+use_deprecated_pex_binary_run_semantics = false
+
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
@@ -124,6 +126,7 @@ macos_big_sur_compatibility = true
 resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
 lockfile_generator = "pex"
+tailor_pex_binary_targets = false
 
 [python-infer]
 assets = true
