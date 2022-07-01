@@ -165,12 +165,8 @@ class LocalPantsRunner:
         (maybe_git_worktree,) = graph_session.scheduler_session.product_request(
             MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
         )
-
-        specs = calculate_specs(
-            options_bootstrapper=options_bootstrapper,
-            options=options,
-            session=graph_session.scheduler_session,
-            maybe_git_worktree=maybe_git_worktree,
+        (specs,) = graph_session.scheduler_session.product_request(
+            Specs, [Params(options, maybe_git_worktree)]
         )
 
         profile_path = env.get("PANTS_PROFILE")
