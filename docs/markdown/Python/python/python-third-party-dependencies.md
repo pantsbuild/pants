@@ -556,7 +556,7 @@ Indexes are assumed to have a nested structure (like <http://pypi.org/simple>), 
 To authenticate to custom repos, you may need to provide credentials 
 (such as a username and password) in the URL. 
 
-You can use [config file `@(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation)
+You can use [config file `%(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation)
 to load the values via environment variables. This avoids checking in sensitive information to
 version control.
 

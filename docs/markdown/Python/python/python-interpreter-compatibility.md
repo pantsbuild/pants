@@ -63,7 +63,7 @@ It is possible for a target to have more precise interpreter constraints than it
 dependencies. For example, if you have a common helper file `utils.py` that works with both
 Python 2.7 and 3.5 (`['==2.7.*', '>=3.5']`), it is legal for a dependee like `app.py` to use more
 precise constraints like `['==3.7.*']`. It is often useful for helper code to work with multiple
-Python versions, whereas specific "root" targets (tests, apps, and binaries) to have more specific
+Python versions, while specific "root" targets (tests, apps, and binaries) have more specific
 constraints.
 
 > 🚧 Pants cannot validate that your interpreter constraints are accurate
