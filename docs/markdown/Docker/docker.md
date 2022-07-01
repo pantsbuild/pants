@@ -249,6 +249,8 @@ Pants can push your images to registries using `./pants publish`:
 # Will build the image and push it to all registries, with all tags.
 ```
 
+Publishing may be skipped per registry or entirely per `docker_image` using `skip_push`.
+
 See [here](doc:tagging-docker-images) for how to set up registries.
 
 Docker configuration
