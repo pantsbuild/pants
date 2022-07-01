@@ -9,30 +9,54 @@ updatedAt: "2022-04-22T08:17:48.824Z"
 Configuring registries
 ----------------------
 
-A `docker_image` target takes an optional `registries` field, whose value is a list of registry endpoints:
+A `docker_image` target takes an optional `registries` field, whose value is a list of registry endpoints and aliases:
 
 ```python src/example/BUILD
 docker_image(
     name="demo",
     registries=[
-        "reg.company.internal",
+        "reg1.company.internal",
+        "@company-registry2",
     ]
 )
 ```
 
-Images built from this target will be published to these registries.
+When publising this image, it will be pushed to these registries by default.
 
-If you push many images to the same registries, and you don't want to repeat the endpoint information, you can name the registries in your `pants.toml` config file, and then refer to them by name in the target, using a `@` prefix.
+In order to provide registry specific configuration, add them to the Pants configuration under
+`[docker.registries.<alias>]` and refer to them by their alias from the `docker_image` targets,
+using a `@` prefix.
 
-You can also designate one or more registries as the default for your repo, and images with no explicit `registries` field will use those default registries.
+Options for `registries` in `pants.toml`:
+
+ * `address` - The registry endpoint.
+
+ * `default` - Use this registry for all `docker_image` targets that does not provide a value for
+   the `registries` field. Multiple registries may be used as default at the same time.
+
+ * `extra_image_tags` - Registry specific version tags to apply to the image when using this
+   registry.
+
+ * `repository` - Format the repository part of the image name for this image. See [Setting a
+   repository name](doc:tagging-docker-images#setting-a-repository-name) for details of this option.
+
+ * `skip_push` - Do not push images to this registry during `./pants publish`.
+
+Example:
 
 ```toml pants.toml
 [docker.registries.company-registry1]
 address = "reg1.company.internal"
 default = true
+extra_image_tags = ["dev"]
 
 [docker.registries.company-registry2]
 address = "reg2.company.internal"
+skip_push = true
+
+[docker.registries.company-registry3]
+address = "reg3.company.internal"
+repository = "{parent_directory}/{name}"
 ```
 ```python src/example/BUILD
 docker_image(name="demo")
@@ -54,14 +78,6 @@ docker_image(
 )
 ```
 
-You may also provide a registry specific value for the repository, see next section for more details.
-```toml pants.toml
-[docker.registries.company-registry3]
-address = "reg3.company.internal"
-repository = "{parent_directory}/{name}"
-```
-
-
 Setting a repository name
 -------------------------
 
@@ -80,14 +96,18 @@ $ ./pants package src/example:demo
 # Will build the image: example/demo:latest
 ```
 
-To use a repository only for a specific registry, provide a `repository` value in the registry configuration, and this can contain placeholders in curly braces that will be interpolated for each image name.
+To use a repository only for a specific registry, provide a `repository` value in the registry
+configuration, and this can contain placeholders in curly braces that will be interpolated for each
+image name.
+
 ```toml pants.toml
 [docker.registries.demo]
 address = "reg.company.internal"
 repository = "example/{name}"
 ```
 
-You can also specify a default repository name in config, and this name can contain placeholders in curly braces that will be interpolated for each `docker_image`:
+You can also specify a default repository name in config, and this name can contain placeholders in
+curly braces that will be interpolated for each `docker_image`:
 
 ```toml pants.toml
 [docker]
@@ -119,9 +139,12 @@ See [String interpolation using placeholder values](doc:tagging-docker-images#st
 Tagging images
 --------------
 
-When Docker builds images, it can tag them with a set of tags. Pants will apply the tags listed in the `image_tags` field of `docker_image`. 
+When Docker builds images, it can tag them with a set of tags. Pants will apply the tags listed in
+the `image_tags` field of `docker_image`, and any additional tags if defined from the registry
+configuration (see [Configuring registries](doc:tagging-docker-images#configuring-registries).
 
-(Note that the field is named `image_tags` and not just `tags`, because Pants has [its own tags concept](doc:reference-target#codetagscode), which is unrelated.)
+(Note that the field is named `image_tags` and not just `tags`, because Pants has [its own tags
+concept](doc:reference-target#codetagscode), which is unrelated.)
 
 ```python src/example/BUILD
 docker_image(
@@ -136,7 +159,9 @@ When pants builds the `src/example:demo` target, a single image will be built, w
 - `example/demo:1.2`
 - `example/demo:example`
 
-It's often useful to keep versions of derived images and their base images in sync. Pants helps you out with this by interpolating tags referenced in `FROM` commands in your Dockerfile into the `image_tags` in the corresponding `docker_image`:
+It's often useful to keep versions of derived images and their base images in sync. Pants helps you
+out with this by interpolating tags referenced in `FROM` commands in your Dockerfile into the
+`image_tags` in the corresponding `docker_image`:
 
 ```python src/example/BUILD
 # These three are equivalent
@@ -155,9 +180,12 @@ FROM scratch
 # ...
 ```
 
-This way you can specify a version just once, on the base image, and the derived images will automatically acquire the same version. 
+This way you can specify a version just once, on the base image, and the derived images will
+automatically acquire the same version.
 
-You may also use any Docker build arguments (when configured as described in [Docker build arguments](doc:docker#build-arguments)) for interpolation into the `image_tags` in the corresponding `docker_image`:
+You may also use any Docker build arguments (when configured as described in [Docker build
+arguments](doc:docker#build-arguments)) for interpolation into the `image_tags` in the corresponding
+`docker_image`:
 
 ```python src/example/BUILD
 docker_image(image_tags=["{build_args.ARG_NAME}"])
