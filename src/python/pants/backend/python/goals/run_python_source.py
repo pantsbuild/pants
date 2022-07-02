@@ -10,6 +10,7 @@ from pants.backend.python.goals.run_helper import (
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    Executable,
     InterpreterConstraintsField,
     PexEntryPointField,
     PythonRunGoalUseSandboxField,
@@ -53,9 +54,16 @@ class PythonSourceFieldSet(RunFieldSet):
 async def create_python_source_run_request(
     field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> RunRequest:
+    # If the python source is not importable (python modules can't be named with '-'),
+    # then it must be an executable script.
+    if "-" in field_set.source.value:
+        executable = Executable(field_set.source.value)
+    else:
+        executable = None
     return await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
+        executable=executable,
         pex_env=pex_env,
         run_in_sandbox=field_set.should_use_sandbox(python_setup),
     )

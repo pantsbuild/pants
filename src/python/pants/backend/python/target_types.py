@@ -296,6 +296,20 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
+@dataclass(frozen=True)
+class Executable(MainSpecification):
+    executable: str
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--executable"
+        yield self.executable
+
+    # TODO: does spec make sense here?
+    @property
+    def spec(self) -> str:
+        return self.executable
+
+
 class EntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
@@ -369,6 +383,31 @@ class PexScriptField(Field):
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         return ConsoleScript(value)
+
+
+class PexExecutableField(Field):
+    alias = "executable"
+    default = None
+    help = help_text(
+        """
+        Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a execuatble
+        local python script. This executable python script is typically something that cannot
+        be imported so it cannot be used via script or entry_point.
+
+        You may only set one of: this field, or the `entry_point` field, or the `script` field.
+        Leave off all three fields to have no entry point.
+        """
+    )
+    value: Executable | None
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
+        return Executable(value)
 
 
 class PexArgsField(StringSequenceField):
@@ -724,6 +763,7 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexExecutableField,
         PexArgsField,
         PexEnvField,
         OutputPathField,
@@ -738,12 +778,18 @@ class PexBinary(Target):
     )
 
     def validate(self) -> None:
-        if self[PexEntryPointField].value is not None and self[PexScriptField].value is not None:
+        got_entry_point = self[PexEntryPointField].value is not None
+        got_script = self[PexScriptField].value is not None
+        got_executable = self[PexExecutableField].value is not None
+
+        if (got_entry_point + got_script + got_executable) > 1:
             raise InvalidTargetException(
+                # TODO: this is ugly. How to improve?
                 softwrap(
                     f"""
-                    The `{self.alias}` target {self.address} cannot set both the
-                    `{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at
+                    The `{self.alias}` target {self.address} cannot set more than one of the
+                    `{self[PexEntryPointField].alias}`, `{self[PexScriptField].alias}`, and
+                    `{self[PexExecutableField].alias}` fields at
                     the same time. To fix, please remove one.
                     """
                 )

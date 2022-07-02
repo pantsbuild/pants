@@ -10,6 +10,7 @@ from typing import Iterable, Optional
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
     ConsoleScript,
+    Executable,
     PexEntryPointField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -43,6 +44,7 @@ async def _create_python_source_run_request(
     run_in_sandbox: bool,
     pex_path: Iterable[Pex] = (),
     console_script: Optional[ConsoleScript] = None,
+    executable: Optional[Executable] = None,
 ) -> RunRequest:
     addresses = [address]
     entry_point, transitive_targets = await MultiGet(
@@ -67,7 +69,7 @@ async def _create_python_source_run_request(
                 include_source_files=False,
                 include_local_dists=True,
                 # `PEX_EXTRA_SYS_PATH` should contain this entry_point's module.
-                main=console_script or entry_point.val,
+                main=executable or console_script or entry_point.val,
                 additional_args=(
                     # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
                     # below, it's important for any app that re-executes itself that these environment
