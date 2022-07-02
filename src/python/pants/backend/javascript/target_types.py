@@ -15,6 +15,10 @@ from pants.engine.target import (
 JS_FILE_EXTENSIONS = (".js",)
 
 
+class JSDependenciesField(Dependencies):
+    pass
+
+
 class JSSourceField(SingleSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
@@ -32,7 +36,7 @@ class JSSourceTarget(Target):
     alias = "javascript_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        JSDependenciesField,
         JSSourceField,
     )
     help = "A single Javascript source file."
@@ -50,5 +54,5 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = JSSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (JSDependenciesField,)
     help = "Generate a `javascript_source` target for each file in the `sources` field."

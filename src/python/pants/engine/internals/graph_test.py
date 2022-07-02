@@ -1569,9 +1569,12 @@ def test_transitive_excludes_error() -> None:
         alias = "valid2"
         core_fields = (MockDependencies,)
 
+    class InvalidDepsField(Dependencies):
+        pass
+
     class Invalid(Target):
         alias = "invalid"
-        core_fields = (Dependencies,)
+        core_fields = (InvalidDepsField,)
 
     exc = TransitiveExcludesNotSupportedError(
         bad_value="!!//:bad",

@@ -85,6 +85,10 @@ class PythonSourceField(SingleSourceField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
+class PythonDependenciesField(Dependencies):
+    pass
+
+
 class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
@@ -930,7 +934,7 @@ class PythonSourceTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
-        Dependencies,
+        PythonDependenciesField,
         PythonResolveField,
         PythonRunGoalUseSandboxField,
         PythonSourceField,
@@ -982,7 +986,7 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     moved_fields = (
         PythonResolveField,
         PythonRunGoalUseSandboxField,
-        Dependencies,
+        PythonDependenciesField,
         InterpreterConstraintsField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
@@ -1013,7 +1017,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     moved_fields = (
         PythonResolveField,
         PythonRunGoalUseSandboxField,
-        Dependencies,
+        PythonDependenciesField,
         InterpreterConstraintsField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
@@ -1068,6 +1072,10 @@ class _PipRequirementSequenceField(Field):
             else:
                 raise invalid_type_error
         return tuple(result)
+
+
+class PythonRequirementDependenciesField(Dependencies):
+    pass
 
 
 class PythonRequirementsField(_PipRequirementSequenceField):
@@ -1161,8 +1169,8 @@ class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         PythonRequirementsField,
+        PythonRequirementDependenciesField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,

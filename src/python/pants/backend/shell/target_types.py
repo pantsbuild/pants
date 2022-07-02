@@ -33,6 +33,10 @@ from pants.util.enums import match
 from pants.util.strutil import softwrap
 
 
+class ShellDependenciesField(Dependencies):
+    pass
+
+
 class ShellSourceField(SingleSourceField):
     # Normally, we would add `expected_file_extensions = ('.sh',)`, but Bash scripts don't need a
     # file extension, so we don't use this.
@@ -214,7 +218,7 @@ class Shunit2TestsGeneratorTarget(TargetFilesGenerator):
 
 class ShellSourceTarget(Target):
     alias = "shell_source"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ShellSourceField)
+    core_fields = (*COMMON_TARGET_FIELDS, ShellDependenciesField, ShellSourceField)
     help = "A single Bourne-based shell script, e.g. a Bash script."
 
 
@@ -247,7 +251,7 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = ShellSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (ShellDependenciesField,)
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
 
@@ -271,6 +275,10 @@ class ShellCommandOutputsField(StringSequenceField):
         Use a trailing slash on directory names, i.e. `my_dir/`.
         """
     )
+
+
+class ShellCommandDependenciesField(Dependencies):
+    pass
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -328,7 +336,7 @@ class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ShellCommandDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
@@ -365,7 +373,7 @@ class ShellCommandRunTarget(Target):
     alias = "experimental_run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        ShellCommandDependenciesField,
         ShellCommandCommandField,
         ShellCommandRunWorkdirField,
     )
