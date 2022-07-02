@@ -8,7 +8,6 @@ import logging
 import os
 from typing import Iterable, Iterator, Optional, cast
 
-from pants.base.deprecated import warn_or_error
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -446,9 +445,9 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _tailor_pex_binary_targets = BoolOption(
+    tailor_pex_binary_targets = BoolOption(
         "--tailor-pex-binary-targets",
-        default=True,
+        default=False,
         help=softwrap(
             """
             If true, add `pex_binary` targets for Python files named `__main__.py` or with a
@@ -457,27 +456,6 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-
-    @property
-    def tailor_pex_binary_targets(self) -> bool:
-        if self.options.is_default("tailor_pex_binary_targets"):
-            warn_or_error(
-                "2.14.0.dev1",
-                "the [python] option `tailor_pex_binary_targets` defaulting to `true`",
-                softwrap(
-                    """
-                    In Pants 2.13, you can run a `python_source` target directly, without the need
-                    for a `pex_binary` target.
-
-                    We believe that most Python files which would've been flagged as `pex_binary`s
-                    (e.g. contain an `if __name__ == "__main__"` block) are likely user scripts and
-                    aren't meant to be packaged. Therefore in Pants 2.14 the default will be changed
-                    to `false`.
-                    """
-                ),
-            )
-        return self._tailor_pex_binary_targets
-
     macos_big_sur_compatibility = BoolOption(
         "--macos-big-sur-compatibility",
         default=False,
