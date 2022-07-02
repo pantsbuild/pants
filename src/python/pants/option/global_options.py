@@ -23,7 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, warn_or_error
+from pants.base.deprecated import deprecated_conditional
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1662,9 +1662,9 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
 
-    _use_deprecated_pex_binary_run_semantics = BoolOption(
+    use_deprecated_pex_binary_run_semantics = BoolOption(
         "--use-deprecated-pex-binary-run-semantics",
-        default=True,
+        default=False,
         help=softwrap(
             """
             If `true`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
@@ -1694,35 +1694,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
     )
-
-    @property
-    def use_deprecated_pex_binary_run_semantics(self) -> bool:
-        if self.options.is_default("use_deprecated_pex_binary_run_semantics"):
-            warn_or_error(
-                "2.14.0.dev1",
-                "the option --use-deprecated-pex-binary-run-semantics defaulting to true",
-                softwrap(
-                    f"""
-                    Currently, running a `pex_binary` by default will not include the source files
-                    in the PEX, and will instead put them in a temporary sandbox.
-
-                    In Pants 2.14, the default will change to instead build the PEX like you had run
-                    the `package` goal, and then execute that PEX. This is more consistent and
-                    intuitive behavior.
-
-                    To fix this deprecation, explictly set `use_deprecated_pex_binary_run_semantics`
-                    in the `[GLOBAL]` section of `pants.toml`.
-                    Set it to `true` to use the "old" behavior.
-                    Set it to `false` to use the "new" behavior.
-
-                    When set to `false`, you can still run the binary as before because you can now
-                    run on a `python_source` target. The simplest way to do this is to use
-                    `{bin_name()} run path/to/file.py`, which will find the owning `python_source`.
-                    Pants will run the file the same way it used to with `pex_binary` targets.
-                    """
-                ),
-            )
-        return self._use_deprecated_pex_binary_run_semantics
 
     @classmethod
     def validate_instance(cls, opts):
