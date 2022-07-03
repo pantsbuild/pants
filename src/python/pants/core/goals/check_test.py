@@ -36,7 +36,7 @@ class MockTarget(Target):
 
 
 class MockCheckFieldSet(FieldSet):
-    required_fields = (MockMultipleSourcesField,)
+    required_fields = (MultipleSourcesField,)
 
 
 class MockCheckRequest(CheckRequest, metaclass=ABCMeta):

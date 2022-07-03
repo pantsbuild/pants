@@ -46,8 +46,8 @@ class MockTarget(Target):
 
 @dataclass(frozen=True)
 class MockLinterFieldSet(FieldSet):
-    required_fields = (MockMultipleSourcesField,)
-    sources: MockMultipleSourcesField
+    required_fields = (MultipleSourcesField,)
+    sources: MultipleSourcesField
 
 
 class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):

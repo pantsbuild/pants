@@ -43,14 +43,14 @@ class MockGeneratedFileTarget(Target):
     core_fields = (MockSingleSourceField, Tags)
 
 
-class MockmultipleSourcesField(MultipleSourcesField):
+class MockMultipleSourcesField(MultipleSourcesField):
     pass
 
 
-class MockFileTargetGenerator(MockmultipleSourcesField):
+class MockFileTargetGenerator(TargetFilesGenerator):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
-    core_fields = (MultipleSourcesField, Tags)
+    core_fields = (MockMultipleSourcesField, Tags)
     copied_fields = (Tags,)
     moved_fields = ()
 
