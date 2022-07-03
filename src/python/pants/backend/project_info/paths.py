@@ -29,7 +29,6 @@ class PathsSubsystem(Outputting, GoalSubsystem):
     help = "List the paths between two addresses."
 
     from_ = StrOption(
-        "--from",
         default=None,
         help="The path starting address",
     )

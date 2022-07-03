@@ -107,7 +107,6 @@ class SourceRootConfig(Subsystem):
     ]
 
     root_patterns = StrListOption(
-        "--root-patterns",
         default=DEFAULT_ROOT_PATTERNS,
         help="A list of source root suffixes. A directory with this suffix will be considered "
         "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
@@ -121,7 +120,6 @@ class SourceRootConfig(Subsystem):
         metavar='["pattern1", "pattern2", ...]',
     )
     marker_filenames = StrListOption(
-        "--marker-filenames",
         help="The presence of a file of this name in a directory indicates that the directory "
         "is a source root. The content of the file doesn't matter, and may be empty. "
         "Useful when you can't or don't wish to centrally enumerate source roots via "

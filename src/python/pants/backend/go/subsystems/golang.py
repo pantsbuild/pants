@@ -63,7 +63,7 @@ class GolangSubsystem(Subsystem):
             "1.18 works with the version set to `1.17`."
         ),
     )
-    minimum_version = StrOption(
+    minimum_expected_version = StrOption(
         default="1.17",
         help=softwrap(
             """
@@ -203,7 +203,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 {list(search_paths)}
 
                 To fix, please install Go (https://golang.org/doc/install) with the version
-                {golang_subsystem.minimum_version} or newer (set by
+                {golang_subsystem.minimum_expected_version} or newer (set by
                 `[golang].minimum_expected_version`). Then ensure that it is discoverable via
                 `[golang].go_search_paths`.
                 """
@@ -242,7 +242,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             )
 
         if compatible_go_version(
-            compiler_version=version, target_version=golang_subsystem.minimum_version
+            compiler_version=version, target_version=golang_subsystem.minimum_expected_version
         ):
             env_result = await Get(
                 ProcessResult,
@@ -274,7 +274,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
         softwrap(
             f"""
             Cannot find a `go` binary compatible with the minimum version of
-            {golang_subsystem.minimum_version} (set by `[golang].minimum_expected_version`).
+            {golang_subsystem.minimum_expected_version} (set by `[golang].minimum_expected_version`).
 
             Found these `go` binaries, but they had incompatible versions:
 

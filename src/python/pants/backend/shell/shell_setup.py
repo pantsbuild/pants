@@ -18,7 +18,6 @@ class ShellSetup(Subsystem):
     help = "Options for Pants's Shell support."
 
     _executable_search_path = StrListOption(
-        "--executable-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """

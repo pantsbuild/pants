@@ -14,7 +14,6 @@ class ThriftPythonSubsystem(Subsystem):
     help = "Options specific to generating Python from Thrift using Apache Thrift"
 
     gen_options = StrListOption(
-        # @TODO: Replace
         "--options",
         help=softwrap(
             """
