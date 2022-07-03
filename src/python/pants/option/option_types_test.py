@@ -6,6 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
+import unittest.mock
 
 import pytest
 
@@ -185,8 +186,11 @@ def test_specialized_options() -> None:
 
         def __init__(self):
             self.options = SimpleNamespace()
-            self.options.skip = True
-            self.options.args = ["--arg1"]
+            self.options.skip_prop1 = True
+            self.options.skip_prop2 = True
+            self.options.args_prop1 = ["--arg1"]
+            self.options.args_prop2 = ["--arg1"]
+            self.options.args_prop3 = ["--arg1"]
 
         skip_prop1 = SkipOption("fmt", "lint")
         skip_prop2 = SkipOption("fmt")
@@ -203,7 +207,7 @@ def test_specialized_options() -> None:
 
     def expected_skip_opt_info(help: str):
         return opt_info(
-            "--skip",
+            unittest.mock.ANY,
             help=help,
             default=False,
             type=bool,
@@ -211,7 +215,7 @@ def test_specialized_options() -> None:
 
     def expected_args_opt_info(help: str):
         return opt_info(
-            "--args",
+            unittest.mock.ANY,
             member_type=shell_str,
             help=help,
             default=[],
