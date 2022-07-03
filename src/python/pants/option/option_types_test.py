@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+import unittest.mock
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
-import unittest.mock
 
 import pytest
 
