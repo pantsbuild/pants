@@ -183,6 +183,59 @@ def test_summary() -> None:
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
 
 
+def test_message_lists_added_files() -> None:
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  added.ext"
+
+
+def test_message_lists_removed_files() -> None:
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  removed.ext"
+
+
+def test_message_lists_files() -> None:
+    # _unsafe_create() cannot be used to simulate changed files,
+    # so just make sure added and removed work together.
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  added.ext\n  removed.ext"
+
+
 def test_streaming_output_skip() -> None:
     result = FmtResult.skip(formatter_name="formatter")
     assert result.level() == LogLevel.DEBUG

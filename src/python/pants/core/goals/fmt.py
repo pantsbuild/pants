@@ -120,8 +120,10 @@ class FmtResult(EngineAwareReturnType):
                 f"\n  {file}"
                 for file in itertools.chain(
                     snapshot_diff.changed_files,
-                    snapshot_diff.their_unique_files,
-                    snapshot_diff.our_unique_files,
+                    snapshot_diff.their_unique_files,  # added files
+                    snapshot_diff.our_unique_files,  # removed files
+                    # NB: there is no rename detection, so a renames will list
+                    # both the old filename (removed) and the new filename (added).
                 )
             )
         else:
