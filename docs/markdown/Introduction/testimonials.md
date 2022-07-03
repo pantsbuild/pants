@@ -20,9 +20,11 @@ Additionally, the safety and speed of our deployment process was drastically aug
 For day-to-day work, Pants has empowered developers to create clear separation of concerns between disparate parts of the application, eliminating unnecessary dependencies and improving stability and maintainability.  It has also brought sanity to keeping linting, formatting, third party dependency versioning and python versions consistent across the codebase.  
 
 Compared to other build tools, Pants is drastically more approachable for a small team of python developers, making it possible for an early-stage company to lay the groundwork for a maintainable codebase at an early stage.  Perhaps most importantly, it is backed by a passionate team who are an absolute joy to work with. I would recommend Pants highly to any team!
+
 </blockquote>
 
 **See also Gordon's case study writeup, "[Putting Pants On: One Thing We Did Right After 5 Years with Django](https://g-cassie.github.io/2021/10/02/django-pants.html)"**
+
 </figure>
 
 <figure>
@@ -42,7 +44,7 @@ We have rolled out Pants across the organization now replacing Conda based workf
 		<h3><a href="https://vicarasolutions.com/">Vicara Solutions</a></h3>
 	</figcaption>
 <blockquote>
-<p>I just wanted to write a quick appreciation message for a) Pants itself, and b) all the plugin help I've received <a href="https://pantsbuild.slack.com">on the Slack community</a>.
+<p>I just wanted to write a quick appreciation message for a) Pants itself, and b) all the plugin help I've received <a href="https://www.pantsbuild.org/docs/getting-help">on the Slack community</a>.
 <p>I just finished re-writing the entire build/deployment process for a multi-year legacy project using Pants + some custom plugins, and I was able to gut a slapdash set of bash scripts, Dockerfiles, build containers, and who knows what else - in favour of a handful of BUILD files of like 15 lines of code each.
 <p>I handed over the project today and this is essentially how it went:
 <p><i>Me: "Okay, so to deploy, we have to generate the protobufs, cythonize our core libs, embed the protobufs and core libs in some of our sub-repos, Dockerize the API gateway and microservices, package our system services, and then deploy all of that to our server and then run e2e testing."</i>
@@ -72,6 +74,7 @@ Pants makes our monorepo keep its promises. In theory, monorepos let any develop
 Moving from "serially building all docker containers with a build script" to "parallel builds using pants": we went from 28.8 minutes (1730 sec) to 611.88 seconds, about a 2.8x improvement! And there's one spectacularly long-build container that's responsible for the long tail; most were built much faster so if it weren't for that laggard this would look even better.
 
 And that's not even counting the impressive dependency checking, etc. that goes with a proper build system.  Very pleased with this.  Thanks for the fantastic support!
+
 </blockquote>
 </figure>
 
@@ -84,7 +87,6 @@ And that's not even counting the impressive dependency checking, etc. that goes 
 Python is the go-to language for most quants, but its flexibility is a double-edged sword.  While seeing immediate results is great, it is quasi-impossible to tame the code as it grows  large without several external tools: type checkers, linters, formatters, hermetic packers etc.  I love Pants not only because it unifies all these in a few simple and swift commands but also  because it adds hassle-free long-term value. Remember that "time is money", so save some for your future self and add Pants to your repos!
 </blockquote>
 </figure>
-
 
 <figure>
 	<figcaption>

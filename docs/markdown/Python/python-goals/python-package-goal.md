@@ -11,42 +11,35 @@ The `package` goal creates an artifact that can be deployed or distributed.
 The exact type of artifact depends on the type of target the goal is invoked on.
 
 You can run `./pants package ::` to build all artifacts in your project. Pants will filter to only the relevant targets.
-[block:callout]
-{
-  "type": "success",
-  "title": "Benefit of Pants: artifacts only include your true dependencies",
-  "body": "Because Pants understands the dependencies of your code, and the dependencies of those dependencies, the generated artifact will only include the exact code needed for your package to work. This results in smaller, more focused packages."
-}
-[/block]
 
-[block:callout]
-{
-  "type": "success",
-  "title": "Benefit of Pants: easily write automated tests of your packaging pipeline",
-  "body": "You can depend on a package target in a `python_test` / `python_tests` target through the `runtime_package_dependencies` field. Pants will run the equivalent of `./pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.\n\nThis allows you to test your packaging pipeline by simply running `./pants test ::`, without needing custom integration test scripts.\n\nSee [test](doc:python-test-goal) for more information."
-}
-[/block]
+> 👍 Benefit of Pants: artifacts only include your true dependencies
+> 
+> Because Pants understands the dependencies of your code, and the dependencies of those dependencies, the generated artifact will only include the exact code needed for your package to work. This results in smaller, more focused packages.
 
-[block:callout]
-{
-  "type": "success",
-  "title": "Streamling Docker builds",
-  "body": "Check out our blog [Streamling Docker Builds](https://blog.pantsbuild.org/pants-pex-and-docker/) to read about how you can combine these `package` formats with Pants's Docker support. Also see our [Docker docs](doc:docker)"
-}
-[/block]
+> 👍 Benefit of Pants: easily write automated tests of your packaging pipeline
+> 
+> You can depend on a package target in a `python_test` / `python_tests` target through the `runtime_package_dependencies` field. Pants will run the equivalent of `./pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
+> 
+> This allows you to test your packaging pipeline by simply running `./pants test ::`, without needing custom integration test scripts.
+> 
+> See [test](doc:python-test-goal) for more information.
 
-[block:api-header]
-{
-  "title": "Creating a PEX file from a `pex_binary` target"
-}
-[/block]
+> 👍 Streamling Docker builds
+> 
+> Check out our blog [Streamling Docker Builds](https://blog.pantsbuild.org/pants-pex-and-docker/) to read about how you can combine these `package` formats with Pants's Docker support. Also see our [Docker docs](doc:docker)
+
+Creating a PEX file from a `pex_binary` target
+----------------------------------------------
+
 Running `package` on a `pex_binary` target will create an executable [PEX file](doc:pex-files).
 
 The PEX file will contain all the code needed to run the binary, namely:
+
 - All Python code and resources the binary transitively depends on.
 - The resolved 3rd-party Python dependencies (sdists and wheels) of all targets the binary transitively depends on.
 
 The PEX metadata will include:
+
 - The entry point or console script specified by the `pex_binary` target, if any.
 - The intersection of all interpreter constraints applicable to the code in the Pex. See [Interpreter compatibility](doc:python-interpreter-compatibility).
 
@@ -80,75 +73,86 @@ If you use the `entry_point` field,  Pants will use dependency inference, which 
 #### `entry_point` with a file name
 
 You can specify a file name, which Pants will convert into a well-formed entry point. Like with the `source` / `sources` field, file paths are relative to the BUILD file, rather than the build root.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "# The default `sources` field will include `main.py`.\npython_sources(name=\"lib\")\n\n# Pants will convert the entry point to `helloworld.main`.\npex_binary(\n  name=\"app\",\n  entry_point=\"main.py\",\n)\n\n# You can also specify the function to run.\npex_binary(\n  name=\"app_with_func\",\n  entry_point=\"main.py:my_func\",\n)",
-      "language": "python",
-      "name": "helloworld/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python helloworld/BUILD
+# The default `sources` field will include `main.py`.
+python_sources(name="lib")
+
+# Pants will convert the entry point to `helloworld.main`.
+pex_binary(
+  name="app",
+  entry_point="main.py",
+)
+
+# You can also specify the function to run.
+pex_binary(
+  name="app_with_func",
+  entry_point="main.py:my_func",
+)
+```
+
 This approach has the added benefit that you can use file arguments, e.g. `./pants package helloworld/main.py`, rather than needing to use target addresses like `./pants package helloworld:app`.
 
 #### Explicit `entry_point`
 
 You can directly specify the entry point in the format `path.to.module` or `path.to.module:my_func`. This allows you to use an entry point for a third-party requirement or the Python standard library.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "# The default `sources` field will include `main.py`.\npython_sources(name=\"lib\")\n\npex_binary(\n  name=\"app\",\n  entry_point=\"helloworld.main\",\n)\n\n# You can also specify the function to run.\npex_binary(\n  name=\"app_with_func\",\n  entry_point=\"helloworld.main:my_func\",\n)\n\n# You can specify third-party requirements and the std lib.\npex_binary(\n  name=\"3rdparty_app\",\n  entry_point=\"bandit:main\",\n)",
-      "language": "python",
-      "name": "helloworld/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python helloworld/BUILD
+# The default `sources` field will include `main.py`.
+python_sources(name="lib")
+
+pex_binary(
+  name="app",
+  entry_point="helloworld.main",
+)
+
+# You can also specify the function to run.
+pex_binary(
+  name="app_with_func",
+  entry_point="helloworld.main:my_func",
+)
+
+# You can specify third-party requirements and the std lib.
+pex_binary(
+  name="3rdparty_app",
+  entry_point="bandit:main",
+)
+```
+
 Unlike using `entry_point` with a file name, this does not work with file arguments; you must use the target address, like `./pants package helloworld:app`.
 
 #### `script`
 
 You can set the `script` to any `console_script` or script exposed by your third-party requirements.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "python_requirement(name=\"black_req\", requirements=[\"black==21.10b0\"])\n\npex_binary(\n  name=\"black_bin\",\n  script=\"black\",\n  dependencies=[\":black_req\"],\n)",
-      "language": "python",
-      "name": "helloworld/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python helloworld/BUILD
+python_requirement(name="black_req", requirements=["black==21.10b0"])
+
+pex_binary(
+  name="black_bin",
+  script="black",
+  dependencies=[":black_req"],
+)
+```
+
 You must explicitly add the dependencies you'd like to the `dependencies` field.
 
 This does not work with file arguments; you must use the target address, like `./pants package helloworld:black_bin`.
-[block:callout]
-{
-  "type": "warning",
-  "title": "PEX files may be platform-specific",
-  "body": "If your code's requirements include distributions that include native code, then the resulting PEX file will only run on the platform it was built on. \n\nHowever, if all native code requirements are available as [wheels](https://packaging.python.org/glossary/#term-wheel) for the target platform, then you can cross-build a PEX file on a different source platform by specifying the `platforms` field on the `pex_binary`, e.g. `platforms=[\"linux-x86_64-cp-37-cp37m\", \"macosx_10_15_x86_64-cp-38-cp38\"]`."
-}
-[/block]
 
-[block:callout]
-{
-  "type": "info",
-  "body": "Because a `.pex` file is simply a ZIP file, you can use the Unix tool `unzip` to inspect the contents. For example, run `unzip -l dist/app.pex` to see all file members.",
-  "title": "Tip: inspect the `.pex` file with `unzip`"
-}
-[/block]
+> 🚧 PEX files may be platform-specific
+> 
+> If your code's requirements include distributions that include native code, then the resulting PEX file will only run on the platform it was built on. 
+> 
+> However, if all native code requirements are available as [wheels](https://packaging.python.org/glossary/#term-wheel) for the target platform, then you can cross-build a PEX file on a different source platform by specifying the `platforms` field on the `pex_binary`, e.g. `platforms=["linux-x86_64-cp-37-cp37m", "macosx_10_15_x86_64-cp-38-cp38"]`.
 
-[block:callout]
-{
-  "type": "warning",
-  "body": "`file` and `files` targets will not be included in the built PEX because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target or wrap your `pex_binary` in an `archive` target. See [Assets and archives](doc:assets) for further explanation.",
-  "title": "Use `resource` instead of `file`"
-}
-[/block]
+> 📘 Tip: inspect the `.pex` file with `unzip`
+> 
+> Because a `.pex` file is simply a ZIP file, you can use the Unix tool `unzip` to inspect the contents. For example, run `unzip -l dist/app.pex` to see all file members.
+
+> 🚧 Use `resource` instead of `file`
+> 
+> `file` and `files` targets will not be included in the built PEX because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target or wrap your `pex_binary` in an `archive` target. See [Assets and archives](doc:assets) for further explanation.
+
 ### Examples
 
 ```
@@ -168,41 +172,50 @@ We can also build the same Pex by using the address of the `pex_binary` target, 
 ### `pex_binaries` target generator
 
 If you have several scripts in the same directory, it can be convenient to use the `pex_binaries` [target generator](doc:targets), which will generate one `pex_binary` target per entry in the `entry_points` field:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "# The default `sources` will include all our source files.\npython_sources(name=\"lib\")\n\npex_binaries(\n    name=\"binaries\",\n    entry_points=[\n        \"app1.py\",\n        \"app2.py\",\n        \"app3.py:my_func\",\n    ],\n    overrides={\n        \"app2.py:my_func\": {\"execution_mode\": \"venv\"},\n    },\n)",
-      "language": "python",
-      "name": "scripts/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python scripts/BUILD
+# The default `sources` will include all our source files.
+python_sources(name="lib")
+
+pex_binaries(
+    name="binaries",
+    entry_points=[
+        "app1.py",
+        "app2.py",
+        "app3.py:my_func",
+    ],
+    overrides={
+        "app2.py:my_func": {"execution_mode": "venv"},
+    },
+)
+```
+
 Use `./pants peek path/to/dir:` to inspect the generated `pex_binary` targets.
-[block:api-header]
-{
-  "title": "Create a setuptools distribution"
-}
-[/block]
+
+Create a setuptools distribution
+--------------------------------
+
 Running `package` on a `python_distribution` target will create a standard setuptools-style Python distribution, such as an sdist or a wheel. See [Building Distributions](doc:python-distributions) for details.
-[block:api-header]
-{
-  "title": "Create a `zip` or `tar` file"
-}
-[/block]
+
+Create a `zip` or `tar` file
+----------------------------
+
 See [Resources and archives](doc:assets) for how to create a zip or tar file with built binaries and/or loose files in it by using the `archive` target. 
 
 This is often useful when you want to create a PEX binary using the `pex_binary` target, and bundle it with some loose config files.
-[block:api-header]
-{
-  "title": "Create an AWS Lambda"
-}
-[/block]
+
+Create an AWS Lambda
+--------------------
+
 See [AWS Lambda](doc:awslambda-python) for how to build a zip file that works with AWS Lambda.
-[block:api-header]
-{
-  "title": "Create a Google Cloud Function"
-}
-[/block]
+
+Create a Google Cloud Function
+------------------------------
+
 See [Google Cloud Functions](doc:google-cloud-function-python) for how to build a zip file that works with Google Cloud Functions.
+
+Create a PyOxidizer binary
+--------------------------
+
+See [PyOxidizer](doc:pyoxidizer) for how to distribute your code as a binary, like PEX, but with 
+the Python interpreter included.

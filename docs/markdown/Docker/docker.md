@@ -30,7 +30,7 @@ A Docker image is built from a recipe specified by a [Dockerfile](https://docs.d
 
 Pants uses [`docker_image`](doc:reference-docker_image) [targets](doc:targets) to indicate which Dockerfiles you want Pants to know about, and to add any necessary metadata. 
 
-You can generate initial BUILD files for your Docker images, using [tailor](doc:create-initial-build-files):
+You can generate initial BUILD files for your Docker images, using [tailor](doc:initial-configuration#5-generate-build-files):
 
 ```
 ❯ ./pants tailor ::
@@ -248,6 +248,8 @@ Pants can push your images to registries using `./pants publish`:
 ❯ ./pants publish src/docker/hw:helloworld
 # Will build the image and push it to all registries, with all tags.
 ```
+
+Publishing may be skipped per registry or entirely per `docker_image` using `skip_push`.
 
 See [here](doc:tagging-docker-images) for how to set up registries.
 

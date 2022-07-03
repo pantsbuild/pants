@@ -31,6 +31,7 @@ class DockerRegistryOptions:
     default: bool = False
     skip_push: bool = False
     extra_image_tags: tuple[str, ...] = ()
+    repository: str | None = None
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -42,6 +43,7 @@ class DockerRegistryOptions:
             extra_image_tags=tuple(
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
+            repository=Parser.to_value_type(d.get("repository"), str, None, None),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:

@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -50,6 +50,8 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @union
@@ -605,14 +607,16 @@ def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
                 tailor goal only accepts literal directories as arguments, which it will run
                 recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
 
-                To fix, either set `use_deprecated_cli_args_semantics` to false, or rerun with
-                specifying only literal directories, e.g. `tailor dir1 dir2`. If changing
-                `use_deprecated_cli_args_semantics` to false, you should specify which directories
-                to run on when using `tailor`:
+                To fix, either use the default value of `use_deprecated_cli_args_semantics` of
+                false, or rerun with
+                specifying only literal directories, e.g. `{bin_name()} tailor dir1 dir2`. If
+                changing `use_deprecated_cli_args_semantics` to false, you should specify which
+                directories to run on when using `tailor`:
 
-                  * `::` to run on everything
-                  * `dir::` to run on `dir` and subdirs
-                  * `dir` to run on `dir`
+                  * `{bin_name()} tailor ::` to run on everything
+                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                  * `{bin_name()} tailor dir` to run on `dir`
+                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
                 """
             )
         )
@@ -631,33 +635,31 @@ async def tailor(
     global_options: GlobalOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
+    if not specs:
+        if not specs.includes.from_change_detection:
+            logger.warning(
+                softwrap(
+                    f"""\
+                    No arguments specified with `{bin_name()} tailor`, so the goal will do nothing.
+
+                    Instead, you should provide arguments like this:
+
+                      * `{bin_name()} tailor ::` to run on everything
+                      * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                      * `{bin_name()} tailor dir` to run on `dir`
+                      * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
+                    """
+                )
+            )
+        return TailorGoal(exit_code=0)
 
     dir_search_paths: tuple[str, ...] = ()
     recursive_search_paths: tuple[str, ...] = ()
-    if specs:
-        if global_options.use_deprecated_directory_cli_args_semantics:
-            recursive_search_paths = specs_to_dirs(specs.includes)
-        else:
-            specs_paths = await Get(SpecsPaths, Specs, specs)
-            dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+    if global_options.use_deprecated_directory_cli_args_semantics:
+        recursive_search_paths = specs_to_dirs(specs.includes)
     else:
-        warn_or_error(
-            "2.14.0.dev0",
-            f"running `{bin_name()} tailor` without arguments",
-            softwrap(
-                f"""
-                Currently, `{bin_name()} tailor` without arguments will run against
-                every file in the project.
-
-                In Pants 2.14, you must use CLI arguments. Use:
-
-                  * `::` to run on everything
-                  * `dir::` to run on `dir` and subdirs
-                  * `dir` to run on `dir`
-                """
-            ),
-        )
-        recursive_search_paths = ("",)
+        specs_paths = await Get(SpecsPaths, Specs, specs)
+        dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
 
     putative_targets_results = await MultiGet(
         Get(

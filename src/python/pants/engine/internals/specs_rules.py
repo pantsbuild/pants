@@ -8,16 +8,17 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from pathlib import PurePath
-from typing import Iterable
+from typing import Iterable, cast
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
+from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
     DirLiteralSpec,
-    FileLiteralSpec,
     RawSpecs,
     RawSpecsWithOnlyFileOwners,
     RawSpecsWithoutFileOwners,
@@ -27,7 +28,7 @@ from pants.base.specs import (
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
-from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
 from pants.engine.internals.parametrize import (
     _TargetParametrizations,
@@ -54,12 +55,12 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import GlobalOptions, UseDeprecatedPexBinaryRunSemanticsOption
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -196,40 +197,19 @@ async def addresses_from_raw_specs_without_file_owners(
 
 
 @rule
-def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return global_options.owners_not_found_behavior
-
-
-@rule
 async def addresses_from_raw_specs_with_only_file_owners(
-    specs: RawSpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
+    specs: RawSpecsWithOnlyFileOwners,
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
     )
-    owners_per_include = await MultiGet(
-        Get(
-            Owners,
-            OwnersRequest(paths.files, filter_by_global_options=specs.filter_by_global_options),
-        )
-        for paths in paths_per_include
+    all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
+    owners = await Get(
+        Owners,
+        OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
     )
-    addresses: set[Address] = set()
-    for spec, owners in zip(specs.all_specs(), owners_per_include):
-        if (
-            not specs.from_change_detection
-            and owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
-            _log_or_raise_unmatched_owners(
-                [PurePath(str(spec))],
-                owners_not_found_behavior,
-                ignore_option="--owners-not-found-behavior=ignore",
-            )
-        addresses.update(owners)
-    return Addresses(sorted(addresses))
+    return Addresses(sorted(owners))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -271,12 +251,7 @@ def setup_specs_filter(
     filter_subsystem: FilterSubsystem,
     registered_target_types: RegisteredTargetTypes,
 ) -> SpecsFilter:
-    return SpecsFilter.create(
-        filter_subsystem,
-        registered_target_types,
-        tags=global_options.tag,
-        exclude_target_regexps=global_options.exclude_target_regexp,
-    )
+    return SpecsFilter.create(filter_subsystem, registered_target_types, tags=global_options.tag)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -474,9 +449,62 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
+def _handle_ambiguous_result(
+    request: TargetRootsToFieldSetsRequest,
+    result: TargetRootsToFieldSets,
+    field_set_to_default_to: type[FieldSet],
+) -> TargetRootsToFieldSets:
+    assert len(result.targets) > 1
+    field_set_types = [type(field_set) for field_set in result.field_sets]
+
+    # NB: See https://github.com/pantsbuild/pants/pull/15849. We don't want to break clients as
+    # we shift behavior, so we add this temporary hackery here.
+    if (
+        # (We check for 2 targets because 3 would've been ambiguous pre-our-change)
+        len(result.targets) == 2
+        and PexBinaryFieldSet in field_set_types
+        and PythonSourceFieldSet in field_set_types
+    ):
+        if field_set_to_default_to is PexBinaryFieldSet:
+            warn_or_error(
+                "2.14.0dev1",
+                "referring to a `pex_binary` by using the filename specified in `entry_point`",
+                softwrap(
+                    """
+                        In Pants 2.14, a `pex_binary` can no longer be referred to by the filename that
+                        the `entry_point` field uses.
+
+                        This is due to a change in Pants 2.13, which allows you to use the `run` goal
+                        directly on a `python_source` target without requiring a `pex_binary`. As a
+                        consequence the ability to refer to the `pex_binary` via its `entry_point` is
+                        being removed, as otherwise it would be ambiguous which target to use.
+
+                        Note that because of this change you are able to remove any `pex_binary` targets
+                        you have declared just to support the `run` goal
+                        (usually these are developer scripts), as using `run` on the `python_source` will
+                        have the equivalent behavior.
+
+                        To fix this deprecation, you can use the `pex_binary`'s address to refer to
+                        the `pex_binary`, or set the `[GLOBAL].use_deprecated_pex_binary_run_semantics`
+                        option to `false` (which, among other things, will have `run` on a Python
+                        filename run the `python_source`).
+                        """
+                ),
+            )
+        return TargetRootsToFieldSets(
+            {
+                target: field_sets
+                for target, field_sets in result.mapping.items()
+                if field_set_to_default_to in {type(field_set) for field_set in field_sets}
+            }
+        )
+    raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
+
+
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
+    use_deprecated_pex_binary_run_semantics: UseDeprecatedPexBinaryRunSemanticsOption,
     specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
@@ -535,7 +563,16 @@ async def find_valid_field_sets_for_target_roots(
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:
-        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
+        return _handle_ambiguous_result(
+            request,
+            result,
+            cast(
+                "type[FieldSet]",
+                PexBinaryFieldSet
+                if use_deprecated_pex_binary_run_semantics.val
+                else PythonSourceFieldSet,
+            ),
+        )
     if len(result.field_sets) > 1:
         raise AmbiguousImplementationsException(
             result.targets[0], result.field_sets, goal_description=request.goal_description

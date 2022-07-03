@@ -243,6 +243,10 @@ class BuildConfiguration:
                 )
             for target_type in target_types:
                 self._target_type_to_providers[target_type].append(plugin_or_backend)
+                # Access the Target._plugin_field_cls here to ensure the PluginField class is
+                # created before the UnionMembership is instantiated, as the class hierarchy is
+                # walked during union membership setup.
+                _ = target_type._plugin_field_cls
 
         def allow_unknown_options(self, allow: bool = True) -> None:
             """Allows overriding whether Options parsing will fail for unrecognized Options.

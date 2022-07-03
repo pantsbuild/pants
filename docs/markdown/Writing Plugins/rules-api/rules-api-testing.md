@@ -11,11 +11,10 @@ There are four main approaches to testing your plugin, ranging in terms of scope
 All approaches use [Pytest](https://docs.pytest.org/en/latest/)-style tests, rather than [`unittest`](https://docs.python.org/3/library/unittest.html)-style tests.
 
 You must also install the distribution `pantsbuild.pants.testutil`. We recommend using the [`pants_requirements` target to do this](doc:plugins-overview).
-[block:api-header]
-{
-  "title": "Approach 1: normal unit tests"
-}
-[/block]
+
+Approach 1: normal unit tests
+-----------------------------
+
 Often, you can factor out normal Python functions from your plugin that do not use the Rules API. These helpers can be tested like you would test any other Python code.
 
 For example, some Pants rules take the type `InterpreterConstraints` as input. `InterpreterConstraints` has a factory method `merge_constraint_sets()` that we can test through a normal unit test.
@@ -43,19 +42,43 @@ def test_timeout_validation() -> None:
         PythonTestTimeoutField(0, Address("demo"))
     assert PythonTestTimeoutField(5, Address("demo")).value == 5
 ```
-[block:callout]
-{
-  "type": "info",
-  "title": "How to create a `Target` in-memory",
-  "body": "For Approaches #1 and #2, you will often want to pass a `Target` instance to your test, such as a `PythonTestTarget` instance.\n\nTo create a `Target` instance, choose which subclass you want, then pass a dictionary of the values you want to use, followed by an `Address` object. The dictionary corresponds to what you'd put in the BUILD file; any values that you leave off will use their default values. \n\nThe `Address` constructor's first argument is the path to the BUILD file; you can optionally define `target_name: str` if it is not the default `name`.\n\nFor example, given this target definition for `project/app:tgt`:\n\n```python\npython_test(\n    name=\"tgt\",\n    source=\"app_test.py\",\n    timeout=120,\n)\n```\n\nWe would write:\n\n```python\ntgt = PythonTestTarget(\n    {\"source\": \"app_test.py\", \"timeout\": 120},\n    Address(\"project/app\", target_name=\"tgt\"),\n)\n```\n\nNote that we did not put `\"name\": \"tgt\"` in the dictionary. `name` is a special field that does not use the Target API. Instead, pass the `name` to the `target_name` argument in the `Address` constructor.\n\nFor Approach #3, you should instead use `rule_runner.write_files()` to write a BUILD file, followed by `rule_runner.get_target()`.\n\nFor Approach #4, you should use `setup_tmpdir()` to set up BUILD files."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Approach 2: `run_rule_with_mocks()` (unit tests for rules)"
-}
-[/block]
+> 📘 How to create a `Target` in-memory
+> 
+> For Approaches #1 and #2, you will often want to pass a `Target` instance to your test, such as a `PythonTestTarget` instance.
+> 
+> To create a `Target` instance, choose which subclass you want, then pass a dictionary of the values you want to use, followed by an `Address` object. The dictionary corresponds to what you'd put in the BUILD file; any values that you leave off will use their default values. 
+> 
+> The `Address` constructor's first argument is the path to the BUILD file; you can optionally define `target_name: str` if it is not the default `name`.
+> 
+> For example, given this target definition for `project/app:tgt`:
+> 
+> ```python
+> python_test(
+>     name="tgt",
+>     source="app_test.py",
+>     timeout=120,
+> )
+> ```
+> 
+> We would write:
+> 
+> ```python
+> tgt = PythonTestTarget(
+>     {"source": "app_test.py", "timeout": 120},
+>     Address("project/app", target_name="tgt"),
+> )
+> ```
+> 
+> Note that we did not put `"name": "tgt"` in the dictionary. `name` is a special field that does not use the Target API. Instead, pass the `name` to the `target_name` argument in the `Address` constructor.
+> 
+> For Approach #3, you should instead use `rule_runner.write_files()` to write a BUILD file, followed by `rule_runner.get_target()`.
+> 
+> For Approach #4, you should use `setup_tmpdir()` to set up BUILD files.
+
+Approach 2: `run_rule_with_mocks()` (unit tests for rules)
+----------------------------------------------------------
+
 `run_rule_with_mocks()` will run your rule's logic, but with each argument to your `@rule` provided explicitly by you and with mocks for any `await Get`s. This means that the test is fully mocked; for example, `run_rule_with_mocks()` will not actually run a `Process`, nor will it use the file system operations. This is useful when you want to test the inlined logic in your rule, but usually, you will want to use Approach #3.
 
 To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`. 
@@ -173,11 +196,10 @@ def test_with_console() -> None:
 ```
 
 If your rule takes `Workspace` as an argument, first create a `pants.testutil.rule_runner.RuleRunner()` instance in your individual test. Then, create a `Workspace` object with `Workspace(rule_runner.scheduler)`.
-[block:api-header]
-{
-  "title": "Approach 3: `RuleRunner` (integration tests for rules)"
-}
-[/block]
+
+Approach 3: `RuleRunner` (integration tests for rules)
+------------------------------------------------------
+
 `RuleRunner` allows you to run rules in an isolated environment, i.e. where you set up the rule graph and registered target types exactly how you want. `RuleRunner` will set up your rule graph and create a temporary build root. This is useful for integration tests that are more isolated and faster than Approach #4.
 
 After setting up your isolated environment, you can run `rule_runner.request(Output, [input1, input2])`, e.g. `rule_runner.request(SourceFiles, [SourceFilesRequest([sources_field])])` or `rule_runner.request(TargetsWithNeedle, [FindNeedle(targets, "needle.txt"])`. This will cause Pants to "call" the relevant `@rule` to get the output type.
@@ -187,13 +209,13 @@ After setting up your isolated environment, you can run `rule_runner.request(Out
 First, you must set up a `RuleRunner` instance and activate the rules and target types you'll use in your tests. Set the argument `target_types` with a list of the `Target` types used in in your tests, and set `rules` with a list of all the rules used transitively. 
 
 This means that you must register the rules you directly wrote, and also any rules that they depend on. Pants will automatically register some core rules for you, but leaves off most of them for better isolation of tests. If you're missing some rules, the rule graph will fail to be built.
-[block:callout]
-{
-  "type": "warning",
-  "title": "Confusing rule graph error?",
-  "body": "It can be confusing figuring out what's wrong when setting up a `RuleRunner`. We know the error messages are not ideal and are working on improving them.\n\nPlease feel free to reach out on [Slack](doc:community) for help with figuring out how to get things working."
-}
-[/block]
+
+> 🚧 Confusing rule graph error?
+> 
+> It can be confusing figuring out what's wrong when setting up a `RuleRunner`. We know the error messages are not ideal and are working on improving them.
+> 
+> Please feel free to reach out on [Slack](doc:community) for help with figuring out how to get things working.
+
 ```python
 from pants.backend.python.goals import pytest_runner
 from pants.backend.python.goals.pytest_runner import PythonTestFieldSet
@@ -474,24 +496,23 @@ def test_one_target_one_source(rule_runner: RuleRunner) -> None:
 ```
 
 Unlike when testing normal `@rules`, you do not need to define a `QueryRule` when using `rule_runner.run_goal_rule()`. This is already set up for you. However, you do need to make sure that your `@goal_rule` and all the rules it depends on are registered with the `RuleRunner` instance.
-[block:api-header]
-{
-  "title": "Approach 4: `run_pants()` (integration tests for Pants)"
-}
-[/block]
+
+Approach 4: `run_pants()` (integration tests for Pants)
+-------------------------------------------------------
+
 `pants_integration_test.py ` provides functions that allow you to run a full Pants process as it would run on the command line. It's useful for acceptance testing and for testing things that are too difficult to test with Approach #3.
 
 You will typically use three functions:
 
-* `setup_tmpdir()`, which is a [context manager](https://book.pythontips.com/en/latest/context_managers.html) that sets up temporary files in the build root to simulate a real project.
-     * It takes a single parameter `files: Mapping[str, str]`, which is a dictionary of file paths to file content.
-         * All file paths will be prefixed by the temporary directory.
-         * File content can include `{tmpdir}`, which will get substituted with the actual temporary directory.
-     * It yields the temporary directory, relative to the test's current work directory. 
-* `run_pants()`, which runs Pants using the `list[str]` of arguments you pass, such as `["help"]`.
-     * It returns a `PantsResult` object, which has the fields `exit_code: int`, `stdout: str`, and `stderr: str`.
-     * It accepts several other optional arguments, including `config`, `extra_env`, and any keyword argument accepted by `subprocess.Popen()`.
-* `PantsResult.assert_success()` or `PantsResult.assert_failure()`, which checks the exit code and prints a nice error message if unexpected.
+- `setup_tmpdir()`, which is a [context manager](https://book.pythontips.com/en/latest/context_managers.html) that sets up temporary files in the build root to simulate a real project.
+  - It takes a single parameter `files: Mapping[str, str]`, which is a dictionary of file paths to file content.
+    - All file paths will be prefixed by the temporary directory.
+    - File content can include `{tmpdir}`, which will get substituted with the actual temporary directory.
+  - It yields the temporary directory, relative to the test's current work directory. 
+- `run_pants()`, which runs Pants using the `list[str]` of arguments you pass, such as `["help"]`.
+  - It returns a `PantsResult` object, which has the fields `exit_code: int`, `stdout: str`, and `stderr: str`.
+  - It accepts several other optional arguments, including `config`, `extra_env`, and any keyword argument accepted by `subprocess.Popen()`.
+- `PantsResult.assert_success()` or `PantsResult.assert_failure()`, which checks the exit code and prints a nice error message if unexpected.
 
 For example:
 

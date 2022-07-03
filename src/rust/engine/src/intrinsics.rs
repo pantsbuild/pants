@@ -176,10 +176,10 @@ fn process_request_to_process_result(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
-      .map_err(|e| throw(format!("Error lifting Process: {}", e)))
+      .map_err(|e| e.enrich("Error lifting Process"))
       .await?;
 
-    let result = context.get(process_request).await?.0;
+    let result = context.get(process_request).await?.result;
 
     let store = context.core.store();
     let (stdout_bytes, stderr_bytes) = try_join!(
@@ -544,10 +544,6 @@ fn interactive_process(
 
     let session = context.session;
 
-    if !restartable {
-        task_side_effected()?;
-    }
-
     let maybe_tempdir = if run_in_workspace {
       None
     } else {
@@ -646,6 +642,10 @@ fn interactive_process(
 
     command.env_clear();
     command.envs(env);
+
+    if !restartable {
+        task_side_effected()?;
+    }
 
     let exit_status = session.clone()
       .with_console_ui_disabled(async move {

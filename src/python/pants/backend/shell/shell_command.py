@@ -23,7 +23,7 @@ from pants.backend.shell.target_types import (
     ShellCommandToolsField,
 )
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import (
@@ -245,6 +245,15 @@ async def run_shell_command_request(shell_command: RunShellCommand) -> RunReques
         digest=process.input_digest,
         args=process.argv,
         extra_env=process.env,
+    )
+
+
+@rule
+async def run_shell_debug_adapter_binary(
+    field_set: RunShellCommand,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError(
+        "Debugging a shell command using a debug adapter has not yet been implemented."
     )
 
 

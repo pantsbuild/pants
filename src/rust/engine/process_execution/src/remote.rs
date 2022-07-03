@@ -1,11 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
+use std::fmt::{self, Debug};
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::SystemTime;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
@@ -17,7 +17,6 @@ use futures::FutureExt;
 use futures::{Stream, StreamExt};
 use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
@@ -28,9 +27,9 @@ use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
 use protos::require_digest;
 use rand::{thread_rng, Rng};
 use remexec::{
-  action_cache_client::ActionCacheClient, capabilities_client::CapabilitiesClient,
-  execution_client::ExecutionClient, Action, Command, ExecuteRequest, ExecuteResponse,
-  ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
+  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient, Action, Command,
+  ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
+  WaitExecutionRequest,
 };
 use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
@@ -102,12 +101,10 @@ pub struct CommandRunner {
   platform: Platform,
   store: Store,
   execution_client: Arc<ExecutionClient<LayeredService>>,
-  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   overall_deadline: Duration,
   retry_interval_duration: Duration,
   capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
-  cache_read_timeout: Duration,
 }
 
 enum StreamOutcome {
@@ -119,7 +116,6 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     execution_address: &str,
-    store_address: &str,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
@@ -128,20 +124,17 @@ impl CommandRunner {
     overall_deadline: Duration,
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
-    cache_concurrency_limit: usize,
-    cache_read_timeout: Duration,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
     let execution_use_tls = execution_address.starts_with("https://");
-    let store_use_tls = store_address.starts_with("https://");
 
-    let tls_client_config = if execution_use_tls || store_use_tls {
+    let tls_client_config = if execution_use_tls {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
     } else {
       None
     };
 
-    let mut execution_headers = headers.clone();
+    let mut execution_headers = headers;
     let execution_endpoint = grpc_util::create_endpoint(
       execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
@@ -155,34 +148,17 @@ impl CommandRunner {
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
 
-    let mut store_headers = headers;
-    let store_endpoint = grpc_util::create_endpoint(
-      store_address,
-      tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut store_headers,
-    )?;
-    let store_http_headers = headers_to_http_header_map(&store_headers)?;
-    let store_channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![store_endpoint].into_iter()),
-      cache_concurrency_limit,
-      store_http_headers,
-    );
-
-    let action_cache_client = Arc::new(ActionCacheClient::new(store_channel));
-
     let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
       metadata,
       execution_client,
-      action_cache_client,
       store,
       platform,
       overall_deadline,
       retry_interval_duration,
       capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
-      cache_read_timeout,
     };
 
     Ok(command_runner)
@@ -240,9 +216,10 @@ impl CommandRunner {
           .as_micros()
           .try_into();
         if let Ok(obs) = timing {
-          context
-            .workunit_store
-            .record_observation(ObservationMetric::RemoteExecutionRPCFirstResponseTime, obs);
+          context.workunit_store.record_observation(
+            ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
+            obs,
+          );
         }
       }
 
@@ -745,6 +722,13 @@ impl CommandRunner {
   }
 }
 
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("remote::CommandRunner")
+      .finish_non_exhaustive()
+  }
+}
+
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
   /// Run the given Process via the Remote Execution API.
@@ -775,29 +759,6 @@ impl crate::CommandRunner for CommandRunner {
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       ensure_action_stored_locally(&self.store, &command, &action).await?;
-
-    // Check the remote Action Cache to see if this request was already computed.
-    // If so, return immediately with the result.
-    let context2 = context.clone();
-    let cached_response_opt = check_action_cache(
-      action_digest,
-      &request.description,
-      &self.metadata,
-      self.platform,
-      &context2,
-      self.action_cache_client.clone(),
-      self.store.clone(),
-      false,
-      self.cache_read_timeout,
-    )
-    .await?;
-    debug!(
-      "action cache response: build_id={}; digest={:?}: {:?}",
-      &build_id, action_digest, cached_response_opt
-    );
-    if let Some(cached_response) = cached_response_opt {
-      return Ok(cached_response);
-    }
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     ensure_action_uploaded(
@@ -1053,7 +1014,7 @@ pub fn make_execute_request(
   Ok((action, command, execute_request))
 }
 
-pub async fn populate_fallible_execution_result_for_timeout(
+async fn populate_fallible_execution_result_for_timeout(
   store: &Store,
   context: &Context,
   description: &str,
@@ -1090,7 +1051,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
 /// of the ActionResult/ExecuteResponse stored in the local cache. When
 /// `treat_tree_digest_as_final_directory_hack` is true, then that final merged directory
 /// will be extracted from the tree_digest of the single output directory.
-pub async fn populate_fallible_execution_result(
+pub(crate) async fn populate_fallible_execution_result(
   store: Store,
   run_id: RunId,
   action_result: &remexec::ActionResult,
@@ -1311,7 +1272,7 @@ pub fn extract_output_files(
 }
 
 /// Apply REAPI request metadata header to a `tonic::Request`.
-fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
+pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
   let reapi_request_metadata = remexec::RequestMetadata {
     tool_details: Some(remexec::ToolDetails {
       tool_name: "pants".into(),
@@ -1328,112 +1289,6 @@ fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
   );
 
   request
-}
-
-/// Check the remote Action Cache for a cached result of running the given `command` and the Action
-/// with the given `action_digest`.
-///
-/// This check is necessary because some REAPI servers do not short-circuit the Execute method
-/// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
-/// explicitly in order to avoid duplicating already-cached work. This behavior matches
-/// the Bazel RE client.
-pub async fn check_action_cache(
-  action_digest: Digest,
-  command_description: &str,
-  metadata: &ProcessMetadata,
-  platform: Platform,
-  context: &Context,
-  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
-  store: Store,
-  eager_fetch: bool,
-  timeout_duration: Duration,
-) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
-  in_workunit!(
-    "check_action_cache",
-    Level::Debug,
-    desc = Some(format!("Remote cache lookup for: {}", command_description)),
-    |workunit| async move {
-      workunit.increment_counter(Metric::RemoteCacheRequests, 1);
-
-      let client = action_cache_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = remexec::GetActionResultRequest {
-            action_digest: Some(action_digest.into()),
-            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
-            ..remexec::GetActionResultRequest::default()
-          };
-          let request = apply_headers(Request::new(request), &context.build_id);
-          async move {
-            let lookup_fut = client.get_action_result(request);
-            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
-            timeout_fut
-              .await
-              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
-          }
-        },
-        status_is_retryable,
-      )
-      .and_then(|action_result| async move {
-        let action_result = action_result.into_inner();
-        let response = populate_fallible_execution_result(
-          store.clone(),
-          context.run_id,
-          &action_result,
-          platform,
-          false,
-          ProcessResultSource::HitRemotely,
-        )
-        .await
-        .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
-
-        if eager_fetch {
-          // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
-          // retried.
-          let response = response.clone();
-          in_workunit!(
-            "eager_fetch_action_cache",
-            Level::Trace,
-            desc = Some("eagerly fetching after action cache hit".to_owned()),
-            |_workunit| async move {
-              future::try_join_all(vec![
-                store.ensure_local_has_file(response.stdout_digest).boxed(),
-                store.ensure_local_has_file(response.stderr_digest).boxed(),
-                store
-                  .ensure_local_has_recursive_directory(response.output_directory)
-                  .boxed(),
-              ])
-              .await
-            }
-          )
-          .await
-          .map_err(|e| Status::unavailable(format!("Output content could not be loaded: {e}")))?;
-        }
-        Ok(response)
-      })
-      .await;
-
-      match response {
-        Ok(response) => {
-          workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
-          Ok(Some(response))
-        }
-        Err(status) => match status.code() {
-          Code::NotFound => {
-            workunit.increment_counter(Metric::RemoteCacheRequestsUncached, 1);
-            Ok(None)
-          }
-          _ => {
-            workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
-            // TODO: Ensure that we're catching missing digests.
-            Err(status_to_str(status).into())
-          }
-        },
-      }
-    }
-  )
-  .await
 }
 
 pub async fn store_proto_locally<P: prost::Message>(

@@ -155,7 +155,7 @@ def filter_targets(
     addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
     warn_or_error(
-        "2.14.0.dev0",
+        "2.14.0.dev1",
         "using `filter` as a goal",
         softwrap(
             f"""

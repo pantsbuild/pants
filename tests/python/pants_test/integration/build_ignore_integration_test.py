@@ -6,8 +6,8 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 def test_build_ignore_list() -> None:
     with setup_tmpdir({"dir/BUILD": "target()"}) as tmpdir:
-        ignore_result = run_pants([f"--build-ignore={tmpdir}/dir", "list", f"{tmpdir}/dir"])
-        no_ignore_result = run_pants(["list", f"{tmpdir}/dir"])
+        ignore_result = run_pants([f"--build-ignore={tmpdir}/dir", "list", f"{tmpdir}/dir:dir"])
+        no_ignore_result = run_pants(["list", f"{tmpdir}/dir:dir"])
     ignore_result.assert_failure()
     assert f"{tmpdir}/dir" in ignore_result.stderr
     no_ignore_result.assert_success()
