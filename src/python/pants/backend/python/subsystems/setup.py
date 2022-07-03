@@ -62,7 +62,7 @@ class PythonSetup(Subsystem):
         advanced=True,
         metavar="<requirement>",
     )
-    interpreter_universe = StrListOption(
+    interpreter_versions_universe = StrListOption(
         default=default_interpreter_universe,
         help=softwrap(
             f"""

@@ -300,7 +300,7 @@ async def _mypy_interpreter_constraints(
         code_constraints = InterpreterConstraints(
             itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
         )
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_versions_universe):
             constraints = code_constraints
     return constraints
 

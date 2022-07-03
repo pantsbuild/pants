@@ -862,6 +862,8 @@ class BootstrapOptions:
     )
     # Pants Daemon options.
     pantsd_nailgun_port = IntOption(
+        # TODO: The name "pailgun" is likely historical, and this should be renamed to "nailgun".
+        "--pantsd-pailgun-port",
         advanced=True,
         default=0,
         daemon=True,
@@ -1085,7 +1087,7 @@ class BootstrapOptions:
             Number of concurrent processes that may be executed locally.
 
             This value is independent of the number of threads that may be used to
-            execute the logic in `@rules` (controlled by `--rule-threads-core-flag`).
+            execute the logic in `@rules` (controlled by `--rule-threads-core`).
             """
         ),
     )

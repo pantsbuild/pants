@@ -95,7 +95,7 @@ async def _black_interpreter_constraints(
             (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
         )
         if code_constraints is not None and code_constraints.requires_python38_or_newer(
-            python_setup.interpreter_universe
+            python_setup.interpreter_versions_universe
         ):
             constraints = code_constraints
     return constraints

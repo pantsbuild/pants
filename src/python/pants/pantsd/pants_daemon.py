@@ -58,7 +58,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         server = native_engine.nailgun_server_create(
             executor,
-            bootstrap_options_values.pantsd_nailgun_port,
+            bootstrap_options_values.pantsd_pailgun_port,
             DaemonPantsRunner(core),
         )
 
