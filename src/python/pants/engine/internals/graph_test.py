@@ -67,6 +67,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockDependencies(Dependencies):
     supports_transitive_excludes = True
     deprecated_alias = "deprecated_field"
@@ -105,12 +109,12 @@ class MockTarget(Target):
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, Tags, SingleSourceField, ResolveField)
+    core_fields = (MockDependencies, Tags, MockSingleSourceField, ResolveField)
 
 
 class MockTargetGenerator(TargetFilesGenerator):
     alias = "generator"
-    core_fields = (MultipleSourcesField, OverridesField)
+    core_fields = (MockMultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
     copied_fields = ()
     moved_fields = (Dependencies, Tags, ResolveField)

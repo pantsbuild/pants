@@ -68,6 +68,10 @@ class MockDepsField(Dependencies):
     pass
 
 
+class MockSingleSourcesField(SingleSourceField):
+    pass
+
+
 class MockMultipleSourcesField(MultipleSourcesField):
     pass
 
@@ -79,7 +83,7 @@ class MockTarget(Target):
 
 class MockGeneratedFileTarget(Target):
     alias = "file_generated"
-    core_fields = (MockDepsField, SingleSourceField, Tags, ResolveField)
+    core_fields = (MockDepsField, MockSingleSourcesField, Tags, ResolveField)
 
 
 class MockFileTargetGenerator(TargetFilesGenerator):
