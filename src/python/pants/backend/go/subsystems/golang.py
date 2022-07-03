@@ -32,7 +32,6 @@ class GolangSubsystem(Subsystem):
     help = "Options for Golang support."
 
     _go_search_paths = StrListOption(
-        "--go-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """
@@ -46,7 +45,6 @@ class GolangSubsystem(Subsystem):
         ),
     )
     expected_version = StrOption(
-        "--expected-version",
         default="1.17",
         help=softwrap(
             """
@@ -66,7 +64,6 @@ class GolangSubsystem(Subsystem):
         ),
     )
     minimum_version = StrOption(
-        "--minimum-expected-version",
         default="1.17",
         help=softwrap(
             """
@@ -83,7 +80,6 @@ class GolangSubsystem(Subsystem):
         ),
     )
     _subprocess_env_vars = StrListOption(
-        "--subprocess-env-vars",
         default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
         help=softwrap(
             """
@@ -96,7 +92,6 @@ class GolangSubsystem(Subsystem):
     )
 
     tailor_go_mod_targets = BoolOption(
-        "--tailor-go-mod-targets",
         default=True,
         help=softwrap(
             """
@@ -107,7 +102,6 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
     tailor_package_targets = BoolOption(
-        "--tailor-package-targets",
         default=True,
         help=softwrap(
             """
@@ -118,7 +112,6 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
     tailor_binary_targets = BoolOption(
-        "--tailor-binary-targets",
         default=True,
         help=softwrap(
             """

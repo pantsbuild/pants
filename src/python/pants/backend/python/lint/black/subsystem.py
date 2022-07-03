@@ -46,7 +46,6 @@ class Black(PythonToolBase):
     args = ArgsListOption(example="--target-version=py37 --quiet")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -60,7 +59,6 @@ class Black(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(

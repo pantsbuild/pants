@@ -87,7 +87,7 @@ async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Proc
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtResult:
-    if buf.skip_format:
+    if buf.format_skip:
         return FmtResult.skip(formatter_name=request.name)
     result = await Get(ProcessResult, BufFormatRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)

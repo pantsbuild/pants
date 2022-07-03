@@ -85,7 +85,6 @@ class PythonInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Python targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help=softwrap(
             """
@@ -97,7 +96,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports = BoolOption(
-        "--string-imports",
         default=False,
         help=softwrap(
             """
@@ -110,7 +108,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports_min_dots = IntOption(
-        "--string-imports-min-dots",
         default=2,
         help=softwrap(
             """
@@ -121,7 +118,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets = BoolOption(
-        "--assets",
         default=False,
         help=softwrap(
             """
@@ -134,7 +130,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets_min_slashes = IntOption(
-        "--assets-min-slashes",
         default=1,
         help=softwrap(
             """
@@ -146,7 +141,6 @@ class PythonInferSubsystem(Subsystem):
     )
 
     init_files = EnumOption(
-        "--init-files",
         help=softwrap(
             f"""
             Infer a target's dependencies on any `__init__.py` files in the packages
@@ -167,7 +161,6 @@ class PythonInferSubsystem(Subsystem):
         default=InitFilesInference.content_only,
     )
     inits = BoolOption(
-        "--inits",
         default=False,
         help=softwrap(
             f"""
@@ -193,7 +186,6 @@ class PythonInferSubsystem(Subsystem):
     )
 
     conftests = BoolOption(
-        "--conftests",
         default=True,
         help=softwrap(
             """
@@ -203,7 +195,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     entry_points = BoolOption(
-        "--entry-points",
         default=True,
         help=softwrap(
             """
@@ -214,7 +205,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     unowned_dependency_behavior = EnumOption(
-        "--unowned-dependency-behavior",
         default=UnownedDependencyUsage.DoNothing,
         help=softwrap(
             """

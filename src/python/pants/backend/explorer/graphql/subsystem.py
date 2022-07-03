@@ -13,7 +13,6 @@ class GraphQLSubsystem(Subsystem):
     help = "Options for the explorer GraphQL API."
 
     open_graphiql = BoolOption(
-        "--open-graphiql",
         default=False,
         help=softwrap(
             """

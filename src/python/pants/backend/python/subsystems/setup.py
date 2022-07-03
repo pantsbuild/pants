@@ -46,7 +46,6 @@ class PythonSetup(Subsystem):
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 
     interpreter_constraints = StrListOption(
-        "--interpreter-constraints",
         default=default_interpreter_constraints,
         help=softwrap(
             """
@@ -64,7 +63,6 @@ class PythonSetup(Subsystem):
         metavar="<requirement>",
     )
     interpreter_universe = StrListOption(
-        "--interpreter-versions-universe",
         default=default_interpreter_universe,
         help=softwrap(
             f"""
@@ -87,7 +85,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     enable_resolves = BoolOption(
-        "--enable-resolves",
         default=False,
         help=softwrap(
             f"""
@@ -119,7 +116,6 @@ class PythonSetup(Subsystem):
         mutually_exclusive_group="lockfile",
     )
     resolves = DictOption[str](
-        "--resolves",
         default={"python-default": "3rdparty/python/default.lock"},
         help=softwrap(
             f"""
@@ -169,7 +165,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     default_resolve = StrOption(
-        "--default-resolve",
         default="python-default",
         help=softwrap(
             """
@@ -181,7 +176,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
-        "--resolves-to-interpreter-constraints",
         help=softwrap(
             """
             Override the interpreter constraints to use when generating a resolve's lockfile
@@ -208,7 +202,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     invalid_lockfile_behavior = EnumOption(
-        "--invalid-lockfile-behavior",
         default=InvalidLockfileBehavior.error,
         help=softwrap(
             """
@@ -226,7 +219,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     _lockfile_generator = EnumOption(
-        "--lockfile-generator",
         default=LockfileGenerator.PEX,
         help=softwrap(
             f"""
@@ -268,7 +260,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     resolves_generate_lockfiles = BoolOption(
-        "--resolves-generate-lockfiles",
         default=True,
         help=softwrap(
             """
@@ -288,7 +279,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     run_against_entire_lockfile = BoolOption(
-        "--run-against-entire-lockfile",
         default=False,
         help=softwrap(
             """
@@ -314,7 +304,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     requirement_constraints = FileOption(
-        "--requirement-constraints",
         default=None,
         help=softwrap(
             """
@@ -337,7 +326,6 @@ class PythonSetup(Subsystem):
         mutually_exclusive_group="lockfile",
     )
     resolve_all_constraints = BoolOption(
-        "--resolve-all-constraints",
         default=True,
         help=softwrap(
             """
@@ -355,7 +343,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     no_binary = StrListOption(
-        "--no-binary",
         help=softwrap(
             """
             Do not use binary packages (i.e., wheels) for these 3rdparty projects.
@@ -372,7 +359,6 @@ class PythonSetup(Subsystem):
         ),
     )
     only_binary = StrListOption(
-        "--only-binary",
         help=softwrap(
             """
             Do not use source packages (i.e., sdists) for these 3rdparty projects.
@@ -389,7 +375,6 @@ class PythonSetup(Subsystem):
         ),
     )
     resolver_manylinux = StrOption(
-        "--resolver-manylinux",
         default="manylinux2014",
         help=softwrap(
             """
@@ -402,7 +387,6 @@ class PythonSetup(Subsystem):
     )
 
     tailor_source_targets = BoolOption(
-        "--tailor-source-targets",
         default=True,
         help=softwrap(
             """
@@ -412,7 +396,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     tailor_ignore_solitary_init_files = BoolOption(
-        "--tailor-ignore-solitary-init-files",
         default=True,
         help=softwrap(
             """
@@ -429,7 +412,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     tailor_requirements_targets = BoolOption(
-        "--tailor-requirements-targets",
         default=True,
         help=softwrap(
             """
@@ -447,7 +429,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     _tailor_pex_binary_targets = BoolOption(
-        "--tailor-pex-binary-targets",
         default=True,
         help=softwrap(
             """
@@ -479,7 +460,6 @@ class PythonSetup(Subsystem):
         return self._tailor_pex_binary_targets
 
     macos_big_sur_compatibility = BoolOption(
-        "--macos-big-sur-compatibility",
         default=False,
         help=softwrap(
             """

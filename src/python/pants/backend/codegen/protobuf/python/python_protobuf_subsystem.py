@@ -39,7 +39,6 @@ class PythonProtobufSubsystem(Subsystem):
     )
 
     mypy_plugin = BoolOption(
-        "--mypy-plugin",
         default=False,
         help=softwrap(
             """
@@ -50,7 +49,6 @@ class PythonProtobufSubsystem(Subsystem):
     )
 
     infer_runtime_dependency = BoolOption(
-        "--infer-runtime-dependency",
         default=True,
         help=softwrap(
             """

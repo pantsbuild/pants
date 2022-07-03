@@ -310,7 +310,6 @@ class TestSubsystem(GoalSubsystem):
         return TestFieldSet in union_membership
 
     debug = BoolOption(
-        "--debug",
         default=False,
         help=softwrap(
             """
@@ -321,7 +320,6 @@ class TestSubsystem(GoalSubsystem):
     )
     # See also `run.py`'s same option
     debug_adapter = BoolOption(
-        "--debug-adapter",
         default=False,
         help=softwrap(
             """
@@ -336,22 +334,18 @@ class TestSubsystem(GoalSubsystem):
         ),
     )
     force = BoolOption(
-        "--force",
         default=False,
         help="Force the tests to run, even if they could be satisfied from cache.",
     )
     output = EnumOption(
-        "--output",
         default=ShowOutput.FAILED,
         help="Show stdout/stderr for these tests.",
     )
     use_coverage = BoolOption(
-        "--use-coverage",
         default=False,
         help="Generate a coverage report if the test runner supports it.",
     )
     open_coverage = BoolOption(
-        "--open-coverage",
         default=False,
         help=softwrap(
             """
@@ -360,18 +354,14 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    report = BoolOption(
-        "--report", default=False, advanced=True, help="Write test reports to --report-dir."
-    )
+    report = BoolOption(default=False, advanced=True, help="Write test reports to --report-dir.")
     default_report_path = str(PurePath("{distdir}", "test", "reports"))
     _report_dir = StrOption(
-        "--report-dir",
         default=default_report_path,
         advanced=True,
         help="Path to write test reports to. Must be relative to the build root.",
     )
     extra_env_vars = StrListOption(
-        "--extra-env-vars",
         help=softwrap(
             """
             Additional environment variables to include in test processes.
@@ -381,7 +371,6 @@ class TestSubsystem(GoalSubsystem):
         ),
     )
     shard = StrOption(
-        "--shard",
         default="",
         help=softwrap(
             """

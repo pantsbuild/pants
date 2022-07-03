@@ -20,7 +20,6 @@ class KotlinSubsystem(Subsystem):
     help = "The Kotlin programming language (https://kotlinlang.org/)."
 
     _version_for_resolve = DictOption[str](
-        "--version-for-resolve",
         help=softwrap(
             """
             A dictionary mapping the name of a resolve to the Kotlin version to use for all Kotlin
@@ -29,7 +28,6 @@ class KotlinSubsystem(Subsystem):
         ),
     )
     tailor_source_targets = BoolOption(
-        "--tailor-source-targets",
         default=True,
         help="If true, add `kotlin_sources` targets with the `tailor` goal.",
         advanced=True,

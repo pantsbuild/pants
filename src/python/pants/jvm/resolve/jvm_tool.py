@@ -43,7 +43,6 @@ class JvmToolBase(Subsystem):
     default_lockfile_url: ClassVar[str | None] = None
 
     version = StrOption(
-        "--version",
         advanced=True,
         default=lambda cls: cls.default_version,
         help=lambda cls: softwrap(
@@ -54,7 +53,6 @@ class JvmToolBase(Subsystem):
         ),
     )
     artifacts = StrListOption(
-        "--artifacts",
         advanced=True,
         default=lambda cls: list(cls.default_artifacts),
         help=lambda cls: softwrap(
@@ -67,7 +65,6 @@ class JvmToolBase(Subsystem):
         ),
     )
     lockfile = StrOption(
-        "--lockfile",
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
         help=lambda cls: softwrap(
@@ -85,7 +82,6 @@ class JvmToolBase(Subsystem):
         ),
     )
     jvm_options = StrListOption(
-        "--jvm-options",
         help=lambda cls: softwrap(
             f"""
             List of JVM options to pass to `{cls.options_scope}` JVM processes.

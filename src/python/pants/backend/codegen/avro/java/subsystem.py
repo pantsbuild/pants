@@ -22,7 +22,6 @@ class AvroSubsystem(JvmToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     runtime_dependencies = TargetListOption(
-        "--runtime-dependencies",
         help=lambda cls: softwrap(
             f"""
             A list of addresses to `jvm_artifact` targets for the runtime dependencies needed for

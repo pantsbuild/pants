@@ -32,13 +32,11 @@ class ShellSetup(Subsystem):
         metavar="<binary-paths>",
     )
     dependency_inference = BoolOption(
-        "--dependency-inference",
         default=True,
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
         advanced=True,
     )
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help=softwrap(
             """
