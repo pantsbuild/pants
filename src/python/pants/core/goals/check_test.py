@@ -26,13 +26,17 @@ from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_ru
 from pants.util.logging import LogLevel
 
 
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MultipleSourcesField,)
+    core_fields = (MockMultipleSourcesField,)
 
 
 class MockCheckFieldSet(FieldSet):
-    required_fields = (MultipleSourcesField,)
+    required_fields = (MockMultipleSourcesField,)
 
 
 class MockCheckRequest(CheckRequest, metaclass=ABCMeta):

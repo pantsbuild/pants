@@ -85,11 +85,15 @@ class ResolveField(StringField):
     alias = "resolve"
 
 
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
         MockDependencies,
-        MultipleSourcesField,
+        MockMultipleSourcesField,
         SpecialCasedDeps1,
         SpecialCasedDeps2,
         ResolveField,

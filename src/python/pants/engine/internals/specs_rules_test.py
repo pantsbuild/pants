@@ -68,9 +68,13 @@ class MockDepsField(Dependencies):
     pass
 
 
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "target"
-    core_fields = (MockDepsField, MultipleSourcesField, Tags, ResolveField)
+    core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
 class MockGeneratedFileTarget(Target):
@@ -81,7 +85,7 @@ class MockGeneratedFileTarget(Target):
 class MockFileTargetGenerator(TargetFilesGenerator):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
-    core_fields = (MultipleSourcesField, Tags, OverridesField)
+    core_fields = (MockMultipleSourcesField, Tags, OverridesField)
     copied_fields = (Tags,)
     moved_fields = (MockDepsField, ResolveField)
 

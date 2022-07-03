@@ -34,12 +34,20 @@ class MockTarget(Target):
     deprecated_alias_removal_version = "99.9.0.dev0"
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockGeneratedFileTarget(Target):
     alias = "file_generated"
-    core_fields = (SingleSourceField, Tags)
+    core_fields = (MockSingleSourceField, Tags)
 
 
-class MockFileTargetGenerator(TargetFilesGenerator):
+class MockmultipleSourcesField(MultipleSourcesField):
+    pass
+
+
+class MockFileTargetGenerator(MockmultipleSourcesField):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
     core_fields = (MultipleSourcesField, Tags)
