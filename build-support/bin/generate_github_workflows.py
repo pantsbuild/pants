@@ -71,6 +71,51 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 # ----------------------------------------------------------------------
 
 
+def is_docs_only() -> Jobs:
+    """Check if this change only involves docs."""
+    linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
+    return {
+        "docs_only_check": {
+            "name": "Check for docs-only change",
+            "runs-on": linux_x86_64_helper.runs_on(),
+            "if": IS_PANTS_OWNER,
+            "outputs": {"docs_only": "${{ steps.docs_only_check.outputs.docs_only }}"},
+            "steps": [
+                {
+                    "id": "files",
+                    "name": "Get changed files",
+                    "uses": "jitterbit/get-changed-files@v1",
+                    # Workaround for https://github.com/jitterbit/get-changed-files/issues/11
+                    "continue-on-error": True,
+                    "with": {
+                        "format": "json",
+                    },
+                },
+                {
+                    "id": "docs_only_check",
+                    "name": "Check for docs-only changes",
+                    "run": dedent(
+                        """\
+                    readarray -t all_files <<<"$(jq -r '.[]' <<<'${{ steps.files.outputs.all }}')"
+                    DOCS_ONLY=1
+                    for file in ${all_files[@]}; do
+                        if [[ ${file} != docs/* ]]; then
+                          DOCS_ONLY=0
+                        fi
+                    done
+                    if [[ ${DOCS_ONLY} == 1 ]]; then
+                        echo "::set-output name=docs_only::1"
+                    else
+                        echo "::set-output name=docs_only::0"
+                    fi
+                    """
+                    ),
+                },
+            ],
+        },
+    }
+
+
 def ensure_category_label() -> Sequence[Step]:
     """Check that exactly one category label is present on a pull request."""
     return [
@@ -831,26 +876,42 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
+# A single job we can apply branch protection to instead of having to
+# configure on multiple job names, that may change over time.
+def merge_ok(needs: list[str], docs_only: bool) -> Jobs:
+    key = "merge_ok_docs_only" if docs_only else "merge_ok_not_docs_only"
+    return {
+        key: {
+            "name": "Merge OK",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "if": f"needs.docs_only_check.outputs.docs_only == {'1' if docs_only else '0'}",
+            # If in the future we have any docs-related checks, we can make both "Merge OK"
+            # jobs depend on them here (we have to do both since some changes may modify docs
+            # as well as code, and so are not "docs only").
+            "needs": ["docs_only_check"] + sorted(needs),
+            "steps": [{"run": "echo 'Merge OK'"}],
+        }
+    }
+
+
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
+    docs_only_cond = "needs.docs_only_check.outputs.docs_only == 0"
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
+    pr_jobs.update(**is_docs_only())
     for key, val in pr_jobs.items():
-        if key == "check_labels":
+        if key in {"check_labels", "docs_only_check"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.append("check_labels")
+        needs.extend(["check_labels", "docs_only_check"])
         val["needs"] = needs
-    # A single job we can apply branch protection to instead of having to
-    # configure on multiple job names, that may change over time.
-    pr_jobs["merge_ok"] = {
-        "name": "Merge OK",
-        "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-        "needs": list(pr_jobs.keys()),
-        "steps": [{"run": "echo 'Merge OK'"}],
-    }
+        if_cond = val.get("if")
+        val["if"] = docs_only_cond if if_cond is None else f"({if_cond}) && {docs_only_cond}"
+    pr_jobs.update(merge_ok(needs=list(pr_jobs.keys()), docs_only=False))
+    pr_jobs.update(merge_ok(needs=[], docs_only=True))
 
     test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(
