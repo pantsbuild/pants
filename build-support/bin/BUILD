@@ -14,7 +14,10 @@ python_sources(
     },
 )
 
-python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
+python_tests(
+    name="py_tests",
+    overrides={"reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]}}
+)
 
 pex_binaries(
     entry_points=[
