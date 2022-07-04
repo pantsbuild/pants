@@ -45,26 +45,6 @@ class GolangSubsystem(Subsystem):
             """
         ),
     )
-    expected_version = StrOption(
-        "--expected-version",
-        default="1.17",
-        help=softwrap(
-            """
-            The Go version you are using, such as `1.17`.
-
-            Pants will only use Go distributions from `--go-search-paths` that have the
-            expected version, and it will error if none are found.
-
-            Do not include the patch version.
-            """
-        ),
-        removal_version="2.14.0.dev1",
-        removal_hint=(
-            "Use `[golang].minimum_expected_version` instead, which is more flexible. Pants will "
-            "now work if your local Go binary is newer than the expected minimum version; e.g. Go "
-            "1.18 works with the version set to `1.17`."
-        ),
-    )
     minimum_version = StrOption(
         "--minimum-expected-version",
         default="1.17",
@@ -268,7 +248,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
 
         logger.debug(
             f"Go binary at {binary_path.path} has version {version}, but this "
-            f"repository expects at least {golang_subsystem.expected_version} "
+            f"repository expects at least {golang_subsystem.minimum_version} "
             "(set by `[golang].expected_minimum_version`). Ignoring."
         )
 
