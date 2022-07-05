@@ -66,26 +66,38 @@ Config file entries
 
 Global options are set in the `GLOBAL` section of the config file:
 
-```toml
+```toml pants.toml
 [GLOBAL]
 level = "debug"
 ```
 
 Subsystem options are set in the section named for their scope:
 
-```toml
+```toml pants.toml
 [source]
 root_patterns = ["/src/python"]
 ```
 
 Note that any dashes in the option flag name are converted to underscores: `--multiword-name` becomes `multiword_name`.
 
-Additionally, a few different variables may be interpolated into strings in config files via a `%(var)s` syntax. For example, this expands to the absolute path of a file in the root of your repository:
+### Config file interpolation
 
-```toml
-[GLOBAL]
-pythonpath = ["%(buildroot)s/examples"]
+Environment variables can be interpolated by using the syntax `%(env.ENV_VAR)s`, e.g.:
+
+```toml pants.toml
+[python-repos]
+# This will substitute `%(env.PY_REPO)s` with the value of the environment
+# variable PY_REPO
+indexes.add = ["http://%(env.PY_REPO)s@my.custom.repo/index
 ```
+
+Additionally, a few special values are pre-populated with the `%(var)s` syntax:
+
+- `%(buildroot)s`: absolute path to the root of your repository
+- `%(homedir)s`: equivalent to `$HOME` or `~`
+- `%(user)s`: equivalent to `$USER`
+- `%(pants_distdir)s`: absolute path of the global option `--pants-distdir`, which defaults 
+   to `{buildroot}/dist/`
 
 Option types
 ============
