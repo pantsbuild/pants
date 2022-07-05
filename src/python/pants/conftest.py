@@ -62,6 +62,8 @@ def dedicated_target_fields():
     for cls in Target.__subclasses__():
         if hasattr(cls, "core_fields"):
             for field_cls in cls.core_fields:
+                # NB: We want to check for all kinds of SourcesFields, like SingleSourceField and
+                # MultipleSourcesField.
                 if (
                     issubclass(field_cls, SourcesField)
                     and field_cls.__module__ is SourcesField.__module__
