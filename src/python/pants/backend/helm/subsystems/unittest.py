@@ -43,7 +43,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
     }
 
     output_type = EnumOption(
-        "--output-type",
         default=HelmUnitTestReportFormat.XUNIT,
         help="Output type used for the test report",
     )

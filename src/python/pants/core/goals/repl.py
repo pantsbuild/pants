@@ -57,12 +57,10 @@ class ReplSubsystem(GoalSubsystem):
         return ReplImplementation in union_membership
 
     shell = StrOption(
-        "--shell",
         default=None,
         help="Override the automatically-detected REPL program for the target(s) specified.",
     )
     restartable = BoolOption(
-        "--restartable",
         default=False,
         help="True if the REPL should be restarted if its inputs have changed.",
     )

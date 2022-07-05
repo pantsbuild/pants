@@ -62,7 +62,6 @@ class TerraformTool(TemplatedExternalTool):
         ]
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
         advanced=True,

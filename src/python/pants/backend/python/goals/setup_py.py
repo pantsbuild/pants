@@ -326,7 +326,6 @@ class SetupPyGeneration(Subsystem):
     # be False. However that would break widespread existing usage, so we'll make that
     # change in a future deprecation cycle.
     generate_setup_default = BoolOption(
-        "--generate-setup-default",
         default=True,
         help=softwrap(
             """
@@ -339,7 +338,6 @@ class SetupPyGeneration(Subsystem):
     )
 
     first_party_dependency_version_scheme = EnumOption(
-        "--first-party-dependency-version-scheme",
         default=FirstPartyDependencyVersionScheme.EXACT,
         help=softwrap(
             """

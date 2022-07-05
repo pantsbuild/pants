@@ -15,10 +15,9 @@ class LifecycleStubsSubsystem(GoalSubsystem):
     help = """Configure workflows for lifecycle tests (Pants stopping and starting)."""
 
     new_interactive_stream_output_file = FileOption(
-            "--new-interactive-stream-output-file",
-            default=None,
-            help="Redirect interactive output into a separate file.",
-        )
+        default=None,
+        help="Redirect interactive output into a separate file.",
+    )
 
 
 class LifecycleStubsGoal(Goal):
@@ -35,6 +34,7 @@ async def run_lifecycle_stubs(opts: LifecycleStubsSubsystem) -> LifecycleStubsGo
 
 def rules():
     return collect_rules()
+
 
 if os.environ.get("_RAISE_EXCEPTION_ON_IMPORT", False):
     raise Exception("exception during import!")

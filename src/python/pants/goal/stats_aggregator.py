@@ -29,7 +29,6 @@ class StatsAggregatorSubsystem(Subsystem):
     help = "An aggregator for Pants stats, such as cache metrics."
 
     log = BoolOption(
-        "--log",
         default=False,
         help=softwrap(
             """
@@ -43,7 +42,6 @@ class StatsAggregatorSubsystem(Subsystem):
         advanced=True,
     )
     memory_summary = BoolOption(
-        "--memory-summary",
         default=False,
         help=softwrap(
             """

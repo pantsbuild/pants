@@ -39,7 +39,6 @@ class Shfmt(TemplatedExternalTool):
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="-i 2")
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=softwrap(

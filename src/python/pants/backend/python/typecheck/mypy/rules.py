@@ -122,7 +122,7 @@ async def mypy_typecheck_partition(
         if (
             mypy.options.is_default("interpreter_constraints")
             and partition.interpreter_constraints.requires_python38_or_newer(
-                python_setup.interpreter_universe
+                python_setup.interpreter_versions_universe
             )
         )
         else mypy.interpreter_constraints
@@ -233,7 +233,7 @@ async def mypy_typecheck_partition(
                 venv_python=requirements_venv_pex.python.argv0,
                 file_list_path=file_list_path,
                 python_version=config_file.python_version_to_autoset(
-                    partition.interpreter_constraints, python_setup.interpreter_universe
+                    partition.interpreter_constraints, python_setup.interpreter_versions_universe
                 ),
             ),
             input_digest=merged_input_files,

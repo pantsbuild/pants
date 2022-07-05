@@ -35,7 +35,6 @@ class DockerOptions(Subsystem):
     help = "Options for interacting with Docker."
 
     _registries = DictOption[Any](
-        "--registries",
         help=softwrap(
             """
             Configure Docker registries. The schema for a registry entry is as follows:
@@ -77,7 +76,6 @@ class DockerOptions(Subsystem):
         fromfile=True,
     )
     default_repository = StrOption(
-        "--default-repository",
         help=softwrap(
             f"""
             Configure the default repository name used in the Docker image tag.
@@ -104,7 +102,6 @@ class DockerOptions(Subsystem):
         default="{name}",
     )
     default_context_root = WorkspacePathOption(
-        "--default-context-root",
         default="",
         help=softwrap(
             """
@@ -122,7 +119,6 @@ class DockerOptions(Subsystem):
         ),
     )
     _build_args = ShellStrListOption(
-        "--build-args",
         help=softwrap(
             f"""
             Global build arguments (for Docker `--build-arg` options) to use for all
@@ -143,7 +139,6 @@ class DockerOptions(Subsystem):
         ),
     )
     build_target_stage = StrOption(
-        "--build-target-stage",
         default=None,
         help=softwrap(
             """
@@ -156,12 +151,10 @@ class DockerOptions(Subsystem):
         ),
     )
     build_verbose = BoolOption(
-        "--build-verbose",
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
     )
     _env_vars = ShellStrListOption(
-        "--env-vars",
         help=softwrap(
             """
             Environment variables to set for `docker` invocations.
@@ -173,7 +166,6 @@ class DockerOptions(Subsystem):
         advanced=True,
     )
     run_args = ShellStrListOption(
-        "--run-args",
         default=["--interactive", "--tty"] if sys.stdout.isatty() else [],
         help=softwrap(
             f"""
@@ -196,7 +188,6 @@ class DockerOptions(Subsystem):
         ),
     )
     _executable_search_paths = StrListOption(
-        "--executable-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """
@@ -209,7 +200,6 @@ class DockerOptions(Subsystem):
         metavar="<binary-paths>",
     )
     _tools = StrListOption(
-        "--tools",
         default=[],
         help=softwrap(
             """
@@ -222,7 +212,6 @@ class DockerOptions(Subsystem):
     )
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `docker_image` targets with the `tailor` goal.",
         advanced=True,

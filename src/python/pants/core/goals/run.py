@@ -102,7 +102,6 @@ class RunSubsystem(GoalSubsystem):
         passthrough=True,
     )
     cleanup = BoolOption(
-        "--cleanup",
         default=True,
         help=softwrap(
             """
@@ -117,7 +116,6 @@ class RunSubsystem(GoalSubsystem):
     )
     # See also `test.py`'s same option
     debug_adapter = BoolOption(
-        "--debug-adapter",
         default=False,
         help=softwrap(
             """

@@ -95,7 +95,6 @@ class MyPy(PythonToolBase):
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -109,7 +108,6 @@ class MyPy(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -122,7 +120,6 @@ class MyPy(PythonToolBase):
         ),
     )
     _source_plugins = TargetListOption(
-        "--source-plugins",
         advanced=True,
         help=softwrap(
             """
@@ -142,7 +139,6 @@ class MyPy(PythonToolBase):
         ),
     )
     extra_type_stubs = StrListOption(
-        "--extra-type-stubs",
         advanced=True,
         help=softwrap(
             """
@@ -304,7 +300,7 @@ async def _mypy_interpreter_constraints(
         code_constraints = InterpreterConstraints(
             itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
         )
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_versions_universe):
             constraints = code_constraints
     return constraints
 

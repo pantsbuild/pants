@@ -130,7 +130,6 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         return cls.__name__.lower()
 
     version = StrOption(
-        "--version",
         default=lambda cls: cls.default_version,
         advanced=True,
         help=lambda cls: f"Use this version of {cls.name}."
@@ -144,7 +143,6 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     # Note that you can compute the length and sha256 conveniently with:
     #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
     known_versions = StrListOption(
-        "--known-versions",
         default=lambda cls: cls.default_known_versions,
         advanced=True,
         help=textwrap.dedent(
@@ -168,7 +166,6 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     )
 
     use_unsupported_version = EnumOption(
-        "--use-unsupported-version",
         advanced=True,
         help=lambda cls: textwrap.dedent(
             f"""
@@ -289,7 +286,6 @@ class TemplatedExternalTool(ExternalTool):
     default_url_platform_mapping: dict[str, str] | None = None
 
     url_template = StrOption(
-        "--url-template",
         default=lambda cls: cls.default_url_template,
         advanced=True,
         help=softwrap(
