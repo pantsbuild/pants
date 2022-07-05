@@ -38,7 +38,6 @@ class AnonymousTelemetry(Subsystem):
     help = "Options related to sending anonymous stats to the Pants project, to aid development."
 
     enabled = BoolOption(
-        "--enabled",
         default=False,
         help=softwrap(
             f"""
@@ -53,7 +52,6 @@ class AnonymousTelemetry(Subsystem):
         advanced=True,
     )
     repo_id = StrOption(
-        "--repo-id",
         default=None,
         help=softwrap(
             f"""

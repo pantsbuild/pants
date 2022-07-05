@@ -45,23 +45,23 @@ async def demo(...) -> Foo:
 In this example, the `search_path` is hardcoded. Instead, you may want to create a [subsystem](doc:rules-api-subsystems) to allow users to override the search path through a dedicated option. See [pex_environment.py](https://github.com/pantsbuild/pants/blob/57a47457bda0b0dfb0882d851ccd58a7535f15c1/src/python/pants/backend/python/rules/pex_environment.py#L60-L71) for an example that allows the user to use the special string `<PATH>` to read the user's `$PATH` environment variable.
 
 > 📘 Checking for valid binaries (recommended)
-> 
+>
 > When setting up a `BinaryPathsRequest`, you can optionally pass the argument `test: BinaryPathTest`. When discovering a binary, Pants will run your test and only use the binary if the return code is 0. Pants will also fingerprint the output and invalidate the cache if the output changes from before, such as because the user upgraded the version of the tool.
-> 
+>
 > Why do this? This is helpful to ensure that all discovered binaries are valid and safe. This is also important for Pants to be able to detect when the user has changed the binary, such as upgrading its version.
-> 
-> `BinaryPathTest` takes the argument `args: Iterable[str]`, which is the arguments that Pants should run on your binary to ensure that it's a valid program. Usually, you'll set `args=["--version"]`.  
-> 
+>
+> `BinaryPathTest` takes the argument `args: Iterable[str]`, which is the arguments that Pants should run on your binary to ensure that it's a valid program. Usually, you'll set `args=["--version"]`.
+>
 > ```python
 > from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPathTest
-> 
+>
 > BinaryPathRequest(
 >     binary_name="docker",
 >     search_path=["/usr/bin", "/bin"],
 >     test=BinaryPathTest(args=["--version"]),
 > )
 > ```
-> 
+>
 > You can optionally set `fingerprint_stdout=False` to the `BinaryPathTest` constructor, but usually, you should keep the default of `True`.
 
 `ExternalTool`: Install pre-compiled binaries
@@ -189,11 +189,11 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 
 
 > 📘 Use `PythonToolBase` when you need a Subsystem
-> 
+>
 > Often, you will want to create a [`Subsystem`](doc:rules-api-subsystems) for your Python tool
 > to allow users to set options to configure the tool. You can subclass `PythonToolBase`, which
 > subclasses `Subsystem`, to do this:
-> 
+>
 > ```python
 > from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 > from pants.backend.python.target_types import ConsoleScript
@@ -209,18 +209,17 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 >     default_interpreter_constraints = ["CPython>=3.6"]
 >
 >     config = StrOption(
->         "--config",
 >         default=None,
 >         advanced=True,
 >         help="Path to Black's pyproject.toml config file",
 >     )
 > ```
-> 
+>
 > You must define the class properties `options_scope`, `default_version`, and `default_main`. You
 > can optionally define `default_extra_requirements` and `default_interpreter_constraints`.
 >
 > Then, you can set up your `Pex` like this:
-> 
+>
 > ```python
 > @rule
 > async def demo(black: Black, ...) -> Foo:

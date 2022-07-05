@@ -32,7 +32,6 @@ class PantsReleases(Subsystem):
     help = "Options for Pants's release process."
 
     _release_notes = DictOption[str](
-        "--release-notes",
         help="A dict from branch name to release notes rst-file location.",
     )
 

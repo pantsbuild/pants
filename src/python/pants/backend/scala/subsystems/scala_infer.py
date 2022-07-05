@@ -11,22 +11,18 @@ class ScalaInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Scala targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help="Infer a target's dependencies by parsing import statements from sources.",
     )
     consumed_types = BoolOption(
-        "--consumed-types",
         default=True,
         help="Infer a target's dependencies by parsing consumed types from sources.",
     )
     package_objects = BoolOption(
-        "--package-objects",
         default=True,
         help="Add dependency on the package object to every target.",
     )
     force_add_siblings_as_dependencies = BoolOption(
-        "--force-add-siblings-as-dependencies",
         default=False,
         help=softwrap(
             """

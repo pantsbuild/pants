@@ -18,7 +18,6 @@ class ShellSetup(Subsystem):
     help = "Options for Pants's Shell support."
 
     _executable_search_path = StrListOption(
-        "--executable-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """
@@ -32,13 +31,11 @@ class ShellSetup(Subsystem):
         metavar="<binary-paths>",
     )
     dependency_inference = BoolOption(
-        "--dependency-inference",
         default=True,
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
         advanced=True,
     )
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help=softwrap(
             """

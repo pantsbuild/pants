@@ -69,7 +69,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         - Provide a typed property for Python usage
     """
 
-    _flag_names: tuple[str, ...]
+    _flag_names: tuple[str, ...] | None
     _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
     _register_if: _RegisterIfFuncT
@@ -79,7 +79,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     # `__new__` and mypy has issues if your class defines both.
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
@@ -98,7 +98,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     ):
         """Construct a new Option descriptor.
 
-        :param flag_name: The argument name, starting with "--", e.g. "--skip".
+        :param flag_name: The argument name, starting with "--", e.g. "--skip". Defaults to the class
+            attribute name in kebab-case (without leading underscore).
         :param default: The default value the property will return if unspecified by the user. Note
             that for "scalar" option types (like StrOption and IntOption) this can either be an
             instance of the scalar type or `None`, but __must__ be provided.
@@ -129,7 +130,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         """
         self = super().__new__(cls)
-        self._flag_names = (flag_name,)
+        self._flag_names = (flag_name,) if flag_name else None
         self._default = default
         self._help = help
         self._register_if = register_if or (lambda cls: True)  # type: ignore[assignment]
@@ -149,6 +150,11 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             if v is not None
         }
         return self
+
+    def __set_name__(self, owner, name) -> None:
+        if self._flag_names is None:
+            kebab_name = name.strip("_").replace("_", "-")
+            self._flag_names = (f"--{kebab_name}",)
 
     # Subclasses can override if necessary
     def get_option_type(self, subsystem_cls):
@@ -175,6 +181,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         ...
 
     def __get__(self, obj, objtype):
+        assert self._flag_names is not None
         if obj is None:
             if self._register_if(objtype):
                 return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
@@ -207,7 +214,7 @@ class _ListOptionBase(
 
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
@@ -422,7 +429,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     @overload
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         default: _EnumT,
         help: _HelpT,
@@ -445,7 +452,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     @overload  # Case: dynamic default
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
@@ -469,7 +476,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     @overload  # Case: default is `None`
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         enum_type: type[_EnumT],
         default: None,
@@ -491,7 +498,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
 
     def __new__(
         cls,
-        flag_name,
+        flag_name=None,
         *,
         enum_type=None,
         default,
@@ -560,7 +567,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     @overload  # Case: static default
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         default: list[_EnumT],
         help: _HelpT,
@@ -583,7 +590,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     @overload  # Case: dynamic default
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
@@ -607,7 +614,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     @overload  # Case: implicit default
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         enum_type: type[_EnumT],
         help: _HelpT,
@@ -628,7 +635,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
 
     def __new__(
         cls,
-        flag_name,
+        flag_name=None,
         *,
         enum_type=None,
         default=[],
@@ -710,7 +717,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 
     def __new__(
         cls,
-        flag_name: str,
+        flag_name: str | None = None,
         *,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
@@ -756,12 +763,11 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 class SkipOption(BoolOption[bool]):
     """A --skip option (for an invocable tool)."""
 
-    def __new__(cls, goal: str, *other_goals: str, flag_name: str = "--skip"):
+    def __new__(cls, goal: str, *other_goals: str):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
             cls,  # type: ignore[arg-type]
-            flag_name,
             default=False,  # type: ignore[arg-type]
             help=(
                 lambda subsystem_cls: (
@@ -783,13 +789,11 @@ class ArgsListOption(ShellStrListOption):
         # This should be set when callers can alternatively use "--" followed by the arguments,
         # instead of having to provide "--[scope]-args='--arg1 --arg2'".
         passthrough: bool | None = None,
-        flag_name: str = "--args",
     ):
         if extra_help:
             extra_help = "\n\n" + extra_help
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
-            flag_name,
             help=(
                 lambda subsystem_cls: softwrap(
                     f"""

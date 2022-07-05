@@ -30,15 +30,14 @@ from pants.option.subsystem import Subsystem
 class ShellcheckSubsystem(Subsystem):
     options_scope = "shellcheck"
     help = "The Shellcheck linter."
-    
+
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help="Whether Pants should...",
     )
 
-        
+
 def rules():
     return [SubsystemRule(ShellcheckSubsystem)]
 ```
@@ -52,16 +51,22 @@ def rules():
 The subsystem should now show up when you run `./pants help shellcheck`.
 
 > 📘 `GoalSubsystem`
-> 
+>
 > As explained in [Goal rules](doc:rules-api-goal-rules), goals use a subclass of  `Subsystem`: `GoalSubsystem` from `pants.engine.goal`.
-> 
+>
 > `GoalSubsystem` behaves the same way as a normal subsystem, except that you set the class property `name` rather than `options_scope`. The `name` will auto-populate the `options_scope`.
 
 ### Option types
 
 These classes correspond to the option types at [Options](doc:options).
 
-Every option type requires that you set the flag name (e.g. `-l` or `--level`) and the keyword argument `help`. Most types require that you set `default`. You can optionally set `advanced=True` with every option for it to only show up with `help-advanced`.
+Every option type requires that you set the keyword argument `help`.
+
+Most types require that you set `default`. You can optionally set `advanced=True` with every option
+for it to only show up with `help-advanced`.
+
+The option name will default to the class attribute name, e.g. `my_opt = StrOption()` will default to `--my-opt`.
+You can instead pass a string positional argument, e.g. `my_opt = StrOption("--different-name")`.
 
 [block:parameters]
 {

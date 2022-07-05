@@ -165,11 +165,9 @@ class FmtSubsystem(GoalSubsystem):
         return FmtRequest in union_membership
 
     only = StrListOption(
-        "--only",
         help=only_option_help("fmt", "formatter", "isort", "shfmt"),
     )
     batch_size = IntOption(
-        "--batch-size",
         advanced=True,
         default=128,
         help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),

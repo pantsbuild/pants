@@ -147,7 +147,6 @@ class CheckSubsystem(GoalSubsystem):
         return CheckRequest in union_membership
 
     only = StrListOption(
-        "--only",
         help=only_option_help("check", "checkers", "mypy", "javac"),
     )
 

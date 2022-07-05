@@ -527,7 +527,7 @@ async def validate_python_dependencies(
             continue
         dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
         if not interpreter_constraints_contains(
-            dep_ics, target_ics, python_setup.interpreter_universe
+            dep_ics, target_ics, python_setup.interpreter_versions_universe
         ):
             non_subset_items.append(f"{dep_ics}: {dep.target.address}")
 

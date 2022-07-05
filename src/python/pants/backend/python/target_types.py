@@ -724,7 +724,6 @@ class PexBinaryDefaults(Subsystem):
     help = "Default settings for creating PEX executables."
 
     emit_warnings = BoolOption(
-        "--emit-warnings",
         default=True,
         help=softwrap(
             """
@@ -737,7 +736,6 @@ class PexBinaryDefaults(Subsystem):
         advanced=True,
     )
     resolve_local_platforms = BoolOption(
-        "--resolve-local-platforms",
         default=False,
         help=softwrap(
             f"""
@@ -800,7 +798,7 @@ class PythonTestsTimeoutField(IntField):
 
     def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
-        if not pytest.timeouts_enabled:
+        if not pytest.timeouts:
             return None
         if self.value is None:
             if pytest.timeout_default is None:

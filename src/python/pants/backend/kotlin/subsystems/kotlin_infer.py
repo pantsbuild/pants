@@ -9,13 +9,11 @@ class KotlinInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Kotlin targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help="Infer a target's dependencies by parsing import statements from sources.",
     )
 
     consumed_types = BoolOption(
-        "--consumed-types",
         default=True,
         help="Infer a target's dependencies by parsing consumed types from sources.",
     )

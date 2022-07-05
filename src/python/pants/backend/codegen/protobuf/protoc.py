@@ -30,12 +30,10 @@ class Protoc(TemplatedExternalTool):
     }
 
     dependency_inference = BoolOption(
-        "--dependency-inference",
         default=True,
         help="Infer Protobuf dependencies on other Protobuf files by analyzing import statements.",
     )
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `protobuf_sources` targets with the `tailor` goal.",
         advanced=True,
