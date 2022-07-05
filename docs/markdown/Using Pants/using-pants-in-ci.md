@@ -190,13 +190,12 @@ Memory usage options:
 
 The default test runners for these CI providers have the following resources. If you are using a custom runner, e.g. enterprise, check with your CI provider.
 
-| CI Provider                  | CPU cores
-========= | RAM     | Docs                                                                                                                                  |
-| :--------------------------- | :------------------ | :------ | :------------------------------------------------------------------------------------------------------------------------------------ |
-| GitHub Actions, Linux        | 2                   | 7 GB    | <https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources> |
-| Travis, Linux                | 2                   | 7.5 GB  | <https://docs.travis-ci.com/user/reference/overview/#virtualisation-environment-vs-operating-system>                                  |
-| Circle CI, Linux, free plan  | 2                   | 4 GB    | <https://circleci.com/docs/2.0/credits/#free-plan>                                                                                    |
-| GitLab, Linux shared runners | 1                   | 3.75 GB | <https://docs.gitlab.com/ee/user/gitlab_com/#linux-shared-runners>                                                                    |
+| CI Provider                  | Cores  | RAM     | Docs                                                                                                                                        |
+| :--------------------------- | :----- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| GitHub Actions, Linux        | 2      | 7 GB    | [link](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources) |
+| Travis, Linux                | 2      | 7.5 GB  | [link](https://docs.travis-ci.com/user/reference/overview/#virtualisation-environment-vs-operating-system)                                  |
+| Circle CI, Linux, free plan  | 2      | 4 GB    | [link](https://circleci.com/docs/2.0/credits/#free-plan)                                                                                    |
+| GitLab, Linux shared runners | 1      | 3.75 GB | [link](https://docs.gitlab.com/ee/user/gitlab_com/#linux-shared-runners)                                                                    |
 
 Tip: store Pants logs as artifacts
 ----------------------------------
