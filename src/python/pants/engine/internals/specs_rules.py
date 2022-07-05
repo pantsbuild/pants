@@ -468,7 +468,7 @@ def _handle_ambiguous_result(
     ):
         if field_set_to_default_to is PexBinaryFieldSet:
             warn_or_error(
-                "2.15.0dev0",
+                "2.15.0.dev0",
                 "referring to a `pex_binary` by using the filename specified in `entry_point`",
                 softwrap(
                     """
