@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
-from pants.base.deprecated import warn_or_error
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -41,28 +40,6 @@ class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
 def scala_settings_request(
     scala_infer_subsystem: ScalaInferSubsystem, _: ScalaSettingsRequest
 ) -> TargetFilesGeneratorSettings:
-    if scala_infer_subsystem.options.is_default("force_add_siblings_as_dependencies"):
-        warn_or_error(
-            removal_version="2.14.0.dev1",
-            entity="`force_add_siblings_as_dependencies` defaulting to True",
-            hint=softwrap(
-                """
-                Setting this option to true reduces the precision of dependency information.
-                That means that you may end up compiling more than is necessary for a particular task,
-                and that compilation will be invalidated more frequently than actually necessary.
-                However, setting to true may be helpful if compilation fails due to missing dependencies.
-
-                We have made several improvements to Pants's Scala dependency inference,
-                where we no longer think it's necessary to adding dependencies on sibling targets.
-                If you have compilation failures after disabling this option, please consider opening an issue at
-                https://github.com/pantsbuild/pants/issues/new so that we can continue to improve Pants's dependency inference.
-
-                To opt into the new default early, set `force_add_siblings_as_dependencies = false` in the `[scala_infer]`
-                section in `pants.toml`. Otherwise, set to `true` to silence this warning.
-                """
-            ),
-        )
-
     return TargetFilesGeneratorSettings(
         add_dependencies_on_all_siblings=scala_infer_subsystem.force_add_siblings_as_dependencies
         or not scala_infer_subsystem.imports

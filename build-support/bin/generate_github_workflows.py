@@ -64,11 +64,49 @@ DONT_SKIP_WHEELS = (
 DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
 
 
-IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
+IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # ----------------------------------------------------------------------
 # Actions
 # ----------------------------------------------------------------------
+
+_DOCS_ONLY_TEXT = "DOCS_ONLY"
+
+
+def _docs_only_cond(docs_only: bool) -> str:
+    op = "==" if docs_only else "!="
+    return f"needs.docs_only_check.outputs.docs_only {op} '{_DOCS_ONLY_TEXT}'"
+
+
+def is_docs_only() -> Jobs:
+    """Check if this change only involves docs."""
+    linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
+    docs_files = ["docs/**"]
+    return {
+        "docs_only_check": {
+            "name": "Check for docs-only change",
+            "runs-on": linux_x86_64_helper.runs_on(),
+            "if": IS_PANTS_OWNER,
+            "outputs": {"docs_only": "${{ steps.docs_only_check.outputs.docs_only }}"},
+            "steps": [
+                *checkout(get_commit_msg=False),
+                {
+                    "id": "files",
+                    "name": "Get changed files",
+                    "uses": "tj-actions/changed-files@v23.1",
+                    "with": {"files_ignore_separator": "|", "files_ignore": "|".join(docs_files)},
+                },
+                {
+                    "id": "docs_only_check",
+                    "name": "Check for docs-only changes",
+                    # Note that if no changes were detected in the step above, the string
+                    # may be empty, not 'false', so we check for != 'true'.
+                    "if": "steps.files.outputs.any_changed != 'true'",
+                    "run": f"echo '::set-output name=docs_only::{_DOCS_ONLY_TEXT}'",
+                },
+            ],
+        },
+    }
 
 
 def ensure_category_label() -> Sequence[Step]:
@@ -94,7 +132,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, containerized: bool = False) -> Sequence[Step]:
+def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -117,36 +155,37 @@ def checkout(*, containerized: bool = False) -> Sequence[Step]:
                 "run": 'git config --global safe.directory "$GITHUB_WORKSPACE"',
             }
         )
-    steps.extend(
-        [
-            # For a push event, the commit we care about is HEAD itself.
-            # This CI currently only runs on PRs, so this is future-proofing.
-            {
-                "name": "Get commit message for branch builds",
-                "if": "github.event_name == 'push'",
-                "run": dedent(
-                    """\
-                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-                echo "EOF" >> $GITHUB_ENV
-                """
-                ),
-            },
-            # For a pull_request event, the commit we care about is the second parent of the merge
-            # commit. This CI currently only runs on PRs, so this is future-proofing.
-            {
-                "name": "Get commit message for PR builds",
-                "if": "github.event_name == 'pull_request'",
-                "run": dedent(
-                    """\
-                echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-                echo "EOF" >> $GITHUB_ENV
-                """
-                ),
-            },
-        ]
-    )
+    if get_commit_msg:
+        steps.extend(
+            [
+                # For a push event, the commit we care about is HEAD itself.
+                # This CI currently only runs on PRs, so this is future-proofing.
+                {
+                    "name": "Get commit message for branch builds",
+                    "if": "github.event_name == 'push'",
+                    "run": dedent(
+                        """\
+                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                    echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+                    echo "EOF" >> $GITHUB_ENV
+                    """
+                    ),
+                },
+                # For a pull_request event, the commit we care about is the second parent of the
+                # merge commit. This CI currently only runs on PRs, so this is future-proofing.
+                {
+                    "name": "Get commit message for PR builds",
+                    "if": "github.event_name == 'pull_request'",
+                    "run": dedent(
+                        """\
+                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+                    echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+                    echo "EOF" >> $GITHUB_ENV
+                    """
+                    ),
+                },
+            ]
+        )
     return steps
 
 
@@ -831,26 +870,42 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
+# A single job we can apply branch protection to instead of having to
+# configure on multiple job names, that may change over time.
+def merge_ok(needs: list[str], docs_only: bool) -> Jobs:
+    key = "merge_ok_docs_only" if docs_only else "merge_ok_not_docs_only"
+    return {
+        key: {
+            "name": "Merge OK",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            "if": _docs_only_cond(docs_only),
+            # If in the future we have any docs-related checks, we can make both "Merge OK"
+            # jobs depend on them here (we have to do both since some changes may modify docs
+            # as well as code, and so are not "docs only").
+            "needs": ["docs_only_check"] + sorted(needs),
+            "steps": [{"run": "echo 'Merge OK'"}],
+        }
+    }
+
+
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
+    not_docs_only = _docs_only_cond(docs_only=False)
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
+    pr_jobs.update(**is_docs_only())
     for key, val in pr_jobs.items():
-        if key == "check_labels":
+        if key in {"check_labels", "docs_only_check"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.append("check_labels")
+        needs.extend(["check_labels", "docs_only_check"])
         val["needs"] = needs
-    # A single job we can apply branch protection to instead of having to
-    # configure on multiple job names, that may change over time.
-    pr_jobs["merge_ok"] = {
-        "name": "Merge OK",
-        "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-        "needs": list(pr_jobs.keys()),
-        "steps": [{"run": "echo 'Merge OK'"}],
-    }
+        if_cond = val.get("if")
+        val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
+    pr_jobs.update(merge_ok(needs=list(pr_jobs.keys()), docs_only=False))
+    pr_jobs.update(merge_ok(needs=[], docs_only=True))
 
     test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(
