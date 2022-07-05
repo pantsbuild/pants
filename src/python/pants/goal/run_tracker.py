@@ -53,7 +53,6 @@ class RunTracker:
             "dependencies",
             "export-codegen",
             "filedeps",
-            "filter",
             "fmt",
             "lint",
             "list",
