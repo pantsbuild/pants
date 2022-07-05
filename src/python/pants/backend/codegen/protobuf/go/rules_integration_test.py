@@ -35,7 +35,7 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
@@ -70,6 +70,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
+            get_filtered_environment,
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateGoFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
