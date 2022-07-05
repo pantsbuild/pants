@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
-from pants.backend.shell.target_types import ShellSourceField
+from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -14,14 +14,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    Dependencies,
-    DependenciesRequest,
-    FieldSet,
-    SourcesField,
-    Target,
-    Targets,
-)
+from pants.engine.target import DependenciesRequest, FieldSet, SourcesField, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -32,7 +25,7 @@ class ShellcheckFieldSet(FieldSet):
     required_fields = (ShellSourceField,)
 
     sources: ShellSourceField
-    dependencies: Dependencies
+    dependencies: ShellDependenciesField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
