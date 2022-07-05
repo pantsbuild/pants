@@ -62,6 +62,9 @@ These classes correspond to the option types at [Options](doc:options).
 
 Every option type requires that you set the keyword argument `help`.
 
+Most types require that you set `default`. You can optionally set `advanced=True` with every option
+for it to only show up with `help-advanced`.
+
 The option name will default to the class attribute name, e.g. `my_opt = StrOption()` will default to `--my-opt`.
 You can instead pass a string positional argument, e.g. `my_opt = StrOption("--different-name")`.
 
