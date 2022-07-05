@@ -635,7 +635,7 @@ async def tailor(
 
     dir_search_paths: tuple[str, ...] = ()
     recursive_search_paths: tuple[str, ...] = ()
-    if specs:
+    if specs or specs.includes.from_change_detection:
         if global_options.use_deprecated_directory_cli_args_semantics:
             recursive_search_paths = specs_to_dirs(specs.includes)
         else:

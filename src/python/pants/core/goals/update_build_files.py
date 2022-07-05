@@ -27,6 +27,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
 )
 from pants.base.deprecated import warn_or_error
+from pants.base.specs import Specs
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -184,7 +185,7 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    specs_paths: SpecsPaths,
+    specs: Specs,
 ) -> UpdateBuildFilesGoal:
     build_file_path_globs = PathGlobs(
         globs=(
@@ -192,8 +193,11 @@ async def update_build_files(
             *(f"!{p}" for p in build_file_options.ignores),
         )
     )
-    if specs_paths.files:
-        all_build_file_paths = await Get(Paths, PathGlobs, build_file_path_globs)
+    if specs or specs.includes.from_change_detection:
+        all_build_file_paths, specs_paths = await MultiGet(
+            Get(Paths, PathGlobs, build_file_path_globs),
+            Get(SpecsPaths, Specs, specs),
+        )
         specified_paths = set(specs_paths.files)
         specified_build_files = await Get(
             DigestContents,
