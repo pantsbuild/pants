@@ -11,8 +11,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
     - check_labels
@@ -156,8 +156,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, test Rust (macOS10-x86_64)
     needs:
     - check_labels
@@ -292,8 +292,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Build wheels and fs_util (Linux-x86_64)
     needs:
     - check_labels
@@ -378,8 +378,8 @@ jobs:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, build wheels and fs_util (macOS11-ARM64)
     needs:
     - check_labels
@@ -498,7 +498,7 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: (github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]'))
-        && (${{ github.repository_owner == 'pantsbuild' }})
+        && (github.repository_owner == 'pantsbuild')
       name: Build wheels
       run: USE_PY39=true arch -arm64 ./build-support/bin/release.sh build-wheels
     - if: github.event_name == 'push'
@@ -519,8 +519,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS10-x86_64)
     needs:
     - check_labels
@@ -619,7 +619,7 @@ jobs:
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 80
   check_labels:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
     runs-on:
     - ubuntu-20.04
@@ -635,29 +635,30 @@ jobs:
           change, category:performance, category:bugfix, category:documentation, category:internal
         mode: exactly
   docs_only_check:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: github.repository_owner == 'pantsbuild'
     name: Check for docs-only change
     outputs:
       docs_only: ${{ steps.docs_only_check.outputs.docs_only }}
     runs-on:
     - ubuntu-20.04
     steps:
-    - continue-on-error: true
-      id: files
-      name: Get changed files
-      uses: jitterbit/get-changed-files@v1
+    - name: Check out code
+      uses: actions/checkout@v3
       with:
-        format: json
+        fetch-depth: 10
+    - id: files
+      name: Get changed files
+      uses: tj-actions/changed-files@v23.1
+      with:
+        files_ignore: docs/**
+        files_ignore_separator: '|'
     - id: docs_only_check
+      if: steps.files.outputs.any_changed != 'true'
       name: Check for docs-only changes
-      run: "readarray -t all_files <<<\"$(jq -r '.[]' <<<'${{ steps.files.outputs.all\
-        \ }}')\"\nDOCS_ONLY=1\nfor file in ${all_files[@]}; do\n    if [[ ${file}\
-        \ != docs/* ]]; then\n      DOCS_ONLY=0\n    fi\ndone\nif [[ ${DOCS_ONLY}\
-        \ == 1 ]]; then\n    echo \"::set-output name=docs_only::1\"\nelse\n    echo\
-        \ \"::set-output name=docs_only::0\"\nfi\n"
+      run: echo '::set-output name=docs_only::DOCS_ONLY'
   lint_python:
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
@@ -726,7 +727,7 @@ jobs:
         - '3.7'
     timeout-minutes: 30
   merge_ok_docs_only:
-    if: needs.docs_only_check.outputs.docs_only == 1
+    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
     name: Merge OK
     needs:
     - docs_only_check
@@ -735,7 +736,7 @@ jobs:
     steps:
     - run: echo 'Merge OK'
   merge_ok_not_docs_only:
-    if: needs.docs_only_check.outputs.docs_only == 0
+    if: needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY'
     name: Merge OK
     needs:
     - docs_only_check
@@ -756,8 +757,8 @@ jobs:
     steps:
     - run: echo 'Merge OK'
   test_python_linux_x86_64_0:
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 0/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -847,8 +848,8 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 1/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -938,8 +939,8 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 2/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -1031,8 +1032,8 @@ jobs:
   test_python_macos_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
-    if: (${{ github.repository_owner == 'pantsbuild' }}) && needs.docs_only_check.outputs.docs_only
-      == 0
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (macOS10-x86_64)
     needs:
     - bootstrap_pants_macos_x86_64
