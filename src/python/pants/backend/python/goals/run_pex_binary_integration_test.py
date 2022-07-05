@@ -14,8 +14,11 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 use_deprecated_semantics_args = pytest.mark.parametrize(
     "use_deprecated_semantics_args",
     [
-        (),
-        ("--use-deprecated-pex-binary-run-semantics",),
+        pytest.param((), id="<default>"),
+        pytest.param(
+            ("--use-deprecated-pex-binary-run-semantics",),
+            id="--use-deprecated-pex-binary-run-semantics",
+        ),
     ],
 )
 
@@ -265,9 +268,14 @@ def test_filename_spec_ambiutity(use_deprecated_semantics_args) -> None:
             *use_deprecated_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
-            f"{tmpdir}/src/app.py",
+            f"{tmpdir}/src:binary",
         ]
         result = run_pants(args)
+        result.assert_success()
         file = result.stdout.strip()
-        assert file.endswith("src/app.py")
-        assert ".pants.d/tmp" in file
+        if use_deprecated_semantics_args:
+            assert file.endswith("src/app.py")
+            assert ".pants.d/tmp" in file
+        else:
+            assert file.endswith("app.py")
+            assert ".pants.d/tmp" not in file
