@@ -55,28 +55,16 @@ python_sources(
 )
 ```
 
-Pants will merge the constraints from the target's _transitive closure_ when deciding which interpreter to use, meaning that it will look at the constraints of the target, its dependencies, and the dependencies of those dependencies. For example:
+A particular target's interpreter constraints must be the same or a subset of all of its
+transitive dependencies. For example, a target marked Python 3-only cannot depend on a
+Python 2-only target, which Pants will validate.
 
-- Target A sets `interpreter_constraints==['2.7.*']`.
-- Target B sets `interpreter_contraints=['>=3.5']`, and it depends on Target A.
-- When running `./pants package :b`, Pants will merge the constraints to `['==2.7.*,>=3.5']`. This is impossible to satisfy, so Pants will error.
-
-This means that every dependency of a target must also be compatible with its interpreter constraints. Generally, you will want to be careful that your common `python_source` / `python_sources` targets are compatible with multiple Python versions because they may be depended upon by other targets. Meanwhile, `pex_binary` and `python_test` / `python_tests` targets can have specific constraints because they are (conventionally) never dependencies for other targets. For example:
-
-```python
-python_sources(
-    # Source files are compatible with Python 2.7 or 3.5+.
-    interpreter_constraints=["==2.7.*", ">=3.5"]`,
-)
-
-pex_binary(
-    name="binary",
-    entry_point="app.py",
-    # When merged with the python_sources's constraints, the final result will 
-    # require `>=3.5`.
-    interpreter_constraints=[">=3.5"],
-)
-```
+It is possible for a target to have more precise interpreter constraints than its transitive
+dependencies. For example, if you have a common helper file `utils.py` that works with both
+Python 2.7 and 3.5 (`['==2.7.*', '>=3.5']`), it is legal for a dependee like `app.py` to use more
+precise constraints like `['==3.7.*']`. It is often useful for helper code to work with multiple
+Python versions, while specific "root" targets (tests, apps, and binaries) have more specific
+constraints.
 
 > 🚧 Pants cannot validate that your interpreter constraints are accurate
 > 
