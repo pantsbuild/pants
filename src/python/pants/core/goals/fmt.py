@@ -108,14 +108,23 @@ class FmtResult(EngineAwareReturnType):
         message = "made changes." if self.did_change else "made no changes."
 
         # NB: Instead of printing out `stdout` and `stderr`, we just print a list of files which
-        # changed. We do this for two reasons:
+        # were changed/added/removed. We do this for two reasons:
         #   1. This is run as part of both `fmt` and `lint`, and we want consistent output between both
         #   2. Different formatters have different stdout/stderr. This way is consistent across all
         #       formatters.
+        # We also allow added/removed files because the `fmt` goal is more like a `fix` goal.
+        # (See https://github.com/pantsbuild/pants/issues/13504)
         if self.did_change:
+            snapshot_diff = SnapshotDiff.from_snapshots(self.input, self.output)
             output = "".join(
                 f"\n  {file}"
-                for file in SnapshotDiff.from_snapshots(self.input, self.output).changed_files
+                for file in itertools.chain(
+                    snapshot_diff.changed_files,
+                    snapshot_diff.their_unique_files,  # added files
+                    snapshot_diff.our_unique_files,  # removed files
+                    # NB: there is no rename detection, so a renames will list
+                    # both the old filename (removed) and the new filename (added).
+                )
             )
         else:
             output = ""
