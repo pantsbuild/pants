@@ -611,7 +611,7 @@ async def _setup_constraints_repository_pex(
                 The constraints file {constraints_path} does not contain
                 entries for the following requirements: {', '.join(unconstrained_projects)}.
 
-                Ignoring `[python_setup].resolve_all_constraints` option.
+                Ignoring `[python].resolve_all_constraints` option.
                 """
             )
         )
