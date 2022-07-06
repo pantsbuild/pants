@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
 use bytes::{Bytes, BytesMut};
-use futures::Future;
-use futures::StreamExt;
+use futures::future::BoxFuture;
+use futures::{Future, FutureExt, StreamExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
@@ -220,19 +220,22 @@ impl ByteStore {
     Ok(batch_api_allowed_by_local_config && batch_api_allowed_by_server_config)
   }
 
-  async fn store_bytes_source<ByteSource>(
+  fn store_bytes_source<ByteSource>(
     &self,
     digest: Digest,
     bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
+  ) -> BoxFuture<Result<(), ByteStoreError>>
   where
     ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
   {
-    if self.len_is_allowed_for_batch_api(digest.size_bytes).await? {
-      self.store_bytes_source_batch(digest, bytes).await
-    } else {
-      self.store_bytes_source_stream(digest, bytes).await
+    async move {
+      if self.len_is_allowed_for_batch_api(digest.size_bytes).await? {
+        self.store_bytes_source_batch(digest, bytes).await
+      } else {
+        self.store_bytes_source_stream(digest, bytes).await
+      }
     }
+    .boxed()
   }
 
   pub(crate) async fn store_bytes_source_batch<ByteSource>(
