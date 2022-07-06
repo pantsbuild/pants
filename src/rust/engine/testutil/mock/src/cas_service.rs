@@ -446,6 +446,11 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<BatchReadBlobsRequest>,
   ) -> Result<Response<BatchReadBlobsResponse>, Status> {
+    {
+      let mut request_count = self.read_request_count.lock();
+      *request_count += 1;
+    }
+
     check_auth!(self, request);
 
     if self.always_errors {
