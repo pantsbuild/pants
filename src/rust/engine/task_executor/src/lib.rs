@@ -25,12 +25,14 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::env;
 use std::future::Future;
 use std::sync::Arc;
 
 use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
 use lazy_static::lazy_static;
+use pyo3::{ffi, Python};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 lazy_static! {
@@ -42,6 +44,13 @@ lazy_static! {
 pub struct Executor {
   _runtime: Option<Arc<Runtime>>,
   handle: Handle,
+}
+
+// NB: This exists because we need the PyInterpreterState to pass to PyThreadState_New,
+// however PyInterpreterState_Get wasn't added until Py 3.9. They vary in implementation, but because
+// we don't have any sub-interpreters they should both return the same object.
+extern "C" {
+  pub fn PyInterpreterState_Main() -> *mut ffi::PyInterpreterState;
 }
 
 impl Executor {
@@ -78,10 +87,31 @@ impl Executor {
       });
     }
 
-    let runtime = Builder::new_multi_thread()
+    let mut runtime_builder = Builder::new_multi_thread();
+
+    runtime_builder
       .worker_threads(num_worker_threads)
       .max_blocking_threads(max_threads - num_worker_threads)
-      .enable_all()
+      .enable_all();
+
+    if env::var("PANTS_DEBUG").is_ok() {
+      runtime_builder.on_thread_start(|| {
+        // NB: We need a PyThreadState object which lives throughout the lifetime of this thread
+        // as the debug trace object is attached to it. Otherwise the PyThreadState is
+        // constructed/destroyed with each `with_gil` call (inside PyGILState_Ensure/PyGILState_Release).
+        //
+        // Constructing (and leaking) a ThreadState object allocates and associates it with the current
+        // thread, and the Python runtime won't wipe the trace function between calls.
+        // See https://github.com/PyO3/pyo3/issues/2495
+        let _ =
+          unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
+        Python::with_gil(|py| {
+          let _ = py.eval("__import__('debugpy').debug_this_thread()", None, None);
+        });
+      });
+    };
+
+    let runtime = runtime_builder
       .build()
       .map_err(|e| format!("Failed to start the runtime: {}", e))?;
 

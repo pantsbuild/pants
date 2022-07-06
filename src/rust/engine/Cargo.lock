@@ -3110,6 +3110,7 @@ dependencies = [
  "arc-swap",
  "futures",
  "lazy_static",
+ "pyo3",
  "stdio",
  "tokio",
  "workunit_store",
