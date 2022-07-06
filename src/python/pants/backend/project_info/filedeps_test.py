@@ -15,9 +15,13 @@ class MockSources(MultipleSourcesField):
     default = ("*.ext",)
 
 
+class MockDepsField(Dependencies):
+    pass
+
+
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (MockSources, Dependencies)
+    core_fields = (MockSources, MockDepsField)
 
 
 class MockSingleSourceField(SingleSourceField):
@@ -26,7 +30,7 @@ class MockSingleSourceField(SingleSourceField):
 
 class MockSingleSourceTarget(Target):
     alias = "single_source"
-    core_fields = (MockSingleSourceField, Dependencies)
+    core_fields = (MockSingleSourceField, MockDepsField)
 
 
 @pytest.fixture

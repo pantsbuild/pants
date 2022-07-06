@@ -67,6 +67,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockDependencies(Dependencies):
     supports_transitive_excludes = True
     deprecated_alias = "deprecated_field"
@@ -85,11 +89,15 @@ class ResolveField(StringField):
     alias = "resolve"
 
 
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
         MockDependencies,
-        MultipleSourcesField,
+        MockMultipleSourcesField,
         SpecialCasedDeps1,
         SpecialCasedDeps2,
         ResolveField,
@@ -101,12 +109,12 @@ class MockTarget(Target):
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, Tags, SingleSourceField, ResolveField)
+    core_fields = (MockDependencies, Tags, MockSingleSourceField, ResolveField)
 
 
 class MockTargetGenerator(TargetFilesGenerator):
     alias = "generator"
-    core_fields = (MultipleSourcesField, OverridesField)
+    core_fields = (MockMultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
     copied_fields = ()
     moved_fields = (Dependencies, Tags, ResolveField)
@@ -1569,9 +1577,12 @@ def test_transitive_excludes_error() -> None:
         alias = "valid2"
         core_fields = (MockDependencies,)
 
+    class InvalidDepsField(Dependencies):
+        pass
+
     class Invalid(Target):
         alias = "invalid"
-        core_fields = (Dependencies,)
+        core_fields = (InvalidDepsField,)
 
     exc = TransitiveExcludesNotSupportedError(
         bad_value="!!//:bad",

@@ -17,6 +17,10 @@ from pants.engine.target import (
 from pants.util.strutil import softwrap
 
 
+class TerraformDependenciesField(Dependencies):
+    pass
+
+
 class TerraformModuleSourcesField(MultipleSourcesField):
     default = ("*.tf",)
     expected_file_extensions = (".tf",)
@@ -35,7 +39,7 @@ class TerraformFieldSet(FieldSet):
 
 class TerraformModuleTarget(Target):
     alias = "terraform_module"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModuleSourcesField)
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformDependenciesField, TerraformModuleSourcesField)
     help = softwrap(
         """
         A single Terraform module corresponding to a directory.
