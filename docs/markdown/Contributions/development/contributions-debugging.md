@@ -38,6 +38,12 @@ The default output is a flamegraph. `py-spy` can also output speedscope (<https:
 
 Additionally, to profile the Rust code the `--native` flag can be passed to `py-spy` as well. The resulting output will contain frames from Pants Rust code.
 
+Debugging `rule` code with a debugger
+-------------------------------------
+
+Running pants with the `PANTS_DEBUG` environment variable set will use `debugpy` (<https://github.com/microsoft/debugpy>)
+
+
 Identifying the impact of Python's GIL (on macOS)
 -------------------------------------------------
 
