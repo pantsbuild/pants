@@ -42,7 +42,13 @@ Debugging `rule` code with a debugger
 -------------------------------------
 
 Running pants with the `PANTS_DEBUG` environment variable set will use `debugpy` (<https://github.com/microsoft/debugpy>)
+to start a Debug-Adapter server (<https://microsoft.github.io/debug-adapter-protocol/>) which will
+wait for a client connection before running Pants.
 
+You can connect any Debug-Adapter-compliant editor (Such as VSCode) as a client, and use breakpoints,
+inspect variables, run code in a REPL, and break-on-exceptions in your `rule` code.
+
+NOTE: `PANTS_DEBUG` doesn't work with the pants daemon, so `--no-pantsd` must be specified.
 
 Identifying the impact of Python's GIL (on macOS)
 -------------------------------------------------
