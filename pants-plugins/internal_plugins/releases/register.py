@@ -128,9 +128,9 @@ async def pants_setup_kwargs(
             "Tracker": "https://github.com/pantsbuild/pants/issues",
             "Changelog": "https://www.pantsbuild.org/docs/changelog",
             "Twitter": "https://twitter.com/pantsbuild",
-            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "Slack": "https://www.pantsbuild.org/docs/getting-help",
             "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
-            "Mailing lists": "https://groups.google.com/g/pants-devel",
+            "Mailing lists": "https://www.pantsbuild.org/docs/getting-help",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,
@@ -167,7 +167,7 @@ async def check_default_tools(
             tool_cls = si.subsystem_cls
             console.print_stdout(f"Checking {console.cyan(tool_cls.name)}:")
             for known_version in tool_cls.default_known_versions:
-                ver, plat_val, sha256, length = tool_cls.split_known_version_str(known_version)
+                version = tool_cls.decode_known_version(known_version)
                 # Note that we don't want to use the real option values here - we want to
                 # verify that the *defaults* aren't broken. However the get_request_for() method
                 # requires an instance (since it can consult option values, including custom
@@ -175,7 +175,7 @@ async def check_default_tools(
                 # default one, but we force the --version to the one we're checking (which will
                 # typically be the same as the default version, but doesn't have to be, if the
                 # tool provides default_known_versions for versions other than default_version).
-                args = ("./pants", f"--{scope}-version={ver}")
+                args = ("./pants", f"--{scope}-version={version.version}")
                 blank_opts = await Get(
                     _Options,
                     SessionValues(
@@ -187,8 +187,8 @@ async def check_default_tools(
                     ),
                 )
                 instance = tool_cls(blank_opts.options.for_scope(scope))
-                req = instance.get_request_for(plat_val, sha256, length)
-                console.write_stdout(f"  version {ver} for {plat_val}... ")
+                req = instance.get_request_for(version.platform, version.sha256, version.filesize)
+                console.write_stdout(f"  version {version.version} for {version.platform}... ")
                 # TODO: We'd like to run all the requests concurrently, but since we can't catch
                 #  engine exceptions, we wouldn't have an easy way to output which one failed.
                 await Get(DownloadedExternalTool, ExternalToolRequest, req)

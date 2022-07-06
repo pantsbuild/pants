@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -69,6 +70,13 @@ class RunRequest:
         self.extra_env = FrozenDict(extra_env or {})
 
 
+class RunDebugAdapterRequest(RunRequest):
+    """Like RunRequest, but launches the process using the relevant Debug Adapter server.
+
+    The process should be launched waiting for the client to connect.
+    """
+
+
 class RunSubsystem(GoalSubsystem):
     name = "run"
     help = softwrap(
@@ -107,6 +115,20 @@ class RunSubsystem(GoalSubsystem):
             """
         ),
     )
+    # See also `test.py`'s same option
+    debug_adapter = BoolOption(
+        "--debug-adapter",
+        default=False,
+        help=softwrap(
+            """
+            Run the interactive process using a Debug Adapter
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
+
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
+            """
+        ),
+    )
 
 
 class Run(Goal):
@@ -116,6 +138,7 @@ class Run(Goal):
 @goal_rule
 async def run(
     run_subsystem: RunSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
@@ -131,7 +154,11 @@ async def run(
         ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, RunFieldSet, field_set)
+    request = await (
+        Get(RunRequest, RunFieldSet, field_set)
+        if not run_subsystem.debug_adapter
+        else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
+    )
     wrapped_target = await Get(
         WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
     )
@@ -152,6 +179,16 @@ async def run(
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
+        if run_subsystem.debug_adapter:
+            logger.info(
+                softwrap(
+                    f"""
+                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                    which will wait for a client connection...
+                    """
+                )
+            )
+
         result = await Effect(
             InteractiveProcessResult,
             InteractiveProcess(

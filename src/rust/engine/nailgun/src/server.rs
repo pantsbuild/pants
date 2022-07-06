@@ -225,8 +225,10 @@ impl Nail for RawFdNail {
     };
 
     // And stdout/stderr.
-    let (stdout_stream, stdout_handle) = Self::output(Self::ttypath_from_env(&env, 1))?;
-    let (stderr_stream, stderr_handle) = Self::output(Self::ttypath_from_env(&env, 2))?;
+    let (stdout_stream, stdout_handle) = Self::output(Self::ttypath_from_env(&env, 1), false)?;
+    // N.B.: POSIX demands stderr is opened read-write and some programs, like pagers, rely on this.
+    // See: https://pubs.opengroup.org/onlinepubs/9699919799/functions/stdin.html
+    let (stderr_stream, stderr_handle) = Self::output(Self::ttypath_from_env(&env, 2), true)?;
 
     // Set up a cancellation token that is triggered on client shutdown.
     let cancelled = AsyncLatch::new();
@@ -297,6 +299,7 @@ impl RawFdNail {
   #[allow(clippy::type_complexity)]
   fn output(
     tty_path: Option<PathBuf>,
+    read_write: bool,
   ) -> Result<
     (
       stream::BoxStream<'static, Result<Bytes, io::Error>>,
@@ -304,7 +307,13 @@ impl RawFdNail {
     ),
     io::Error,
   > {
-    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().write(true).create(false)) {
+    if let Some(tty) = Self::try_open_tty(
+      tty_path,
+      OpenOptions::new()
+        .read(read_write)
+        .write(true)
+        .create(false),
+    ) {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
       let (stdin_reader, stdin_writer) = os_pipe::pipe()?;

@@ -709,8 +709,8 @@ def build_3rdparty_wheels() -> None:
                 [
                     "./pants",
                     "--concurrent",
-                    "filter",
-                    "--target-type=python_requirement",
+                    "list",
+                    "--filter-target-type=python_requirement",
                     *deps,
                 ],
                 stdout=subprocess.PIPE,

@@ -447,7 +447,7 @@ class PythonSetup(Subsystem):
     )
     tailor_pex_binary_targets = BoolOption(
         "--tailor-pex-binary-targets",
-        default=True,
+        default=False,
         help=softwrap(
             """
             If true, add `pex_binary` targets for Python files named `__main__.py` or with a
@@ -456,7 +456,6 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-
     macos_big_sur_compatibility = BoolOption(
         "--macos-big-sur-compatibility",
         default=False,

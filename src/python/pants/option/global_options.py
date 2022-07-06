@@ -1662,6 +1662,39 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
 
+    use_deprecated_pex_binary_run_semantics = BoolOption(
+        "--use-deprecated-pex-binary-run-semantics",
+        default=False,
+        help=softwrap(
+            """
+            If `true`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
+            a sandbox (while still using a PEX for thirdparty dependencies). Additionally, you can
+            refer to the `pex_binary` using the value of its `entry_point` field (if it is a filename).
+
+            If `false`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
+            This makes `run` equivalent to using `package` and running the artifact. Additionally,
+            the binary must be `run` using the `pex_binary`'s address, as passing a filename to `run`
+            will run the `python_source`.
+
+            Note that support has been added to Pants to allow you to `run` any `python_source`,
+            so setting this to `true` should be reserved for maintaining backwards-compatibility
+            with previous versions of Pants. Additionally, you can remove any `pex_binary` targets
+            that exist solely for running Python code (and aren't meant to be packaged).
+            """
+        ),
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            """
+            If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
+            simply delete the option from `pants.toml` because `false` is now the default.
+
+            If set to `true`, removing the option will cause `run` on a `pex_binary` to package and
+            run the built PEX file. Additionally, the `pex_binary` must be referred to by its address.
+            To keep the old `run` semantics, use `run` on the relevant `python_source` target.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
@@ -1919,3 +1952,13 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+@dataclass(frozen=True)
+class UseDeprecatedPexBinaryRunSemanticsOption:
+    """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool

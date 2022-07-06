@@ -1085,7 +1085,9 @@ dependencies = [
  "http",
  "hyper",
  "itertools",
+ "lazy_static",
  "parking_lot 0.11.2",
+ "pin-project 1.0.8",
  "prost",
  "prost-build",
  "prost-types",
@@ -1102,6 +1104,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "webpki 0.21.4",
+ "workunit_store",
 ]
 
 [[package]]
