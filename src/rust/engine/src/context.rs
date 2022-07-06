@@ -301,11 +301,11 @@ impl Core {
     }
 
     if local_cache_read || local_cache_write {
-      // TODO: Conditionally read in the local cache.
       runner = Arc::new(process_execution::cache::CommandRunner::new(
         runner,
         local_cache.clone(),
         full_store.clone(),
+        local_cache_read,
         eager_fetch,
         process_execution_metadata.clone(),
       ));
@@ -346,7 +346,6 @@ impl Core {
     let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
     let remote_cache_write =
       exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
-    // TODO: Conditionally read in the local cache.
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
     let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
