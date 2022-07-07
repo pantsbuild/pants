@@ -9,12 +9,14 @@ from typing import Iterable
 
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.avro.target_types import (
+    AvroDependenciesField,
     AvroSourceField,
     AvroSourcesGeneratorTarget,
     AvroSourceTarget,
 )
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import (
     AddPrefix,
@@ -36,15 +38,28 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    MissingJvmArtifacts,
+    UnversionedCoordinate,
+    find_jvm_artifacts_or_raise,
+)
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 
@@ -217,6 +232,99 @@ def generate_avro_tools_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
+class InjectAvroRuntimeDependencyRequest(InjectDependenciesRequest):
+    inject_for = AvroDependenciesField
+
+
+@dataclass(frozen=True)
+class ApacheAvroRuntimeForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ApacheAvroRuntimeForResolve:
+    addresses: frozenset[Address]
+
+
+_AVRO_GROUP = "org.apache.avro"
+
+
+@rule
+async def resolve_apache_avro_runtime_for_resolve(
+    request: ApacheAvroRuntimeForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+) -> ApacheAvroRuntimeForResolve:
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                UnversionedCoordinate(
+                    group=_AVRO_GROUP,
+                    artifact="avro",
+                ),
+                UnversionedCoordinate(
+                    group=_AVRO_GROUP,
+                    artifact="avro-ipc",
+                ),
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ApacheAvroRuntimeForResolve(addresses)
+    except MissingJvmArtifacts:
+        raise MissingApacheAvroRuntimeInResolveError(
+            request.resolve_name,
+        )
+
+
+@rule
+async def inject_apache_avro_java_dependencies(
+    request: InjectAvroRuntimeDependencyRequest, jvm: JvmSubsystem
+) -> InjectedDependencies:
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
+    target = wrapped_target.target
+
+    if not target.has_field(JvmResolveField):
+        return InjectedDependencies()
+    resolve = target[JvmResolveField].normalized_value(jvm)
+
+    dependencies_info = await Get(
+        ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)
+    )
+    return InjectedDependencies(dependencies_info.addresses)
+
+
+class MissingApacheAvroRuntimeInResolveError(ValueError):
+    def __init__(self, resolve_name: str) -> None:
+        super().__init__(
+            f"The JVM resolve `{resolve_name}` does not contain a requirement for the Apache Avro runtime. "
+            "Since at least one JVM target type in this repository consumes a `avro_sources` target "
+            "in this resolve, the resolve must contain a `jvm_artifact` target for the Apache Avro runtime.\n\n"
+            "Please add the following `jvm_artifact` targets somewhere in the repository and re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            "jvm_artifact(\n"
+            f'  name="{_AVRO_GROUP}_avro",\n'
+            f'  group="{_AVRO_GROUP}",\n'
+            f'  artifact="avro",\n'
+            '  version="<your chosen version>",\n'
+            f'  resolve="{resolve_name}",\n'
+            ")\n\n"
+            "jvm_artifact(\n"
+            f'  name="{_AVRO_GROUP}_avro",\n'
+            f'  group="{_AVRO_GROUP}",\n'
+            f'  artifact="avro-ipc",\n'
+            '  version="<your chosen version>",\n'
+            f'  resolve="{resolve_name}",\n'
+            ")"
+        )
+
+
 def rules():
     return (
         *collect_rules(),
@@ -224,8 +332,11 @@ def rules():
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
+        UnionRule(InjectDependenciesRequest, InjectAvroRuntimeDependencyRequest),
         AvroSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        # Needed to avoid rule graph errors (for dependency inference):
+        *artifact_mapper.rules(),
     )
