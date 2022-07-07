@@ -45,6 +45,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     MissingJvmArtifacts,
@@ -336,4 +337,6 @@ def rules():
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        # Needed to avoid rule graph errors (for dependency inference):
+        *artifact_mapper.rules(),
     )
