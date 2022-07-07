@@ -73,7 +73,8 @@ pub struct Core {
   pub local_parallelism: usize,
   pub graceful_shutdown_timeout: Duration,
   pub sessions: Sessions,
-  pub named_caches_dir: PathBuf,
+  pub named_caches: NamedCaches,
+  pub immutable_inputs: ImmutableInputs,
 }
 
 #[derive(Clone, Debug)]
@@ -177,9 +178,11 @@ impl Core {
   ///
   fn make_leaf_runner(
     full_store: &Store,
+    local_runner_store: &Store,
     executor: &Executor,
     local_execution_root_dir: &Path,
-    named_caches_dir: &Path,
+    immutable_inputs: &ImmutableInputs,
+    named_caches: &NamedCaches,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
@@ -206,22 +209,12 @@ impl Core {
         exec_strategy_opts.remote_parallelism,
       )
     } else {
-      // If eager_fetch is enabled, we do not want to use any remote store with the local command
-      // runner. This reduces the surface area of where the remote store is
-      // used to only be the remote cache command runner.
-      let store_for_local_runner = if remoting_opts.cache_eager_fetch {
-        full_store.clone().into_local_only()
-      } else {
-        full_store.clone()
-      };
-      let immutable_inputs =
-        ImmutableInputs::new(store_for_local_runner.clone(), local_execution_root_dir)?;
       let local_command_runner = local::CommandRunner::new(
-        store_for_local_runner.clone(),
+        local_runner_store.clone(),
         executor.clone(),
         local_execution_root_dir.to_path_buf(),
-        NamedCaches::new(named_caches_dir.to_path_buf()),
-        immutable_inputs,
+        named_caches.clone(),
+        immutable_inputs.clone(),
         exec_strategy_opts.local_cleanup,
       );
 
@@ -242,7 +235,7 @@ impl Core {
         Box::new(nailgun::CommandRunner::new(
           local_command_runner,
           local_execution_root_dir.to_path_buf(),
-          store_for_local_runner,
+          local_runner_store.clone(),
           executor.clone(),
           pool_size,
         ))
@@ -320,10 +313,12 @@ impl Core {
   ///
   fn make_command_runners(
     full_store: &Store,
+    local_runner_store: &Store,
     executor: &Executor,
     local_cache: &PersistentCache,
     local_execution_root_dir: &Path,
-    named_caches_dir: &Path,
+    immutable_inputs: &ImmutableInputs,
+    named_caches: &NamedCaches,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
@@ -332,9 +327,11 @@ impl Core {
   ) -> Result<Vec<Arc<dyn CommandRunner>>, String> {
     let leaf_runner = Self::make_leaf_runner(
       full_store,
+      local_runner_store,
       executor,
       local_execution_root_dir,
-      named_caches_dir,
+      immutable_inputs,
+      named_caches,
       process_execution_metadata,
       root_ca_certs,
       exec_strategy_opts,
@@ -488,6 +485,8 @@ impl Core {
       full_store.clone()
     };
 
+    let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
+    let named_caches = NamedCaches::new(named_caches_dir);
     let process_execution_metadata = ProcessMetadata {
       instance_name: remoting_opts.instance_name.clone(),
       cache_key_gen_version: remoting_opts.execution_process_cache_namespace.clone(),
@@ -496,10 +495,12 @@ impl Core {
 
     let command_runners = Self::make_command_runners(
       &full_store,
+      &store,
       &executor,
       &local_cache,
       &local_execution_root_dir,
-      &named_caches_dir,
+      &immutable_inputs,
+      &named_caches,
       &process_execution_metadata,
       &root_ca_certs,
       &exec_strategy_opts,
@@ -565,7 +566,8 @@ impl Core {
       local_parallelism: exec_strategy_opts.local_parallelism,
       graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
       sessions,
-      named_caches_dir,
+      named_caches,
+      immutable_inputs,
     })
   }
 

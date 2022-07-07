@@ -1,7 +1,6 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -25,11 +24,10 @@ use pyo3::{PyRef, Python, ToPyObject};
 use tempfile::TempDir;
 use tokio::process;
 
-use fs::{
-  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
-};
+use fs::{DirectoryDigest, RelativePath};
 use hashing::Digest;
-use process_execution::{ManagedChild, NamedCaches};
+use process_execution::local::prepare_workdir;
+use process_execution::ManagedChild;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 
@@ -533,99 +531,43 @@ fn interactive_process(
 
     let session = context.session;
 
-    let maybe_tempdir = if run_in_workspace {
-      None
-    } else {
-      Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
-    };
-
-    if process.input_digests.input_files != *EMPTY_DIRECTORY_DIGEST {
-      if run_in_workspace {
-        return Err(
-          "Local interactive process should not attempt to materialize files when run in workspace.".to_owned().into()
-        );
-      }
-
-      let destination = match maybe_tempdir {
-        Some(ref dir) => dir.path().to_path_buf(),
-        None => unreachable!(),
-      };
-
-      context
-        .core
-        .store()
-        .materialize_directory(destination, process.input_digests.input_files, Permissions::Writable)
-        .await?;
-    }
-
-    // TODO: `immutable_input_digests` are not supported for InteractiveProcess, but they would be
-    // materialized here.
-    //   see https://github.com/pantsbuild/pants/issues/13852
-    if !process.append_only_caches.is_empty() {
-       let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
-       let named_cache_symlinks = named_caches
-           .local_paths(&process.append_only_caches)
-           .collect::<Vec<_>>();
-
-       let workdir = match maybe_tempdir {
-         Some(ref dir) => dir.path().to_path_buf(),
-         None => unreachable!(),
-       };
-
-       for named_cache_symlink in named_cache_symlinks {
-         safe_create_dir_all_ioerror(&named_cache_symlink.dst).map_err(|err| {
-           format!(
-             "Error making {} for local execution: {:?}",
-             named_cache_symlink.dst.display(),
-             err
-           )
-         })?;
-
-         let src = workdir.join(&named_cache_symlink.src);
-         if let Some(dir) = src.parent() {
-           safe_create_dir_all_ioerror(dir).map_err(|err| {
-             format!(
-               "Error making {} for local execution: {:?}", dir.display(), err
-             )
-           })?;
-         }
-         symlink(&named_cache_symlink.dst, &src).map_err(|err| {
-           format!(
-             "Error linking {} -> {} for local execution: {:?}",
-             src.display(),
-             named_cache_symlink.dst.display(),
-             err
-           )
-         })?;
-       }
-     }
+    let tempdir = TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?;
+    prepare_workdir(
+      tempdir.path().to_owned(),
+      &process,
+      process.input_digests.input_files.clone(),
+      context.core.store(),
+      context.core.executor.clone(),
+      &context.core.named_caches,
+      &context.core.immutable_inputs,
+    )
+    .await?;
 
     let p = Path::new(&process.argv[0]);
-    let program_name = match maybe_tempdir {
-      Some(ref tempdir) if p.is_relative() => {
-        let mut buf = PathBuf::new();
-        buf.push(tempdir);
-        buf.push(p);
-        buf
-      }
-      _ => p.to_path_buf(),
+    // TODO: Replace program name calculation with `{chroot}` replacement in args.
+    let program_name = if !run_in_workspace && p.is_relative() {
+      let mut buf = PathBuf::new();
+      buf.push(tempdir.path());
+      buf.push(p);
+      buf
+    } else {
+      p.to_path_buf()
     };
 
     let mut command = process::Command::new(program_name);
+    if !run_in_workspace {
+      command.current_dir(tempdir.path());
+    }
     for arg in process.argv[1..].iter() {
       command.arg(arg);
     }
 
+    // Replace any references to `{chroot}` in the environment variables with the path to the
+    // temporary directory. This matches `engine.process_execution.local:update_env()`.
     let mut env = process.env;
-    if let Some(ref tempdir) = maybe_tempdir {
-      command.current_dir(tempdir.path());
-
-      // Replace any references to `{chroot}` in the environment variables with the path to the
-      // temporary directory. This matches `engine.process_execution.local:update_env()`.
-      for value in env.values_mut() {
-        if value.contains("{chroot}") {
-          *value = value.replace("{chroot}", tempdir.path().to_str().unwrap());
-        }
+    for value in env.values_mut() {
+      if value.contains("{chroot}") {
+        *value = value.replace("{chroot}", tempdir.path().to_str().unwrap());
       }
     }
 
