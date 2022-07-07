@@ -17,7 +17,7 @@ parking_lot = "0.12"
 # TODO: See https://github.com/Byron/prodash/pull/9.
 prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messages-draft', version = "16", default-features = false, features = ["progress-tree", "render-line", "render-line-termion"] }
 stdio = { path = "../stdio" }
-terminal_size = "0.1.15"
+terminal_size = "0.2.1"
 task_executor = { path = "../task_executor" }
 uuid = { version = "1.1", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
