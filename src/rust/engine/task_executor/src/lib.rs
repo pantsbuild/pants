@@ -32,7 +32,6 @@ use std::sync::Arc;
 use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
 use lazy_static::lazy_static;
-use pyo3::{ffi, Python};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 lazy_static! {
@@ -44,13 +43,6 @@ lazy_static! {
 pub struct Executor {
   _runtime: Option<Arc<Runtime>>,
   handle: Handle,
-}
-
-// NB: This exists because we need the PyInterpreterState to pass to PyThreadState_New,
-// however PyInterpreterState_Get wasn't added until Py 3.9. They vary in implementation, but because
-// we don't have any sub-interpreters they should both return the same object.
-extern "C" {
-  pub fn PyInterpreterState_Main() -> *mut ffi::PyInterpreterState;
 }
 
 impl Executor {
@@ -78,7 +70,14 @@ impl Executor {
   /// need thread configurability, but also want to know reliably when the Runtime will shutdown
   /// (which, because it is static, will only be at the entire process' exit).
   ///
-  pub fn global(num_worker_threads: usize, max_threads: usize) -> Result<Executor, String> {
+  pub fn global<F>(
+    num_worker_threads: usize,
+    max_threads: usize,
+    on_thread_start: F,
+  ) -> Result<Executor, String>
+  where
+    F: Fn() + Send + Sync + Clone + 'static,
+  {
     let global = GLOBAL_EXECUTOR.load();
     if let Some(ref runtime) = *global {
       return Ok(Executor {
@@ -95,20 +94,7 @@ impl Executor {
       .enable_all();
 
     if env::var("PANTS_DEBUG").is_ok() {
-      runtime_builder.on_thread_start(|| {
-        // NB: We need a PyThreadState object which lives throughout the lifetime of this thread
-        // as the debug trace object is attached to it. Otherwise the PyThreadState is
-        // constructed/destroyed with each `with_gil` call (inside PyGILState_Ensure/PyGILState_Release).
-        //
-        // Constructing (and leaking) a ThreadState object allocates and associates it with the current
-        // thread, and the Python runtime won't wipe the trace function between calls.
-        // See https://github.com/PyO3/pyo3/issues/2495
-        let _ =
-          unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
-        Python::with_gil(|py| {
-          let _ = py.eval("__import__('debugpy').debug_this_thread()", None, None);
-        });
-      });
+      runtime_builder.on_thread_start(on_thread_start.clone());
     };
 
     let runtime = runtime_builder
@@ -117,7 +103,7 @@ impl Executor {
 
     // Attempt to swap, then recurse to retry.
     GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));
-    Self::global(num_worker_threads, max_threads)
+    Self::global(num_worker_threads, max_threads, on_thread_start)
   }
 
   ///
