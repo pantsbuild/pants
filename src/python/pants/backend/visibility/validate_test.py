@@ -23,11 +23,15 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, logg
 from pants.util.logging import LogLevel
 
 
+class TestDependencies(Dependencies):
+    pass
+
+
 class TestTarget(Target):
     alias = "tgt"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        TestDependencies,
     )
 
     __test__ = False

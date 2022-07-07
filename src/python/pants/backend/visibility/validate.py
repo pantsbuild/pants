@@ -11,6 +11,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSet,
     StringSequenceField,
+    TargetGenerator,
     ValidatedDependencies,
     ValidateDependenciesRequest,
     WrappedTarget,
@@ -68,10 +69,17 @@ async def validate_visibility_rules(
         await MultiGet(Get(Addresses, Specs, specs) for specs in targets_visibility_specs.values()),
     )
 
+    # The target generator check for `invalid_deps` is to avoid issues like:
+    #
+    # pants.backend.visibility.validate.VisibilityViolationError: The following 1 target is not
+    # visible to 3rdparty/python#pytest:
+    #   * 3rdparty/python/requirements.txt has visibility: ::
+    #
     invalid_deps = {
         (target, targets_visibility_specs[target])
         for target, allowed_addresses in targets_allowed_addresses
-        if request.field_set.address not in allowed_addresses
+        if not isinstance(target, TargetGenerator)
+        and request.field_set.address not in allowed_addresses
     }
 
     if not invalid_deps:
