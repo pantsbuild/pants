@@ -7,6 +7,9 @@ python_requirements(
     },
     overrides={
         "humbug": {"dependencies": ["#setuptools"]},
+        ("fastapi", "starlette", "strawberry-graphql", "uvicorn"): {
+            "visibility": ["src/python/pants/backend/explorer::", "3rdparty/python:python"]
+        },
     },
 )
 
