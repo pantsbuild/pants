@@ -48,13 +48,11 @@ class PythonToolRequirementsBase(Subsystem):
     uses_requirements_from_source_plugins: ClassVar[bool] = False
 
     version = StrOption(
-        "--version",
         advanced=True,
         default=lambda cls: cls.default_version,
         help="Requirement string for the tool.",
     )
     extra_requirements = StrListOption(
-        "--extra-requirements",
         advanced=True,
         default=lambda cls: cls.default_extra_requirements,
         help="Any additional requirement strings to use with the tool. This is useful if the "
@@ -62,7 +60,6 @@ class PythonToolRequirementsBase(Subsystem):
         "a certain version.",
     )
     _interpreter_constraints = StrListOption(
-        "--interpreter-constraints",
         register_if=lambda cls: cls.register_interpreter_constraints,
         advanced=True,
         default=lambda cls: cls.default_interpreter_constraints,
@@ -70,7 +67,6 @@ class PythonToolRequirementsBase(Subsystem):
     )
 
     _lockfile = StrOption(
-        "--lockfile",
         register_if=lambda cls: cls.register_lockfile,
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
@@ -233,7 +229,6 @@ class PythonToolBase(PythonToolRequirementsBase):
     default_main: ClassVar[MainSpecification]
 
     console_script = StrOption(
-        "--console-script",
         advanced=True,
         default=lambda cls: (
             cls.default_main.spec if isinstance(cls.default_main, ConsoleScript) else None
@@ -248,7 +243,6 @@ class PythonToolBase(PythonToolRequirementsBase):
         ),
     )
     entry_point = StrOption(
-        "--entry-point",
         advanced=True,
         default=lambda cls: (
             cls.default_main.spec if isinstance(cls.default_main, EntryPoint) else None
@@ -306,7 +300,6 @@ class ExportToolOption(BoolOption):
     def __new__(cls):
         return super().__new__(
             cls,
-            "--export",
             default=True,
             help=(
                 lambda subsystem_cls: softwrap(

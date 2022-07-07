@@ -25,8 +25,6 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
-# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# `protobuf_source` targets.
 class ProtobufDependenciesField(Dependencies):
     pass
 

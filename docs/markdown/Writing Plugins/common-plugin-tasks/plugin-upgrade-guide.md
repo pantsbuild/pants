@@ -6,6 +6,48 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-04-27T20:02:17.695Z"
 ---
+2.14
+----
+
+See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x.md> for the changelog.
+
+### Optional Option flag name
+
+Pants 2.14 adds support for deducing the flag name from the attribute name when declaring `XOption`s.
+You can still provide the flag name in case the generated one shouldn't match the attribute name.
+
+Before:
+
+```python
+my_version = StrOption("--my-version", ...)
+_run = BoolOption("--run", ...)
+```
+
+Now:
+
+```python
+my_version = StrOption(...)  # Still uses --my-version
+_run = BoolOption(...)  # Still uses --run
+```
+
+2.13
+----
+
+See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.13.x.md> for the changelog.
+
+(TODO. Come back later)
+
+2.12
+----
+
+See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.12.x.md> for the changelog.
+
+### Unified formatters
+
+Formatters no longer need to be installed in both the `FmtRequest` and `LintTargetsRequest` `@unions`: instead, installing in the `FmtRequest` union is sufficient to act as both a linter and formatter.
+
+See [Add a formatter](doc:plugins-fmt-goal) for more information.
+
 2.11
 ----
 
@@ -216,7 +258,7 @@ This is a more declarative way to set up files than the older API of `RuleRunner
 2.4
 ---
 
-See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.4.x.md> for the changelog. 
+See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.4.x.md> for the changelog.
 
 ### `PexRequest` changes how entry point is set
 
@@ -226,14 +268,14 @@ See <https://github.com/pantsbuild/pants/pull/11620>. Instead of setting `entry_
 
 See <https://github.com/pantsbuild/pants/pull/11641>. Pants now eagerly purges environment variables from the run, so using `os.environ` in plugins won't work anymore.
 
-Instead, use `await Get(Environment, EnvironmentRequest(["MY_ENV_VAR"])`. 
+Instead, use `await Get(Environment, EnvironmentRequest(["MY_ENV_VAR"])`.
 
 For `RuleRunner` tests, you must now either set `env` or the new `env_inherit` arguments for environment variables to be set. Tests are now hermetic.
 
 2.3
 ---
 
-There were no substantial changes to the Plugin API in 2.3. See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.3.x.md> for the changelog. 
+There were no substantial changes to the Plugin API in 2.3. See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.3.x.md> for the changelog.
 
 2.2
 ---

@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 class ExplorerBuiltinGoal(BuiltinGoal):
     name = "experimental-explorer"
     help = "Run the Pants Explorer Web UI server."
-    address = StrOption("--address", default="localhost", help="Server address to bind to.")
-    port = IntOption("--port", default=8000, help="Server port to bind to.")
+    address = StrOption(default="localhost", help="Server address to bind to.")
+    port = IntOption(default=8000, help="Server port to bind to.")
 
     def run(
         self,

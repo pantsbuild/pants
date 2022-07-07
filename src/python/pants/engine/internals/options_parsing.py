@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import GlobalOptions, NamedCachesDirOption, ProcessCleanupOption
+from pants.option.global_options import (
+    GlobalOptions,
+    NamedCachesDirOption,
+    ProcessCleanupOption,
+    UseDeprecatedPexBinaryRunSemanticsOption,
+)
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
@@ -61,6 +66,15 @@ def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessClea
 @rule
 def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCachesDirOption:
     return NamedCachesDirOption(global_options.named_caches_dir)
+
+
+@rule
+def extract_use_deprecated_pex_binary_run_semantics(
+    global_options: GlobalOptions,
+) -> UseDeprecatedPexBinaryRunSemanticsOption:
+    return UseDeprecatedPexBinaryRunSemanticsOption(
+        global_options.use_deprecated_pex_binary_run_semantics
+    )
 
 
 def rules():

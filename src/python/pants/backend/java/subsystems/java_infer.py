@@ -12,18 +12,15 @@ class JavaInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Java targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help="Infer a target's dependencies by parsing import statements from sources.",
     )
     consumed_types = BoolOption(
-        "--consumed-types",
         default=True,
         help="Infer a target's dependencies by parsing consumed types from sources.",
     )
     # TODO: Move to `coursier` or a generic `jvm` subsystem.
     third_party_import_mapping = DictOption[Any](
-        "--third-party-import-mapping",
         help=softwrap(
             """
             A dictionary mapping a Java package path to a JVM artifact coordinate

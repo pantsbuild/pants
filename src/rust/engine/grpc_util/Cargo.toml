@@ -13,6 +13,8 @@ hyper = "0.14"
 http = "0.2"
 itertools = "0.10"
 rustls-native-certs = "0.5"
+lazy_static = "1"
+pin-project = "1.0"
 prost = "0.9"
 rand = "0.8"
 rustls = { version = "0.19", features = ["dangerous_configuration"] }
@@ -25,6 +27,7 @@ tower = { version = "0.4", features = ["limit"] }
 tower-layer = "0.3"
 tower-service = "0.3"
 webpki = "0.21"
+workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.

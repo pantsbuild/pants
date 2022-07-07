@@ -23,7 +23,6 @@ class GoogleJavaFormatSubsystem(JvmToolBase):
 
     skip = SkipOption("fmt", "lint")
     aosp = BoolOption(
-        "--aosp",
         default=False,
         help=softwrap(
             """

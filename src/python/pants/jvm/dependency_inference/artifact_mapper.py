@@ -195,7 +195,9 @@ class FrozenTrieNode:
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "children": {name: child.to_json_dict() for name, child in self._children.items()},
-            **({"addresses": [str(a) for a in self._addresses]} if self._addresses else {}),
+            "addresses": {
+                ns: [str(a) for a in addresses] for ns, addresses in self._addresses.items()
+            },
             "recursive": self._recursive,
             "first_party": self._first_party,
         }

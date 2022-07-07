@@ -129,7 +129,6 @@ class CoursierSubsystem(TemplatedExternalTool):
     }
 
     repos = StrListOption(
-        "--repos",
         default=[
             "https://maven-central.storage-download.googleapis.com/maven2",
             "https://repo1.maven.org/maven2",

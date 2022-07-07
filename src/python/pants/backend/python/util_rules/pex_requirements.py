@@ -294,7 +294,7 @@ def validate_metadata(
         is_tool=isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile)),
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
-        interpreter_universe=python_setup.interpreter_universe,
+        interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
     )
     if validation:

@@ -24,7 +24,6 @@ class JvmSubsystem(Subsystem):
     )
 
     tool_jdk = StrOption(
-        "--tool-jdk",
         default="temurin:1.11",
         help=softwrap(
             """
@@ -35,7 +34,6 @@ class JvmSubsystem(Subsystem):
         advanced=True,
     )
     jdk = StrOption(
-        "--jdk",
         default="temurin:1.11",
         help=softwrap(
             """
@@ -52,13 +50,11 @@ class JvmSubsystem(Subsystem):
         advanced=True,
     )
     resolves = DictOption(
-        "--resolves",
         default={"jvm-default": "3rdparty/jvm/default.lock"},
         # TODO: expand help message
         help="A dictionary mapping resolve names to the path of their lockfile.",
     )
     default_resolve = StrOption(
-        "--default-resolve",
         default="jvm-default",
         help=softwrap(
             """
@@ -69,7 +65,6 @@ class JvmSubsystem(Subsystem):
         ),
     )
     debug_args = StrListOption(
-        "--debug-args",
         help=softwrap(
             """
             Extra JVM arguments to use when running tests in debug mode.
@@ -80,7 +75,6 @@ class JvmSubsystem(Subsystem):
         ),
     )
     global_options = StrListOption(
-        "--global-options",
         help=softwrap(
             """
             List of JVM options to pass to all JVM processes.

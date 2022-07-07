@@ -6,11 +6,9 @@ hidden: false
 createdAt: "2020-07-23T20:40:30.771Z"
 updatedAt: "2022-04-26T22:33:52.117Z"
 ---
-[block:api-header]
-{
-  "title": "`BinaryPaths`: Find already installed binaries"
-}
-[/block]
+`BinaryPaths`: Find already installed binaries
+----------------------------------------------
+
 For certain tools that are hard to automatically install—such as Docker or language interpreters—you may want to assume that the user already has the tool installed on their machine.
 
 The simplest approach is to assume that the binary is installed at a fixed absolute path, such as `/bin/echo` or `/usr/bin/perl`. In the `argv` for your `Process`, use this absolute path as your first element.
@@ -32,7 +30,8 @@ async def demo(...) -> Foo:
         BinaryPathRequest(
             binary_name="docker",
             search_path=["/usr/bin", "/bin"],
-        )  
+        )
+    )
     docker_bin = docker_paths.first_path
     if docker_bin is None:
         raise OSError("Could not find 'docker'.")
@@ -44,19 +43,30 @@ async def demo(...) -> Foo:
 `BinaryPaths` also has a convenience property called `first_path: BinaryPath | None`, which will return the first matching path, if any.
 
 In this example, the `search_path` is hardcoded. Instead, you may want to create a [subsystem](doc:rules-api-subsystems) to allow users to override the search path through a dedicated option. See [pex_environment.py](https://github.com/pantsbuild/pants/blob/57a47457bda0b0dfb0882d851ccd58a7535f15c1/src/python/pants/backend/python/rules/pex_environment.py#L60-L71) for an example that allows the user to use the special string `<PATH>` to read the user's `$PATH` environment variable.
-[block:callout]
-{
-  "type": "info",
-  "title": "Checking for valid binaries (recommended)",
-  "body": "When setting up a `BinaryPathsRequest`, you can optionally pass the argument `test: BinaryPathTest`. When discovering a binary, Pants will run your test and only use the binary if the return code is 0. Pants will also fingerprint the output and invalidate the cache if the output changes from before, such as because the user upgraded the version of the tool.\n\nWhy do this? This is helpful to ensure that all discovered binaries are valid and safe. This is also important for Pants to be able to detect when the user has changed the binary, such as upgrading its version.\n\n`BinaryPathTest` takes the argument `args: Iterable[str]`, which is the arguments that Pants should run on your binary to ensure that it's a valid program. Usually, you'll set `args=[\"--version\"]`.  \n\n```python\nfrom pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPathTest\n\nBinaryPathRequest(\n    binary_name=\"docker\",\n    search_path=[\"/usr/bin\", \"/bin\"],\n    test=BinaryPathTest(args=[\"--version\"]),\n)\n```\n\nYou can optionally set `fingerprint_stdout=False` to the `BinaryPathTest` constructor, but usually, you should keep the default of `True`."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "`ExternalTool`: Install pre-compiled binaries"
-}
-[/block]
+> 📘 Checking for valid binaries (recommended)
+>
+> When setting up a `BinaryPathsRequest`, you can optionally pass the argument `test: BinaryPathTest`. When discovering a binary, Pants will run your test and only use the binary if the return code is 0. Pants will also fingerprint the output and invalidate the cache if the output changes from before, such as because the user upgraded the version of the tool.
+>
+> Why do this? This is helpful to ensure that all discovered binaries are valid and safe. This is also important for Pants to be able to detect when the user has changed the binary, such as upgrading its version.
+>
+> `BinaryPathTest` takes the argument `args: Iterable[str]`, which is the arguments that Pants should run on your binary to ensure that it's a valid program. Usually, you'll set `args=["--version"]`.
+>
+> ```python
+> from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPathTest
+>
+> BinaryPathRequest(
+>     binary_name="docker",
+>     search_path=["/usr/bin", "/bin"],
+>     test=BinaryPathTest(args=["--version"]),
+> )
+> ```
+>
+> You can optionally set `fingerprint_stdout=False` to the `BinaryPathTest` constructor, but usually, you should keep the default of `True`.
+
+`ExternalTool`: Install pre-compiled binaries
+---------------------------------------------
+
 If your tool has a pre-compiled binary available online, Pants can download and use that binary automatically for users. This is often a better user experience than requiring the users to pre-install the tool. This will also make your build more deterministic because everyone will be using the same binary.
 
 First, manually download the file. Typically, the downloaded file will be an archive like a `.zip` or `.tar.xz` file, but it may also be the actual binary. Then, run `shasum -a 256` on the downloaded file to get its digest ID, and `wc -c` to get its number of bytes.
@@ -102,7 +112,7 @@ You must define the class properties `default_version` and `default_known_versio
 
 You must also define the methods `generate_url`, which is the URL to make a GET request to download the file, and `generate_exe`, which is the relative path to the binary in the downloaded digest. Both methods take `plat: Platform` as a parameter.
 
-Because an `ExternalTool` is a subclass of [`Subsystem`](doc:rules-api-subsystems), you must also define an `options_scope`. You may optionally register options by overriding the classmethod `register_options`.
+Because an `ExternalTool` is a subclass of [`Subsystem`](doc:rules-api-subsystems), you must also define an `options_scope`. You may optionally register additional options from `pants.option.option_types`.
 
 In your rules, include the `ExternalTool` as a parameter of the rule, then use `Get(DownloadedExternalTool, ExternalToolRequest)` to download and extract the tool.
 
@@ -125,11 +135,9 @@ async def demo(shellcheck: Shellcheck, ...) -> Foo:
 
 A `DownloadedExternalTool` object has two fields: `digest: Digest` and `exe: str`. Use the `.exe` field as the first value of a `Process`'s `argv`, and use the `.digest` in the `Process's` `input_digest`. If you want to use multiple digests for the input, call `Get(Digest, MergeDigests)` with the `DownloadedExternalTool.digest` included.
 
-[block:api-header]
-{
-  "title": "`Pex`: Install binaries through pip"
-}
-[/block]
+`Pex`: Install binaries through pip
+-----------------------------------
+
 If a tool can be installed via `pip` - e.g., Pytest or Black - you can install and run it using `Pex`.
 
 ```python
@@ -178,10 +186,42 @@ The resulting `Pex` object has a `digest: Digest` field containing the built `.p
 Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, Process)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
 
 `PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `Get(Digest, MergeDigests)` on the `pex.digest` and any of the other input digests.
-[block:callout]
-{
-  "type": "info",
-  "title": "Use `PythonToolBase` when you need a Subsystem",
-  "body": "Often, you will want to create a [`Subsystem`](doc:rules-api-subsystems) for your Python tool to allow users to set options to configure the tool. You can subclass `PythonToolBase`, which subclasses `Subsystem`, to do this:\n\n```python\n\nfrom pants.backend.python.subsystems.python_tool_base import PythonToolBase\nfrom pants.backend.python.target_types import ConsoleScript\nfrom pants.option.custom_types import file_option\n\n\nclass Black(PythonToolBase):\n    options_scope = \"black\"\n    help = \"The Black Python code formatter (https://black.readthedocs.io/).\"\n\n    default_version = \"black==19.10b0\"\n    default_extra_requirements = [\"setuptools\"]\n    default_main = ConsoleScript(\"black\")\n    default_interpreter_constraints = [\"CPython>=3.6\"]\n\n    config = StrOption(\n        \"--config\",\n        default=None,\n        advanced=True,\n        help=\"Path to Black's pyproject.toml config file\",\n    )\n```\n\nYou must define the class properties `options_scope`, `default_version`, and `default_main`, and can optionally define `default_extra_requirements` and `default_interpreter_constraints`.\n\nThen, you can set up your `Pex` like this:\n\n```python\n@rule\nasync def demo(black: Black, ...) -> Foo:\n    pex = await Get(Pex, PexRequest, black.to_pex_request())\n```"
-}
-[/block]
+
+
+> 📘 Use `PythonToolBase` when you need a Subsystem
+>
+> Often, you will want to create a [`Subsystem`](doc:rules-api-subsystems) for your Python tool
+> to allow users to set options to configure the tool. You can subclass `PythonToolBase`, which
+> subclasses `Subsystem`, to do this:
+>
+> ```python
+> from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+> from pants.backend.python.target_types import ConsoleScript
+> from pants.option.option_types import StrOption
+>
+> class Black(PythonToolBase):
+>     options_scope = "black"
+>     help = "The Black Python code formatter (https://black.readthedocs.io/)."
+>
+>     default_version = "black==19.10b0"
+>     default_extra_requirements = ["setuptools"]
+>     default_main = ConsoleScript("black")
+>     default_interpreter_constraints = ["CPython>=3.6"]
+>
+>     config = StrOption(
+>         default=None,
+>         advanced=True,
+>         help="Path to Black's pyproject.toml config file",
+>     )
+> ```
+>
+> You must define the class properties `options_scope`, `default_version`, and `default_main`. You
+> can optionally define `default_extra_requirements` and `default_interpreter_constraints`.
+>
+> Then, you can set up your `Pex` like this:
+>
+> ```python
+> @rule
+> async def demo(black: Black, ...) -> Foo:
+>     pex = await Get(Pex, PexRequest, black.to_pex_request())
+> ```

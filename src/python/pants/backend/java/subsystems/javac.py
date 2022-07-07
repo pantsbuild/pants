@@ -19,7 +19,6 @@ class JavacSubsystem(Subsystem):
     args = ArgsListOption(example="-g -deprecation")
 
     tailor_source_targets = BoolOption(
-        "--tailor-source-targets",
         default=True,
         help="If true, add `java_sources` and `java_tests` targets with the `tailor` goal.",
         advanced=True,

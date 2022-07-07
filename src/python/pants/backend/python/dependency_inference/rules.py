@@ -85,7 +85,6 @@ class PythonInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Python targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help=softwrap(
             """
@@ -97,7 +96,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports = BoolOption(
-        "--string-imports",
         default=False,
         help=softwrap(
             """
@@ -110,7 +108,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports_min_dots = IntOption(
-        "--string-imports-min-dots",
         default=2,
         help=softwrap(
             """
@@ -121,7 +118,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets = BoolOption(
-        "--assets",
         default=False,
         help=softwrap(
             """
@@ -134,7 +130,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets_min_slashes = IntOption(
-        "--assets-min-slashes",
         default=1,
         help=softwrap(
             """
@@ -144,9 +139,7 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
     )
-
     init_files = EnumOption(
-        "--init-files",
         help=softwrap(
             f"""
             Infer a target's dependencies on any `__init__.py` files in the packages
@@ -166,34 +159,7 @@ class PythonInferSubsystem(Subsystem):
         ),
         default=InitFilesInference.content_only,
     )
-    inits = BoolOption(
-        "--inits",
-        default=False,
-        help=softwrap(
-            f"""
-            Infer a target's dependencies on any `__init__.py` files in the packages
-            it is located in (recursively upward in the directory structure).
-
-            Even if this is disabled, Pants will still include any ancestor `__init__.py` files,
-            only they will not be 'proper' dependencies, e.g. they will not show up in
-            `{bin_name()} dependencies` and their own dependencies will not be used.
-
-            If you have empty `__init__.py` files, it's safe to leave this option off; otherwise,
-            you should enable this option.
-            """
-        ),
-        removal_version="2.14.0.dev1",
-        removal_hint=softwrap(
-            """
-            Use the more powerful option `[python-infer].init_files`. For identical
-            behavior, set to 'always'. Otherwise, we recommend the default of `content_only`
-            (simply delete the option `[python-infer].inits` to trigger the default).
-            """
-        ),
-    )
-
     conftests = BoolOption(
-        "--conftests",
         default=True,
         help=softwrap(
             """
@@ -203,7 +169,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     entry_points = BoolOption(
-        "--entry-points",
         default=True,
         help=softwrap(
             """
@@ -214,7 +179,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     unowned_dependency_behavior = EnumOption(
-        "--unowned-dependency-behavior",
         default=UnownedDependencyUsage.DoNothing,
         help=softwrap(
             """
@@ -471,15 +435,10 @@ async def infer_python_init_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> InferredDependencies:
-    if (
-        not python_infer_subsystem.options.is_default("inits") and not python_infer_subsystem.inits
-    ) or python_infer_subsystem.init_files is InitFilesInference.never:
+    if python_infer_subsystem.init_files is InitFilesInference.never:
         return InferredDependencies([])
 
-    ignore_empty_files = (
-        python_infer_subsystem.options.is_default("inits")
-        and python_infer_subsystem.init_files is InitFilesInference.content_only
-    )
+    ignore_empty_files = python_infer_subsystem.init_files is InitFilesInference.content_only
     fp = request.sources_field.file_path
     assert fp is not None
     init_files = await Get(

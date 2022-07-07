@@ -145,35 +145,22 @@ By default, `thrift_source` / `thrift_sources` targets use the resolve set by th
 
 You must also make sure that any resolves that use codegen include the `python_requirement` target for the `thrift` runtime library from Step 2. Pants will eagerly validate this for you.
 
+If the same Thrift files should work with multiple resolves, you can use the
+[`parametrize`](doc:targets#parametrizing-targets) mechanism.
+
 For example:
 
 ```python BUILD
 python_requirement(
-    name="thrift_resolve-a",
-    requirements=["thrift==0.15.0"],
-    resolve="resolve-a",
+    name="thrift-requirement",
+    # Here, we use the same version of Thrift in both resolves. You could instead create
+    # a distinct target per resolve so that they have different versions.
+    requirements=["thrift==0.15.0""],
+    resolve=parametrize("resolve-a", "resolve-b"),
 )
 
-python_requirement(
-    name="thrift_resolve-b",
-    # Note that this version can be different than what we use 
-    # above for `resolve-a`.
-    requirements=["thrift==0.13.0"],
-    resolve="resolve-b",
-)
-
-protobuf_source(
-    name="data_science_models",
-    source="data_science_models.thrift",
-    resolve="resolve-a",
-)
-
-
-protobuf_source(
-    name="mobile_app_models",
-    source="mobile_app_models.thrift",
-    resolve="resolve-b",
+thrift_sources(
+    name="thrift",
+    python_resolve=parametrize("resolve-a", "resolve-b")
 )
 ```
-
-Pants 2.11 will be adding support for using the same `thrift_source` target with multiple resolves through a new `parametrize()` feature.

@@ -22,7 +22,7 @@ You will also likely want to register some options, like `--config`, `--skip`, a
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class Shfmt(ExternalTool):
@@ -61,8 +61,8 @@ class Shfmt(ExternalTool):
         return f"./shfmt_{self.version}_{plat_str}"
 ```
 
-2. Set up a `FieldSet` and `FmtRequest`/`LintTargetsRequest`
-------------------------------------------------------------
+2. Set up a `FieldSet` and `FmtRequest`
+---------------------------------------
 
 As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
@@ -84,18 +84,17 @@ class ShfmtFieldSet(FieldSet):
     sources: ShellSourceField
 ```
 
-Then, hook this up to a new subclass of both `LintTargetsRequest` and `FmtRequest`.
+Then, hook this up to a new subclass of `FmtRequest`.
 
 ```python
 from pants.core.goals.fmt import FmtRequest
-from pants.core.goals.lint import LintTargetsRequest
 
-class ShfmtRequest(FmtRequest, LintRequest):
+class ShfmtRequest(FmtRequest):
     field_set_type = ShfmtFieldSet
     name = "shfmt"
 ```
 
-Finally, register your new `LintTargetsRequest`/`FmtRequest` with two [`UnionRule`s](doc:rules-api-unions) so that Pants knows your formatter exists:
+Finally, register your new `FmtRequest` with a [`UnionRule`](doc:rules-api-unions) so that Pants knows your formatter exists:
 
 ```python
 from pants.engine.unions import UnionRule
@@ -106,45 +105,20 @@ def rules():
     return [
       	*collect_rules(),
         UnionRule(FmtRequest, ShfmtRequest),
-        UnionRule(LintTargetsRequest, ShfmtRequest),
     ]
 ```
 
-3. Create `fmt` and `lint` rules
---------------------------------
+3. Create `fmt` rules
+---------------------
 
-You will need rules for both `fmt` and `lint`. Both rules should take the `LintTargetsRequest`/`FmtRequest` from step 3  (e.g. `ShfmtRequest`) as a parameter. The `fmt` rule should return `FmtResult`, and the `lint` rule should return `LintResults`.
+You will need a rule for `fmt` which takes the `FmtRequest` from step 3  (e.g. `ShfmtRequest`) as a parameter and returns a `FmtResult`.
 
 ```python
-@rule(desc="Format with shfmt")
+@rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    ...
-    return FmtResult(..., formatter_name=request.name)
+    if shfmt.skip:
+        return FmtResult.skip(formatter_name=request.name)
 
-
-@rule(desc="Lint with shfmt")
-async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
-    ...
-    return LintResults([], linter_name=request.name)
-```
-
-The `fmt` and `lint` rules will be very similar, except that a) the `argv` to your `Process` will be different, b) for `lint`, you should use `await Get(FallibleProcessResult, Process)` so that you tolerate failures, whereas `fmt` should use `await Get(ProcessResult, Process)`. To avoid duplication between the `fmt` and `lint` rules, you should set up a helper `setup` rule, along with dataclasses for `SetupRequest` and `Setup`.
-
-```python
-@dataclass(frozen=True)
-class SetupRequest:
-    request: ShfmtRequest
-    check_only: bool
-
-
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_digest: Digest
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
     download_shfmt_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
@@ -162,77 +136,41 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
         ),
     )
 
-    source_files_get= Get(
-        SourceFiles,
-        SourceFilesRequest(
-            field_set.source for field_set in setup_request.request.field_sets
-        ),
-    )
-
-    downloaded_shfmt, source_files = await MultiGet(
-        download_shfmt_get, source_files_get
-    )
-
-    # If we were given an input digest from a previous formatter for the source files, then we
-    # should use that input digest instead of the one we read from the filesystem.
-    source_files_snapshot = (
-        source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+    downloaded_shfmt, config_digest = await MultiGet(
+        download_shfmt_get, config_digest_get
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
-            (source_files_snapshot.digest, downloaded_shfmt.digest)
+            (request.snapshot.digest, downloaded_shfmt.digest, config_digest)
         ),
     )
 
     argv = [
         downloaded_shfmt.exe,
-        "-d" if setup_request.check_only else "-w",
+        "-w",
         *shfmt.args,
-        *source_files_snapshot.files,
+        *request.snapshot.files,
     ]
     process = Process(
         argv=argv,
         input_digest=input_digest,
-        output_files=source_files_snapshot.files,
-        description=f"Run shfmt on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+        output_files=request.snapshot.files,
+        description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
-    return Setup(process, original_digest=source_files_snapshot.digest)
 
-
-@rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    if shfm.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
-    result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name=request.name
-    )
-
-
-@rule(desc="Lint with shfmt", level=LogLevel.DEBUG)
-async def shfmt_lint(request: ShfmtRequest, shfmt: Shfmt) -> LintResults:
-    if shfmt..skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults(
-        [LintResult.from_fallible_process_result(result)], linter_name=request.name
-    )
+    result = await Get(ProcessResult, Process, process)
+    output_snapshot = await Get(Snapshot, result.output_digest)
+    return FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest`/`LintRequest` has a property called `.field_sets`, which stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances. 
+The `FmtRequest` has properties `.field_sets` and `.snapshot`, which store collections of the `FieldSet`s defined in step 2, and their sources. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances.
 
 If you have a `--skip` option, you should check if it was used at the beginning of your `fmt` and `lint` rules and, if so, to early return an empty `LintResults()` and return `FmtResult.skip()`.
 
-Use `Get(SourceFiles, SourceFilesRequest)` to get all the sources you want to run your linter on. However, you should check if the `FmtRequest.prior_formatter_result` is set, and if so, use that value instead. This ensures that the result of any previous formatters is used, rather than the original source files. 
-
-If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` in the `setup` rule to install the tool.
+If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 
 Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files and downloaded tool.
 
