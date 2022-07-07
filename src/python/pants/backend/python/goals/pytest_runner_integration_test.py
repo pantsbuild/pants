@@ -606,7 +606,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
     inputs = [PythonTestFieldSet.create(tgt)]
     request = rule_runner.request(TestDebugAdapterRequest, inputs)
     assert request.process is not None
-    assert request.process.argv == (
+    assert request.process.process.argv == (
         "./pytest_runner.pex_pex_shim.sh",
         "--listen",
         "127.0.0.1:5678",

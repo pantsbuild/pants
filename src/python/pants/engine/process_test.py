@@ -280,7 +280,7 @@ def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) ->
         immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
     )
     iproc = rule_runner.request(InteractiveProcess, [InteractiveProcessRequest(process)])
-    assert iproc.argv == process.argv
-    assert iproc.env == process.env
-    snapshot = rule_runner.request(Snapshot, [iproc.input_digest])
+    assert iproc.process.argv == process.argv
+    assert iproc.process.env == process.env
+    snapshot = rule_runner.request(Snapshot, [iproc.process.input_digest])
     assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")

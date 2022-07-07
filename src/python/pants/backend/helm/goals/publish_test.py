@@ -20,6 +20,7 @@ from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
+from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -81,17 +82,10 @@ def assert_publish(
     assert publish.names == expect_names
     assert publish.description == expect_description
     if expect_process:
-        expect_process(publish.process)
+        assert publish.process
+        expect_process(publish.process.process)
     else:
         assert publish.process is None
-
-
-def process_assertion(**assertions):
-    def assert_process(process):
-        for attr, expected in assertions.items():
-            assert getattr(process, attr) == expected
-
-    return assert_process
 
 
 def _declare_targets(rule_runner: RuleRunner) -> None:

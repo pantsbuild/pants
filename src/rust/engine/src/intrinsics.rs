@@ -1,7 +1,6 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::BTreeMap;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -22,7 +21,7 @@ use crate::Failure;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
-use pyo3::{PyRef, Python};
+use pyo3::{PyRef, Python, ToPyObject};
 use tempfile::TempDir;
 use tokio::process;
 
@@ -30,7 +29,7 @@ use fs::{
   safe_create_dir_all_ioerror, DirectoryDigest, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::Digest;
-use process_execution::{CacheName, ManagedChild, NamedCaches};
+use process_execution::{ManagedChild, NamedCaches};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 
@@ -519,28 +518,18 @@ fn interactive_process(
     let types = &context.core.types;
     let interactive_process_result = types.interactive_process_result;
 
-    let (argv, run_in_workspace, restartable, input_digest, env, append_only_caches) = Python::with_gil(|py| {
+    let (py_interactive_process, py_process): (Value, Value) = Python::with_gil(|py| {
       let py_interactive_process = (*args[0]).as_ref(py);
-      let argv: Vec<String> = externs::getattr(py_interactive_process, "argv").unwrap();
-      if argv.is_empty() {
-        return Err("Empty argv list not permitted".to_owned());
-      }
-      let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
-      let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
-      let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
-      let input_digest = lift_directory_digest(py_input_digest)?;
-      let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
-
-      let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
-        .into_iter()
-        .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
-        .collect::<Result<BTreeMap<_, _>, String>>()?;
-      if !append_only_caches.is_empty() && run_in_workspace {
-        return Err("Local interactive process cannot use append-only caches when run in workspace.".to_owned());
-      }
-
-      Ok((argv, run_in_workspace, restartable, input_digest, env, append_only_caches))
-    })?;
+      let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
+      (py_interactive_process.extract().unwrap(), py_process)
+    });
+    let process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
+    let (run_in_workspace, restartable) = Python::with_gil(|py| {
+      let py_interactive_process = py_interactive_process.to_object(py);
+      let run_in_workspace: bool = externs::getattr(py_interactive_process.as_ref(py), "run_in_workspace").unwrap();
+      let restartable: bool = externs::getattr(py_interactive_process.as_ref(py), "restartable").unwrap();
+      (run_in_workspace, restartable)
+    });
 
     let session = context.session;
 
@@ -550,7 +539,7 @@ fn interactive_process(
       Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
     };
 
-    if input_digest != *EMPTY_DIRECTORY_DIGEST {
+    if process.input_digests.input_files != *EMPTY_DIRECTORY_DIGEST {
       if run_in_workspace {
         return Err(
           "Local interactive process should not attempt to materialize files when run in workspace.".to_owned().into()
@@ -565,17 +554,17 @@ fn interactive_process(
       context
         .core
         .store()
-        .materialize_directory(destination, input_digest, Permissions::Writable)
+        .materialize_directory(destination, process.input_digests.input_files, Permissions::Writable)
         .await?;
     }
 
     // TODO: `immutable_input_digests` are not supported for InteractiveProcess, but they would be
     // materialized here.
     //   see https://github.com/pantsbuild/pants/issues/13852
-    if !append_only_caches.is_empty() {
+    if !process.append_only_caches.is_empty() {
        let named_caches = NamedCaches::new(context.core.named_caches_dir.clone());
        let named_cache_symlinks = named_caches
-           .local_paths(&append_only_caches)
+           .local_paths(&process.append_only_caches)
            .collect::<Vec<_>>();
 
        let workdir = match maybe_tempdir {
@@ -611,7 +600,7 @@ fn interactive_process(
        }
      }
 
-    let p = Path::new(&argv[0]);
+    let p = Path::new(&process.argv[0]);
     let program_name = match maybe_tempdir {
       Some(ref tempdir) if p.is_relative() => {
         let mut buf = PathBuf::new();
@@ -623,11 +612,11 @@ fn interactive_process(
     };
 
     let mut command = process::Command::new(program_name);
-    for arg in argv[1..].iter() {
+    for arg in process.argv[1..].iter() {
       command.arg(arg);
     }
 
-    let mut env = env;
+    let mut env = process.env;
     if let Some(ref tempdir) = maybe_tempdir {
       command.current_dir(tempdir.path());
 
