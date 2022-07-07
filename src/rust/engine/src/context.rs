@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
-use crate::python::Failure;
+use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
