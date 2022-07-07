@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
-use crate::python::Failure;
+use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
@@ -22,6 +22,7 @@ use async_oncecell::OnceCell;
 use cache::PersistentCache;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
+use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
@@ -631,10 +632,12 @@ pub struct Context {
   run_id: RunId,
   /// The number of attempts which have been made to backtrack to a particular ExecuteProcess node.
   ///
-  /// Presence in this map at process runtime indicates that the pricess is being retried, and that
+  /// Presence in this map at process runtime indicates that the process is being retried, and that
   /// there was something invalid or unusable about previous attempts. Successive attempts should
   /// run in a different mode (skipping caches, etc) to attempt to produce a valid result.
   backtrack_levels: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
+  /// The Digests that we have successfully invalidated a Node for.
+  backtrack_digests: Arc<Mutex<HashSet<Digest>>>,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -647,6 +650,7 @@ impl Context {
       session,
       run_id,
       backtrack_levels: Arc::default(),
+      backtrack_digests: Arc::default(),
       stats: Arc::default(),
     }
   }
@@ -685,7 +689,7 @@ impl Context {
       return result;
     };
 
-    // Locate the source(s) of this Digest and their backtracking levels.
+    // Locate live source(s) of this Digest and their backtracking levels.
     // TODO: Currently needs a combination of `visit_live` and `invalidate_from_roots` because
     // `invalidate_from_roots` cannot view `Node` results. Would be more efficient as a merged
     // method.
@@ -700,8 +704,23 @@ impl Context {
     });
 
     if candidate_roots.is_empty() {
-      // We did not identify any roots to invalidate: allow the Node to fail.
-      return result;
+      // If there are no live sources of the Digest, see whether any have already been invalidated
+      // by other consumers.
+      if self.backtrack_digests.lock().get(&digest).is_some() {
+        // Some other consumer has already identified and invalidated the source of this Digest: we
+        // can wait for the attempt to complete.
+        return Err(Failure::Invalidated);
+      } else {
+        // There are no live or invalidated sources of this Digest. Directly fail.
+        return result.map_err(|e| {
+          throw(format!(
+            "Could not identify a process to backtrack to for: {e}"
+          ))
+        });
+      }
+    } else {
+      // We have identified a Node to backtrack on. Record it.
+      self.backtrack_digests.lock().insert(digest);
     }
 
     // Attempt to trigger backtrack attempts for the matched Nodes. It's possible that we are not
@@ -784,6 +803,7 @@ impl NodeContext for Context {
       session: self.session.clone(),
       run_id: self.run_id,
       backtrack_levels: self.backtrack_levels.clone(),
+      backtrack_digests: self.backtrack_digests.clone(),
       stats: self.stats.clone(),
     }
   }
