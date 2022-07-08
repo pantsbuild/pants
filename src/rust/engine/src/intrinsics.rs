@@ -25,7 +25,7 @@ use tokio::process;
 
 use fs::{DirectoryDigest, RelativePath};
 use hashing::Digest;
-use process_execution::local::{create_sandbox, prepare_workdir};
+use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir};
 use process_execution::ManagedChild;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -520,7 +520,7 @@ fn interactive_process(
       let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
       (py_interactive_process.extract().unwrap(), py_process)
     });
-    let process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
+    let mut process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
     let (run_in_workspace, restartable, cleanup) = Python::with_gil(|py| {
       let py_interactive_process_obj = py_interactive_process.to_object(py);
       let py_interactive_process = py_interactive_process_obj.as_ref(py);
@@ -548,9 +548,11 @@ fn interactive_process(
       &context.core.immutable_inputs,
     )
     .await?;
+    apply_chroot(tempdir.path().to_str().unwrap(), &mut process);
 
     let p = Path::new(&process.argv[0]);
-    // TODO: Replace program name calculation with `{chroot}` replacement in args.
+    // TODO: Deprecate this program name calculation, and recommend `{chroot}` replacement in args
+    // instead.
     let program_name = if !run_in_workspace && p.is_relative() {
       let mut buf = PathBuf::new();
       buf.push(tempdir.path());
@@ -568,17 +570,8 @@ fn interactive_process(
       command.arg(arg);
     }
 
-    // Replace any references to `{chroot}` in the environment variables with the path to the
-    // temporary directory. This matches `engine.process_execution.local:update_env()`.
-    let mut env = process.env;
-    for value in env.values_mut() {
-      if value.contains("{chroot}") {
-        *value = value.replace("{chroot}", tempdir.path().to_str().unwrap());
-      }
-    }
-
     command.env_clear();
-    command.envs(env);
+    command.envs(process.env);
 
     if !restartable {
         task_side_effected()?;
