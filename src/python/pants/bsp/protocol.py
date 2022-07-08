@@ -155,8 +155,7 @@ class BSPConnection:
         workspace = Workspace(self._scheduler_session)
         params = Params(request, workspace)
         execution_request = self._scheduler_session.execution_request(
-            products=[method_mapping.response_type],
-            subjects=[params],
+            requests=[(method_mapping.response_type, params)],
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:

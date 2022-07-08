@@ -85,7 +85,7 @@ class ExecutionRequest:
     To create an ExecutionRequest, see `SchedulerSession.execution_request`.
     """
 
-    roots: tuple[Any, ...]
+    roots: tuple[tuple[type, Any | Params], ...]
     native: PyExecutionRequest
 
 
@@ -390,22 +390,14 @@ class SchedulerSession:
 
     def execution_request(
         self,
-        products: Sequence[type],
-        subjects: Sequence[Any | Params],
+        requests: Sequence[tuple[type, Any | Params]],
         poll: bool = False,
         poll_delay: float | None = None,
         timeout: float | None = None,
     ) -> ExecutionRequest:
-        """Create and return an ExecutionRequest for the given products and subjects.
+        """Create and return an ExecutionRequest for the given (product, subject) pairs.
 
-        The resulting ExecutionRequest object will contain keys tied to this scheduler's product
-        Graph, and so it will not be directly usable with other scheduler instances without being
-        re-created.
-
-        NB: This method does a "cross product", mapping all subjects to all products.
-
-        :param products: A list of product types to request for the roots.
-        :param subjects: A list of singleton input parameters or Params instances.
+        :param requests: A sequence of product types to request for subjects.
         :param poll: True to wait for _all_ of the given roots to
           have changed since their last observed values in this SchedulerSession.
         :param poll_delay: A delay (in seconds) to wait after observing a change, and before
@@ -414,15 +406,14 @@ class SchedulerSession:
           request has not completed before the timeout has elapsed, ExecutionTimeoutError is raised.
         :returns: An ExecutionRequest for the given products and subjects.
         """
-        request_specs = tuple((s, p) for s in subjects for p in products)
         native_execution_request = PyExecutionRequest(
             poll=poll,
             poll_delay_in_ms=int(poll_delay * 1000) if poll_delay else None,
             timeout_in_ms=int(timeout * 1000) if timeout else None,
         )
-        for subject, product in request_specs:
+        for product, subject in requests:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
-        return ExecutionRequest(request_specs, native_execution_request)
+        return ExecutionRequest(tuple(requests), native_execution_request)
 
     def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
         """Invalidates the given filenames in an internal product Graph instance."""
@@ -454,13 +445,9 @@ class SchedulerSession:
     def teardown_dynamic_ui(self) -> None:
         native_engine.teardown_dynamic_ui(self.py_scheduler, self.py_session)
 
-    def execute(
+    def _execute(
         self, execution_request: ExecutionRequest
     ) -> tuple[tuple[tuple[Any, Return], ...], tuple[tuple[Any, Throw], ...]]:
-        """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
-
-        :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
-        """
         start_time = time.time()
         try:
             raw_roots = native_engine.scheduler_execute(
@@ -522,10 +509,26 @@ class SchedulerSession:
                 wrapped_exceptions=tuple(t.exc for t in throws),
             )
 
+    def execute(self, execution_request: ExecutionRequest) -> list[Any]:
+        """Invoke the engine for the given ExecutionRequest, returning successful values or raising.
+
+        :return: A sequence of per-request results.
+        """
+        returns, throws = self._execute(execution_request)
+
+        # Throw handling.
+        if throws:
+            self._raise_on_error([t for _, t in throws])
+
+        # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
+        # order in output lists.
+        return [ret.value for _, ret in returns]
+
     def run_goal_rule(
         self,
         product: type[Goal],
         subject: Params,
+        *,
         poll: bool = False,
         poll_delay: float | None = None,
     ) -> int:
@@ -544,20 +547,16 @@ class SchedulerSession:
                 [type(p) for p in params],
                 product,
             )
-
-        request = self.execution_request([product], [subject], poll=poll, poll_delay=poll_delay)
-        returns, throws = self.execute(request)
-
-        if throws:
-            self._raise_on_error([t for _, t in throws])
-        _, state = returns[0]
-        return cast(int, state.value.exit_code)
+        (return_value,) = self.product_request(product, [subject], poll=poll, poll_delay=poll_delay)
+        return cast(int, return_value.exit_code)
 
     def product_request(
         self,
         product: type,
         subjects: Sequence[Any | Params],
+        *,
         poll: bool = False,
+        poll_delay: float | None = None,
         timeout: float | None = None,
     ) -> list:
         """Executes a request for a single product for some subjects, and returns the products.
@@ -565,19 +564,17 @@ class SchedulerSession:
         :param product: A product type for the request.
         :param subjects: A list of subjects or Params instances for the request.
         :param poll: See self.execution_request.
+        :param poll_delay: See self.execution_request.
         :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
-        request = self.execution_request([product], subjects, poll=poll, timeout=timeout)
-        returns, throws = self.execute(request)
-
-        # Throw handling.
-        if throws:
-            self._raise_on_error([t for _, t in throws])
-
-        # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
-        # order in output lists.
-        return [ret.value for _, ret in returns]
+        request = self.execution_request(
+            [(product, subject) for subject in subjects],
+            poll=poll,
+            poll_delay=poll_delay,
+            timeout=timeout,
+        )
+        return self.execute(request)
 
     def capture_snapshots(self, path_globs_and_roots: Iterable[PathGlobsAndRoot]) -> list[Snapshot]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
