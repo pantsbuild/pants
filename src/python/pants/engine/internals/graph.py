@@ -1073,17 +1073,16 @@ async def resolve_dependencies(
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred: tuple[InferredDependencies, ...] = ()
     if inference_request_types:
-        sources_field = tgt.get(SourcesField)
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
-            if isinstance(sources_field, inference_request_type.infer_from)
+            if inference_request_type.infer_from.is_applicable(tgt)
         ]
         inferred = await MultiGet(
             Get(
                 InferredDependencies,
                 InferDependenciesRequest,
-                inference_request_type(sources_field),
+                inference_request_type(inference_request_type.infer_from.create(tgt)),
             )
             for inference_request_type in relevant_inference_request_types
         )
