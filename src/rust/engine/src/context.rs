@@ -75,6 +75,7 @@ pub struct Core {
   pub sessions: Sessions,
   pub named_caches: NamedCaches,
   pub immutable_inputs: ImmutableInputs,
+  pub local_execution_root_dir: PathBuf,
 }
 
 #[derive(Clone, Debug)]
@@ -568,6 +569,7 @@ impl Core {
       sessions,
       named_caches,
       immutable_inputs,
+      local_execution_root_dir,
     })
   }
 

@@ -292,6 +292,7 @@ class InteractiveProcess(SideEffecting):
     run_in_workspace: bool
     forward_signals_to_process: bool
     restartable: bool
+    cleanup: bool
 
     def __init__(
         self,
@@ -302,6 +303,7 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        cleanup: bool = True,
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
@@ -327,6 +329,7 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
+        self.cleanup = cleanup
 
         self.__post_init__()
 

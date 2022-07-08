@@ -21,12 +21,11 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
 use pyo3::{PyRef, Python, ToPyObject};
-use tempfile::TempDir;
 use tokio::process;
 
 use fs::{DirectoryDigest, RelativePath};
 use hashing::Digest;
-use process_execution::local::prepare_workdir;
+use process_execution::local::{create_sandbox, prepare_workdir};
 use process_execution::ManagedChild;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -522,16 +521,23 @@ fn interactive_process(
       (py_interactive_process.extract().unwrap(), py_process)
     });
     let process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
-    let (run_in_workspace, restartable) = Python::with_gil(|py| {
-      let py_interactive_process = py_interactive_process.to_object(py);
-      let run_in_workspace: bool = externs::getattr(py_interactive_process.as_ref(py), "run_in_workspace").unwrap();
-      let restartable: bool = externs::getattr(py_interactive_process.as_ref(py), "restartable").unwrap();
-      (run_in_workspace, restartable)
+    let (run_in_workspace, restartable, cleanup) = Python::with_gil(|py| {
+      let py_interactive_process_obj = py_interactive_process.to_object(py);
+      let py_interactive_process = py_interactive_process_obj.as_ref(py);
+      let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
+      let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
+      let cleanup: bool = externs::getattr(py_interactive_process, "cleanup").unwrap();
+      (run_in_workspace, restartable, cleanup)
     });
 
     let session = context.session;
 
-    let tempdir = TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?;
+    let tempdir = create_sandbox(
+      context.core.executor.clone(),
+      &context.core.local_execution_root_dir,
+      "interactive process",
+      cleanup,
+    )?;
     prepare_workdir(
       tempdir.path().to_owned(),
       &process,
