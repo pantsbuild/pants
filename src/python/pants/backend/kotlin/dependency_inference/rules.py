@@ -19,8 +19,8 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -87,8 +87,8 @@ async def infer_kotlin_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-class InjectKotlinRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = KotlinDependenciesField
+class InferKotlinRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_for = KotlinDependenciesField
 
 
 @dataclass(frozen=True)
@@ -136,11 +136,11 @@ async def resolve_kotlin_runtime_for_resolve(
     return KotlinRuntimeForResolve(addresses)
 
 
-@rule(desc="Inject dependency on Kotlin runtime artifacts for Kotlin targets.")
-async def inject_kotlin_stdlib_dependency(
-    request: InjectKotlinRuntimeDependencyRequest,
+@rule(desc="Infer dependency on Kotlin runtime artifacts for Kotlin targets.")
+async def infer_kotlin_stdlib_dependency(
+    request: InferKotlinRuntimeDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -150,13 +150,13 @@ async def inject_kotlin_stdlib_dependency(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     kotlin_runtime_target_info = await Get(
         KotlinRuntimeForResolve, KotlinRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(kotlin_runtime_target_info.addresses)
+    return InferredDependencies(kotlin_runtime_target_info.addresses)
 
 
 def rules():
@@ -167,5 +167,5 @@ def rules():
         *jvm_symbol_mapper.rules(),
         *artifact_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferKotlinSourceDependencies),
-        UnionRule(InjectDependenciesRequest, InjectKotlinRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferKotlinRuntimeDependencyRequest),
     )

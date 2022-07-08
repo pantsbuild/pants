@@ -56,8 +56,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
@@ -1071,14 +1069,6 @@ async def resolve_dependencies(
     )
     tgt = wrapped_tgt.target
 
-    # Inject any dependencies (based on `Dependencies` field rather than `SourcesField`).
-    inject_request_types = union_membership.get(InjectDependenciesRequest)
-    injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
-    )
-
     # Infer any dependencies (based on `SourcesField` field).
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred: tuple[InferredDependencies, ...] = ()
@@ -1174,7 +1164,6 @@ async def resolve_dependencies(
                 for addr in (
                     *generated_addresses,
                     *explicitly_provided_includes,
-                    *itertools.chain.from_iterable(injected),
                     *itertools.chain.from_iterable(inferred),
                     *special_cased,
                 )

@@ -24,8 +24,8 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
     SecondaryOwnerMixin,
@@ -145,18 +145,18 @@ class PythonAwsLambdaDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonAwsLambdaDependencies
+class InferPythonLambdaHandlerDependency(InferDependenciesRequest):
+    infer_for = PythonAwsLambdaDependencies
 
 
 @rule(desc="Inferring dependency from the python_awslambda `handler` field")
-async def inject_lambda_handler_dependency(
-    request: InjectPythonLambdaHandlerDependency,
+async def infer_lambda_handler_dependency(
+    request: InferPythonLambdaHandlerDependency,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
+        return InferredDependencies()
     original_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -199,7 +199,7 @@ async def inject_lambda_handler_dependency(
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )
-    return InjectedDependencies(unambiguous_owners)
+    return InferredDependencies(unambiguous_owners)
 
 
 class PythonAwsLambdaIncludeRequirements(BoolField):
@@ -287,5 +287,5 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonLambdaHandlerDependency),
+        UnionRule(InferDependenciesRequest, InferPythonLambdaHandlerDependency),
     )

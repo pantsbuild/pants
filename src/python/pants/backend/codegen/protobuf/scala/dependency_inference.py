@@ -11,8 +11,8 @@ from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -33,8 +33,8 @@ _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
 
 
-class InjectScalaPBRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
+class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_for = ProtobufDependenciesField
 
 
 @dataclass(frozen=True)
@@ -85,10 +85,10 @@ async def resolve_scalapb_runtime_for_resolve(
 
 
 @rule
-async def inject_scalapb_runtime_dependency(
-    request: InjectScalaPBRuntimeDependencyRequest,
+async def infer_scalapb_runtime_dependency(
+    request: InferScalaPBRuntimeDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -98,13 +98,13 @@ async def inject_scalapb_runtime_dependency(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     scalapb_runtime_target_info = await Get(
         ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(scalapb_runtime_target_info.addresses)
+    return InferredDependencies(scalapb_runtime_target_info.addresses)
 
 
 class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):
@@ -148,5 +148,5 @@ class MissingScalaPBRuntimeInResolveError(ValueError):
 def rules():
     return (
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectScalaPBRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferScalaPBRuntimeDependencyRequest),
     )

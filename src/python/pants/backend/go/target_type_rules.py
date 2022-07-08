@@ -50,8 +50,8 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     Targets,
     WrappedTarget,
@@ -153,16 +153,16 @@ async def infer_go_dependencies(
     return InferredDependencies(inferred_dependencies)
 
 
-class InjectGoThirdPartyPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoThirdPartyPackageDependenciesField
+class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
+    infer_for = GoThirdPartyPackageDependenciesField
 
 
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
-async def inject_go_third_party_package_dependencies(
-    request: InjectGoThirdPartyPackageDependenciesRequest,
+async def infer_go_third_party_package_dependencies(
+    request: InferGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     addr = request.dependencies_field.address
     go_mod_address = addr.maybe_convert_to_target_generator()
     wrapped_target, go_mod_info = await MultiGet(
@@ -196,7 +196,7 @@ async def inject_go_third_party_package_dependencies(
                 f"in go_third_party_package at address '{addr}'."
             )
 
-    return InjectedDependencies(inferred_dependencies)
+    return InferredDependencies(inferred_dependencies)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -321,14 +321,14 @@ async def determine_main_pkg_for_go_binary(
     )
 
 
-class InjectGoBinaryMainDependencyRequest(InjectDependenciesRequest):
-    inject_for = GoBinaryDependenciesField
+class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
+    infer_for = GoBinaryDependenciesField
 
 
 @rule
-async def inject_go_binary_main_dependency(
-    request: InjectGoBinaryMainDependencyRequest,
-) -> InjectedDependencies:
+async def infer_go_binary_main_dependency(
+    request: InferGoBinaryMainDependencyRequest,
+) -> InferredDependencies:
     wrapped_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -339,7 +339,7 @@ async def inject_go_binary_main_dependency(
         GoBinaryMainPackage,
         GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),
     )
-    return InjectedDependencies([main_pkg.address])
+    return InferredDependencies([main_pkg.address])
 
 
 def rules():
@@ -348,7 +348,7 @@ def rules():
         *first_party_pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
-        UnionRule(InjectDependenciesRequest, InjectGoThirdPartyPackageDependenciesRequest),
-        UnionRule(InjectDependenciesRequest, InjectGoBinaryMainDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferGoBinaryMainDependencyRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
     )

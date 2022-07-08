@@ -38,8 +38,8 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -232,8 +232,8 @@ def generate_avro_tools_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
-class InjectAvroRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = AvroDependenciesField
+class InferAvroRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_for = AvroDependenciesField
 
 
 @dataclass(frozen=True)
@@ -279,9 +279,9 @@ async def resolve_apache_avro_runtime_for_resolve(
 
 
 @rule
-async def inject_apache_avro_java_dependencies(
-    request: InjectAvroRuntimeDependencyRequest, jvm: JvmSubsystem
-) -> InjectedDependencies:
+async def infer_apache_avro_java_dependencies(
+    request: InferAvroRuntimeDependencyRequest, jvm: JvmSubsystem
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -291,13 +291,13 @@ async def inject_apache_avro_java_dependencies(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(dependencies_info.addresses)
+    return InferredDependencies(dependencies_info.addresses)
 
 
 class MissingApacheAvroRuntimeInResolveError(ValueError):
@@ -332,7 +332,7 @@ def rules():
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
-        UnionRule(InjectDependenciesRequest, InjectAvroRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferAvroRuntimeDependencyRequest),
         AvroSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourceTarget.register_plugin_field(PrefixedJvmResolveField),

@@ -44,8 +44,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -1602,26 +1600,6 @@ class CustomSmalltalkDependencies(SmalltalkDependencies):
     pass
 
 
-class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
-
-
-class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
-
-
-@rule
-def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies(
-        [Address("", target_name="injected1"), Address("", target_name="injected2")]
-    )
-
-
-@rule
-def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address("", target_name="custom_injected")])
-
-
 class SmalltalkLibrarySource(SmalltalkSource):
     pass
 
@@ -1665,13 +1643,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            inject_smalltalk_deps,
-            inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibraryGenerator, MockTarget],

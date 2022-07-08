@@ -11,8 +11,8 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     Target,
 )
 from pants.engine.unions import UnionRule
@@ -38,14 +38,14 @@ class AmbiguousHelmUnitTestChart(Exception):
         )
 
 
-class InjectHelmUnitTestChartDependencyRequest(InjectDependenciesRequest):
-    inject_for = HelmUnitTestDependenciesField
+class InferHelmUnitTestChartDependencyRequest(InferDependenciesRequest):
+    infer_for = HelmUnitTestDependenciesField
 
 
 @rule
-async def inject_chart_dependency_into_unittests(
-    request: InjectHelmUnitTestChartDependencyRequest, all_helm_charts: AllHelmChartTargets
-) -> InjectedDependencies:
+async def infer_chart_dependency_into_unittests(
+    request: InferHelmUnitTestChartDependencyRequest, all_helm_charts: AllHelmChartTargets
+) -> InferredDependencies:
     unittest_target_addr: Address = request.dependencies_field.address
 
     putative_chart_path, unittest_target_dir = os.path.split(unittest_target_addr.spec_path)
@@ -88,11 +88,11 @@ async def inject_chart_dependency_into_unittests(
             f"Found Helm chart at '{found_dep.spec}' for unittest at: {unittest_target_addr.spec}"
         )
 
-    return InjectedDependencies(chart_dependencies)
+    return InferredDependencies(chart_dependencies)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectHelmUnitTestChartDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferHelmUnitTestChartDependencyRequest),
     ]

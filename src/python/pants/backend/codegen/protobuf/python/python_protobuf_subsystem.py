@@ -16,8 +16,8 @@ from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -100,20 +100,20 @@ def setup_mypy_protobuf_lockfile(
     )
 
 
-class InjectPythonProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
+class InferPythonProtobufDependencies(InferDependenciesRequest):
+    infer_for = ProtobufDependenciesField
 
 
 @rule
-async def inject_dependencies(
-    request: InjectPythonProtobufDependencies,
+async def infer_dependencies(
+    request: InferPythonProtobufDependencies,
     python_protobuf: PythonProtobufSubsystem,
     python_setup: PythonSetup,
     # TODO(#12946): Make this a lazy Get once possible.
     module_mapping: ThirdPartyPythonModuleMapping,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_protobuf.infer_runtime_dependency:
-        return InjectedDependencies()
+        return InferredDependencies()
 
     wrapped_tgt = await Get(
         WrappedTarget,
@@ -152,13 +152,13 @@ async def inject_dependencies(
             )
         )
 
-    return InjectedDependencies(result)
+    return InferredDependencies(result)
 
 
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonProtobufDependencies),
+        UnionRule(InferDependenciesRequest, InferPythonProtobufDependencies),
         UnionRule(GenerateToolLockfileSentinel, MypyProtobufLockfileSentinel),
     ]

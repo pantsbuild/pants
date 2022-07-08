@@ -10,19 +10,19 @@ from pants.backend.docker.target_types import DockerImageDependenciesField
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
+from pants.engine.target import InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
 
 
-class InjectDockerDependencies(InjectDependenciesRequest):
-    inject_for = DockerImageDependenciesField
+class InferDockerDependencies(InferDependenciesRequest):
+    infer_for = DockerImageDependenciesField
 
 
 @rule
-async def inject_docker_dependencies(
-    request: InjectDockerDependencies, all_packageable_targets: AllPackageableTargets
-) -> InjectedDependencies:
+async def infer_docker_dependencies(
+    request: InferDockerDependencies, all_packageable_targets: AllPackageableTargets
+) -> InferredDependencies:
     """Inspects the Dockerfile for references to known packagable targets."""
     dockerfile_info = await Get(
         DockerfileInfo, DockerfileInfoRequest(request.dependencies_field.address)
@@ -52,10 +52,10 @@ async def inject_docker_dependencies(
     # NB: The suffix gets an `or None` `pathlib` includes the ".", but `OutputPathField` doesnt
     # expect it (if you give it "", it'll leave a trailing ".").
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
-    inject_addresses = []
+    inferred_addresses = []
     for target in all_packageable_targets:
         if target.address in putative_image_addresses:
-            inject_addresses.append(target.address)
+            inferred_addresses.append(target.address)
             continue
 
         output_path_field = target.get(OutputPathField)
@@ -65,14 +65,14 @@ async def inject_docker_dependencies(
         }
         for output_path in possible_output_paths:
             if output_path in maybe_output_paths:
-                inject_addresses.append(target.address)
+                inferred_addresses.append(target.address)
                 break
 
-    return InjectedDependencies(Addresses(inject_addresses))
+    return InferredDependencies(Addresses(inferred_addresses))
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectDockerDependencies),
+        UnionRule(InferDependenciesRequest, InferDockerDependencies),
     ]

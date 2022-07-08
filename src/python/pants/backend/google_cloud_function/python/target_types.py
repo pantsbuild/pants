@@ -24,8 +24,8 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
     SecondaryOwnerMixin,
@@ -135,18 +135,18 @@ class PythonGoogleCloudFunctionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class InjectPythonCloudFunctionHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonGoogleCloudFunctionDependencies
+class InferPythonCloudFunctionHandlerDependency(InferDependenciesRequest):
+    infer_for = PythonGoogleCloudFunctionDependencies
 
 
 @rule(desc="Inferring dependency from the python_google_cloud_function `handler` field")
-async def inject_cloud_function_handler_dependency(
-    request: InjectPythonCloudFunctionHandlerDependency,
+async def infer_cloud_function_handler_dependency(
+    request: InferPythonCloudFunctionHandlerDependency,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
+        return InferredDependencies()
     original_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -189,7 +189,7 @@ async def inject_cloud_function_handler_dependency(
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )
-    return InjectedDependencies(unambiguous_owners)
+    return InferredDependencies(unambiguous_owners)
 
 
 class PythonGoogleCloudFunctionRuntimes(Enum):
@@ -286,5 +286,5 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonCloudFunctionHandlerDependency),
+        UnionRule(InferDependenciesRequest, InferPythonCloudFunctionHandlerDependency),
     )

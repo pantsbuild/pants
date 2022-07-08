@@ -29,8 +29,6 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -100,12 +98,12 @@ async def infer_scala_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-class InjectScalaLibraryDependencyRequest(InjectDependenciesRequest):
-    inject_for = ScalaDependenciesField
+class InferScalaLibraryDependencyRequest(InferDependenciesRequest):
+    infer_for = ScalaDependenciesField
 
 
-class InjectScalaPluginDependenciesRequest(InjectDependenciesRequest):
-    inject_for = ScalaDependenciesField
+class InferScalaPluginDependenciesRequest(InferDependenciesRequest):
+    infer_for = ScalaDependenciesField
 
 
 @dataclass(frozen=True)
@@ -149,11 +147,11 @@ async def resolve_scala_library_for_resolve(
         raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
 
-@rule(desc="Inject dependency on scala-library artifact for Scala target.")
-async def inject_scala_library_dependency(
-    request: InjectScalaLibraryDependencyRequest,
+@rule(desc="Infer dependency on scala-library artifact for Scala target.")
+async def infer_scala_library_dependency(
+    request: InferScalaLibraryDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -163,19 +161,19 @@ async def inject_scala_library_dependency(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(scala_library_target_info.addresses)
+    return InferredDependencies(scala_library_target_info.addresses)
 
 
-@rule(desc="Inject dependency on scala plugin artifacts for Scala target.")
-async def inject_scala_plugin_dependencies(
-    request: InjectScalaPluginDependenciesRequest,
-) -> InjectedDependencies:
+@rule(desc="Infer dependency on scala plugin artifacts for Scala target.")
+async def infer_scala_plugin_dependencies(
+    request: InferScalaPluginDependenciesRequest,
+) -> InferredDependencies:
     """Adds dependencies on plugins for scala source files, so that they get included in the
     target's resolve."""
 
@@ -188,7 +186,7 @@ async def inject_scala_plugin_dependencies(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
 
     scala_plugins = await Get(
         ScalaPluginTargetsForTarget, ScalaPluginsForTargetWithoutResolveRequest(target)
@@ -196,7 +194,7 @@ async def inject_scala_plugin_dependencies(
 
     plugin_addresses = [target.address for target in scala_plugins.artifacts]
 
-    return InjectedDependencies(plugin_addresses)
+    return InferredDependencies(plugin_addresses)
 
 
 def rules():
@@ -207,6 +205,6 @@ def rules():
         *scalac_plugins.rules(),
         *symbol_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
-        UnionRule(InjectDependenciesRequest, InjectScalaLibraryDependencyRequest),
-        UnionRule(InjectDependenciesRequest, InjectScalaPluginDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferScalaLibraryDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferScalaPluginDependenciesRequest),
     ]

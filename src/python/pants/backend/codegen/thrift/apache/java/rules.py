@@ -24,8 +24,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -77,8 +77,8 @@ async def generate_java_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-class InjectApacheThriftJavaDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+class InferApacheThriftJavaDependencies(InferDependenciesRequest):
+    infer_for = ThriftDependenciesField
 
 
 @dataclass(frozen=True)
@@ -121,9 +121,9 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
 
 
 @rule
-async def inject_apache_thrift_java_dependencies(
-    request: InjectApacheThriftJavaDependencies, jvm: JvmSubsystem
-) -> InjectedDependencies:
+async def infer_apache_thrift_java_dependencies(
+    request: InferApacheThriftJavaDependencies, jvm: JvmSubsystem
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -133,13 +133,13 @@ async def inject_apache_thrift_java_dependencies(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(dependencies_info.addresses)
+    return InferredDependencies(dependencies_info.addresses)
 
 
 class MissingApacheThriftJavaRuntimeInResolveError(ValueError):
@@ -171,7 +171,7 @@ def rules():
         *collect_rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectApacheThriftJavaDependencies),
+        UnionRule(InferDependenciesRequest, InferApacheThriftJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),

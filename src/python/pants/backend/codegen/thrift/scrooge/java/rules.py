@@ -19,8 +19,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
@@ -33,8 +33,8 @@ class GenerateJavaFromThriftRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class InjectScroogeJavaDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+class InferScroogeJavaDependencies(InferDependenciesRequest):
+    infer_for = ThriftDependenciesField
 
 
 @rule(desc="Generate Java from Thrift with Scrooge", level=LogLevel.DEBUG)
@@ -63,18 +63,18 @@ async def generate_java_from_thrift_with_scrooge(
 
 
 @rule
-async def inject_scrooge_java_dependencies(
-    _: InjectScroogeJavaDependencies, scrooge: ScroogeJavaSubsystem
-) -> InjectedDependencies:
+async def infer_scrooge_java_dependencies(
+    _: InferScroogeJavaDependencies, scrooge: ScroogeJavaSubsystem
+) -> InferredDependencies:
     addresses = await Get(Addresses, UnparsedAddressInputs, scrooge.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    return InferredDependencies(addresses)
 
 
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectScroogeJavaDependencies),
+        UnionRule(InferDependenciesRequest, InferScroogeJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),

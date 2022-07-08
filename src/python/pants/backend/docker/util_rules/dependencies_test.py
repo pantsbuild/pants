@@ -10,8 +10,8 @@ from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.target_types import DockerImageDependenciesField, DockerImageTarget
 from pants.backend.docker.util_rules import dockerfile
 from pants.backend.docker.util_rules.dependencies import (
-    InjectDockerDependencies,
-    inject_docker_dependencies,
+    InferDockerDependencies,
+    infer_docker_dependencies,
 )
 from pants.backend.go.goals import package_binary as package_go_binary
 from pants.backend.go.target_types import GoBinaryTarget
@@ -21,7 +21,7 @@ from pants.backend.python.target_types import PexBinariesGeneratorTarget, PexBin
 from pants.backend.python.util_rules import pex
 from pants.core.goals import package
 from pants.engine.addresses import Address
-from pants.engine.target import GenerateTargetsRequest, InjectedDependencies
+from pants.engine.target import GenerateTargetsRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -37,10 +37,10 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *package_go_binary.rules(),
             *pex.rules(),
-            inject_docker_dependencies,
+            infer_docker_dependencies,
             py_target_types_rules.generate_targets_from_pex_binaries,
             UnionRule(GenerateTargetsRequest, py_target_types_rules.GenerateTargetsFromPexBinaries),
-            QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
+            QueryRule(InferredDependencies, (InferDockerDependencies,)),
         ],
         target_types=[
             DockerImageTarget,
@@ -90,7 +90,7 @@ def rule_runner() -> RuleRunner:
         ),
     ],
 )
-def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
+def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
     dockerfile_content = dedent(
         """\
             ARG BASE_IMAGE=:base
@@ -123,11 +123,11 @@ def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
-    injected = rule_runner.request(
-        InjectedDependencies,
-        [InjectDockerDependencies(tgt[DockerImageDependenciesField])],
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferDockerDependencies(tgt[DockerImageDependenciesField])],
     )
-    assert injected == InjectedDependencies(
+    assert inferred == InferredDependencies(
         [
             Address("project/image/test", target_name="base"),
             Address("project/hello/main/py", target_name="main_binary"),

@@ -8,7 +8,7 @@ import pytest
 
 from pants.backend.codegen.thrift.apache.python.rules import (
     GeneratePythonFromThriftRequest,
-    InjectApacheThriftPythonDependencies,
+    InferApacheThriftPythonDependencies,
 )
 from pants.backend.codegen.thrift.apache.python.rules import rules as apache_thrift_python_rules
 from pants.backend.codegen.thrift.apache.rules import rules as apache_thrift_rules
@@ -32,7 +32,7 @@ from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
-    InjectedDependencies,
+    InferredDependencies,
 )
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -187,15 +187,15 @@ def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
         ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
     )
     thrift_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.thrift"))
-    request = InjectApacheThriftPythonDependencies(thrift_tgt[Dependencies])
+    request = InferApacheThriftPythonDependencies(thrift_tgt[Dependencies])
 
     # Start with no relevant requirements.
     with engine_error(MissingPythonCodegenRuntimeLibrary):
-        rule_runner.request(InjectedDependencies, [request])
+        rule_runner.request(InferredDependencies, [request])
 
     # If exactly one, match it.
     rule_runner.write_files({"reqs1/BUILD": "python_requirement(requirements=['thrift'])"})
-    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+    assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
         [Address("reqs1")]
     )
 
@@ -203,7 +203,7 @@ def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"another_resolve/BUILD": "python_requirement(requirements=['thrift'], resolve='another')"}
     )
-    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+    assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
         [Address("reqs1")]
     )
 
@@ -212,4 +212,4 @@ def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
     with engine_error(
         AmbiguousPythonCodegenRuntimeLibrary, contains="['reqs1:reqs1', 'reqs2:reqs2']"
     ):
-        rule_runner.request(InjectedDependencies, [request])
+        rule_runner.request(InferredDependencies, [request])

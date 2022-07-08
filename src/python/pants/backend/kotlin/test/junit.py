@@ -10,8 +10,8 @@ from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -25,8 +25,8 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 
-class InjectKotlinJunitTestDependencyRequest(InjectDependenciesRequest):
-    inject_for = KotlinJunitTestDependenciesField
+class InferKotlinJunitTestDependencyRequest(InferDependenciesRequest):
+    infer_for = KotlinJunitTestDependenciesField
 
 
 @dataclass(frozen=True)
@@ -64,11 +64,11 @@ async def resolve_kotlin_junit_libraries_for_resolve(
     return KotlinJunitLibrariesForResolve(addresses)
 
 
-@rule(desc="Inject dependency on Kotlin Junit support artifact.")
-async def inject_kotlin_junit_dependency(
-    request: InjectKotlinJunitTestDependencyRequest,
+@rule(desc="Infer dependency on Kotlin Junit support artifact.")
+async def infer_kotlin_junit_dependency(
+    request: InferKotlinJunitTestDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -78,17 +78,17 @@ async def inject_kotlin_junit_dependency(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     kotlin_junit_libraries = await Get(
         KotlinJunitLibrariesForResolve, KotlinJunitLibrariesForResolveRequest(resolve)
     )
-    return InjectedDependencies(kotlin_junit_libraries.addresses)
+    return InferredDependencies(kotlin_junit_libraries.addresses)
 
 
 def rules():
     return (
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectKotlinJunitTestDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferKotlinJunitTestDependencyRequest),
     )

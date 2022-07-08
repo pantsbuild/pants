@@ -19,8 +19,8 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -63,20 +63,20 @@ async def generate_python_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+class InferApacheThriftPythonDependencies(InferDependenciesRequest):
+    infer_for = ThriftDependenciesField
 
 
 @rule
 async def find_apache_thrift_python_requirement(
-    request: InjectApacheThriftPythonDependencies,
+    request: InferApacheThriftPythonDependencies,
     thrift_python: ThriftPythonSubsystem,
     python_setup: PythonSetup,
     # TODO(#12946): Make this a lazy Get once possible.
     module_mapping: ThirdPartyPythonModuleMapping,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not thrift_python.infer_runtime_dependency:
-        return InjectedDependencies()
+        return InferredDependencies()
 
     wrapped_tgt = await Get(
         WrappedTarget,
@@ -96,7 +96,7 @@ async def find_apache_thrift_python_requirement(
         recommended_requirement_url="https://pypi.org/project/thrift/",
         disable_inference_option=f"[{thrift_python.options_scope}].infer_runtime_dependency",
     )
-    return InjectedDependencies([addr])
+    return InferredDependencies([addr])
 
 
 def rules():
@@ -104,5 +104,5 @@ def rules():
         *collect_rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectApacheThriftPythonDependencies),
+        UnionRule(InferDependenciesRequest, InferApacheThriftPythonDependencies),
     )

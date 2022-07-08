@@ -14,8 +14,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -27,8 +27,8 @@ class GenerateScalaFromThriftRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class InjectScroogeScalaDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+class InferScroogeScalaDependencies(InferDependenciesRequest):
+    infer_for = ThriftDependenciesField
 
 
 @rule(desc="Generate Scala from Thrift with Scrooge", level=LogLevel.DEBUG)
@@ -57,16 +57,16 @@ async def generate_scala_from_thrift_with_scrooge(
 
 
 @rule
-async def inject_scrooge_scala_dependencies(
-    _: InjectScroogeScalaDependencies, scrooge: ScroogeScalaSubsystem
-) -> InjectedDependencies:
+async def infer_scrooge_scala_dependencies(
+    _: InferScroogeScalaDependencies, scrooge: ScroogeScalaSubsystem
+) -> InferredDependencies:
     addresses = await Get(Addresses, UnparsedAddressInputs, scrooge.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    return InferredDependencies(addresses)
 
 
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectScroogeScalaDependencies),
+        UnionRule(InferDependenciesRequest, InferScroogeScalaDependencies),
     )

@@ -53,8 +53,8 @@ from pants.engine.target import (
     FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
@@ -198,18 +198,18 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     )
 
 
-class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
-    inject_for = PexBinaryDependenciesField
+class InferPexBinaryEntryPointDependency(InferDependenciesRequest):
+    infer_for = PexBinaryDependenciesField
 
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
-async def inject_pex_binary_entry_point_dependency(
-    request: InjectPexBinaryEntryPointDependency,
+async def infer_pex_binary_entry_point_dependency(
+    request: InferPexBinaryEntryPointDependency,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
+        return InferredDependencies()
     original_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -218,14 +218,14 @@ async def inject_pex_binary_entry_point_dependency(
     )
     entry_point_field = original_tgt.target.get(PexEntryPointField)
     if entry_point_field.value is None:
-        return InjectedDependencies()
+        return InferredDependencies()
 
     explicitly_provided_deps, entry_point = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(entry_point_field)),
     )
     if entry_point.val is None:
-        return InjectedDependencies()
+        return InferredDependencies()
 
     owners = await Get(
         PythonModuleOwners,
@@ -256,7 +256,7 @@ async def inject_pex_binary_entry_point_dependency(
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )
-    return InjectedDependencies(unambiguous_owners)
+    return InferredDependencies(unambiguous_owners)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -411,17 +411,17 @@ async def resolve_python_distribution_entry_points(
     )
 
 
-class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependenciesField
+class InferPythonDistributionDependencies(InferDependenciesRequest):
+    infer_for = PythonDistributionDependenciesField
 
 
 @rule
-async def inject_python_distribution_dependencies(
-    request: InjectPythonDistributionDependencies, python_infer_subsystem: PythonInferSubsystem
-) -> InjectedDependencies:
-    """Inject dependencies that we can infer from entry points in the distribution."""
+async def infer_python_distribution_dependencies(
+    request: InferPythonDistributionDependencies, python_infer_subsystem: PythonInferSubsystem
+) -> InferredDependencies:
+    """Infer dependencies that we can infer from entry points in the distribution."""
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
+        return InferredDependencies()
 
     original_tgt = await Get(
         WrappedTarget,
@@ -481,7 +481,7 @@ async def inject_python_distribution_dependencies(
         )
         module_owners.update(unambiguous_owners)
 
-    return InjectedDependencies(
+    return InferredDependencies(
         Addresses(module_owners)
         + distribution_entry_points.pex_binary_addresses
         + provides_entry_points.pex_binary_addresses
@@ -555,7 +555,7 @@ def rules():
         *import_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, PythonFilesGeneratorSettingsRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
-        UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
-        UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
+        UnionRule(InferDependenciesRequest, InferPexBinaryEntryPointDependency),
+        UnionRule(InferDependenciesRequest, InferPythonDistributionDependencies),
         UnionRule(ValidateDependenciesRequest, PythonValidateDependenciesRequest),
     )

@@ -8,8 +8,8 @@ from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -30,8 +30,8 @@ _PROTOBUF_JAVA_RUNTIME_GROUP = "com.google.protobuf"
 _PROTOBUF_JAVA_RUNTIME_ARTIFACT = "protobuf-java"
 
 
-class InjectProtobufJavaRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
+class InferProtobufJavaRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_for = ProtobufDependenciesField
 
 
 @dataclass(frozen=True)
@@ -69,10 +69,10 @@ async def resolve_protobuf_java_runtime_for_resolve(
 
 
 @rule
-async def inject_protobuf_java_runtime_dependency(
-    request: InjectProtobufJavaRuntimeDependencyRequest,
+async def infer_protobuf_java_runtime_dependency(
+    request: InferProtobufJavaRuntimeDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -82,14 +82,14 @@ async def inject_protobuf_java_runtime_dependency(
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
+        return InferredDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
     protobuf_java_runtime_target_info = await Get(
         ProtobufJavaRuntimeForResolve, ProtobufJavaRuntimeForResolveRequest(resolve)
     )
 
-    return InjectedDependencies(protobuf_java_runtime_target_info.addresses)
+    return InferredDependencies(protobuf_java_runtime_target_info.addresses)
 
 
 class MissingProtobufJavaRuntimeInResolveError(ValueError):
@@ -115,5 +115,5 @@ def rules():
     return (
         *collect_rules(),
         *artifact_mapper_rules(),
-        UnionRule(InjectDependenciesRequest, InjectProtobufJavaRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferProtobufJavaRuntimeDependencyRequest),
     )

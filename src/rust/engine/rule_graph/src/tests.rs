@@ -452,14 +452,6 @@ fn full_scale_target() {
       vec![DependencyKey("Targets", Some("AddressSpecs"))],
     ),
     Rule(
-      "InjectedDependencies",
-      "inject_dependencies",
-      vec![
-        DependencyKey("InjectProtobufDependencies", None),
-        DependencyKey("Address", Some("AddressInput")),
-      ],
-    ),
-    Rule(
       "Targets",
       "resolve_targets",
       vec![
@@ -773,7 +765,6 @@ fn full_scale_target() {
         DependencyKey("DependenciesRequest", None),
         DependencyKey("RegisteredTargetTypes", None),
         DependencyKey("Address", Some("AddressInput")),
-        DependencyKey("InjectedDependencies", Some("InjectProtobufDependencies")),
         DependencyKey("WrappedTarget", Some("Address")),
         DependencyKey("InferredDependencies", Some("InferPythonDependencies")),
         DependencyKey("InferredDependencies", Some("InferInitDependencies")),
