@@ -12,18 +12,17 @@ from pants.engine.fs import (
     DigestContents,
     Directory,
     FileContent,
-    Snapshot,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
+    InteractiveProcessResult,
     Process,
     ProcessCacheScope,
     ProcessResult,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
 
@@ -32,7 +31,7 @@ def new_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
-            QueryRule(InteractiveProcess, [InteractiveProcessRequest]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
         ],
     )
 
@@ -272,15 +271,13 @@ def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) ->
     digest2 = rule_runner.request(
         Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
     )
-    process = Process(
-        argv=["foo", "bar"],
-        description="dummy",
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", "ls -1"],
         env={"BAZ": "QUX"},
         input_digest=digest0,
         immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
     )
-    iproc = rule_runner.request(InteractiveProcess, [InteractiveProcessRequest(process)])
-    assert iproc.process.argv == process.argv
-    assert iproc.process.env == process.env
-    snapshot = rule_runner.request(Snapshot, [iproc.process.input_digest])
-    assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        assert result.exit_code == 0
+        assert set(stdio_reader.get_stdout().splitlines()) == {"file0", "prefix1", "prefix2"}

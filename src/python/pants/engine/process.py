@@ -9,12 +9,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, FileDigest, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -303,6 +303,7 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
         append_only_caches: Mapping[str, str] | None = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -321,6 +322,7 @@ class InteractiveProcess(SideEffecting):
             env=env,
             input_digest=input_digest,
             append_only_caches=append_only_caches,
+            immutable_input_digests=immutable_input_digests,
         )
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
@@ -349,14 +351,6 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
     ) -> InteractiveProcess:
-        # TODO: Remove this check once https://github.com/pantsbuild/pants/issues/13852 is
-        #  implemented and the immutable_input_digests are propagated into the InteractiveProcess.
-        if process.immutable_input_digests:
-            raise ValueError(
-                "Process has immutable_input_digests, so it cannot be converted to an "
-                "InteractiveProcess by calling from_process().  Use an async "
-                "InteractiveProcessRequest instead."
-            )
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -364,6 +358,7 @@ class InteractiveProcess(SideEffecting):
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
             append_only_caches=process.append_only_caches,
+            immutable_input_digests=process.immutable_input_digests,
         )
 
 
@@ -376,27 +371,15 @@ class InteractiveProcessRequest:
 
 @rule
 async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    # TODO: Temporary workaround until https://github.com/pantsbuild/pants/issues/13852
-    #  is implemented. Once that is implemented we can get rid of this rule, and the
-    #  InteractiveProcessRequest type, and use InteractiveProcess.from_process directly.
-
-    if req.process.immutable_input_digests:
-        prefixed_immutable_input_digests = await MultiGet(
-            Get(Digest, AddPrefix(digest, prefix))
-            for prefix, digest in req.process.immutable_input_digests.items()
-        )
-        full_input_digest = await Get(
-            Digest, MergeDigests([req.process.input_digest, *prefixed_immutable_input_digests])
-        )
-    else:
-        full_input_digest = req.process.input_digest
-    return InteractiveProcess(
-        argv=req.process.argv,
-        env=req.process.env,
-        input_digest=full_input_digest,
+    warn_or_error(
+        removal_version="2.15.0.dev1",
+        entity="InteractiveProcessRequest",
+        hint="Instead, use `InteractiveProcess.from_process`.",
+    )
+    return InteractiveProcess.from_process(
+        req.process,
         forward_signals_to_process=req.forward_signals_to_process,
         restartable=req.restartable,
-        append_only_caches=req.process.append_only_caches,
     )
 
 
