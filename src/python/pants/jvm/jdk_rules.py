@@ -101,13 +101,20 @@ class JdkEnvironment:
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
-    def args(self, bash: BashBinary, classpath_entries: Iterable[str]) -> tuple[str, ...]:
+    def args(
+        self, bash: BashBinary, classpath_entries: Iterable[str], chroot: str | None = None
+    ) -> tuple[str, ...]:
+        def in_chroot(path: str) -> str:
+            if not chroot:
+                return path
+            return os.path.join(chroot, path)
+
         return (
             bash.path,
-            self.jdk_preparation_script,
+            in_chroot(self.jdk_preparation_script),
             f"{self.java_home}/bin/java",
             "-cp",
-            ":".join([self.nailgun_jar, *classpath_entries]),
+            ":".join([in_chroot(self.nailgun_jar), *classpath_entries]),
         )
 
     @property
@@ -203,7 +210,7 @@ async def prepare_jdk_environment(
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={version}")
 
-    # TODO(#14386) This argument re-writing code should be done in a more standardised way.
+    # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `run_deploy_jar` for other argument re-writing code.
     def prefixed(arg: str) -> str:
         if arg.startswith("__"):

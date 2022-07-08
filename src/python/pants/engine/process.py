@@ -331,21 +331,6 @@ class InteractiveProcess(SideEffecting):
         self.restartable = restartable
         self.cleanup = cleanup
 
-        self.__post_init__()
-
-    def __post_init__(self):
-        if self.process.input_digest != EMPTY_DIGEST and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess should use the Workspace API to materialize any needed "
-                "files when it runs in the workspace"
-            )
-        if self.process.append_only_caches and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess requested setup of append-only caches and also requested to run"
-                " in the workspace. These options are incompatible since setting up append-only"
-                " caches would modify the workspace."
-            )
-
     @classmethod
     def from_process(
         cls,

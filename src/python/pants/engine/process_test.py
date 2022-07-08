@@ -252,32 +252,27 @@ def test_create_files(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"hellogoodbye"
 
 
-def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
-    mock_digest = Digest(EMPTY_DIGEST.fingerprint, 1)
-    with pytest.raises(ValueError):
-        InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
-
-
-def test_interactive_process_cannot_have_append_only_caches_and_workspace() -> None:
-    with pytest.raises(ValueError):
-        InteractiveProcess(
-            argv=["/bin/echo"], append_only_caches={"foo": "bar"}, run_in_workspace=True
-        )
-
-
-def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("run_in_workspace", [True, False])
+def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: bool) -> None:
     digest0 = rule_runner.request(Digest, [CreateDigest([FileContent("file0", b"")])])
     digest1 = rule_runner.request(Digest, [CreateDigest([FileContent("file1", b"")])])
     digest2 = rule_runner.request(
         Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
     )
     process = InteractiveProcess(
-        argv=["/bin/bash", "-c", "ls -1"],
+        argv=["/bin/bash", "-c", "ls -1 '{chroot}'"],
         env={"BAZ": "QUX"},
         input_digest=digest0,
         immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
+        append_only_caches={"cache_name": "append_only0"},
+        run_in_workspace=run_in_workspace,
     )
     with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
         result = rule_runner.run_interactive_process(process)
         assert result.exit_code == 0
-        assert set(stdio_reader.get_stdout().splitlines()) == {"file0", "prefix1", "prefix2"}
+        assert set(stdio_reader.get_stdout().splitlines()) == {
+            "append_only0",
+            "file0",
+            "prefix1",
+            "prefix2",
+        }
