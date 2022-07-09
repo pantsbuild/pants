@@ -38,6 +38,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -1619,15 +1620,21 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
+class SmalltalkDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (SmalltalkLibrarySource,)
+
+    source: SmalltalkLibrarySource
+
+
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkLibrarySource
+    infer_from = SmalltalkDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
         file_content.content.decode().splitlines() for file_content in digest_contents

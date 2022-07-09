@@ -10,12 +10,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InferDependenciesRequest,
-    InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -33,8 +28,16 @@ _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
 
 
+@dataclass(frozen=True)
+class ScalaPBRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (ProtobufDependenciesField, JvmResolveField)
+
+    dependencies: ProtobufDependenciesField
+    resolve: JvmResolveField
+
+
 class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
-    infer_for = ProtobufDependenciesField
+    infer_from = ScalaPBRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -89,17 +92,7 @@ async def infer_scalapb_runtime_dependency(
     request: InferScalaPBRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     scalapb_runtime_target_info = await Get(
         ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)

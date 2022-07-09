@@ -34,14 +34,13 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
@@ -232,8 +231,19 @@ def generate_avro_tools_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
+@dataclass(frozen=True)
+class AvroRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (
+        AvroDependenciesField,
+        JvmResolveField,
+    )
+
+    dependencies: AvroDependenciesField
+    resolve: JvmResolveField
+
+
 class InferAvroRuntimeDependencyRequest(InferDependenciesRequest):
-    infer_for = AvroDependenciesField
+    infer_from = AvroRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -282,17 +292,7 @@ async def resolve_apache_avro_runtime_for_resolve(
 async def infer_apache_avro_java_dependencies(
     request: InferAvroRuntimeDependencyRequest, jvm: JvmSubsystem
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.jvm_resolve.normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)

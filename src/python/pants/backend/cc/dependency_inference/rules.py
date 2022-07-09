@@ -9,7 +9,7 @@ from pathlib import PurePath
 from typing import DefaultDict
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
-from pants.backend.cc.target_types import CCSourceField
+from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
@@ -19,16 +19,14 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     Targets,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -39,8 +37,16 @@ from pants.util.strutil import softwrap
 INCLUDE_REGEX = re.compile(r"^\s*#\s*include\s+((\".*\")|(<.*>))")
 
 
+@dataclass(frozen=True)
+class CCDependencyInferenceFieldSet(FieldSet):
+    required_fields = (CCSourceField, CCDependenciesField)
+
+    sources: CCSourceField
+    dependencies: CCDependenciesField
+
+
 class InferCCDependenciesRequest(InferDependenciesRequest):
-    infer_from = CCSourceField
+    infer_from = CCDependencyInferenceFieldSet
 
 
 class AllCCTargets(Targets):
@@ -120,13 +126,10 @@ async def infer_cc_source_dependencies(
     if not cc_infer.includes:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
-    )
+    address = request.field_set.address
     explicitly_provided_deps, hydrated_sources = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources)),
     )
 
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)

@@ -46,10 +46,9 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     Dependencies,
+    FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
-    InferDependenciesRequest,
-    InferredDependencies,
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
@@ -103,8 +102,15 @@ async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPac
     return ImportPathToPackages(frozen_mapping)
 
 
+@dataclass(frozen=True)
+class GoPackageDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (GoPackageSourcesField,)
+
+    sources: GoPackageSourcesField
+
+
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoPackageSourcesField
+    infer_from = GoPackageDependenciesInferenceFieldSet
 
 
 @rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
@@ -113,7 +119,7 @@ async def infer_go_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
-    addr = request.sources_field.address
+    addr = request.field_set.address
     maybe_pkg_analysis = await Get(
         FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr)
     )
@@ -153,8 +159,16 @@ async def infer_go_dependencies(
     return InferredDependencies(inferred_dependencies)
 
 
+@dataclass(frozen=True)
+class GoThirdPartyPackageInferenceFieldSet(FieldSet):
+    required_fields = (GoThirdPartyPackageDependenciesField, GoImportPathField)
+
+    dependencies: GoThirdPartyPackageDependenciesField
+    import_path: GoImportPathField
+
+
 class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
-    infer_for = GoThirdPartyPackageDependenciesField
+    infer_from = GoThirdPartyPackageInferenceFieldSet
 
 
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
@@ -163,17 +177,13 @@ async def infer_go_third_party_package_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
-    addr = request.dependencies_field.address
+    addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
-    wrapped_target, go_mod_info = await MultiGet(
-        Get(WrappedTarget, WrappedTargetRequest(addr, description_of_origin="<infallible>")),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
-    )
-    tgt = wrapped_target.target
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
     pkg_info = await Get(
         ThirdPartyPkgAnalysis,
         ThirdPartyPkgAnalysisRequest(
-            tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
+            request.field_set.import_path, go_mod_info.digest, go_mod_info.mod_path
         ),
     )
 
@@ -321,23 +331,25 @@ async def determine_main_pkg_for_go_binary(
     )
 
 
+@dataclass(frozen=True)
+class GoBinaryMainDependencyInferenceFieldSet(FieldSet):
+    required_fields = (GoBinaryDependenciesField, GoBinaryMainPackageField)
+
+    dependencies: GoBinaryDependenciesField
+    main_package: GoBinaryMainPackageField
+
+
 class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
-    infer_for = GoBinaryDependenciesField
+    infer_from = GoBinaryMainDependencyInferenceFieldSet
 
 
 @rule
 async def infer_go_binary_main_dependency(
     request: InferGoBinaryMainDependencyRequest,
 ) -> InferredDependencies:
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
     main_pkg = await Get(
         GoBinaryMainPackage,
-        GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),
+        GoBinaryMainPackageRequest(request.field_set.main_package),
     )
     return InferredDependencies([main_pkg.address])
 

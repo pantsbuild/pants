@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence
+from typing import Iterable, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -1070,7 +1070,9 @@ async def resolve_dependencies(
     tgt = wrapped_tgt.target
 
     # Infer any dependencies (based on `SourcesField` field).
-    inference_request_types = union_membership.get(InferDependenciesRequest)
+    inference_request_types = cast(
+        "Sequence[Type[InferDependenciesRequest]]", union_membership.get(InferDependenciesRequest)
+    )
     inferred: tuple[InferredDependencies, ...] = ()
     if inference_request_types:
         relevant_inference_request_types = [

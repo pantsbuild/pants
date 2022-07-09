@@ -47,7 +47,6 @@ from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
@@ -198,8 +197,17 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     )
 
 
+@dataclass(frozen=True)
+class PexBinaryEntryPointDependencyInferenceFieldSet(FieldSet):
+    required_fields = (PexBinaryDependenciesField, PexEntryPointField, PythonResolveField)
+
+    dependencies: PexBinaryDependenciesField
+    entry_point: PexEntryPointField
+    resolve: PythonResolveField
+
+
 class InferPexBinaryEntryPointDependency(InferDependenciesRequest):
-    infer_for = PexBinaryDependenciesField
+    infer_from = PexBinaryEntryPointDependencyInferenceFieldSet
 
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
@@ -209,32 +217,27 @@ async def infer_pex_binary_entry_point_dependency(
     python_setup: PythonSetup,
 ) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InferredDependencies()
-    original_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    entry_point_field = original_tgt.target.get(PexEntryPointField)
+        return InferredDependencies([])
+
+    entry_point_field = request.field_set.entry_point
     if entry_point_field.value is None:
-        return InferredDependencies()
+        return InferredDependencies([])
 
     explicitly_provided_deps, entry_point = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(entry_point_field)),
     )
     if entry_point.val is None:
-        return InferredDependencies()
+        return InferredDependencies([])
 
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
             entry_point.val.module,
-            resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup),
+            resolve=request.field_set.resolve.normalized_value(python_setup),
         ),
     )
-    address = original_tgt.target.address
+    address = request.field_set.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
         address,
@@ -411,8 +414,21 @@ async def resolve_python_distribution_entry_points(
     )
 
 
+@dataclass(frozen=True)
+class PythonDistributionDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (
+        PythonDistributionDependenciesField,
+        PythonDistributionEntryPointsField,
+        PythonProvidesField,
+    )
+
+    dependencies: PythonDistributionDependenciesField
+    entry_points: PythonDistributionEntryPointsField
+    provides: PythonProvidesField
+
+
 class InferPythonDistributionDependencies(InferDependenciesRequest):
-    infer_for = PythonDistributionDependenciesField
+    infer_from = PythonDistributionDependenciesInferenceFieldSet
 
 
 @rule
@@ -421,31 +437,23 @@ async def infer_python_distribution_dependencies(
 ) -> InferredDependencies:
     """Infer dependencies that we can infer from entry points in the distribution."""
     if not python_infer_subsystem.entry_points:
-        return InferredDependencies()
+        return InferredDependencies([])
 
-    original_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
     explicitly_provided_deps, distribution_entry_points, provides_entry_points = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(
-                entry_points_field=original_tgt.target[PythonDistributionEntryPointsField]
+                entry_points_field=request.field_set.entry_points
             ),
         ),
         Get(
             ResolvedPythonDistributionEntryPoints,
-            ResolvePythonDistributionEntryPointsRequest(
-                provides_field=original_tgt.target[PythonProvidesField]
-            ),
+            ResolvePythonDistributionEntryPointsRequest(provides_field=request.field_set.provides),
         ),
     )
 
-    address = original_tgt.target.address
+    address = request.field_set.address
     all_module_entry_points = [
         (category, name, entry_point)
         for category, entry_points in chain(

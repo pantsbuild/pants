@@ -14,15 +14,11 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    InferDependenciesRequest,
-    InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -38,8 +34,17 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
+@dataclass(frozen=True)
+class KotlinSourceDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (KotlinSourceField, KotlinDependenciesField, JvmResolveField)
+
+    source: KotlinSourceField
+    dependencies: KotlinDependenciesField
+    resolve: JvmResolveField
+
+
 class InferKotlinSourceDependencies(InferDependenciesRequest):
-    infer_from = KotlinSourceField
+    infer_from = KotlinSourceDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Kotlin dependencies by analyzing sources")
@@ -52,14 +57,10 @@ async def infer_kotlin_dependencies_via_source_analysis(
     if not kotlin_infer_subsystem.imports:
         return InferredDependencies([])
 
-    address = request.sources_field.address
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
-    )
-    tgt = wrapped_tgt.target
+    address = request.field_set.address
     explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])),
-        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([request.sources_field])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([request.field_set.source])),
     )
 
     symbols: OrderedSet[str] = OrderedSet()
@@ -68,7 +69,7 @@ async def infer_kotlin_dependencies_via_source_analysis(
     if kotlin_infer_subsystem.consumed_types:
         symbols.update(analysis.fully_qualified_consumed_symbols())
 
-    resolve = tgt[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
@@ -87,8 +88,16 @@ async def infer_kotlin_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
+@dataclass(frozen=True)
+class KotlinRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (KotlinDependenciesField, JvmResolveField)
+
+    dependencies: KotlinDependenciesField
+    resolve: JvmResolveField
+
+
 class InferKotlinRuntimeDependencyRequest(InferDependenciesRequest):
-    infer_for = KotlinDependenciesField
+    infer_from = KotlinRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -141,17 +150,7 @@ async def infer_kotlin_stdlib_dependency(
     request: InferKotlinRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     kotlin_runtime_target_info = await Get(
         KotlinRuntimeForResolve, KotlinRuntimeForResolveRequest(resolve)

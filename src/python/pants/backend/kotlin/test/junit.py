@@ -9,12 +9,7 @@ from pants.backend.kotlin.target_types import KotlinJunitTestDependenciesField
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InferDependenciesRequest,
-    InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -25,8 +20,16 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 
+@dataclass(frozen=True)
+class KotlinJunitTestDependencyInferenceFieldSet(FieldSet):
+    required_fields = (KotlinJunitTestDependenciesField, JvmResolveField)
+
+    dependencies: KotlinJunitTestDependenciesField
+    resolve: JvmResolveField
+
+
 class InferKotlinJunitTestDependencyRequest(InferDependenciesRequest):
-    infer_for = KotlinJunitTestDependenciesField
+    infer_from = KotlinJunitTestDependenciesField
 
 
 @dataclass(frozen=True)
@@ -69,17 +72,7 @@ async def infer_kotlin_junit_dependency(
     request: InferKotlinJunitTestDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     kotlin_junit_libraries = await Get(
         KotlinJunitLibrariesForResolve, KotlinJunitLibrariesForResolveRequest(resolve)

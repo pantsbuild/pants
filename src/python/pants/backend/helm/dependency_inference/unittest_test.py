@@ -5,9 +5,7 @@ import textwrap
 
 import pytest
 
-from pants.backend.helm.dependency_inference.unittest import (
-    InferHelmUnitTestChartDependencyRequest,
-)
+from pants.backend.helm.dependency_inference.unittest import InferHelmUnitTestChartDependencyRequest
 from pants.backend.helm.dependency_inference.unittest import rules as infer_deps_rules
 from pants.backend.helm.target_types import (
     HelmChartTarget,
@@ -67,8 +65,8 @@ def test_infers_single_chart(rule_runner: RuleRunner) -> None:
         [InferHelmUnitTestChartDependencyRequest(unittest_tgt[HelmUnitTestDependenciesField])],
     )
 
-    assert len(inferred_deps) == 1
-    assert list(inferred_deps)[0] == chart_tgt.address
+    assert len(inferred_deps.dependencies) == 1
+    assert list(inferred_deps.dependencies)[0] == chart_tgt.address
 
 
 def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
@@ -115,8 +113,8 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert len(chart1_inferred_deps) == 1
-    assert len(chart2_inferred_deps) == 1
+    assert len(chart1_inferred_deps.dependencies) == 1
+    assert len(chart2_inferred_deps.dependencies) == 1
 
-    assert list(chart1_inferred_deps)[0] == chart1_tgt.address
-    assert list(chart2_inferred_deps)[0] == chart2_tgt.address
+    assert list(chart1_inferred_deps.dependencies)[0] == chart1_tgt.address
+    assert list(chart2_inferred_deps.dependencies)[0] == chart2_tgt.address

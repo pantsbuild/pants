@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
@@ -14,13 +15,8 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    InferDependenciesRequest,
-    InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -100,8 +96,21 @@ def setup_mypy_protobuf_lockfile(
     )
 
 
+@dataclass(frozen=True)
+class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (
+        ProtobufDependenciesField,
+        PythonResolveField,
+        ProtobufGrpcToggleField,
+    )
+
+    dependencies: ProtobufDependenciesField
+    resolve: PythonResolveField
+    grpc_toggle: ProtobufGrpcToggleField
+
+
 class InferPythonProtobufDependencies(InferDependenciesRequest):
-    infer_for = ProtobufDependenciesField
+    infer_from = PythonProtobufDependenciesInferenceFieldSet
 
 
 @rule
@@ -113,21 +122,14 @@ async def infer_dependencies(
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InferredDependencies:
     if not python_protobuf.infer_runtime_dependency:
-        return InferredDependencies()
+        return InferredDependencies([])
 
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    tgt = wrapped_tgt.target
-    resolve = tgt.get(PythonResolveField).normalized_value(python_setup)
+    resolve = request.field_set.resolve.normalized_value(python_setup)
 
     result = [
         find_python_runtime_library_or_raise_error(
             module_mapping,
-            request.dependencies_field.address,
+            request.field_set.address,
             "google.protobuf",
             resolve=resolve,
             resolves_enabled=python_setup.enable_resolves,
@@ -137,11 +139,11 @@ async def infer_dependencies(
         )
     ]
 
-    if tgt.get(ProtobufGrpcToggleField).value:
+    if request.field_set.grpc_toggle.value:
         result.append(
             find_python_runtime_library_or_raise_error(
                 module_mapping,
-                request.dependencies_field.address,
+                request.field_set.address,
                 # Note that the library is called `grpcio`, but the module is `grpc`.
                 "grpc",
                 resolve=resolve,

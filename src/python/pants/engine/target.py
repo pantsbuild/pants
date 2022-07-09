@@ -40,7 +40,7 @@ from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
-from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     GlobExpansionConjunction,
@@ -2341,8 +2341,8 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency inference—use
-    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    To resolve all dependencies—including the results of dependency inference—use either `await
+    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
     DependenciesRequest(tgt[Dependencies])`.
     """
 
@@ -2530,7 +2530,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     For example:
 
         class InferFortranDependencies(InferDependenciesRequest):
-            infer_from = FortranFieldSet
+            infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:

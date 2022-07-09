@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.backend.codegen.thrift.apache.python import subsystem
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
@@ -17,12 +19,11 @@ from pants.backend.python.target_types import PythonResolveField, PythonSourceFi
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -63,8 +64,16 @@ async def generate_python_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
+@dataclass(frozen=True)
+class ApacheThriftPythonDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField, PythonResolveField)
+
+    dependencies: ThriftDependenciesField
+    resolve: PythonResolveField
+
+
 class InferApacheThriftPythonDependencies(InferDependenciesRequest):
-    infer_for = ThriftDependenciesField
+    infer_from = ApacheThriftPythonDependenciesInferenceFieldSet
 
 
 @rule
@@ -76,19 +85,13 @@ async def find_apache_thrift_python_requirement(
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InferredDependencies:
     if not thrift_python.infer_runtime_dependency:
-        return InferredDependencies()
+        return InferredDependencies([])
 
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    resolve = wrapped_tgt.target.get(PythonResolveField).normalized_value(python_setup)
+    resolve = request.field_set.resolve.normalized_value(python_setup)
 
     addr = find_python_runtime_library_or_raise_error(
         module_mapping,
-        request.dependencies_field.address,
+        request.field_set.address,
         "thrift",
         resolve=resolve,
         resolves_enabled=python_setup.enable_resolves,

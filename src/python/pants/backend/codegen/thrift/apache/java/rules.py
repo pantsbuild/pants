@@ -22,12 +22,11 @@ from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -77,8 +76,16 @@ async def generate_java_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
+@dataclass(frozen=True)
+class ApacheThriftJavaDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField, JvmResolveField)
+
+    dependencies: ThriftDependenciesField
+    resolve: JvmResolveField
+
+
 class InferApacheThriftJavaDependencies(InferDependenciesRequest):
-    infer_for = ThriftDependenciesField
+    infer_from = ApacheThriftJavaDependenciesInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -124,17 +131,7 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
 async def infer_apache_thrift_java_dependencies(
     request: InferApacheThriftJavaDependencies, jvm: JvmSubsystem
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)

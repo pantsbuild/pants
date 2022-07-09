@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
+
 from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
@@ -12,6 +14,7 @@ from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     InferDependenciesRequest,
@@ -27,8 +30,15 @@ class GenerateScalaFromThriftRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
+@dataclass(frozen=True)
+class ScroogeScalaDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField,)
+
+    dependencies: ThriftDependenciesField
+
+
 class InferScroogeScalaDependencies(InferDependenciesRequest):
-    infer_for = ThriftDependenciesField
+    infer_from = ScroogeScalaDependenciesInferenceFieldSet
 
 
 @rule(desc="Generate Scala from Thrift with Scrooge", level=LogLevel.DEBUG)

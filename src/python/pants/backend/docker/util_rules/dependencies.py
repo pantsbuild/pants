@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
@@ -10,13 +11,20 @@ from pants.backend.docker.target_types import DockerImageDependenciesField
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InferDependenciesRequest, InferredDependencies
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
 
 
+@dataclass(frozen=True)
+class DockerInferenceFieldSet(FieldSet):
+    required_fields = (DockerImageDependenciesField,)
+
+    depenendencies: DockerImageDependenciesField
+
+
 class InferDockerDependencies(InferDependenciesRequest):
-    infer_for = DockerImageDependenciesField
+    infer_from = DockerInferenceFieldSet
 
 
 @rule
@@ -24,9 +32,7 @@ async def infer_docker_dependencies(
     request: InferDockerDependencies, all_packageable_targets: AllPackageableTargets
 ) -> InferredDependencies:
     """Inspects the Dockerfile for references to known packagable targets."""
-    dockerfile_info = await Get(
-        DockerfileInfo, DockerfileInfoRequest(request.dependencies_field.address)
-    )
+    dockerfile_info = await Get(DockerfileInfo, DockerfileInfoRequest(request.field_set.address))
 
     putative_image_addresses = set(
         await Get(

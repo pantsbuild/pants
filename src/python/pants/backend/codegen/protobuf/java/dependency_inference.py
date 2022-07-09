@@ -7,12 +7,7 @@ from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesFiel
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InferDependenciesRequest,
-    InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -30,8 +25,19 @@ _PROTOBUF_JAVA_RUNTIME_GROUP = "com.google.protobuf"
 _PROTOBUF_JAVA_RUNTIME_ARTIFACT = "protobuf-java"
 
 
+@dataclass(frozen=True)
+class ProtobufJavaRuntimeDependencyInferenceFiedSet(FieldSet):
+    required_fields = (
+        ProtobufDependenciesField,
+        JvmResolveField,
+    )
+
+    dependencies: ProtobufDependenciesField
+    resolve: JvmResolveField
+
+
 class InferProtobufJavaRuntimeDependencyRequest(InferDependenciesRequest):
-    infer_for = ProtobufDependenciesField
+    infer_from = ProtobufJavaRuntimeDependencyInferenceFiedSet
 
 
 @dataclass(frozen=True)
@@ -73,17 +79,7 @@ async def infer_protobuf_java_runtime_dependency(
     request: InferProtobufJavaRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InferredDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InferredDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     protobuf_java_runtime_target_info = await Get(
         ProtobufJavaRuntimeForResolve, ProtobufJavaRuntimeForResolveRequest(resolve)

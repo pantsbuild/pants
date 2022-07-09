@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
+
 from pants.backend.codegen.thrift.scrooge.java.subsystem import ScroogeJavaSubsystem
 from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
@@ -17,6 +19,7 @@ from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     InferDependenciesRequest,
@@ -33,8 +36,15 @@ class GenerateJavaFromThriftRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
+@dataclass(frozen=True)
+class ScroogeJavaDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField,)
+
+    dependencies: ThriftDependenciesField
+
+
 class InferScroogeJavaDependencies(InferDependenciesRequest):
-    infer_for = ThriftDependenciesField
+    infer_from = ScroogeJavaDependenciesInferenceFieldSet
 
 
 @rule(desc="Generate Java from Thrift with Scrooge", level=LogLevel.DEBUG)
