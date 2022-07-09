@@ -302,7 +302,7 @@ Reply to the email thread for the series' `dev` releases.
 >
 > The first alpha release for `2.9.0` is now available [on PyPI](https://pypi.org/project/pantsbuild.pants/2.9.0a0/)! Please visit the release page to see the changelog.
 >
-> Although alpha release have not received any vetting beyond what a `dev` release receives, they are the first release for their stable branch, and are worth trying out to help report bugs before we start release candidates.
+> Although alpha releases have not received any vetting beyond what a `dev` release receives, they are the first release for their stable branch, and are worth trying out to help report bugs before we start release candidates.
 >
 > Thank you to everyone who contributed patches in this cycle!
 >

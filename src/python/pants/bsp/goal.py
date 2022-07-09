@@ -37,7 +37,6 @@ class BSPGoal(BuiltinGoal):
     help = "Setup repository for Build Server Protocol (https://build-server-protocol.github.io/)."
 
     server = BoolOption(
-        "--server",
         default=False,
         advanced=True,
         help=softwrap(
@@ -48,7 +47,6 @@ class BSPGoal(BuiltinGoal):
         ),
     )
     runner_env_vars = StrListOption(
-        "--runner-env-vars",
         default=["PATH"],
         help=softwrap(
             f"""
@@ -70,7 +68,6 @@ class BSPGoal(BuiltinGoal):
     )
 
     groups_config_files = FileListOption(
-        "--groups-config-files",
         help=softwrap(
             """
             A list of config files that define groups of Pants targets to expose to IDEs via Build Server Protocol.

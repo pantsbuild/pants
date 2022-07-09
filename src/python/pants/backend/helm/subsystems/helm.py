@@ -59,12 +59,9 @@ class HelmSubsystem(TemplatedExternalTool):
         "macos_x86_64": "darwin-amd64",
     }
 
-    _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
-    lint_strict = BoolOption(
-        "--lint-strict", default=False, help="Enables strict linting of Helm charts"
-    )
+    _registries = DictOption[Any](help=registries_help, fromfile=True)
+    lint_strict = BoolOption(default=False, help="Enables strict linting of Helm charts")
     default_registry_repository = StrOption(
-        "--default-registry-repository",
         default=None,
         help=softwrap(
             """
@@ -77,7 +74,6 @@ class HelmSubsystem(TemplatedExternalTool):
         ),
     )
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `helm_chart` targets with the `tailor` goal.",
         advanced=True,

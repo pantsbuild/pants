@@ -131,7 +131,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         return RewrittenBuildFileRequest in union_membership
 
     check = BoolOption(
-        "--check",
         default=False,
         help=softwrap(
             """
@@ -141,7 +140,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         ),
     )
     fmt = BoolOption(
-        "--fmt",
         default=True,
         help=softwrap(
             """
@@ -157,12 +155,10 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         ),
     )
     formatter = EnumOption(
-        "--formatter",
         default=Formatter.BLACK,
         help="Which formatter Pants should use to format BUILD files.",
     )
     fix_safe_deprecations = BoolOption(
-        "--fix-safe-deprecations",
         default=True,
         help=softwrap(
             """

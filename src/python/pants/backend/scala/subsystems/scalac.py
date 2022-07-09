@@ -24,8 +24,7 @@ class Scalac(Subsystem):
     args = ArgsListOption(example="-encoding UTF-8")
 
     # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option
-    default_plugins = DictOption[str](
-        "--plugins-for-resolve",
+    plugins_for_resolve = DictOption[str](
         help=softwrap(
             """
             A dictionary, whose keys are the names of each JVM resolve that requires default
@@ -39,5 +38,5 @@ class Scalac(Subsystem):
     def parsed_default_plugins(self) -> dict[str, list[str]]:
         return {
             key: [i.strip() for i in value.split(",")]
-            for key, value in self.default_plugins.items()
+            for key, value in self.plugins_for_resolve.items()
         }

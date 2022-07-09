@@ -279,7 +279,6 @@ class TailorSubsystem(GoalSubsystem):
         return PutativeTargetsRequest in union_membership
 
     check = BoolOption(
-        "--check",
         default=False,
         help=softwrap(
             """
@@ -289,7 +288,6 @@ class TailorSubsystem(GoalSubsystem):
         ),
     )
     build_file_name = StrOption(
-        "--build-file-name",
         default="BUILD",
         help=softwrap(
             """
@@ -301,19 +299,16 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     build_file_header = StrOption(
-        "--build-file-header",
         default=None,
         help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
         advanced=True,
     )
     build_file_indent = StrOption(
-        "--build-file-indent",
         default="    ",
         help="The indent to use when auto-editing BUILD files.",
         advanced=True,
     )
     _alias_mapping = DictOption[str](
-        "--alias-mapping",
         help=softwrap(
             f"""
             A mapping from standard target type to custom type to use instead. The custom
@@ -324,7 +319,6 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     ignore_paths = StrListOption(
-        "--ignore-paths",
         help=softwrap(
             """
             Do not edit or create BUILD files at these paths.
@@ -339,7 +333,6 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     _ignore_adding_targets = StrListOption(
-        "--ignore-adding-targets",
         help=softwrap(
             """
             Do not add these target definitions.

@@ -122,9 +122,17 @@ class ResolveField(StringField):
     alias = "resolve"
 
 
+class MockDepsField(Dependencies):
+    pass
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTgt(Target):
     alias = "mock_tgt"
-    core_fields = (Dependencies, MultipleSourcesField, Tags, ResolveField)
+    core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
 def test_resolve_address() -> None:

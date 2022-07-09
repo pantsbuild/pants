@@ -12,8 +12,14 @@ from typing import List, Type
 from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
+    CreateDigest,
+    Digest,
+    FileContent,
+    Snapshot,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
@@ -175,6 +181,59 @@ def test_summary() -> None:
         only=[SmalltalkNoopRequest.name],
     )
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
+
+
+def test_message_lists_added_files() -> None:
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  added.ext"
+
+
+def test_message_lists_removed_files() -> None:
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  removed.ext"
+
+
+def test_message_lists_files() -> None:
+    # _unsafe_create() cannot be used to simulate changed files,
+    # so just make sure added and removed work together.
+    input_snapshot = Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+    )
+    output_snapshot = Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+    )
+    result = FmtResult(
+        input=input_snapshot,
+        output=output_snapshot,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.message() == "formatter made changes.\n  added.ext\n  removed.ext"
 
 
 def test_streaming_output_skip() -> None:

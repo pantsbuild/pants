@@ -64,34 +64,46 @@ class ResolveField(StringField):
     alias = "resolve"
 
 
+class MockDepsField(Dependencies):
+    pass
+
+
+class MockSingleSourcesField(SingleSourceField):
+    pass
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "target"
-    core_fields = (Dependencies, MultipleSourcesField, Tags, ResolveField)
+    core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
 class MockGeneratedFileTarget(Target):
     alias = "file_generated"
-    core_fields = (Dependencies, SingleSourceField, Tags, ResolveField)
+    core_fields = (MockDepsField, MockSingleSourcesField, Tags, ResolveField)
 
 
 class MockFileTargetGenerator(TargetFilesGenerator):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
-    core_fields = (MultipleSourcesField, Tags, OverridesField)
+    core_fields = (MockMultipleSourcesField, Tags, OverridesField)
     copied_fields = (Tags,)
-    moved_fields = (Dependencies, ResolveField)
+    moved_fields = (MockDepsField, ResolveField)
 
 
 class MockGeneratedNonfileTarget(Target):
     alias = "nonfile_generated"
-    core_fields = (Dependencies, Tags, ResolveField)
+    core_fields = (MockDepsField, Tags, ResolveField)
 
 
 class MockNonfileTargetGenerator(TargetGenerator):
     alias = "nonfile_generator"
     core_fields = (Tags,)
     copied_fields = (Tags,)
-    moved_fields = (Dependencies, ResolveField)
+    moved_fields = (MockDepsField, ResolveField)
 
 
 class MockGenerateTargetsRequest(GenerateTargetsRequest):

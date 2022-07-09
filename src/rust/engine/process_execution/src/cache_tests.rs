@@ -59,6 +59,7 @@ fn create_cached_runner(
     cache,
     store,
     true,
+    true,
     ProcessMetadata::default(),
   ));
 

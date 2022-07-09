@@ -22,6 +22,7 @@ use async_oncecell::OnceCell;
 use cache::PersistentCache;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
+use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
@@ -260,56 +261,58 @@ impl Core {
   }
 
   ///
-  /// Wraps the given runner in the local cache runner.
+  /// Creates a single stack of cached runners around the given "leaf" CommandRunner.
   ///
-  fn make_local_cached_runner(
-    inner_runner: Arc<dyn CommandRunner>,
+  /// The given cache read/write flags override the relevant cache flags to allow this method
+  /// to be called with all cache reads disabled, regardless of their configured values.
+  ///
+  fn make_cached_runner(
+    mut runner: Arc<dyn CommandRunner>,
     full_store: &Store,
-    local_cache: &PersistentCache,
-    eager_fetch: bool,
-    process_execution_metadata: &ProcessMetadata,
-  ) -> Arc<dyn CommandRunner> {
-    Arc::new(process_execution::cache::CommandRunner::new(
-      inner_runner,
-      local_cache.clone(),
-      full_store.clone(),
-      eager_fetch,
-      process_execution_metadata.clone(),
-    ))
-  }
-
-  ///
-  /// Wraps the given runner in any configured caches.
-  ///
-  fn make_remote_cached_runner(
-    inner_runner: Arc<dyn CommandRunner>,
-    full_store: &Store,
-    remote_store_address: &Option<String>,
     executor: &Executor,
+    local_cache: &PersistentCache,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
-    _exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     remote_cache_read: bool,
     remote_cache_write: bool,
-    eager_fetch: bool,
+    local_cache_read: bool,
+    local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    Ok(Arc::new(remote_cache::CommandRunner::new(
-      inner_runner,
-      process_execution_metadata.clone(),
-      executor.clone(),
-      full_store.clone(),
-      remote_store_address.as_ref().unwrap(),
-      root_ca_certs.clone(),
-      remoting_opts.store_headers.clone(),
-      Platform::current()?,
-      remote_cache_read,
-      remote_cache_write,
-      remoting_opts.cache_warnings_behavior,
-      eager_fetch,
-      remoting_opts.cache_rpc_concurrency,
-      remoting_opts.cache_read_timeout,
-    )?))
+    // TODO: Until we can deprecate letting the flag default, we implicitly disable
+    // eager_fetch when remote execution is in use. See the TODO in `global_options.py`.
+    let eager_fetch = remoting_opts.cache_eager_fetch && !remoting_opts.execution_enable;
+    if remote_cache_read || remote_cache_write {
+      runner = Arc::new(remote_cache::CommandRunner::new(
+        runner,
+        process_execution_metadata.clone(),
+        executor.clone(),
+        full_store.clone(),
+        remoting_opts.store_address.as_ref().unwrap(),
+        root_ca_certs.clone(),
+        remoting_opts.store_headers.clone(),
+        Platform::current()?,
+        remote_cache_read,
+        remote_cache_write,
+        remoting_opts.cache_warnings_behavior,
+        eager_fetch,
+        remoting_opts.cache_rpc_concurrency,
+        remoting_opts.cache_read_timeout,
+      )?);
+    }
+
+    if local_cache_read || local_cache_write {
+      runner = Arc::new(process_execution::cache::CommandRunner::new(
+        runner,
+        local_cache.clone(),
+        full_store.clone(),
+        local_cache_read,
+        eager_fetch,
+        process_execution_metadata.clone(),
+      ));
+    }
+
+    Ok(runner)
   }
 
   ///
@@ -339,59 +342,38 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    // TODO: Until we can deprecate letting the flag default, we implicitly disable
-    // eager_fetch when remote execution is in use. See the TODO in `global_options.py`.
-    let eager_fetch = remoting_opts.cache_eager_fetch && !remoting_opts.execution_enable;
     // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
     // enable them when remote execution is in use. See the TODO in `global_options.py`.
     let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
     let remote_cache_write =
       exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
-    let maybe_remote_cached_runner = if remote_cache_read || remote_cache_write {
-      Some(Self::make_remote_cached_runner(
+    let local_cache_read_write = exec_strategy_opts.local_cache;
+
+    let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
+      Self::make_cached_runner(
         leaf_runner.clone(),
         full_store,
-        &remoting_opts.store_address,
         executor,
+        local_cache,
         process_execution_metadata,
         root_ca_certs,
-        exec_strategy_opts,
         remoting_opts,
-        remote_cache_read,
+        remote_cache_read && should_cache_read,
         remote_cache_write,
-        eager_fetch,
-      )?)
-    } else {
-      None
+        local_cache_read_write && should_cache_read,
+        local_cache_read_write,
+      )
     };
 
-    let maybe_local_cached_runner = if exec_strategy_opts.local_cache {
-      Some(Self::make_local_cached_runner(
-        maybe_remote_cached_runner
-          .clone()
-          .unwrap_or_else(|| leaf_runner.clone()),
-        full_store,
-        local_cache,
-        eager_fetch,
-        process_execution_metadata,
-      ))
-    } else {
-      None
-    };
+    // The first attempt is always with all caches.
+    let mut runners = vec![make_cached_runner(true)?];
+    // If any cache is both readable and writable, we additionally add a backtracking attempt which
+    // disables all cache reads.
+    if (remote_cache_read && remote_cache_write) || local_cache_read_write {
+      runners.push(make_cached_runner(false)?);
+    }
 
-    Ok(
-      vec![
-        // Use all enabled caches on the first attempt.
-        maybe_local_cached_runner,
-        // Remove local caching on the second attempt.
-        maybe_remote_cached_runner,
-        // Remove all caching on the third attempt.
-        Some(leaf_runner),
-      ]
-      .into_iter()
-      .flatten()
-      .collect(),
-    )
+    Ok(runners)
   }
 
   fn load_certificates(
@@ -650,10 +632,12 @@ pub struct Context {
   run_id: RunId,
   /// The number of attempts which have been made to backtrack to a particular ExecuteProcess node.
   ///
-  /// Presence in this map at process runtime indicates that the pricess is being retried, and that
+  /// Presence in this map at process runtime indicates that the process is being retried, and that
   /// there was something invalid or unusable about previous attempts. Successive attempts should
   /// run in a different mode (skipping caches, etc) to attempt to produce a valid result.
   backtrack_levels: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
+  /// The Digests that we have successfully invalidated a Node for.
+  backtrack_digests: Arc<Mutex<HashSet<Digest>>>,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -666,6 +650,7 @@ impl Context {
       session,
       run_id,
       backtrack_levels: Arc::default(),
+      backtrack_digests: Arc::default(),
       stats: Arc::default(),
     }
   }
@@ -704,7 +689,7 @@ impl Context {
       return result;
     };
 
-    // Locate the source(s) of this Digest and their backtracking levels.
+    // Locate live source(s) of this Digest and their backtracking levels.
     // TODO: Currently needs a combination of `visit_live` and `invalidate_from_roots` because
     // `invalidate_from_roots` cannot view `Node` results. Would be more efficient as a merged
     // method.
@@ -719,12 +704,23 @@ impl Context {
     });
 
     if candidate_roots.is_empty() {
-      // We did not identify any roots to invalidate: allow the Node to fail.
-      return result.map_err(|e| {
-        throw(format!(
-          "Could not identify a process to backtrack to for: {e}"
-        ))
-      });
+      // If there are no live sources of the Digest, see whether any have already been invalidated
+      // by other consumers.
+      if self.backtrack_digests.lock().get(&digest).is_some() {
+        // Some other consumer has already identified and invalidated the source of this Digest: we
+        // can wait for the attempt to complete.
+        return Err(Failure::Invalidated);
+      } else {
+        // There are no live or invalidated sources of this Digest. Directly fail.
+        return result.map_err(|e| {
+          throw(format!(
+            "Could not identify a process to backtrack to for: {e}"
+          ))
+        });
+      }
+    } else {
+      // We have identified a Node to backtrack on. Record it.
+      self.backtrack_digests.lock().insert(digest);
     }
 
     // Attempt to trigger backtrack attempts for the matched Nodes. It's possible that we are not
@@ -807,6 +803,7 @@ impl NodeContext for Context {
       session: self.session.clone(),
       run_id: self.run_id,
       backtrack_levels: self.backtrack_levels.clone(),
+      backtrack_digests: self.backtrack_digests.clone(),
       stats: self.stats.clone(),
     }
   }

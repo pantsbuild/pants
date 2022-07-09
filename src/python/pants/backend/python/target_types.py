@@ -85,6 +85,10 @@ class PythonSourceField(SingleSourceField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
 
+class PythonDependenciesField(Dependencies):
+    pass
+
+
 class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
 
@@ -724,7 +728,6 @@ class PexBinaryDefaults(Subsystem):
     help = "Default settings for creating PEX executables."
 
     emit_warnings = BoolOption(
-        "--emit-warnings",
         default=True,
         help=softwrap(
             """
@@ -737,7 +740,6 @@ class PexBinaryDefaults(Subsystem):
         advanced=True,
     )
     resolve_local_platforms = BoolOption(
-        "--resolve-local-platforms",
         default=False,
         help=softwrap(
             f"""
@@ -800,7 +802,7 @@ class PythonTestsTimeoutField(IntField):
 
     def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
-        if not pytest.timeouts_enabled:
+        if not pytest.timeouts:
             return None
         if self.value is None:
             if pytest.timeout_default is None:
@@ -930,7 +932,7 @@ class PythonSourceTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         InterpreterConstraintsField,
-        Dependencies,
+        PythonDependenciesField,
         PythonResolveField,
         PythonRunGoalUseSandboxField,
         PythonSourceField,
@@ -982,7 +984,7 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     moved_fields = (
         PythonResolveField,
         PythonRunGoalUseSandboxField,
-        Dependencies,
+        PythonDependenciesField,
         InterpreterConstraintsField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
@@ -1013,7 +1015,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     moved_fields = (
         PythonResolveField,
         PythonRunGoalUseSandboxField,
-        Dependencies,
+        PythonDependenciesField,
         InterpreterConstraintsField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
@@ -1068,6 +1070,10 @@ class _PipRequirementSequenceField(Field):
             else:
                 raise invalid_type_error
         return tuple(result)
+
+
+class PythonRequirementDependenciesField(Dependencies):
+    pass
 
 
 class PythonRequirementsField(_PipRequirementSequenceField):
@@ -1161,8 +1167,8 @@ class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         PythonRequirementsField,
+        PythonRequirementDependenciesField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
