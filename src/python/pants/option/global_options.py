@@ -1732,17 +1732,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             that exist solely for running Python code (and aren't meant to be packaged).
             """
         ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            """
-            If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
-            simply delete the option from `pants.toml` because `false` is now the default.
-
-            If set to `true`, removing the option will cause `run` on a `pex_binary` to package and
-            run the built PEX file. Additionally, the `pex_binary` must be referred to by its address.
-            To keep the old `run` semantics, use `run` on the relevant `python_source` target.
-            """
-        ),
     )
 
     @property
