@@ -32,6 +32,7 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
+    GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
@@ -176,6 +177,18 @@ async def generate_lockfile(
                     "--style=universal",
                     "--resolver-version",
                     "pip-2020-resolver",
+                    # PEX files currently only run on Linux and Mac machines; so we hard code this
+                    # limit on lock universaility to avoid issues locking due to irrelevant
+                    # Windows-only dependency issues. See this Pex issue that originated from a
+                    # Pants user issue presented in Slack:
+                    #   https://github.com/pantsbuild/pex/issues/1821
+                    #
+                    # At some point it will probably make sense to expose `--target-system` for
+                    # configuration.
+                    "--target-system",
+                    "linux",
+                    "--target-system",
+                    "mac",
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     "-r",
@@ -319,10 +332,27 @@ async def setup_user_lockfile_requests(
     )
 
 
+class PoetryLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = PoetrySubsystem.options_scope
+
+
+@rule
+async def setup_poetry_lockfile(
+    _: PoetryLockfileSentinel, poetry_subsystem: PoetrySubsystem, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    # No matter what venv (Python) Poetry lives in, it can still create locks for projects with
+    # a disjoint set of Pythons as implied by the project's `python` requirement; so we need not
+    # account for user resolve ICs.
+    return GeneratePythonLockfile.from_tool(
+        poetry_subsystem, use_pex=python_setup.generate_lockfiles_with_pex
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateLockfile, GeneratePythonLockfile),
+        UnionRule(GenerateToolLockfileSentinel, PoetryLockfileSentinel),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
     )

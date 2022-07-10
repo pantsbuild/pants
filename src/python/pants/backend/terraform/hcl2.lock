@@ -55,14 +55,11 @@
           "version": "3.0.5"
         }
       ],
-      "platform_tag": [
-        "cp39",
-        "cp39",
-        "macosx_12_0_x86_64"
-      ]
+      "platform_tag": null
     }
   ],
-  "pex_version": "2.1.72",
+  "path_mappings": {},
+  "pex_version": "2.1.95",
   "prefer_older_binary": false,
   "requirements": [
     "python-hcl2==3.0.5"
@@ -72,6 +69,10 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }
