@@ -7,7 +7,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Sequence, Tuple
+from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
@@ -106,7 +106,7 @@ class StreamingWorkunitContext:
         request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
         unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
-        targets_dict: Dict[str, list[TargetInfo]] = {str(addr): [] for addr in unexpanded_addresses}
+        targets_dict: dict[str, list[TargetInfo]] = {str(addr): [] for addr in unexpanded_addresses}
         for target in expanded_targets:
             source = targets_dict.get(str(target.address.spec), None)
             if source is None:

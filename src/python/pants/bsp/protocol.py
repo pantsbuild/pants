@@ -157,19 +157,12 @@ class BSPConnection:
         execution_request = self._scheduler_session.execution_request(
             requests=[(method_mapping.response_type, params)],
         )
-        returns, throws = self._scheduler_session.execute(execution_request)
-        if len(returns) == 1 and len(throws) == 0:
-            # Initialize the BSPContext with the client-supplied init parameters. See earlier comment on why this
-            # call to `BSPContext.initialize_connection` is safe.
-            if method_name == self._INITIALIZE_METHOD_NAME:
-                self._context.initialize_connection(request, self.notify_client)
-            return returns[0][1].value.to_json_dict()
-        elif len(returns) == 0 and len(throws) == 1:
-            raise throws[0][1].exc
-        else:
-            raise AssertionError(
-                f"Received unexpected result from engine: returns={returns}; throws={throws}"
-            )
+        (result,) = self._scheduler_session.execute(execution_request)
+        # Initialize the BSPContext with the client-supplied init parameters. See earlier comment on why this
+        # call to `BSPContext.initialize_connection` is safe.
+        if method_name == self._INITIALIZE_METHOD_NAME:
+            self._context.initialize_connection(request, self.notify_client)
+        return result.to_json_dict()
 
     # Called by `Endpoint` to dispatch requests and notifications.
     # TODO: Should probably vendor `Endpoint` so we can detect notifications versus method calls, which
