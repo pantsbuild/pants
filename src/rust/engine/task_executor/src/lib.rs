@@ -25,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::env;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -69,7 +70,14 @@ impl Executor {
   /// need thread configurability, but also want to know reliably when the Runtime will shutdown
   /// (which, because it is static, will only be at the entire process' exit).
   ///
-  pub fn global(num_worker_threads: usize, max_threads: usize) -> Result<Executor, String> {
+  pub fn global<F>(
+    num_worker_threads: usize,
+    max_threads: usize,
+    on_thread_start: F,
+  ) -> Result<Executor, String>
+  where
+    F: Fn() + Send + Sync + Clone + 'static,
+  {
     let global = GLOBAL_EXECUTOR.load();
     if let Some(ref runtime) = *global {
       return Ok(Executor {
@@ -78,16 +86,24 @@ impl Executor {
       });
     }
 
-    let runtime = Builder::new_multi_thread()
+    let mut runtime_builder = Builder::new_multi_thread();
+
+    runtime_builder
       .worker_threads(num_worker_threads)
       .max_blocking_threads(max_threads - num_worker_threads)
-      .enable_all()
+      .enable_all();
+
+    if env::var("PANTS_DEBUG").is_ok() {
+      runtime_builder.on_thread_start(on_thread_start.clone());
+    };
+
+    let runtime = runtime_builder
       .build()
       .map_err(|e| format!("Failed to start the runtime: {}", e))?;
 
     // Attempt to swap, then recurse to retry.
     GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));
-    Self::global(num_worker_threads, max_threads)
+    Self::global(num_worker_threads, max_threads, on_thread_start)
   }
 
   ///
