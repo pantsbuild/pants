@@ -24,7 +24,7 @@ class PoetrySubsystem(PythonToolRequirementsBase):
     options_scope = "poetry"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
-    default_version = "poetry==1.1.8"
+    default_version = "poetry==1.1.14"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
