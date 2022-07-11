@@ -51,8 +51,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         help="Output type used for the test report.",
     )
 
-    strict = BoolOption("--strict", default=None, help="Strict parse the test suites.")
-
     def generate_exe(self, _: Platform) -> str:
         return "./untt"
 

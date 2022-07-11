@@ -117,8 +117,7 @@ async def run_helm_unittest(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    strict = field_set.strict.value or unittest_subsystem.strict
-
+    strict = field_set.strict.value
     process_result = await Get(
         FallibleProcessResult,
         HelmProcess(
