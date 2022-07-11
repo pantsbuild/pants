@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Type, cast
+from typing import Any, Callable, Type, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -228,6 +228,18 @@ class DynamicRemoteOptions:
         )
 
     @classmethod
+    def _get_auth_plugin_from_option(cls, remote_auth_plugin_option_value: str) -> Callable:
+        if ":" not in remote_auth_plugin_option_value:
+            raise OptionsError(
+                "Invalid value for `--remote-auth-plugin`: "
+                f"{remote_auth_plugin_option_value}. Please use the format "
+                f"`path.to.module:my_func`."
+            )
+        auth_plugin_path, auth_plugin_func = remote_auth_plugin_option_value.split(":")
+        auth_plugin_module = importlib.import_module(auth_plugin_path)
+        return cast(Callable, getattr(auth_plugin_module, auth_plugin_func))
+
+    @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
         oauth_token = (
             Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
@@ -278,6 +290,7 @@ class DynamicRemoteOptions:
         full_options: Options,
         env: CompleteEnvironment,
         prior_result: AuthPluginResult | None = None,
+        remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
         bootstrap_options = full_options.bootstrap_option_values()
         assert bootstrap_options is not None
@@ -295,10 +308,13 @@ class DynamicRemoteOptions:
             )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
-
-        if bootstrap_options.remote_auth_plugin:
+        if bootstrap_options.remote_auth_plugin or remote_auth_plugin_func:
             return cls._use_auth_plugin(
-                bootstrap_options, full_options=full_options, env=env, prior_result=prior_result
+                bootstrap_options,
+                full_options=full_options,
+                env=env,
+                prior_result=prior_result,
+                remote_auth_plugin_func_from_entry_point=remote_auth_plugin_func,
             )
         return cls._use_no_auth(bootstrap_options), None
 
@@ -338,6 +354,7 @@ class DynamicRemoteOptions:
         full_options: Options,
         env: CompleteEnvironment,
         prior_result: AuthPluginResult | None,
+        remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
         auth_plugin_result: AuthPluginResult | None = None
         if ":" not in bootstrap_options.remote_auth_plugin:
@@ -346,6 +363,17 @@ class DynamicRemoteOptions:
                 f"{bootstrap_options.remote_auth_plugin}. Please use the format "
                 "`path.to.module:my_func`."
             )
+        if not remote_auth_plugin_func_from_entry_point:
+            remote_auth_plugin_func = cls._get_auth_plugin_from_option(
+                bootstrap_options.remote_auth_plugin
+            )
+        else:
+            remote_auth_plugin_func = remote_auth_plugin_func_from_entry_point
+            if bootstrap_options.remote_auth_plugin:
+                raise OptionsError(
+                    "remote auth plugin already provided via entry point of a plugin. `[GLOBAL].remote_auth_plugin` should not be specified in options."
+                )
+
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -358,12 +386,9 @@ class DynamicRemoteOptions:
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
-        auth_plugin_path, _, auth_plugin_func = bootstrap_options.remote_auth_plugin.partition(":")
-        auth_plugin_module = importlib.import_module(auth_plugin_path)
-        auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
         auth_plugin_result = cast(
             AuthPluginResult,
-            auth_plugin_func(
+            remote_auth_plugin_func(
                 initial_execution_headers=execution_headers,
                 initial_store_headers=store_headers,
                 options=full_options,
@@ -1295,6 +1320,8 @@ class BootstrapOptions:
     remote_auth_plugin = StrOption(
         default=None,
         advanced=True,
+        removal_version="2.15.0.dev1",
+        removal_hint="Remote auth plugin function is now specified via a backend entrypoint.",
         help=softwrap(
             """
             Path to a plugin to dynamically configure remote caching and execution options.

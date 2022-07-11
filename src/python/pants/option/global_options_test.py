@@ -42,7 +42,9 @@ def create_dynamic_remote_options(
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironment({})
     _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
-    return DynamicRemoteOptions.from_options(options, env)[0]
+    return DynamicRemoteOptions.from_options(
+        options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
+    )[0]
 
 
 def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
