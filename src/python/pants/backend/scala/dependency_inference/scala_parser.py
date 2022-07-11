@@ -28,7 +28,7 @@ from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure,
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
-from pants.jvm.compile import ClasspathEntry
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryType
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
@@ -398,7 +398,7 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
     stripped_classfiles_digest = await Get(
         Digest, RemovePrefix(process_result.output_digest, dest_dir)
     )
-    return ScalaParserCompiledClassfiles(digest=stripped_classfiles_digest)
+    return ScalaParserCompiledClassfiles(digest=stripped_classfiles_digest, type=ClasspathEntryType.RESOLVED)
 
 
 @rule

@@ -29,6 +29,7 @@ from pants.jvm.compile import (
     ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
+    ClasspathEntryType,
     CompileResult,
     FallibleClasspathEntries,
     FallibleClasspathEntry,
@@ -117,7 +118,7 @@ async def compile_scala_source(
         exported_digest = await Get(
             Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
         )
-        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
+        classpath_entry = ClasspathEntry.merge(exported_digest, ClasspathEntryType.COMPILED, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
@@ -206,7 +207,7 @@ async def compile_scala_source(
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
         output = ClasspathEntry(
-            process_result.output_digest, (output_file,), direct_dependency_classpath_entries
+            process_result.output_digest, ClasspathEntryType.COMPILED, (output_file,), direct_dependency_classpath_entries
         )
 
     return FallibleClasspathEntry.from_fallible_process_result(
@@ -233,7 +234,7 @@ async def fetch_scala_library(request: ScalaLibraryRequest) -> ClasspathEntry:
         ),
     )
 
-    return ClasspathEntry(tcp.digest, tcp.content.files)
+    return ClasspathEntry(tcp.digest, ClasspathEntryType.RESOLVED, tcp.content.files)
 
 
 def rules():

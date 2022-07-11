@@ -210,6 +210,10 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
 
     return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
+class ClasspathEntryType(Enum):
+    EMPTY = auto()
+    COMPILED = auto()
+    RESOLVED = auto()
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -234,18 +238,21 @@ class ClasspathEntry:
     def __init__(
         self,
         digest: Digest,
+        type: ClasspathEntryType,
         filenames: Iterable[str] = (),
         dependencies: Iterable[ClasspathEntry] = (),
     ):
         self.digest = digest
+        self.type = type
         self.filenames = tuple(filenames)
         self.dependencies = FrozenOrderedSet(dependencies)
 
     @classmethod
-    def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
+    def merge(cls, digest: Digest, type: ClasspathEntryType, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
         """After merging the Digests for entries, merge their filenames and dependencies."""
         return cls(
             digest,
+            type,
             (f for cpe in entries for f in cpe.filenames),
             (d for cpe in entries for d in cpe.dependencies),
         )

@@ -18,7 +18,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, CoarsenedTargets, Target, Targets
-from pants.jvm.compile import ClasspathEntry, FallibleClasspathEntry
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryType, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
@@ -187,7 +187,7 @@ async def fetch_kotlinc_plugins(request: KotlincPluginsRequest) -> KotlincPlugin
 
     entries = list(ClasspathEntry.closure(artifacts))
     merged_classpath_digest = await Get(Digest, MergeDigests(entry.digest for entry in entries))
-    merged = ClasspathEntry.merge(merged_classpath_digest, entries)
+    merged = ClasspathEntry.merge(merged_classpath_digest, ClasspathEntryType.RESOLVED, entries)
 
     ids = tuple(_plugin_id(target) for target in request.plugins)
 

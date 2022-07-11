@@ -15,6 +15,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
+    ClasspathEntryType,
     CompileResult,
     FallibleClasspathEntry,
 )
@@ -50,7 +51,7 @@ async def noop_classpath_entry(
     return FallibleClasspathEntry(
         f"Empty classpath for no-op classpath target {request.component}",
         CompileResult.SUCCEEDED,
-        ClasspathEntry(EMPTY_DIGEST, [], []),
+        ClasspathEntry(EMPTY_DIGEST, ClasspathEntryType.EMPTY, [], []),
         exit_code=0,
     )
 

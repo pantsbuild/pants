@@ -41,6 +41,7 @@ from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntry,
+    ClasspathEntryType,
     ClasspathEntryRequest,
     CompileResult,
     FallibleClasspathEntry,
@@ -516,7 +517,7 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     return FallibleClasspathEntry(
         description=str(request.component),
         result=CompileResult.SUCCEEDED,
-        output=ClasspathEntry.merge(exported_digest, classpath_entries),
+        output=ClasspathEntry.merge(exported_digest, ClasspathEntryType.RESOLVED, classpath_entries),
         exit_code=0,
     )
 
@@ -618,7 +619,7 @@ async def coursier_fetch_one_coord(
         raise CoursierError(
             f"Coursier fetch for '{resolved_coord}' succeeded, but fetched artifact {file_digest} did not match the expected artifact: {request.file_digest}."
         )
-    return ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,))
+    return ClasspathEntry(digest=stripped_digest, type=ClasspathEntryType.RESOLVED, filenames=(classpath_dest_name,))
 
 
 @rule(level=LogLevel.DEBUG)

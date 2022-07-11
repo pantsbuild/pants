@@ -22,6 +22,7 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequests,
+    ClasspathEntryType,
     CompileResult,
     FallibleClasspathEntries,
     FallibleClasspathEntry,
@@ -89,7 +90,7 @@ async def assemble_resources_jar(
         ),
     )
 
-    cpe = ClasspathEntry(resources_jar_result.output_digest, output_files, [])
+    cpe = ClasspathEntry(resources_jar_result.output_digest, ClasspathEntryType.COMPILED, output_files, [])
 
     merged_cpe_digest = await Get(
         Digest,
@@ -97,7 +98,7 @@ async def assemble_resources_jar(
     )
 
     merged_cpe = ClasspathEntry.merge(
-        digest=merged_cpe_digest, entries=[cpe, *direct_dependency_classpath_entries]
+        digest=merged_cpe_digest, type=ClasspathEntryType.COMPILED, entries=[cpe, *direct_dependency_classpath_entries]
     )
 
     return FallibleClasspathEntry(output_filename, CompileResult.SUCCEEDED, merged_cpe, 0)

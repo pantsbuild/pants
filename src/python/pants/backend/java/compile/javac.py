@@ -27,6 +27,7 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequests,
+    ClasspathEntryType,
     CompileResult,
     FallibleClasspathEntries,
     FallibleClasspathEntry,
@@ -122,7 +123,7 @@ async def compile_java_source(
         exported_digest = await Get(
             Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
         )
-        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
+        classpath_entry = ClasspathEntry.merge(exported_digest, ClasspathEntryType.COMPILED, direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
@@ -221,7 +222,7 @@ async def compile_java_source(
         jar_output_digest = EMPTY_DIGEST
 
     output_classpath = ClasspathEntry(
-        jar_output_digest, output_files, direct_dependency_classpath_entries
+        jar_output_digest, ClasspathEntryType.COMPILED, output_files, direct_dependency_classpath_entries
     )
 
     if export_classpath_entries:
@@ -230,7 +231,7 @@ async def compile_java_source(
             MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries))),
         )
         merged_classpath = ClasspathEntry.merge(
-            merged_export_digest, (output_classpath, *export_classpath_entries)
+            merged_export_digest, ClasspathEntryType.COMPILED, (output_classpath, *export_classpath_entries)
         )
         output_classpath = merged_classpath
 

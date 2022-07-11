@@ -44,7 +44,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.compile import ClasspathEntry
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryType
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
@@ -315,7 +315,7 @@ async def setup_scalapb_shim_classfiles(
     stripped_classfiles_digest = await Get(
         Digest, RemovePrefix(process_result.output_digest, dest_dir)
     )
-    return ScalaPBShimCompiledClassfiles(digest=stripped_classfiles_digest)
+    return ScalaPBShimCompiledClassfiles(digest=stripped_classfiles_digest, type=ClasspathEntryType.COMPILED)
 
 
 @rule

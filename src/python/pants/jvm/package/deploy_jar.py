@@ -27,6 +27,7 @@ from pants.jvm.compile import (
     ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
+    ClasspathEntryType,
     CompileResult,
     FallibleClasspathEntries,
     FallibleClasspathEntry,
@@ -85,7 +86,7 @@ async def deploy_jar_classpath(
     return FallibleClasspathEntry(
         description=str(request.component),
         result=CompileResult.SUCCEEDED,
-        output=ClasspathEntry(EMPTY_DIGEST, dependencies=classpath_entries),
+        output=ClasspathEntry(EMPTY_DIGEST, ClasspathEntryType.EMPTY, dependencies=classpath_entries),
         exit_code=0,
     )
 
