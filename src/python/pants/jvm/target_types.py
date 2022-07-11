@@ -13,6 +13,7 @@ from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     FieldSet,
     InvalidFieldException,
@@ -307,6 +308,17 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 # -----------------------------------------------------------------------------------------------
 # JAR support fields
 # -----------------------------------------------------------------------------------------------
+
+
+class ReproducibleJar(BoolField):
+    alias = "reproducible"
+    default = False
+    help = softwrap(
+        """
+        Indicate if the deploy jar should be reproducible by stripping timestamps
+        and metadata from the deploy jar.
+        """
+    )
 
 
 class JvmMainClassNameField(StringField):

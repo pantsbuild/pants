@@ -31,7 +31,13 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
-from pants.jvm.target_types import JvmDependenciesField, JvmJdkField, JvmMainClassNameField
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.target_types import (
+    JvmDependenciesField,
+    JvmJdkField,
+    JvmMainClassNameField,
+    ReproducibleJar,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +51,13 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,
+        ReproducibleJar,
         JvmJdkField,
         Dependencies,
     )
 
     main_class: JvmMainClassNameField
+    reproducible: ReproducibleJar
     output_path: OutputPathField
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
@@ -201,9 +209,14 @@ async def package_deploy_jar(
         Digest, AddPrefix(cat_and_repair.output_digest, str(output_filename.parent))
     )
 
+    reproducible_digest = renamed_output_digest
+
+    if field_set.reproducible:
+        reproducible_digest = await Get(Digest, StripJarRequest(renamed_output_digest))
+
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
 
-    return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=reproducible_digest, artifacts=(artifact,))
 
 
 def rules():
