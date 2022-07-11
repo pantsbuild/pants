@@ -42,11 +42,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "01d84219b5cdbfc8122223b39a954820929497a1cb1422824bb86b07b74594b6",
-              "url": "https://files.pythonhosted.org/packages/15/a4/5d5b5e2001d384b97cdaf3f19f52370a5abe9a5b1db876c580418bcb1151/coverage-5.5-cp38-cp38-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "53194af30d5bad77fcba80e23a1441c71abfb3e01192034f8246e0d8f99528f3",
               "url": "https://files.pythonhosted.org/packages/16/e0/fc9f7bd9b84e6b41d0aad1a113e36714aac0c0a9b307aca5f9af443bc50f/coverage-5.5-cp37-cp37m-manylinux2010_x86_64.whl"
             },
@@ -82,11 +77,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "13034c4409db851670bc9acd836243aeee299949bd5673e11844befcb0149f03",
-              "url": "https://files.pythonhosted.org/packages/60/41/fa43e0321f0b6157eb017c6c098604a2fe02b553e4ea5aebe51f5dbbd612/coverage-5.5-cp39-cp39-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "1aa846f56c3d49205c952d8318e76ccc2ae23303351d9270ab220004c580cfe2",
               "url": "https://files.pythonhosted.org/packages/62/05/9f43545401929bd0f49a2e0e4e38f69f6f7a59c1be88d1f63c34aebd7684/coverage-5.5-cp38-cp38-manylinux1_i686.whl"
             },
@@ -97,23 +87,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "d314ed732c25d29775e84a960c3c60808b682c08d86602ec2c3008e1202e3bb6",
-              "url": "https://files.pythonhosted.org/packages/76/7b/81dafcea3845e8bf1baf126dacbb2c079d7ce30072fa1514262539911b5e/coverage-5.5-cp39-cp39-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "2949cad1c5208b8298d5686d5a85b66aae46d73eec2c3e08c817dd3513e5848a",
-              "url": "https://files.pythonhosted.org/packages/82/b1/6e8aeedb94c7d0b154a0f36fe8f1b86c395f069ea54efba7e22123d816c0/coverage-5.5-cp37-cp37m-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "796c9c3c79747146ebd278dbe1e5c5c05dd6b10cc3bcb8389dfdf844f3ead638",
               "url": "https://files.pythonhosted.org/packages/89/c7/9ddfcf5f72cbbf959bb3db6b801901a4747c6261d9f2c2ccead2e4cd66ca/coverage-5.5-cp37-cp37m-manylinux2010_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c0891a6a97b09c1f3e073a890514d5012eb256845c451bd48f7968ef939bf4ae",
-              "url": "https://files.pythonhosted.org/packages/a2/a2/10974646b530b043a04cfe3ffa38a0f3b31a04c3b19cc68b9627b2c8e8dc/coverage-5.5-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
@@ -144,16 +119,6 @@
               "algorithm": "sha256",
               "hash": "51cb9476a3987c8967ebab3f0fe144819781fca264f57f89760037a2ea191cb0",
               "url": "https://files.pythonhosted.org/packages/d4/3e/4f6451b8b09a1eb2d0e7f61a3d7019bd98d556fc5343378f76e8905b2789/coverage-5.5-cp310-cp310-manylinux1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "2e0d881ad471768bf6e6c2bf905d183543f10098e3b3640fc029509530091502",
-              "url": "https://files.pythonhosted.org/packages/e9/92/45878381df409a4b5e5a6399e522964cfd4e6976d07f6300e97eebd6e307/coverage-5.5-cp38-cp38-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "184a47bbe0aa6400ed2d41d8e9ed868b8205046518c52464fde713ea06e3a74a",
-              "url": "https://files.pythonhosted.org/packages/f3/70/798456621f7aadfabdba6be6146f0439c8381ec56153fbe80213e410c7f1/coverage-5.5-cp37-cp37m-win32.whl"
             }
           ],
           "project_name": "coverage",
@@ -182,14 +147,11 @@
           "version": "0.10.2"
         }
       ],
-      "platform_tag": [
-        "cp39",
-        "cp39",
-        "macosx_11_0_arm64"
-      ]
+      "platform_tag": null
     }
   ],
-  "pex_version": "2.1.72",
+  "path_mappings": {},
+  "pex_version": "2.1.95",
   "prefer_older_binary": false,
   "requirements": [
     "coverage[toml]<5.6,>=5.5"
@@ -199,6 +161,10 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }
