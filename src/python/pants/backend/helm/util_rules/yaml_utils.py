@@ -43,7 +43,7 @@ class YamlPath:
         """Returns the path to the parent element unless this path is already the root."""
 
         if not self.is_root:
-            return YamlPath(self._elements[:-1])
+            return YamlPath(self._elements[:-1], absolute=self.absolute)
         return None
 
     @property
