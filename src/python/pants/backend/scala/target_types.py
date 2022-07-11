@@ -30,6 +30,7 @@ from pants.jvm.target_types import (
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmTimeoutField,
 )
 from pants.util.strutil import softwrap
 
