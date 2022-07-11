@@ -62,11 +62,15 @@
           "version": "4.2.1"
         }
       ],
-      "platform_tag": null
+      "platform_tag": [
+        "cp37",
+        "cp37m",
+        "manylinux_2_27_x86_64"
+      ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "pyupgrade<2.35,>=2.33.0"
@@ -76,10 +80,6 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
-  "target_systems": [
-    "linux",
-    "mac"
-  ],
   "transitive": true,
   "use_pep517": null
 }
