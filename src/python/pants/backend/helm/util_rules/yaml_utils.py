@@ -15,37 +15,58 @@ from pants.util.meta import frozen_after_init
 @dataclass(unsafe_hash=True)
 @frozen_after_init
 class YamlPath:
-    _elements: tuple[str, ...]
+    """Simple implementation of YAML paths using `/` syntax and being the single slash the path to
+    the root."""
 
-    def __init__(self, elements: Iterable[str]) -> None:
+    _elements: tuple[str, ...]
+    absolute: bool
+
+    def __init__(self, elements: Iterable[str], *, absolute: bool) -> None:
         self._elements = tuple(elements)
+        self.absolute = absolute
 
     @classmethod
     def parse(cls, path: str) -> YamlPath:
-        return cls([elem for elem in path.split("/") if elem])
+        """Parses a YAML path."""
+
+        is_absolute = path.startswith("/")
+        return cls([elem for elem in path.split("/") if elem], absolute=is_absolute)
 
     @classmethod
     def root(cls) -> YamlPath:
-        return cls([])
+        """Returns a YamlPath that represents the root element."""
+
+        return cls([], absolute=True)
 
     @property
-    def parent(self) -> YamlPath:
+    def parent(self) -> YamlPath | None:
+        """Returns the path to the parent element unless this path is already the root."""
+
         if not self.is_root:
             return YamlPath(self._elements[:-1])
-        return self
+        return None
 
     @property
     def current(self) -> str:
+        """Returns the name of the current element referenced by this path.
+
+        The root element will return the empty string.
+        """
+
         if self.is_root:
             return ""
         return self._elements[len(self._elements) - 1]
 
     @property
     def is_root(self) -> bool:
+        """Returns `True` if this path represents the root element."""
+
         return len(self._elements) == 0
 
     @property
     def is_index(self) -> bool:
+        """Returns `True` if this path is referencing an indexed item inside an array."""
+
         try:
             int(self.current)
             return True
@@ -53,20 +74,30 @@ class YamlPath:
             return False
 
     def __add__(self, other: YamlPath) -> YamlPath:
-        return YamlPath(self._elements + other._elements)
+        if other.absolute:
+            raise ValueError("Can not append an absolute path to another path.")
+        return YamlPath(self._elements + other._elements, absolute=self.absolute)
 
     def __truediv__(self, other: str) -> YamlPath:
-        return YamlPath([*self._elements, *YamlPath.parse(other)._elements])
+        return self + YamlPath.parse(other)
 
     def __iter__(self):
         return iter(self._elements)
 
     def __str__(self) -> str:
-        return f"/{'/'.join(self._elements)}"
+        path = "/".join(self._elements)
+        if self.absolute:
+            path = f"/{path}"
+        return path
 
 
 @dataclass(frozen=True)
 class YamlElement(metaclass=ABCMeta):
+    """Abstract base class for elements read from YAML files.
+
+    `element_path` represents the location inside the YAML file where this element is.
+    """
+
     element_path: YamlPath
 
 
@@ -76,6 +107,9 @@ T = TypeVar("T")
 @dataclass(unsafe_hash=True)
 @frozen_after_init
 class YamlElements(Generic[T]):
+    """Collection of values that are indexed by a file name and a YAML path inside the given
+    file."""
+
     _data: FrozenDict[PurePath, FrozenDict[YamlPath, T]]
 
     def __init__(self, data: Mapping[PurePath, Mapping[YamlPath, T]] = {}) -> None:

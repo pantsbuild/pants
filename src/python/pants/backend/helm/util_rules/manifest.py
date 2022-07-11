@@ -182,7 +182,7 @@ class KubeManifest:
 
         spec = None
         if std_kind:
-            base_path = YamlPath.parse("spec")
+            base_path = YamlPath.parse("/spec")
             spec = KubePodSpec.from_manifest_dict(base_path, std_kind, d)
 
         return cls(

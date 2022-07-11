@@ -93,9 +93,9 @@ def test_parses_kube_resource_manifests(
     )
 
     if kind == StandardKind.POD:
-        expected_spec_path = YamlPath.parse("spec")
+        expected_spec_path = YamlPath.parse("/spec")
     else:
-        expected_spec_path = YamlPath.parse("spec/jobTemplate/spec/template/spec")
+        expected_spec_path = YamlPath.parse("/spec/jobTemplate/spec/template/spec")
 
     assert len(parsed_manifests) == 1
     assert parsed_manifests[0].api_version == api_version
