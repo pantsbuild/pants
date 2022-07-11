@@ -132,7 +132,7 @@ async def run_helm_unittest(
                 reports_file,
                 chart.path,
             ],
-            description=f"Running Helm unittest on: {field_set.address}",
+            description=f"Running Helm unittest suite {field_set.address}",
             input_digest=input_digest,
             cache_scope=cache_scope,
             output_directories=(reports_dir,),
