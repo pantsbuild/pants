@@ -25,9 +25,11 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
+    JunitTimeoutField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmTimeoutField,
 )
 from pants.util.strutil import softwrap
 
@@ -98,6 +100,14 @@ class ScalatestTestSourceField(ScalaSourceField):
     pass
 
 
+class ScalatestTestTimeoutField(JvmTimeoutField):
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each ScalaTest test file belonging to this target.
+        """
+    )
+
+
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
@@ -105,6 +115,7 @@ class ScalatestTestTarget(Target):
         ScalaDependenciesField,
         ScalatestTestSourceField,
         ScalaConsumedPluginNamesField,
+        ScalatestTestTimeoutField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -126,7 +137,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         ScalatestTestsGeneratorSourcesField,
     )
     generated_target_cls = ScalatestTestTarget
-    copied_fields = COMMON_TARGET_FIELDS
+    copied_fields = (*COMMON_TARGET_FIELDS, ScalatestTestTimeoutField)
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
@@ -159,6 +170,7 @@ class ScalaJunitTestTarget(Target):
         ScalaDependenciesField,
         ScalaJunitTestSourceField,
         ScalaConsumedPluginNamesField,
+        JunitTimeoutField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,

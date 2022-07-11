@@ -21,6 +21,7 @@ from pants.engine.target import (
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
+    JunitTimeoutField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -135,6 +136,7 @@ class KotlinJunitTestTarget(Target):
         KotlinJunitTestDependenciesField,
         KotlinJunitTestSourceField,
         KotlincConsumedPluginIdsField,
+        JunitTimeoutField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -156,7 +158,7 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
         KotlinJunitTestsGeneratorSourcesField,
     )
     generated_target_cls = KotlinJunitTestTarget
-    copied_fields = COMMON_TARGET_FIELDS
+    copied_fields = (*COMMON_TARGET_FIELDS, JunitTimeoutField)
     moved_fields = (
         KotlinJunitTestDependenciesField,
         KotlincConsumedPluginIdsField,

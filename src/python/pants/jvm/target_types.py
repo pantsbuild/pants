@@ -15,6 +15,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     Dependencies,
     FieldSet,
+    IntField,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
@@ -23,6 +24,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    ValidNumbers,
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
@@ -70,6 +72,18 @@ class JvmJdkField(StringField):
         will default to `[jvm].default_source_jdk`.
         """
     )
+
+
+class JvmTimeoutField(IntField, metaclass=ABCMeta):
+    """Base field class for implementing timeouts for JVM tools.
+
+    Each JVM tool that wants to implement a timeout needs to provide with its own concrete field
+    class extending this one.
+    """
+
+    alias = "timeout"
+    required = False
+    valid_numbers = ValidNumbers.positive_only
 
 
 class PrefixedJvmJdkField(JvmJdkField):
@@ -302,6 +316,14 @@ class JvmArtifactTarget(Target):
 
 class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
+
+
+class JunitTimeoutField(JvmTimeoutField):
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each JUnit test file belonging to this target.
+        """
+    )
 
 
 # -----------------------------------------------------------------------------------------------
