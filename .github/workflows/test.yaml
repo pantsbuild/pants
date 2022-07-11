@@ -726,18 +726,35 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 30
-  merge_ok_docs_only:
-    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+  merge_ok:
+    if: always()
     name: Merge OK
     needs:
-    - docs_only_check
+    - set_merge_ok_docs_only
+    - set_merge_ok_not_docs_only
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: echo 'Merge OK'
-  merge_ok_not_docs_only:
+    - run: "merge_ok_docs_only=\"${{ needs.set_merge_ok_docs_only.outputs.merge_ok\
+        \ }}\"\nmerge_ok_not_docs_only=\"${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok\
+        \ }}\"\nif [[ \"${merge_ok_docs_only}\" == \"true\" || \"${merge_ok_not_docs_only}\"\
+        \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
+        \ \"Merge NOT OK\"\n    exit 1\nfi\n"
+  set_merge_ok_docs_only:
+    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+    name: Set Merge OK
+    needs:
+    - docs_only_check
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
+  set_merge_ok_not_docs_only:
     if: needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY'
-    name: Merge OK
+    name: Set Merge OK
     needs:
     - docs_only_check
     - bootstrap_pants_linux_x86_64
@@ -752,10 +769,13 @@ jobs:
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
     - test_python_macos_x86_64
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: echo 'Merge OK'
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
   test_python_linux_x86_64_0:
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
