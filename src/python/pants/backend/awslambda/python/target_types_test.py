@@ -9,9 +9,9 @@ import pytest
 from pants.backend.awslambda.python.target_types import (
     InferPythonLambdaHandlerDependency,
     PythonAWSLambda,
-    PythonAwsLambdaDependencies,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaRuntime,
+    PythonLambdaHandlerDependencyInferenceFieldSet,
     ResolvedPythonAwsHandler,
     ResolvePythonAwsHandlerRequest,
 )
@@ -170,7 +170,11 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         tgt = rule_runner.get_target(address)
         inferred = rule_runner.request(
             InferredDependencies,
-            [InferPythonLambdaHandlerDependency(tgt[PythonAwsLambdaDependencies])],
+            [
+                InferPythonLambdaHandlerDependency(
+                    PythonLambdaHandlerDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
         assert inferred == InferredDependencies([expected] if expected else [])
 

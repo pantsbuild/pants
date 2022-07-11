@@ -183,7 +183,7 @@ async def infer_go_third_party_package_dependencies(
     pkg_info = await Get(
         ThirdPartyPkgAnalysis,
         ThirdPartyPkgAnalysisRequest(
-            request.field_set.import_path, go_mod_info.digest, go_mod_info.mod_path
+            request.field_set.import_path.value, go_mod_info.digest, go_mod_info.mod_path
         ),
     )
 

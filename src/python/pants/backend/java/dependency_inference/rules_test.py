@@ -10,6 +10,7 @@ from pants.backend.java.dependency_inference.rules import (
     InferJavaSourceDependencies,
     JavaInferredDependencies,
     JavaInferredDependenciesAndExportsRequest,
+    JavaSourceDependenciesInferenceFieldSet,
 )
 from pants.backend.java.dependency_inference.rules import rules as dep_inference_rules
 from pants.backend.java.target_types import (
@@ -96,12 +97,12 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferJavaSourceDependencies(target_a[JavaSourceField])],
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[])
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferJavaSourceDependencies(target_b[JavaSourceField])],
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[])
 
 
@@ -147,11 +148,13 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[])
 
 
@@ -200,11 +203,13 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
@@ -253,7 +258,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     # disambiguates with a `!`, and so gets the appropriate version.
     caplog.clear()
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[])
     assert len(caplog.records) == 1
     assert (
@@ -261,7 +267,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     )
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_c[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_c))],
     ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.java")])
 
 
@@ -295,7 +302,8 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(
         dependencies=[Address("", target_name="a", relative_file_path="Lib.java")]
     )
@@ -338,11 +346,13 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.java"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_a[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferJavaSourceDependencies(target_b[JavaSourceField])]
+        InferredDependencies,
+        [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[target_a.address])
 
 

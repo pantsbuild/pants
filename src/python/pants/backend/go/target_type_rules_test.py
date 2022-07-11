@@ -8,7 +8,10 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import InferGoBinaryMainDependencyRequest
+from pants.backend.go.target_type_rules import (
+    GoBinaryMainDependencyInferenceFieldSet,
+    InferGoBinaryMainDependencyRequest,
+)
 from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
@@ -288,7 +291,12 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
             GoBinaryMainPackage, [GoBinaryMainPackageRequest(tgt[GoBinaryMainPackageField])]
         ).address
         inferred_addresses = rule_runner.request(
-            InferredDependencies, [InferGoBinaryMainDependencyRequest(tgt[Dependencies])]
+            InferredDependencies,
+            [
+                InferGoBinaryMainDependencyRequest(
+                    GoBinaryMainDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
         assert [main_addr] == list(inferred_addresses)
         return main_addr

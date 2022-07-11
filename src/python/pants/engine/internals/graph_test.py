@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, List, Set, Tuple, Type, cast
@@ -1620,6 +1621,7 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
+@dataclass(frozen=True)
 class SmalltalkDependenciesInferenceFieldSet(FieldSet):
     required_fields = (SmalltalkLibrarySource,)
 

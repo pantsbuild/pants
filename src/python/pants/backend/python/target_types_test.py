@@ -19,11 +19,9 @@ from pants.backend.python.target_types import (
     EntryPoint,
     PexBinariesGeneratorTarget,
     PexBinary,
-    PexBinaryDependenciesField,
     PexEntryPointField,
     PexScriptField,
     PythonDistribution,
-    PythonDistributionDependenciesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -37,6 +35,8 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import (
     InferPexBinaryEntryPointDependency,
     InferPythonDistributionDependencies,
+    PexBinaryEntryPointDependencyInferenceFieldSet,
+    PythonDistributionDependenciesInferenceFieldSet,
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
@@ -245,7 +245,11 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
         tgt = rule_runner.get_target(address)
         inferred = rule_runner.request(
             InferredDependencies,
-            [InferPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
+            [
+                InferPexBinaryEntryPointDependency(
+                    PexBinaryEntryPointDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
         assert inferred == InferredDependencies([expected] if expected else [])
 
@@ -492,7 +496,11 @@ def test_infer_python_distribution_dependencies() -> None:
         tgt = rule_runner.get_target(address)
         inferred = rule_runner.request(
             InferredDependencies,
-            [InferPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
+            [
+                InferPythonDistributionDependencies(
+                    PythonDistributionDependenciesInferenceFieldSet.create(tgt)
+                )
+            ],
         )
         assert inferred == InferredDependencies(expected)
 

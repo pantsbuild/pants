@@ -93,7 +93,7 @@ class ProtobufDependencyInferenceFieldSet(FieldSet):
 
 
 class InferProtobufDependencies(InferDependenciesRequest):
-    infer_from = ProtobufSourceField
+    infer_from = ProtobufDependencyInferenceFieldSet
 
 
 @rule(desc="Inferring Protobuf dependencies by analyzing imports")

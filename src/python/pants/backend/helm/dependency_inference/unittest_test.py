@@ -5,11 +5,13 @@ import textwrap
 
 import pytest
 
-from pants.backend.helm.dependency_inference.unittest import InferHelmUnitTestChartDependencyRequest
+from pants.backend.helm.dependency_inference.unittest import (
+    HelmUnitTestChartDependencyInferenceFieldSet,
+    InferHelmUnitTestChartDependencyRequest,
+)
 from pants.backend.helm.dependency_inference.unittest import rules as infer_deps_rules
 from pants.backend.helm.target_types import (
     HelmChartTarget,
-    HelmUnitTestDependenciesField,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
 )
@@ -62,7 +64,11 @@ def test_infers_single_chart(rule_runner: RuleRunner) -> None:
     unittest_tgt = rule_runner.get_target(Address("tests", target_name="foo_tests"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
-        [InferHelmUnitTestChartDependencyRequest(unittest_tgt[HelmUnitTestDependenciesField])],
+        [
+            InferHelmUnitTestChartDependencyRequest(
+                HelmUnitTestChartDependencyInferenceFieldSet.create(unittest_tgt)
+            )
+        ],
     )
 
     assert len(inferred_deps.dependencies) == 1
@@ -100,7 +106,7 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
         InferredDependencies,
         [
             InferHelmUnitTestChartDependencyRequest(
-                chart1_unittest_tgt[HelmUnitTestDependenciesField]
+                HelmUnitTestChartDependencyInferenceFieldSet.create(chart1_unittest_tgt)
             )
         ],
     )
@@ -108,7 +114,7 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
         InferredDependencies,
         [
             InferHelmUnitTestChartDependencyRequest(
-                chart2_unittest_tgt[HelmUnitTestDependenciesField]
+                HelmUnitTestChartDependencyInferenceFieldSet.create(chart2_unittest_tgt)
             )
         ],
     )

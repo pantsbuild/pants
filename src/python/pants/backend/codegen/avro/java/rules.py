@@ -292,7 +292,7 @@ async def resolve_apache_avro_runtime_for_resolve(
 async def infer_apache_avro_java_dependencies(
     request: InferAvroRuntimeDependencyRequest, jvm: JvmSubsystem
 ) -> InferredDependencies:
-    resolve = request.field_set.jvm_resolve.normalized_value(jvm)
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)

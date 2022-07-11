@@ -6,6 +6,7 @@ from pants.backend.codegen.protobuf import target_types
 from pants.backend.codegen.protobuf.python import python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     InferPythonProtobufDependencies,
+    PythonProtobufDependenciesInferenceFieldSet,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.utils import (
@@ -16,7 +17,7 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.target import Dependencies, InferredDependencies
+from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
@@ -39,7 +40,9 @@ def test_find_protobuf_python_requirement() -> None:
         ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
     )
     proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
-    request = InferPythonProtobufDependencies(proto_tgt[Dependencies])
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
+    )
 
     # Start with no relevant requirements.
     with engine_error(MissingPythonCodegenRuntimeLibrary, contains="protobuf"):

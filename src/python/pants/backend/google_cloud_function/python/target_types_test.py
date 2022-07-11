@@ -8,8 +8,8 @@ import pytest
 
 from pants.backend.google_cloud_function.python.target_types import (
     InferPythonCloudFunctionHandlerDependency,
+    PythonCloudFunctionHandlerInferenceFieldSet,
     PythonGoogleCloudFunction,
-    PythonGoogleCloudFunctionDependencies,
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
     ResolvedPythonGoogleHandler,
@@ -194,7 +194,11 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         tgt = rule_runner.get_target(address)
         inferred = rule_runner.request(
             InferredDependencies,
-            [InferPythonCloudFunctionHandlerDependency(tgt[PythonGoogleCloudFunctionDependencies])],
+            [
+                InferPythonCloudFunctionHandlerDependency(
+                    PythonCloudFunctionHandlerInferenceFieldSet.create(tgt)
+                )
+            ],
         )
         assert inferred == InferredDependencies([expected] if expected else [])
 
