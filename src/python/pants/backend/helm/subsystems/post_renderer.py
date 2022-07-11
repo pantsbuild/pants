@@ -137,6 +137,7 @@ async def setup_post_renderer_launcher(
     post_renderer_tool: HelmPostRendererTool,
     cat_binary: CatBinary,
 ) -> HelmPostRendererRunnable:
+    # Build post-renderer configuration file and create a digest containing it.
     post_renderer_config = "---\n"
     for manifest in request.replacements.file_paths():
         post_renderer_config += f'"{manifest}":\n'
@@ -152,6 +153,7 @@ async def setup_post_renderer_launcher(
         ),
     )
 
+    # Generate a temporary PEX process that uses the previously created configuration file.
     post_renderer_cfg_file = os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME)
     post_renderer_stdin_file = os.path.join(".", "__stdin.yaml")
     post_renderer_process = await Get(
@@ -164,6 +166,7 @@ async def setup_post_renderer_launcher(
         ),
     )
 
+    # Build a shell wrapper script which will be the actual entry-point sent to Helm as the post-renderer.
     post_renderer_process_cli = " ".join(post_renderer_process.argv)
     logger.debug(f"Built post-renderer process CLI: {post_renderer_process_cli}")
 
@@ -190,6 +193,7 @@ async def setup_post_renderer_launcher(
         ),
     )
 
+    # Extract all info needed to invoke the post-renderer from the PEX process
     launcher_digest = await Get(
         Digest, MergeDigests([wrapper_digest, post_renderer_process.input_digest])
     )

@@ -50,13 +50,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "825d5fccef6da42f3c8eccd4281af399f21c02b32d98e113dbc631ea6a6ecbc7",
-              "url": "https://files.pythonhosted.org/packages/4a/8e/f187926adf40bcea2709e903f0efa7ae7cc704e31fe967f317a0d5dbd422/ruamel.yaml.clib-0.2.6-cp39-cp39-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "a49e0161897901d1ac9c4a79984b8410f450565bbad64dbfcbf76152743a0cdb",
-              "url": "https://files.pythonhosted.org/packages/10/7b/2f9e14ae5be9a94bed7a4c1aa040a068fe053dd199330a46e7f42b89f4bf/ruamel.yaml.clib-0.2.6-cp37-cp37m-win32.whl"
+              "hash": "1866cf2c284a03b9524a5cc00daca56d80057c5ce3cdc86a52020f4c720856f0",
+              "url": "https://files.pythonhosted.org/packages/3e/36/f1e3b5a0507662a66f156518457ffaf530c818f204467a5c532fc44056f9/ruamel.yaml.clib-0.2.6-cp39-cp39-manylinux1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -67,31 +62,6 @@
               "algorithm": "sha256",
               "hash": "a32f8d81ea0c6173ab1b3da956869114cae53ba1e9f72374032e33ba3118c233",
               "url": "https://files.pythonhosted.org/packages/23/2e/79d684c6cfa50b593f47938fec86f7c5d0208e0ecd278eef2ff0e10889d3/ruamel.yaml.clib-0.2.6-cp38-cp38-macosx_10_9_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "31ea73e564a7b5fbbe8188ab8b334393e06d997914a4e184975348f204790277",
-              "url": "https://files.pythonhosted.org/packages/26/4b/412a91a7ed7313eff51b5dbaf4c63c3a945b9e09195a75400eb4a16de9b6/ruamel.yaml.clib-0.2.6-cp38-cp38-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "3fb9575a5acd13031c57a62cc7823e5d2ff8bc3835ba4d94b921b4e6ee664104",
-              "url": "https://files.pythonhosted.org/packages/26/aa/d80ca2e1bb30f3b1052aa9a0f9151f214006eeeb124b3629e204603d1dcd/ruamel.yaml.clib-0.2.6-cp39-cp39-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "1866cf2c284a03b9524a5cc00daca56d80057c5ce3cdc86a52020f4c720856f0",
-              "url": "https://files.pythonhosted.org/packages/3e/36/f1e3b5a0507662a66f156518457ffaf530c818f204467a5c532fc44056f9/ruamel.yaml.clib-0.2.6-cp39-cp39-manylinux1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "bf75d28fa071645c529b5474a550a44686821decebdd00e21127ef1fd566eabe",
-              "url": "https://files.pythonhosted.org/packages/49/8c/be4e675b5c38497f10e3eba89bf141ac7aa085db1a541294f0b60e4237a7/ruamel.yaml.clib-0.2.6-cp37-cp37m-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "89221ec6d6026f8ae859c09b9718799fea22c0e8da8b766b0b2c9a9ba2db326b",
-              "url": "https://files.pythonhosted.org/packages/63/bf/231aa2913e416a118ba767cc36a5cb6322998e2d96f96067735a5f4b077d/ruamel.yaml.clib-0.2.6-cp38-cp38-win32.whl"
             },
             {
               "algorithm": "sha256",
@@ -140,15 +110,11 @@
           "version": "3.6.4"
         }
       ],
-      "platform_tag": [
-        "cp39",
-        "cp39",
-        "macosx_12_0_arm64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.95",
   "prefer_older_binary": false,
   "requirements": [
     "ruamel.yaml!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21,>=0.15.96",
@@ -159,6 +125,10 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }

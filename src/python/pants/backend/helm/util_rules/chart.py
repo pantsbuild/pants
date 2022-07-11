@@ -185,9 +185,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
                     repository=chart.artifact.location_url,
                 )
             else:
-                dependency = HelmChartDependency(
-                    name=chart.info.name, version=chart.info.version
-                )
+                dependency = HelmChartDependency(name=chart.info.name, version=chart.info.version)
             updated_dependencies.add(dependency)
 
         # Update metadata with the information about charts' dependencies.
