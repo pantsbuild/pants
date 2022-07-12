@@ -109,8 +109,6 @@ async def resolve_kotlin_runtime_for_resolve(
     kotlin_subsystem: KotlinSubsystem,
 ) -> KotlinRuntimeForResolve:
     kotlin_version = kotlin_subsystem.version_for_resolve(request.resolve_name)
-
-    # TODO: Nicer exception messages if this fails due to the resolve missing a jar.
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             Coordinate(
@@ -132,6 +130,9 @@ async def resolve_kotlin_runtime_for_resolve(
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
+        subsystem="the Kotlin runtime",
+        target_type="kotlin_sources",
+        requirement_source="the relevant entry for this resolve in the `[kotlin].version_for_resolve` option",
     )
     return KotlinRuntimeForResolve(addresses)
 

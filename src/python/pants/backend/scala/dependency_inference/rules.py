@@ -11,12 +11,7 @@ from pants.backend.scala.compile.scalac_plugins import (
 )
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.resolve.lockfile import (
-    SCALA_LIBRARY_ARTIFACT,
-    SCALA_LIBRARY_GROUP,
-    ConflictingScalaLibraryVersionInResolveError,
-    MissingScalaLibraryInResolveError,
-)
+from pants.backend.scala.resolve.lockfile import SCALA_LIBRARY_ARTIFACT, SCALA_LIBRARY_GROUP
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
@@ -38,8 +33,6 @@ from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    ConflictingJvmArtifactVersion,
-    MissingJvmArtifacts,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
@@ -126,27 +119,22 @@ async def resolve_scala_library_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-
-    try:
-        addresses = find_jvm_artifacts_or_raise(
-            required_coordinates=[
-                Coordinate(
-                    group=SCALA_LIBRARY_GROUP,
-                    artifact=SCALA_LIBRARY_ARTIFACT,
-                    version=scala_version,
-                )
-            ],
-            resolve=request.resolve_name,
-            jvm_artifact_targets=jvm_artifact_targets,
-            jvm=jvm,
-        )
-        return ScalaRuntimeForResolve(addresses)
-    except ConflictingJvmArtifactVersion as ex:
-        raise ConflictingScalaLibraryVersionInResolveError(
-            request.resolve_name, scala_version, ex.found_coordinate
-        )
-    except MissingJvmArtifacts:
-        raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            Coordinate(
+                group=SCALA_LIBRARY_GROUP,
+                artifact=SCALA_LIBRARY_ARTIFACT,
+                version=scala_version,
+            )
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the Scala runtime library",
+        target_type="scala_sources",
+        requirement_source="the relevant entry for this resolve in the `[scala].version_for_resolve` option",
+    )
+    return ScalaRuntimeForResolve(addresses)
 
 
 @rule(desc="Inject dependency on scala-library artifact for Scala target.")

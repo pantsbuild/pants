@@ -48,7 +48,6 @@ from pants.jvm import jdk_rules
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    MissingJvmArtifacts,
     UnversionedCoordinate,
     find_jvm_artifacts_or_raise,
 )
@@ -255,27 +254,24 @@ async def resolve_apache_avro_runtime_for_resolve(
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
 ) -> ApacheAvroRuntimeForResolve:
-    try:
-        addresses = find_jvm_artifacts_or_raise(
-            required_coordinates=[
-                UnversionedCoordinate(
-                    group=_AVRO_GROUP,
-                    artifact="avro",
-                ),
-                UnversionedCoordinate(
-                    group=_AVRO_GROUP,
-                    artifact="avro-ipc",
-                ),
-            ],
-            resolve=request.resolve_name,
-            jvm_artifact_targets=jvm_artifact_targets,
-            jvm=jvm,
-        )
-        return ApacheAvroRuntimeForResolve(addresses)
-    except MissingJvmArtifacts:
-        raise MissingApacheAvroRuntimeInResolveError(
-            request.resolve_name,
-        )
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            UnversionedCoordinate(
+                group=_AVRO_GROUP,
+                artifact="avro",
+            ),
+            UnversionedCoordinate(
+                group=_AVRO_GROUP,
+                artifact="avro-ipc",
+            ),
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the Apache Avro runtime",
+        target_type="avro_sources",
+    )
+    return ApacheAvroRuntimeForResolve(addresses)
 
 
 @rule

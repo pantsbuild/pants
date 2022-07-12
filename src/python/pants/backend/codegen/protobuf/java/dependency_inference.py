@@ -16,15 +16,12 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    ConflictingJvmArtifactVersion,
-    MissingJvmArtifacts,
     UnversionedCoordinate,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.artifact_mapper import rules as artifact_mapper_rules
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.util.docutil import bin_name
 
 _PROTOBUF_JAVA_RUNTIME_GROUP = "com.google.protobuf"
 _PROTOBUF_JAVA_RUNTIME_ARTIFACT = "protobuf-java"
@@ -50,22 +47,20 @@ async def resolve_protobuf_java_runtime_for_resolve(
     jvm: JvmSubsystem,
     request: ProtobufJavaRuntimeForResolveRequest,
 ) -> ProtobufJavaRuntimeForResolve:
-
-    try:
-        addresses = find_jvm_artifacts_or_raise(
-            required_coordinates=[
-                UnversionedCoordinate(
-                    group=_PROTOBUF_JAVA_RUNTIME_GROUP,
-                    artifact=_PROTOBUF_JAVA_RUNTIME_ARTIFACT,
-                )
-            ],
-            resolve=request.resolve_name,
-            jvm_artifact_targets=jvm_artifact_targets,
-            jvm=jvm,
-        )
-        return ProtobufJavaRuntimeForResolve(addresses)
-    except (MissingJvmArtifacts, ConflictingJvmArtifactVersion):
-        raise MissingProtobufJavaRuntimeInResolveError(request.resolve_name)
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            UnversionedCoordinate(
+                group=_PROTOBUF_JAVA_RUNTIME_GROUP,
+                artifact=_PROTOBUF_JAVA_RUNTIME_ARTIFACT,
+            )
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the Protobuf Java runtime",
+        target_type="protobuf_sources",
+    )
+    return ProtobufJavaRuntimeForResolve(addresses)
 
 
 @rule
@@ -90,25 +85,6 @@ async def inject_protobuf_java_runtime_dependency(
     )
 
     return InjectedDependencies(protobuf_java_runtime_target_info.addresses)
-
-
-class MissingProtobufJavaRuntimeInResolveError(ValueError):
-    def __init__(self, resolve_name: str) -> None:
-        super().__init__(
-            f"The JVM resolve `{resolve_name}` does not contain a requirement for the protobuf-java "
-            "runtime. Since at least one JVM target type in this repository consumes a "
-            "`protobuf_sources` target in this resolve, the resolve must contain a `jvm_artifact` "
-            "target for the `protobuf-java` runtime.\n\n Please add the following `jvm_artifact` "
-            f"target somewhere in the repository and re-run `{bin_name()} generate-lockfiles "
-            f"--resolve={resolve_name}`:\n"
-            "jvm_artifact(\n"
-            f'  name="{_PROTOBUF_JAVA_RUNTIME_GROUP}_{_PROTOBUF_JAVA_RUNTIME_ARTIFACT}",\n'
-            f'  group="{_PROTOBUF_JAVA_RUNTIME_GROUP}",\n',
-            f'  artifact="{_PROTOBUF_JAVA_RUNTIME_ARTIFACT}",\n',
-            '  version="<your preferred runtime version>",\n',
-            f'  resolve="{resolve_name}",\n',
-            ")",
-        )
 
 
 def rules():
