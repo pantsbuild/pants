@@ -1769,33 +1769,6 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
     )
 
 
-def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files(
-        {
-            "src/smalltalk/util/f1.st": "",
-            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
-        }
-    )
-
-    def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
-        provided_deps = ["//:provided"]
-        if injected:
-            provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
-        result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
-
-    assert_injected(Dependencies, injected=[])
-    assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])
-    assert_injected(
-        CustomSmalltalkDependencies,
-        injected=[
-            Address("", target_name="custom_injected"),
-            Address("", target_name="injected1"),
-        ],
-    )
-
-
 def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     """We test that dependency inference works generally and that we merge it correctly with
     explicitly provided dependencies.
