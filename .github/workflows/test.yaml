@@ -710,7 +710,7 @@ jobs:
 
         '
     - name: Lint
-      run: './pants update-build-files --check
+      run: './pants update-build-files --check ::
 
         ./pants lint check ''**''
 
