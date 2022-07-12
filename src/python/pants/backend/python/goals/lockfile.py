@@ -177,6 +177,18 @@ async def generate_lockfile(
                     "--style=universal",
                     "--resolver-version",
                     "pip-2020-resolver",
+                    # PEX files currently only run on Linux and Mac machines; so we hard code this
+                    # limit on lock universaility to avoid issues locking due to irrelevant
+                    # Windows-only dependency issues. See this Pex issue that originated from a
+                    # Pants user issue presented in Slack:
+                    #   https://github.com/pantsbuild/pex/issues/1821
+                    #
+                    # At some point it will probably make sense to expose `--target-system` for
+                    # configuration.
+                    "--target-system",
+                    "linux",
+                    "--target-system",
+                    "mac",
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     "-r",
