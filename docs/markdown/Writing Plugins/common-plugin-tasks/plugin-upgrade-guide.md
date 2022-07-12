@@ -30,6 +30,21 @@ my_version = StrOption(...)  # Still uses --my-version
 _run = BoolOption(...)  # Still uses --run
 ```
 
+### `InjectDependencies` -> `InferDependencies`, with `InferDependencies` using a `FieldSet`
+
+`InjectDependenciesRequest` has been folded into `InferDependenciesRequest`, which has also been changed
+to receive a `FieldSet`.
+
+If you have an `InjectDependenciesRequest` type/rule, those should be renamed to `Infer...`.
+
+Then for each `InferDependenciesRequest`, the `infer_from` class variable should now point to a
+relevant `FieldSet` subclass type. If you had an `Inject...` request, the `required_fields` will
+likely include the relevant `Dependencies` subclass. Likewise for pre-2.14 `Infer...` request, the
+`required_fields` will include the relevant `SourcesField` subclass.
+
+Note that in most cases, you no longer need to request the target in your rule code, and should rely
+on `FieldSet`'s mechanisms for matching targets and getting field values.
+
 2.13
 ----
 

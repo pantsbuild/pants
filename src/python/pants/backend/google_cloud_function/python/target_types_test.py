@@ -7,9 +7,9 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.google_cloud_function.python.target_types import (
-    InjectPythonCloudFunctionHandlerDependency,
+    InferPythonCloudFunctionHandlerDependency,
+    PythonCloudFunctionHandlerInferenceFieldSet,
     PythonGoogleCloudFunction,
-    PythonGoogleCloudFunctionDependencies,
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
     ResolvedPythonGoogleHandler,
@@ -25,7 +25,7 @@ from pants.backend.python.target_types_rules import rules as python_target_types
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import InjectedDependencies, InvalidFieldException
+from pants.engine.target import InferredDependencies, InvalidFieldException
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules(),
             *python_target_types_rules(),
             QueryRule(ResolvedPythonGoogleHandler, [ResolvePythonGoogleHandlerRequest]),
-            QueryRule(InjectedDependencies, [InjectPythonCloudFunctionHandlerDependency]),
+            QueryRule(InferredDependencies, [InferPythonCloudFunctionHandlerDependency]),
         ],
         target_types=[
             FileTarget,
@@ -109,7 +109,7 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         assert_resolved("*.py:func", expected="doesnt matter", is_file=True)
 
 
-def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
+def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -190,35 +190,35 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         }
     )
 
-    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+    def assert_inferred(address: Address, *, expected: Optional[Address]) -> None:
         tgt = rule_runner.get_target(address)
-        injected = rule_runner.request(
-            InjectedDependencies,
+        inferred = rule_runner.request(
+            InferredDependencies,
             [
-                InjectPythonCloudFunctionHandlerDependency(
-                    tgt[PythonGoogleCloudFunctionDependencies]
+                InferPythonCloudFunctionHandlerDependency(
+                    PythonCloudFunctionHandlerInferenceFieldSet.create(tgt)
                 )
             ],
         )
-        assert injected == InjectedDependencies([expected] if expected else [])
+        assert inferred == InferredDependencies([expected] if expected else [])
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_shorthand"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_party"),
         expected=Address("", target_name="ansicolors"),
     )
-    assert_injected(Address("project", target_name="unrecognized"), expected=None)
+    assert_inferred(Address("project", target_name="unrecognized"), expected=None)
 
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    assert_injected(Address("project", target_name="ambiguous"), expected=None)
+    assert_inferred(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
         "project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python "
@@ -229,7 +229,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
     # warning about ambiguity.
     caplog.clear()
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="disambiguated"),
         expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
     )
@@ -238,7 +238,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     # Test that using a file path results in ignoring all targets which are not an ancestor. We can
     # do this because we know the file name must be in the current directory or subdir of the
     # `python_google_cloud_function`.
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="another_root__file_used"),
         expected=Address(
             "project",
@@ -247,16 +247,16 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         ),
     )
     caplog.clear()
-    assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
+    assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
         "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
         "ambiguous_in_another_root.py']"
     ) in caplog.text
 
-    # Test that we can turn off the injection.
+    # Test that we can turn off the inference.
     rule_runner.set_options(["--no-python-infer-entry-points"])
-    assert_injected(Address("project", target_name="first_party"), expected=None)
+    assert_inferred(Address("project", target_name="first_party"), expected=None)
 
 
 def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:

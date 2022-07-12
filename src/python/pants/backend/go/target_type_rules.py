@@ -46,12 +46,11 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     Dependencies,
+    FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     InvalidFieldException,
     Targets,
     WrappedTarget,
@@ -103,8 +102,15 @@ async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPac
     return ImportPathToPackages(frozen_mapping)
 
 
+@dataclass(frozen=True)
+class GoPackageDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (GoPackageSourcesField,)
+
+    sources: GoPackageSourcesField
+
+
 class InferGoPackageDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoPackageSourcesField
+    infer_from = GoPackageDependenciesInferenceFieldSet
 
 
 @rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
@@ -113,7 +119,7 @@ async def infer_go_dependencies(
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
-    addr = request.sources_field.address
+    addr = request.field_set.address
     maybe_pkg_analysis = await Get(
         FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr)
     )
@@ -153,27 +159,31 @@ async def infer_go_dependencies(
     return InferredDependencies(inferred_dependencies)
 
 
-class InjectGoThirdPartyPackageDependenciesRequest(InjectDependenciesRequest):
-    inject_for = GoThirdPartyPackageDependenciesField
+@dataclass(frozen=True)
+class GoThirdPartyPackageInferenceFieldSet(FieldSet):
+    required_fields = (GoThirdPartyPackageDependenciesField, GoImportPathField)
+
+    dependencies: GoThirdPartyPackageDependenciesField
+    import_path: GoImportPathField
+
+
+class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
+    infer_from = GoThirdPartyPackageInferenceFieldSet
 
 
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
-async def inject_go_third_party_package_dependencies(
-    request: InjectGoThirdPartyPackageDependenciesRequest,
+async def infer_go_third_party_package_dependencies(
+    request: InferGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
     package_mapping: ImportPathToPackages,
-) -> InjectedDependencies:
-    addr = request.dependencies_field.address
+) -> InferredDependencies:
+    addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
-    wrapped_target, go_mod_info = await MultiGet(
-        Get(WrappedTarget, WrappedTargetRequest(addr, description_of_origin="<infallible>")),
-        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
-    )
-    tgt = wrapped_target.target
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
     pkg_info = await Get(
         ThirdPartyPkgAnalysis,
         ThirdPartyPkgAnalysisRequest(
-            tgt[GoImportPathField].value, go_mod_info.digest, go_mod_info.mod_path
+            request.field_set.import_path.value, go_mod_info.digest, go_mod_info.mod_path
         ),
     )
 
@@ -196,7 +206,7 @@ async def inject_go_third_party_package_dependencies(
                 f"in go_third_party_package at address '{addr}'."
             )
 
-    return InjectedDependencies(inferred_dependencies)
+    return InferredDependencies(inferred_dependencies)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -321,25 +331,27 @@ async def determine_main_pkg_for_go_binary(
     )
 
 
-class InjectGoBinaryMainDependencyRequest(InjectDependenciesRequest):
-    inject_for = GoBinaryDependenciesField
+@dataclass(frozen=True)
+class GoBinaryMainDependencyInferenceFieldSet(FieldSet):
+    required_fields = (GoBinaryDependenciesField, GoBinaryMainPackageField)
+
+    dependencies: GoBinaryDependenciesField
+    main_package: GoBinaryMainPackageField
+
+
+class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
+    infer_from = GoBinaryMainDependencyInferenceFieldSet
 
 
 @rule
-async def inject_go_binary_main_dependency(
-    request: InjectGoBinaryMainDependencyRequest,
-) -> InjectedDependencies:
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
+async def infer_go_binary_main_dependency(
+    request: InferGoBinaryMainDependencyRequest,
+) -> InferredDependencies:
     main_pkg = await Get(
         GoBinaryMainPackage,
-        GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),
+        GoBinaryMainPackageRequest(request.field_set.main_package),
     )
-    return InjectedDependencies([main_pkg.address])
+    return InferredDependencies([main_pkg.address])
 
 
 def rules():
@@ -348,7 +360,7 @@ def rules():
         *first_party_pkg.rules(),
         *import_analysis.rules(),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
-        UnionRule(InjectDependenciesRequest, InjectGoThirdPartyPackageDependenciesRequest),
-        UnionRule(InjectDependenciesRequest, InjectGoBinaryMainDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferGoBinaryMainDependencyRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
     )

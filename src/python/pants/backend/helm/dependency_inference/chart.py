@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
@@ -22,10 +23,9 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -82,8 +82,16 @@ async def first_party_helm_chart_mapping(
     return FirstPartyHelmChartMapping(name_addr_mapping)
 
 
+@dataclass(frozen=True)
+class HelmChartDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (HelmChartMetaSourceField, HelmChartDependenciesField)
+
+    source: HelmChartMetaSourceField
+    dependencies: HelmChartDependenciesField
+
+
 class InferHelmChartDependenciesRequest(InferDependenciesRequest):
-    infer_from = HelmChartMetaSourceField
+    infer_from = HelmChartDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring Helm chart dependencies", level=LogLevel.DEBUG)
@@ -93,16 +101,12 @@ async def infer_chart_dependencies_via_metadata(
     third_party_mapping: ThirdPartyHelmArtifactMapping,
     subsystem: HelmSubsystem,
 ) -> InferredDependencies:
-    original_addr = request.sources_field.address
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(original_addr, description_of_origin="<infallible>")
-    )
-    tgt = wrapped_tgt.target
+    address = request.field_set.address
 
     # Parse Chart.yaml for explicitly set dependencies.
     explicitly_provided_deps, metadata = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(tgt[HelmChartDependenciesField])),
-        Get(HelmChartMetadata, HelmChartMetaSourceField, request.sources_field),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
+        Get(HelmChartMetadata, HelmChartMetaSourceField, request.field_set.source),
     )
 
     remotes = subsystem.remotes()
@@ -131,14 +135,14 @@ async def infer_chart_dependencies_via_metadata(
             candidate_addrs.append(third_party_dep)
 
         if not candidate_addrs:
-            raise UnknownHelmChartDependency(original_addr, chart_dep)
+            raise UnknownHelmChartDependency(address, chart_dep)
 
         matches = frozenset(candidate_addrs).difference(explicitly_provided_deps.includes)
 
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             matches,
-            original_addr,
-            context=f"The Helm chart {original_addr} declares `{chart_dep.name}` as dependency",
+            address,
+            context=f"The Helm chart {address} declares `{chart_dep.name}` as dependency",
             import_reference="helm dependency",
         )
 
@@ -147,7 +151,7 @@ async def infer_chart_dependencies_via_metadata(
             dependencies.add(maybe_disambiguated)
 
     logger.debug(
-        f"Inferred {pluralize(len(dependencies), 'dependency')} for target at address: {request.sources_field.address}"
+        f"Inferred {pluralize(len(dependencies), 'dependency')} for target at address: {address}"
     )
     return InferredDependencies(dependencies)
 

@@ -7,15 +7,12 @@ import pytest
 
 from pants.backend.helm.dependency_inference.chart import (
     FirstPartyHelmChartMapping,
+    HelmChartDependenciesInferenceFieldSet,
     InferHelmChartDependenciesRequest,
 )
 from pants.backend.helm.dependency_inference.chart import rules as chart_infer_rules
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.target_types import (
-    HelmArtifactTarget,
-    HelmChartMetaSourceField,
-    HelmChartTarget,
-)
+from pants.backend.helm.target_types import HelmArtifactTarget, HelmChartTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.util_rules import chart
 from pants.engine.addresses import Address
@@ -147,7 +144,8 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
-        InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+        InferredDependencies,
+        [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
     assert set(inferred_deps.dependencies) == {
         Address("3rdparty/helm/jetstack", target_name="cert-manager"),
@@ -189,7 +187,8 @@ def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
-        InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+        InferredDependencies,
+        [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
     assert set(inferred_deps.dependencies) == {
         Address("src/bar", target_name="bar"),
@@ -221,5 +220,6 @@ def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -
         ExecutionError, match="Can not find any declared artifact for dependency 'bar'"
     ):
         rule_runner.request(
-            InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+            InferredDependencies,
+            [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
         )

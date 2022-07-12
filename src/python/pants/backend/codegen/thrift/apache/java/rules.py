@@ -22,12 +22,11 @@ from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -77,8 +76,16 @@ async def generate_java_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-class InjectApacheThriftJavaDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+@dataclass(frozen=True)
+class ApacheThriftJavaDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField, JvmResolveField)
+
+    dependencies: ThriftDependenciesField
+    resolve: JvmResolveField
+
+
+class InferApacheThriftJavaDependencies(InferDependenciesRequest):
+    infer_from = ApacheThriftJavaDependenciesInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -121,25 +128,15 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
 
 
 @rule
-async def inject_apache_thrift_java_dependencies(
-    request: InjectApacheThriftJavaDependencies, jvm: JvmSubsystem
-) -> InjectedDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+async def infer_apache_thrift_java_dependencies(
+    request: InferApacheThriftJavaDependencies, jvm: JvmSubsystem
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(dependencies_info.addresses)
+    return InferredDependencies(dependencies_info.addresses)
 
 
 class MissingApacheThriftJavaRuntimeInResolveError(ValueError):
@@ -171,7 +168,7 @@ def rules():
         *collect_rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectApacheThriftJavaDependencies),
+        UnionRule(InferDependenciesRequest, InferApacheThriftJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),

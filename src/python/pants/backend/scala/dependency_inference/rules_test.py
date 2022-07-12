@@ -7,9 +7,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
-from pants.backend.scala.dependency_inference.rules import InferScalaSourceDependencies
+from pants.backend.scala.dependency_inference.rules import (
+    InferScalaSourceDependencies,
+    ScalaSourceDependenciesInferenceFieldSet,
+)
 from pants.backend.scala.dependency_inference.rules import rules as dep_inference_rules
-from pants.backend.scala.target_types import ScalaSourceField, ScalaSourcesGeneratorTarget
+from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -86,12 +89,12 @@ def test_infer_scala_imports_same_target(rule_runner: RuleRunner) -> None:
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferScalaSourceDependencies(target_a[ScalaSourceField])],
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[])
 
     assert rule_runner.request(
         InferredDependencies,
-        [InferScalaSourceDependencies(target_b[ScalaSourceField])],
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[])
 
 
@@ -138,11 +141,13 @@ def test_infer_scala_imports_with_cycle(rule_runner: RuleRunner) -> None:
     target_b = rule_runner.get_target(Address("sub", target_name="b", relative_file_path="B.scala"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_a[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_a))],
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_b[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[target_a.address])
 
 
@@ -191,7 +196,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     # disambiguates with a `!`, and so gets the appropriate version.
     caplog.clear()
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_b[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
     ) == InferredDependencies(dependencies=[])
     assert len(caplog.records) == 1
     assert (
@@ -199,7 +205,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     )
 
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_c[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_c))],
     ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.scala")])
 
 
@@ -232,7 +239,8 @@ def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunne
     )
     tgt = rule_runner.get_target(Address("foo", relative_file_path="A.scala"))
     deps = rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(tgt))],
     )
     assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])
 
@@ -278,7 +286,8 @@ def test_overlapping_package_unambiguous(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("foo", relative_file_path="A.scala"))
     deps = rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(tgt))],
     )
     assert deps == InferredDependencies(
         [
@@ -339,7 +348,8 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
         Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.13"})
     )
     deps = rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(tgt))],
     )
     assert deps == InferredDependencies(
         [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.13"})]
@@ -349,7 +359,8 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
         Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.12"})
     )
     deps = rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(tgt))],
     )
     assert deps == InferredDependencies(
         [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.12"})]
@@ -430,9 +441,11 @@ def test_recursive_objects(rule_runner: RuleRunner) -> None:
     target_d = rule_runner.get_target(Address("D", target_name="d", relative_file_path="D.scala"))
 
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_c[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_c))],
     ) == InferredDependencies(dependencies=[target_b.address])
 
     assert rule_runner.request(
-        InferredDependencies, [InferScalaSourceDependencies(target_d[ScalaSourceField])]
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_d))],
     ) == InferredDependencies(dependencies=[target_b.address])

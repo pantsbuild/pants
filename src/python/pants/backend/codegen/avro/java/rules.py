@@ -34,14 +34,13 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm import jdk_rules
@@ -232,8 +231,19 @@ def generate_avro_tools_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
-class InjectAvroRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = AvroDependenciesField
+@dataclass(frozen=True)
+class AvroRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (
+        AvroDependenciesField,
+        JvmResolveField,
+    )
+
+    dependencies: AvroDependenciesField
+    resolve: JvmResolveField
+
+
+class InferAvroRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_from = AvroRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -279,25 +289,15 @@ async def resolve_apache_avro_runtime_for_resolve(
 
 
 @rule
-async def inject_apache_avro_java_dependencies(
-    request: InjectAvroRuntimeDependencyRequest, jvm: JvmSubsystem
-) -> InjectedDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+async def infer_apache_avro_java_dependencies(
+    request: InferAvroRuntimeDependencyRequest, jvm: JvmSubsystem
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     dependencies_info = await Get(
         ApacheAvroRuntimeForResolve, ApacheAvroRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(dependencies_info.addresses)
+    return InferredDependencies(dependencies_info.addresses)
 
 
 class MissingApacheAvroRuntimeInResolveError(ValueError):
@@ -332,7 +332,7 @@ def rules():
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
-        UnionRule(InjectDependenciesRequest, InjectAvroRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferAvroRuntimeDependencyRequest),
         AvroSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         AvroSourceTarget.register_plugin_field(PrefixedJvmResolveField),

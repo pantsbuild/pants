@@ -12,9 +12,10 @@ from pants.backend.shell.dependency_inference import (
     InferShellDependencies,
     ParsedShellImports,
     ParseShellImportsRequest,
+    ShellDependenciesInferenceFieldSet,
     ShellMapping,
 )
-from pants.backend.shell.target_types import ShellSourceField, ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
@@ -131,7 +132,8 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferShellDependencies(tgt[ShellSourceField])]
+            InferredDependencies,
+            [InferShellDependencies(ShellDependenciesInferenceFieldSet.create(tgt))],
         )
 
     assert run_dep_inference(Address("a", relative_file_path="f1.sh")) == InferredDependencies(

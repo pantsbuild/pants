@@ -8,7 +8,10 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import InjectGoBinaryMainDependencyRequest
+from pants.backend.go.target_type_rules import (
+    GoBinaryMainDependencyInferenceFieldSet,
+    InferGoBinaryMainDependencyRequest,
+)
 from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
@@ -41,7 +44,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    InjectedDependencies,
+    InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
 )
@@ -67,7 +70,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
-            QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
+            QueryRule(InferredDependencies, [InferGoBinaryMainDependencyRequest]),
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget, GenericTarget],
     )
@@ -287,10 +290,15 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
         main_addr = rule_runner.request(
             GoBinaryMainPackage, [GoBinaryMainPackageRequest(tgt[GoBinaryMainPackageField])]
         ).address
-        injected_addresses = rule_runner.request(
-            InjectedDependencies, [InjectGoBinaryMainDependencyRequest(tgt[Dependencies])]
+        inferred_addresses = rule_runner.request(
+            InferredDependencies,
+            [
+                InferGoBinaryMainDependencyRequest(
+                    GoBinaryMainDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
-        assert [main_addr] == list(injected_addresses)
+        assert [main_addr] == list(inferred_addresses)
         return main_addr
 
     assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")

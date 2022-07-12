@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, List, Set, Tuple, Type, cast
@@ -38,14 +39,13 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -1602,26 +1602,6 @@ class CustomSmalltalkDependencies(SmalltalkDependencies):
     pass
 
 
-class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
-
-
-class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
-
-
-@rule
-def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies(
-        [Address("", target_name="injected1"), Address("", target_name="injected2")]
-    )
-
-
-@rule
-def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address("", target_name="custom_injected")])
-
-
 class SmalltalkLibrarySource(SmalltalkSource):
     pass
 
@@ -1641,15 +1621,22 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
+@dataclass(frozen=True)
+class SmalltalkDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (SmalltalkLibrarySource,)
+
+    source: SmalltalkLibrarySource
+
+
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkLibrarySource
+    infer_from = SmalltalkDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
         file_content.content.decode().splitlines() for file_content in digest_contents
@@ -1665,13 +1652,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            inject_smalltalk_deps,
-            inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibraryGenerator, MockTarget],
@@ -1782,33 +1765,6 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
         expected=[
             Address("src/smalltalk/util", relative_file_path="f1.st", target_name="util"),
             Address("src/smalltalk/util", relative_file_path="f2.st", target_name="util"),
-        ],
-    )
-
-
-def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files(
-        {
-            "src/smalltalk/util/f1.st": "",
-            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
-        }
-    )
-
-    def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
-        provided_deps = ["//:provided"]
-        if injected:
-            provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
-        result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
-
-    assert_injected(Dependencies, injected=[])
-    assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])
-    assert_injected(
-        CustomSmalltalkDependencies,
-        injected=[
-            Address("", target_name="custom_injected"),
-            Address("", target_name="injected1"),
         ],
     )
 

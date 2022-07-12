@@ -10,12 +10,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -33,8 +28,16 @@ _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
 
 
-class InjectScalaPBRuntimeDependencyRequest(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
+@dataclass(frozen=True)
+class ScalaPBRuntimeDependencyInferenceFieldSet(FieldSet):
+    required_fields = (ProtobufDependenciesField, JvmResolveField)
+
+    dependencies: ProtobufDependenciesField
+    resolve: JvmResolveField
+
+
+class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
+    infer_from = ScalaPBRuntimeDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -85,26 +88,16 @@ async def resolve_scalapb_runtime_for_resolve(
 
 
 @rule
-async def inject_scalapb_runtime_dependency(
-    request: InjectScalaPBRuntimeDependencyRequest,
+async def infer_scalapb_runtime_dependency(
+    request: InferScalaPBRuntimeDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     scalapb_runtime_target_info = await Get(
         ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies(scalapb_runtime_target_info.addresses)
+    return InferredDependencies(scalapb_runtime_target_info.addresses)
 
 
 class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):
@@ -148,5 +141,5 @@ class MissingScalaPBRuntimeInResolveError(ValueError):
 def rules():
     return (
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectScalaPBRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferScalaPBRuntimeDependencyRequest),
     )
