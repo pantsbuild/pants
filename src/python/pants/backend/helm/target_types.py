@@ -220,12 +220,18 @@ class HelmUnitTestSourceField(SingleSourceField):
     )
 
 
+class HelmUnitTestStrictField(TriBoolField):
+    alias = "strict"
+    help = "If set to true, parses the UnitTest suite files strictly."
+
+
 class HelmUnitTestTestTarget(Target):
     alias = "helm_unittest_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         HelmUnitTestSourceField,
         HelmUnitTestDependenciesField,
+        HelmUnitTestStrictField,
     )
     help = "A single helm-unittest suite file."
 
@@ -263,6 +269,7 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
+        HelmUnitTestStrictField,
     )
     generated_target_cls = HelmUnitTestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
