@@ -147,10 +147,12 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
         InferredDependencies,
         [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
-    assert set(inferred_deps.dependencies) == {
-        Address("3rdparty/helm/jetstack", target_name="cert-manager"),
-        Address("src/bar", target_name="bar"),
-    }
+    assert inferred_deps == InferredDependencies(
+        [
+            Address("3rdparty/helm/jetstack", target_name="cert-manager"),
+            Address("src/bar", target_name="bar"),
+        ]
+    )
 
 
 def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
@@ -190,9 +192,11 @@ def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
         InferredDependencies,
         [InferHelmChartDependenciesRequest(HelmChartDependenciesInferenceFieldSet.create(tgt))],
     )
-    assert set(inferred_deps.dependencies) == {
-        Address("src/bar", target_name="bar"),
-    }
+    assert inferred_deps == InferredDependencies(
+        [
+            Address("src/bar", target_name="bar"),
+        ]
+    )
 
 
 def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -> None:

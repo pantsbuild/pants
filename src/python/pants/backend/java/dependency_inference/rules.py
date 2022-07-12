@@ -64,7 +64,7 @@ async def infer_java_dependencies_via_source_analysis(
         JavaInferredDependencies,
         JavaInferredDependenciesAndExportsRequest(request.field_set.source),
     )
-    return InferredDependencies(dependencies=jids.dependencies)
+    return InferredDependencies(jids.dependencies)
 
 
 @rule(desc="Inferring Java dependencies and exports by source analysis")

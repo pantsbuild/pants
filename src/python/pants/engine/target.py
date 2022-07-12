@@ -2553,17 +2553,18 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class InferredDependencies:
-    dependencies: FrozenOrderedSet[Address]
+    include: FrozenOrderedSet[Address]
+    exclude: FrozenOrderedSet[Address]
 
-    def __init__(self, dependencies: Iterable[Address]) -> None:
+    def __init__(
+        self,
+        include: Iterable[Address],
+        *,
+        exclude: Iterable[Address] = (),
+    ) -> None:
         """The result of inferring dependencies."""
-        self.dependencies = FrozenOrderedSet(sorted(dependencies))
-
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
-
-    def __iter__(self) -> Iterator[Address]:
-        return iter(self.dependencies)
+        self.include = FrozenOrderedSet(sorted(include))
+        self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
 @union

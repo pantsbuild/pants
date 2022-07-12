@@ -98,12 +98,12 @@ def test_infer_java_imports_same_target(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
 
 @maybe_skip_jdk_test
@@ -150,12 +150,12 @@ def test_infer_java_imports(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
 
 @maybe_skip_jdk_test
@@ -205,12 +205,12 @@ def test_infer_java_imports_with_cycle(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[target_a.address])
+    ) == InferredDependencies([target_a.address])
 
 
 @maybe_skip_jdk_test
@@ -260,7 +260,7 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
     assert len(caplog.records) == 1
     assert (
         "The target b/B.java imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
@@ -269,7 +269,7 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_c))],
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.java")])
+    ) == InferredDependencies([Address("a_one", relative_file_path="A.java")])
 
 
 @maybe_skip_jdk_test
@@ -304,9 +304,7 @@ def test_infer_java_imports_unnamed_package(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(
-        dependencies=[Address("", target_name="a", relative_file_path="Lib.java")]
-    )
+    ) == InferredDependencies([Address("", target_name="a", relative_file_path="Lib.java")])
 
 
 @maybe_skip_jdk_test
@@ -348,12 +346,12 @@ def test_infer_java_imports_same_target_with_cycle(rule_runner: RuleRunner) -> N
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferJavaSourceDependencies(JavaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[target_a.address])
+    ) == InferredDependencies([target_a.address])
 
 
 @maybe_skip_jdk_test

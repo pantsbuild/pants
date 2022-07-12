@@ -1165,10 +1165,13 @@ async def resolve_dependencies(
                 for addr in (
                     *generated_addresses,
                     *explicitly_provided_includes,
-                    *itertools.chain.from_iterable(inferred),
+                    *itertools.chain.from_iterable(deps.include for deps in inferred),
                     *special_cased,
                 )
-                if addr not in explicitly_provided.ignores
+                if addr
+                not in explicitly_provided.ignores.union(
+                    *itertools.chain(deps.exclude for deps in inferred)
+                )
             }
         )
     )
