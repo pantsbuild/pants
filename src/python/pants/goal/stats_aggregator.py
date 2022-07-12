@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import logging
 from collections import Counter
+from dataclasses import dataclass
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -150,6 +151,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             )
 
 
+@dataclass(frozen=True)
 class StatsAggregatorCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 

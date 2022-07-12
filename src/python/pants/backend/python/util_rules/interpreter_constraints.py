@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import functools
 import itertools
 from collections import defaultdict
 from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
@@ -56,6 +55,20 @@ def interpreter_constraints_contains(
     return InterpreterConstraints(a).contains(InterpreterConstraints(b), interpreter_universe)
 
 
+@memoized
+def parse_constraint(constraint: str) -> Requirement:
+    """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
+
+    We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
+    interpreter.py's `parse_requirement()`.
+    """
+    try:
+        parsed_requirement = Requirement.parse(constraint)
+    except ValueError:
+        parsed_requirement = Requirement.parse(f"CPython{constraint}")
+    return parsed_requirement
+
+
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
 class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter):
     @classmethod
@@ -69,7 +82,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # We need to sort the component constraints for each requirement _before_ sorting the entire list
         # for the ordering to be correct.
         parsed_constraints = (
-            i if isinstance(i, Requirement) else self.parse_constraint(i) for i in constraints
+            i if isinstance(i, Requirement) else parse_constraint(i) for i in constraints
         )
         super().__init__(sorted(parsed_constraints, key=lambda c: str(c)))
 
@@ -78,19 +91,6 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
     def debug_hint(self) -> str:
         return str(self)
-
-    @staticmethod
-    def parse_constraint(constraint: str) -> Requirement:
-        """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
-
-        We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
-        interpreter.py's `parse_requirement()`.
-        """
-        try:
-            parsed_requirement = Requirement.parse(constraint)
-        except ValueError:
-            parsed_requirement = Requirement.parse(f"CPython{constraint}")
-        return parsed_requirement
 
     @classmethod
     def compute_for_targets(
@@ -182,7 +182,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         )
 
     @classmethod
-    def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> list[Requirement]:
+    def merge_constraint_sets(
+        cls, constraint_sets: Iterable[Iterable[str]]
+    ) -> frozenset[Requirement]:
         """Given a collection of constraints sets, merge by ORing within each individual constraint
         set and ANDing across each distinct constraint set.
 
@@ -192,14 +194,18 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
         if not constraint_sets:
-            return []
+            return frozenset()
+
         parsed_constraint_sets: set[frozenset[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
             parsed_constraint_set = frozenset(
-                cls.parse_constraint(constraint) for constraint in constraint_set
+                parse_constraint(constraint) for constraint in constraint_set
             )
             parsed_constraint_sets.add(parsed_constraint_set)
+
+        if len(parsed_constraint_sets) == 1:
+            return next(iter(parsed_constraint_sets))
 
         def and_constraints(parsed_constraints: Sequence[Requirement]) -> Requirement:
             merged_specs: set[tuple[str, str]] = set()
@@ -229,7 +235,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 )
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
-            return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
+            return parse_constraint(f"{expected_interpreter}{formatted_specs}")
 
         def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
             if req1.project_name != req2.project_name:
@@ -238,12 +244,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 return 0
             return -1 if req1.specs < req2.specs else 1
 
-        return sorted(
-            {
-                and_constraints(constraints_product)
-                for constraints_product in itertools.product(*parsed_constraint_sets)
-            },
-            key=functools.cmp_to_key(cmp_constraints),
+        return frozenset(
+            and_constraints(constraints_product)
+            for constraints_product in itertools.product(*parsed_constraint_sets)
         )
 
     @classmethod
@@ -339,7 +342,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                         )
                         req_strs.extend(f"!={major}.{minor}.{p}" for p in invalid_patches)
                         req_str = ",".join(req_strs)
-                        snapped = Requirement.parse(req_str)
+                        snapped = parse_constraint(req_str)
                         return InterpreterConstraints([snapped])
         return None
 
