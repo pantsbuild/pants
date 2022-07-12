@@ -109,6 +109,7 @@ class MaybeWarnPythonRepos:
     pass
 
 
+@dataclass(frozen=True)
 class MaybeWarnPythonReposRequest:
     pass
 
