@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from typing import cast
 
 from humbug.consent import HumbugConsent
@@ -153,6 +154,7 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
         reporter.publish(report)
 
 
+@dataclass(frozen=True)
 class AnonymousTelemetryCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 
