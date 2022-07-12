@@ -103,7 +103,8 @@ def rules():
     return [
         *collect_rules(),
         *system_binaries.rules(),
+        QueryRule(CoarsenedTargets, (Addresses,)),
         QueryRule(RenderedClasspath, (Classpath,)),
         QueryRule(RenderedClasspath, (ClasspathEntry,)),
-        QueryRule(CoarsenedTargets, (Addresses,)),
+        QueryRule(Targets, (Addresses,)),
     ]

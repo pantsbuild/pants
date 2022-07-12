@@ -102,23 +102,24 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        (unexpanded_addresses,) = self._scheduler.product_request(
-            Addresses, [Params(self._specs, self._options_bootstrapper)]
-        )
+        params = Params(self._specs, self._options_bootstrapper)
+        request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
+        unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
-        expanded_targets = self._scheduler.product_request(
-            Targets, [Params(Addresses([addr])) for addr in unexpanded_addresses]
-        )
-        targets_dict: dict[str, list[TargetInfo]] = {}
-        for addr, targets in zip(unexpanded_addresses, expanded_targets):
-            targets_dict[addr.spec] = [
+        targets_dict: dict[str, list[TargetInfo]] = {str(addr): [] for addr in unexpanded_addresses}
+        for target in expanded_targets:
+            source = targets_dict.get(str(target.address.spec), None)
+            if source is None:
+                source = targets_dict[str(target.address.maybe_convert_to_target_generator())]
+            source.append(
                 TargetInfo(
                     filename=(
-                        tgt.address.filename if tgt.address.is_file_target else str(tgt.address)
+                        target.address.filename
+                        if target.address.is_file_target
+                        else str(target.address)
                     )
                 )
-                for tgt in targets
-            ]
+            )
         return ExpandedSpecs(targets=targets_dict)
 
 
@@ -306,7 +307,7 @@ class _InnerHandler(threading.Thread):
 def rules():
     return [
         QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
-        QueryRule(Targets, (Addresses,)),
+        QueryRule(Targets, (Specs, OptionsBootstrapper)),
         QueryRule(Addresses, (Specs, OptionsBootstrapper)),
         *collect_rules(),
     ]
