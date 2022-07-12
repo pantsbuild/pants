@@ -20,6 +20,7 @@ python_tests(
 )
 
 pex_binaries(
+    execution_mode="venv",
     entry_points=[
         "cache_comparison.py",
         "changelog.py",
