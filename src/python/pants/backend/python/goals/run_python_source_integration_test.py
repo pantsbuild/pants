@@ -84,7 +84,7 @@ def test_run_sample_script(
     file = result.stdout.strip()
     if run_in_sandbox:
         assert file.endswith("src_root2/utils/strutil.py")
-        assert ".pants.d/tmp" in file
+        assert "pants-sandbox-" in file
     else:
         assert file.endswith(os.path.join(test_repo_root, "src_root2/utils/strutil.py"))
     assert result.exit_code == 23

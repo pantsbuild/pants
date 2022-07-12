@@ -63,7 +63,7 @@ def mock_export(
 
 def _mock_run(rule_runner: RuleRunner, ip: InteractiveProcess) -> InteractiveProcessResult:
     subprocess.check_call(
-        ip.argv,
+        ip.process.argv,
         stderr=subprocess.STDOUT,
         env={
             "PATH": os.environ.get("PATH", ""),

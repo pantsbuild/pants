@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -66,32 +67,26 @@ async def create_scala_repl_request(
         Get(Digest, AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
     )
 
-    # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
-    # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
-    jdk_digests = await MultiGet(
-        Get(Digest, AddPrefix(digest, relpath))
-        for relpath, digest in jdk.immutable_input_digests.items()
-    )
-
     repl_digest = await Get(
         Digest,
-        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_digests]),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest]),
     )
 
     return ReplRequest(
         digest=repl_digest,
         args=[
-            *jdk.args(bash, tool_classpath.classpath_entries()),
+            *jdk.args(bash, tool_classpath.classpath_entries(), chroot="{chroot}"),
             "-Dscala.usejavacp=true",
             "scala.tools.nsc.MainGenericRunner",
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
+        run_in_workspace=False,
         extra_env={
             **jdk.env,
             "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
         },
-        run_in_workspace=False,
+        immutable_input_digests=jdk.immutable_input_digests,
         append_only_caches=jdk.append_only_caches,
     )
 
