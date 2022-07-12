@@ -573,6 +573,8 @@ class Address(EngineAwareParameter):
         )
 
     def __eq__(self, other):
+        if self is other:
+            return True
         if not isinstance(other, Address):
             return False
         return self._equal_without_parameters(other) and self.parameters == other.parameters

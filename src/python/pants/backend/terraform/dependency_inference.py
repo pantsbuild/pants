@@ -22,6 +22,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -115,15 +116,22 @@ async def setup_process_for_parse_terraform_module_sources(
     return process
 
 
+@dataclass(frozen=True)
+class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (TerraformModuleSourcesField,)
+
+    sources: TerraformModuleSourcesField
+
+
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
-    infer_from = TerraformModuleSourcesField
+    infer_from = TerraformModuleDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_terraform_module_dependencies(
     request: InferTerraformModuleDependenciesRequest,
 ) -> InferredDependencies:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
 
     paths = OrderedSet(
         filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")

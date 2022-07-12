@@ -95,7 +95,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.96",
   "prefer_older_binary": false,
   "requirements": [
     "setuptools<58.0,>=50.3.0",

@@ -515,6 +515,7 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
 class AllAssetTargetsRequest:
     pass
 

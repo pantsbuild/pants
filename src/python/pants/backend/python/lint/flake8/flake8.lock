@@ -195,7 +195,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.96",
   "prefer_older_binary": false,
   "requirements": [
     "flake8<4.0,>=3.9.2"

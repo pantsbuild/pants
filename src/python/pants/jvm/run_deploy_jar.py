@@ -68,7 +68,7 @@ async def create_deploy_jar_run_request(
     runtime_jvm = await Get(__RuntimeJvm, JdkEnvironment, jdk)
     support_digests += (runtime_jvm.digest,)
 
-    # TODO(#14386) This argument re-writing code should be done in a more standardised way.
+    # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `jdk_rules.py` for other argument re-writing code.
     def prefixed(arg: str, prefixes: Iterable[str]) -> str:
         if any(arg.startswith(prefix) for prefix in prefixes):

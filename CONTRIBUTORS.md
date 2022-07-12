@@ -249,6 +249,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
 + Win Wang

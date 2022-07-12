@@ -3,6 +3,7 @@
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Sequence
 
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField
@@ -11,8 +12,9 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    FieldSet,
+    InferDependenciesRequest,
+    InferredDependencies,
     Target,
 )
 from pants.engine.unions import UnionRule
@@ -38,15 +40,22 @@ class AmbiguousHelmUnitTestChart(Exception):
         )
 
 
-class InjectHelmUnitTestChartDependencyRequest(InjectDependenciesRequest):
-    inject_for = HelmUnitTestDependenciesField
+@dataclass(frozen=True)
+class HelmUnitTestChartDependencyInferenceFieldSet(FieldSet):
+    required_fields = (HelmUnitTestDependenciesField,)
+
+    dependencies: HelmUnitTestDependenciesField
+
+
+class InferHelmUnitTestChartDependencyRequest(InferDependenciesRequest):
+    infer_from = HelmUnitTestChartDependencyInferenceFieldSet
 
 
 @rule
-async def inject_chart_dependency_into_unittests(
-    request: InjectHelmUnitTestChartDependencyRequest, all_helm_charts: AllHelmChartTargets
-) -> InjectedDependencies:
-    unittest_target_addr: Address = request.dependencies_field.address
+async def infer_chart_dependency_into_unittests(
+    request: InferHelmUnitTestChartDependencyRequest, all_helm_charts: AllHelmChartTargets
+) -> InferredDependencies:
+    unittest_target_addr: Address = request.field_set.address
 
     putative_chart_path, unittest_target_dir = os.path.split(unittest_target_addr.spec_path)
     if unittest_target_dir != "tests":
@@ -62,7 +71,7 @@ async def inject_chart_dependency_into_unittests(
     chart_dependencies: OrderedSet[Address] = OrderedSet()
 
     explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.dependencies_field)
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
 
     for candidate_chart in candidate_charts:
@@ -88,11 +97,11 @@ async def inject_chart_dependency_into_unittests(
             f"Found Helm chart at '{found_dep.spec}' for unittest at: {unittest_target_addr.spec}"
         )
 
-    return InjectedDependencies(chart_dependencies)
+    return InferredDependencies(chart_dependencies)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectHelmUnitTestChartDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferHelmUnitTestChartDependencyRequest),
     ]

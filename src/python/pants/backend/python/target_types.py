@@ -783,7 +783,7 @@ class PythonTestSourceField(PythonSourceField):
             )
 
 
-class PythonTestsDependenciesField(Dependencies):
+class PythonTestsDependenciesField(PythonDependenciesField):
     supports_transitive_excludes = True
 
 

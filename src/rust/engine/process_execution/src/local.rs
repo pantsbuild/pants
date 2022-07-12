@@ -26,6 +26,8 @@ use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
 use store::{OneOffStoreFileByDigest, Snapshot, Store, StoreError};
+use task_executor::Executor;
+use tempfile::TempDir;
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
@@ -42,7 +44,7 @@ pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
 pub struct CommandRunner {
   pub store: Store,
-  executor: task_executor::Executor,
+  executor: Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
@@ -54,7 +56,7 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     store: Store,
-    executor: task_executor::Executor,
+    executor: Executor,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
@@ -269,41 +271,21 @@ impl super::CommandRunner for CommandRunner {
       // renders at the Process's level.
       desc = Some(req.description.clone()),
       |workunit| async move {
-        // Set up a temporary workdir, which will optionally be preserved.
-        let (workdir_path, maybe_workdir) = {
-          let workdir = tempfile::Builder::new()
-            .prefix("pants-sandbox-")
-            .tempdir_in(&self.work_dir_base)
-            .map_err(|err| {
-              format!(
-                "Error making tempdir for local process execution: {:?}",
-                err
-              )
-            })?;
-          if self.cleanup_local_dirs {
-            // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
-            (workdir.path().to_owned(), Some(workdir))
-          } else {
-            // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-            // that the temporary directory will no longer be automatically deleted when dropped.
-            let preserved_path = workdir.into_path();
-            info!(
-              "Preserving local process execution dir {} for {:?}",
-              preserved_path.display(),
-              req.description
-            );
-            (preserved_path, None)
-          }
-        };
+        let workdir = create_sandbox(
+          self.executor.clone(),
+          &self.work_dir_base,
+          &req.description,
+          self.cleanup_local_dirs,
+        )?;
 
         // Start working on a mutable version of the process.
         let mut req = req;
         // Update env, replacing `{chroot}` placeholders with `workdir_path`.
-        update_env(&workdir_path, &mut req);
+        apply_chroot(workdir.path().to_str().unwrap(), &mut req);
 
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
-          workdir_path.clone(),
+          workdir.path().to_owned(),
           &req,
           req.input_digests.input_files.clone(),
           self.store.clone(),
@@ -320,7 +302,7 @@ impl super::CommandRunner for CommandRunner {
             context,
             self.store.clone(),
             self.executor.clone(),
-            workdir_path.clone(),
+            workdir.path().to_owned(),
             (),
             exclusive_spawn,
             self.platform(),
@@ -338,15 +320,8 @@ impl super::CommandRunner for CommandRunner {
           })
           .await;
 
-        match maybe_workdir {
-          Some(workdir) => {
-            // Dropping the temporary directory will likely involve a lot of IO: do it in the
-            // background.
-            let _background_cleanup = self.executor.spawn_blocking(|| std::mem::drop(workdir));
-          }
-          None => {
-            setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
-          }
+        if !self.cleanup_local_dirs {
+          setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
         }
 
         res
@@ -478,7 +453,7 @@ pub trait CapturedWorkdir {
     req: Process,
     context: Context,
     store: Store,
-    executor: task_executor::Executor,
+    executor: Executor,
     workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
@@ -609,22 +584,18 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
-/// Updates the Process env.
 ///
-/// Mutates the env for the process `req`, replacing any `{chroot}` placeholders with
-/// `workdir_path`.
+/// Mutates a Process, replacing any `{chroot}` placeholders with `chroot_path`.
 ///
-/// This matches the behavior of interactive processes executed in a temporary directory and those
-/// executed by the `run` goal.
-///
-/// TODO: align this with the code path for interactive processes. Related issue #14386.
-///
-pub fn update_env(workdir_path: &Path, req: &mut Process) {
-  if let Some(workdir) = workdir_path.to_str() {
-    for value in req.env.values_mut() {
-      if value.contains("{chroot}") {
-        *value = value.replace("{chroot}", workdir);
-      }
+pub fn apply_chroot(chroot_path: &str, req: &mut Process) {
+  for value in req.env.values_mut() {
+    if value.contains("{chroot}") {
+      *value = value.replace("{chroot}", chroot_path);
+    }
+  }
+  for value in &mut req.argv {
+    if value.contains("{chroot}") {
+      *value = value.replace("{chroot}", chroot_path);
     }
   }
 }
@@ -646,7 +617,7 @@ pub async fn prepare_workdir(
   req: &Process,
   materialized_input_digest: DirectoryDigest,
   store: Store,
-  executor: task_executor::Executor,
+  executor: Executor,
   named_caches: &NamedCaches,
   immutable_inputs: &ImmutableInputs,
 ) -> Result<bool, StoreError> {
@@ -753,6 +724,60 @@ pub async fn prepare_workdir(
     })
     .await?;
   Ok(exclusive_spawn)
+}
+
+/// Creates an optionally-cleaned-up sandbox in the given base path.
+pub fn create_sandbox(
+  executor: Executor,
+  base_directory: &Path,
+  description: &str,
+  cleanup: bool,
+) -> Result<AsyncDropSandbox, String> {
+  let workdir = tempfile::Builder::new()
+    .prefix("pants-sandbox-")
+    .tempdir_in(base_directory)
+    .map_err(|err| {
+      format!(
+        "Error making tempdir for local process execution: {:?}",
+        err
+      )
+    })?;
+
+  let (workdir_path, maybe_workdir) = if cleanup {
+    // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
+    (workdir.path().to_owned(), Some(workdir))
+  } else {
+    // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+    // that the temporary directory will no longer be automatically deleted when dropped.
+    let preserved_path = workdir.into_path();
+    info!(
+      "Preserving local process execution dir {} for {}",
+      preserved_path.display(),
+      description,
+    );
+    (preserved_path, None)
+  };
+
+  Ok(AsyncDropSandbox(executor, workdir_path, maybe_workdir))
+}
+
+/// Dropping sandboxes can involve a lot of IO, so it is spawned to the background as a blocking
+/// task.
+#[must_use]
+pub struct AsyncDropSandbox(Executor, PathBuf, Option<TempDir>);
+
+impl AsyncDropSandbox {
+  pub fn path(&self) -> &Path {
+    &self.1
+  }
+}
+
+impl Drop for AsyncDropSandbox {
+  fn drop(&mut self) {
+    if let Some(sandbox) = self.2.take() {
+      let _background_cleanup = self.0.spawn_blocking(|| std::mem::drop(sandbox));
+    }
+  }
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.

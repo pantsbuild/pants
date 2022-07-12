@@ -32,6 +32,7 @@ from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
+    Targets,
 )
 from pants.jvm import classpath
 from pants.jvm.compile import rules as jvm_compile_rules
@@ -64,10 +65,12 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *javac_check_rules(),
             *java_dep_inf_rules(),
-            QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [GenerateJavaFromAvroRequest]),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
+            QueryRule(GeneratedSources, [GenerateJavaFromAvroRequest]),
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(Targets, (Addresses,)),
         ],
         target_types=[
             JavaSourceTarget,

@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence
+from typing import Iterable, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -56,8 +56,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
@@ -1071,29 +1069,22 @@ async def resolve_dependencies(
     )
     tgt = wrapped_tgt.target
 
-    # Inject any dependencies (based on `Dependencies` field rather than `SourcesField`).
-    inject_request_types = union_membership.get(InjectDependenciesRequest)
-    injected = await MultiGet(
-        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
-        for inject_request_type in inject_request_types
-        if isinstance(request.field, inject_request_type.inject_for)
-    )
-
     # Infer any dependencies (based on `SourcesField` field).
-    inference_request_types = union_membership.get(InferDependenciesRequest)
+    inference_request_types = cast(
+        "Sequence[Type[InferDependenciesRequest]]", union_membership.get(InferDependenciesRequest)
+    )
     inferred: tuple[InferredDependencies, ...] = ()
     if inference_request_types:
-        sources_field = tgt.get(SourcesField)
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
-            if isinstance(sources_field, inference_request_type.infer_from)
+            if inference_request_type.infer_from.is_applicable(tgt)
         ]
         inferred = await MultiGet(
             Get(
                 InferredDependencies,
                 InferDependenciesRequest,
-                inference_request_type(sources_field),
+                inference_request_type(inference_request_type.infer_from.create(tgt)),
             )
             for inference_request_type in relevant_inference_request_types
         )
@@ -1174,7 +1165,6 @@ async def resolve_dependencies(
                 for addr in (
                     *generated_addresses,
                     *explicitly_provided_includes,
-                    *itertools.chain.from_iterable(injected),
                     *itertools.chain.from_iterable(inferred),
                     *special_cased,
                 )

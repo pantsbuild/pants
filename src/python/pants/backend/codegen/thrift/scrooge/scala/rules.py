@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
+
 from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
@@ -12,10 +14,11 @@ from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    InferDependenciesRequest,
+    InferredDependencies,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -27,8 +30,15 @@ class GenerateScalaFromThriftRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class InjectScroogeScalaDependencies(InjectDependenciesRequest):
-    inject_for = ThriftDependenciesField
+@dataclass(frozen=True)
+class ScroogeScalaDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ThriftDependenciesField,)
+
+    dependencies: ThriftDependenciesField
+
+
+class InferScroogeScalaDependencies(InferDependenciesRequest):
+    infer_from = ScroogeScalaDependenciesInferenceFieldSet
 
 
 @rule(desc="Generate Scala from Thrift with Scrooge", level=LogLevel.DEBUG)
@@ -57,16 +67,16 @@ async def generate_scala_from_thrift_with_scrooge(
 
 
 @rule
-async def inject_scrooge_scala_dependencies(
-    _: InjectScroogeScalaDependencies, scrooge: ScroogeScalaSubsystem
-) -> InjectedDependencies:
+async def infer_scrooge_scala_dependencies(
+    _: InferScroogeScalaDependencies, scrooge: ScroogeScalaSubsystem
+) -> InferredDependencies:
     addresses = await Get(Addresses, UnparsedAddressInputs, scrooge.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    return InferredDependencies(addresses)
 
 
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromThriftRequest),
-        UnionRule(InjectDependenciesRequest, InjectScroogeScalaDependencies),
+        UnionRule(InferDependenciesRequest, InferScroogeScalaDependencies),
     )

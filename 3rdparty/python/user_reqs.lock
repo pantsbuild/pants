@@ -12,6 +12,7 @@
 //     "PyYAML<7.0,>=6.0",
 //     "ansicolors==1.1.8",
 //     "chevron==0.14.0",
+//     "debugpy==1.6.0",
 //     "fastapi==0.78.0",
 //     "fasteners==0.16.3",
 //     "freezegun==1.1.0",
@@ -19,7 +20,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.95",
+//     "pex==2.1.96",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -277,6 +278,54 @@
           ],
           "requires_python": ">=3.7",
           "version": "8.1.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "4de7777842da7e08652f2776c552070bbdd758557fdec73a15d7be0e4aab95ce",
+              "url": "https://files.pythonhosted.org/packages/e3/9c/0920139b8ccce7565e1e5ba1ccdeeba281bbab37392689aa00dfb6b55a6d/debugpy-1.6.0-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8ee75844242b4537beb5899f3e60a578454d1f136b99e8d57ac424573797b94a",
+              "url": "https://files.pythonhosted.org/packages/0e/21/eaac4b6ff2503e2ad86b3cdd7fe2875cbcd11af2b648eef8285346290196/debugpy-1.6.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "132defb585b518955358321d0f42f6aa815aa15b432be27db654807707c70b2f",
+              "url": "https://files.pythonhosted.org/packages/29/14/37d8721384550a40d766634a0aa6ecdcd1967c462f9c1ef38e1ad4d87bb1/debugpy-1.6.0-cp38-cp38-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0e3aa2368883e83e7b689ddff3cafb595f7b711f6a065886b46a96a7fef874e7",
+              "url": "https://files.pythonhosted.org/packages/31/c4/7da0696f7f07dc30d474d06cf087c788d1dad12d6fdb39b0ba8cbece1f72/debugpy-1.6.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "245c7789a012f86210847ec7ee9f38c30a30d4c2223c3e111829a76c9006a5d0",
+              "url": "https://files.pythonhosted.org/packages/45/a7/0bf4729aa497cc8837e9b525f34e6bad69f2191cfc14d63b36214add7a5c/debugpy-1.6.0-cp39-cp39-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "7b79c40852991f7b6c3ea65845ed0f5f6b731c37f4f9ad9c61e2ab4bd48a9275",
+              "url": "https://files.pythonhosted.org/packages/9c/45/8e3384e99b8bf79f8ba937aa3e726331789bdfb65ab03aedaedda9e2d30b/debugpy-1.6.0.zip"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "1ff853e60e77e1c16f85a31adb8360bb2d98ca588d7ed645b7f0985b240bdb5e",
+              "url": "https://files.pythonhosted.org/packages/9d/70/f05a8ba35d5b75045c7fbbd268fe3b4d721b4013df42c30b00aed5bfda54/debugpy-1.6.0-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0d383b91efee57dbb923ba20801130cf60450a0eda60bce25bccd937de8e323a",
+              "url": "https://files.pythonhosted.org/packages/a2/4f/b194a30eadabe0b578a4e9cf2ac9b1e387f0f5d2d6333d9bca18b69de689/debugpy-1.6.0-cp37-cp37m-macosx_10_15_x86_64.whl"
+            }
+          ],
+          "project_name": "debugpy",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.6"
         },
         {
           "artifacts": [
@@ -783,13 +832,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6737d05553eae0f7b8f19a73acf1134d054fd6e542382202ffc20d8aaa2ad590",
-              "url": "https://files.pythonhosted.org/packages/bb/8f/263373630022b0579f71dd6a985ff90c848541a101f0d60c1ef94ce5cbe8/pex-2.1.95-py2.py3-none-any.whl"
+              "hash": "86d916739c60a3dcbaa1cf294d75a7c2e4150a8e4e668cc29eed03195de7832e",
+              "url": "https://files.pythonhosted.org/packages/ec/c6/6c681c7ab22f09c52c8779b8ce4649b08f9cf9ae4ae810291124393a43d6/pex-2.1.96-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ef4e2e1059551d412bd2dbf938567b2db8d8dabddbcd7f47684f4602413e26f6",
-              "url": "https://files.pythonhosted.org/packages/d4/6a/9e288782752882aa34bb9baec1286f1f38b633de3ea8a866847d1fb17948/pex-2.1.95.tar.gz"
+              "hash": "b8ad4bc045e1beb7f202d2c367264787e0587c66c6af498b088df590a112da15",
+              "url": "https://files.pythonhosted.org/packages/48/1f/4170b055e2a30f5d1a3a34c45d92a43eb06f56b90566392d408c1bdf2d0f/pex-2.1.96.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -797,7 +846,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.95"
+          "version": "2.1.96"
         },
         {
           "artifacts": [
@@ -2186,12 +2235,13 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.96",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
     "chevron==0.14.0",
+    "debugpy==1.6.0",
     "fastapi==0.78.0",
     "fasteners==0.16.3",
     "freezegun==1.1.0",
@@ -2199,7 +2249,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.95",
+    "pex==2.1.96",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",

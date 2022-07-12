@@ -146,7 +146,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.96",
   "prefer_older_binary": false,
   "requirements": [
     "mypy-protobuf==2.10",
