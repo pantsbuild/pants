@@ -1158,6 +1158,9 @@ async def resolve_dependencies(
             for addr in special_cased_field.to_unparsed_address_inputs().values
         )
 
+    excluded = explicitly_provided.ignores.union(
+        *itertools.chain(deps.exclude for deps in inferred)
+    )
     result = Addresses(
         sorted(
             {
@@ -1168,10 +1171,7 @@ async def resolve_dependencies(
                     *itertools.chain.from_iterable(deps.include for deps in inferred),
                     *special_cased,
                 )
-                if addr
-                not in explicitly_provided.ignores.union(
-                    *itertools.chain(deps.exclude for deps in inferred)
-                )
+                if addr not in excluded
             }
         )
     )
