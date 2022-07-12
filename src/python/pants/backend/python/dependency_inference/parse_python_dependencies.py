@@ -54,15 +54,27 @@ class ParsePythonDependenciesRequest:
     assets_min_slashes: int
 
 
+@dataclass(frozen=True)
+class ParserScript:
+    digest: Digest
+
+
+@rule
+async def parser_script() -> ParserScript:
+    script = pkgutil.get_data(__name__, "scripts/dependency_parser.py")
+    assert script is not None
+    return ParserScript(
+        await Get(Digest, CreateDigest([FileContent("__parse_python_dependencies.py", script)]))
+    )
+
+
 @rule
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
+    parser_script: ParserScript,
 ) -> ParsedPythonDependencies:
-    script = pkgutil.get_data(__name__, "scripts/dependency_parser.py")
-    assert script is not None
-    python_interpreter, script_digest, stripped_sources = await MultiGet(
+    python_interpreter, stripped_sources = await MultiGet(
         Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(Digest, CreateDigest([FileContent("__parse_python_dependencies.py", script)])),
         Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
     )
 
@@ -71,7 +83,7 @@ async def parse_python_dependencies(
     file = stripped_sources.snapshot.files[0]
 
     input_digest = await Get(
-        Digest, MergeDigests([script_digest, stripped_sources.snapshot.digest])
+        Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])
     )
     process_result = await Get(
         ProcessResult,

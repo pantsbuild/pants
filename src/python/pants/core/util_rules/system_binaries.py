@@ -706,34 +706,42 @@ async def find_git() -> GitBinary:
 # -------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
 class ZipBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class UnzipBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class GunzipBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class TarBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class MkdirBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class ChmodBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class DiffBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class GitBinaryRequest:
     pass
 
