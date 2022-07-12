@@ -5,6 +5,24 @@ hidden: false
 createdAt: "2020-02-21T17:44:53.022Z"
 updatedAt: "2022-05-03T20:48:35.453Z"
 ---
+
+
+Installation using the 1-step setup script
+==========================================
+
+Pants has a launch script that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of pants that you want to use. 
+
+We provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `pants` launch script.
+
+```
+/bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/one_step_setup.sh)" 
+```
+
+
+Installation using manual steps
+===============================
+
+
 Creating the launch script
 --------------------------
 
