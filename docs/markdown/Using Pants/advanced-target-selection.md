@@ -186,5 +186,5 @@ You can leverage shell piping to partition the input targets into multiple shard
 For example, to split your Python tests into 10 shards, and select shard 0:
 
 ```bash
-./pants --filter-target-type=python_test list :: | awk 'NR % 10 == 0' | ./pants test
+./pants --filter-target-type=python_test list :: | awk 'NR % 10 == 0' | xargs ./pants test
 ```
