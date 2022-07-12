@@ -102,6 +102,8 @@ def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
     def pluralize_string(x: str) -> str:
         if x.endswith("s"):
             return x + "es"
+        elif x.endswith("y"):
+            return x[:-1] + "ies"
         else:
             return x + "s"
 
