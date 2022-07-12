@@ -6,6 +6,10 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.thrift.rules import rules as thrift_rules
 from pants.backend.codegen.thrift.scrooge.rules import rules as scrooge_rules
 from pants.backend.codegen.thrift.scrooge.scala.rules import GenerateScalaFromThriftRequest
@@ -15,6 +19,7 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourcesGeneratorTarget,
 )
 from pants.backend.scala import target_types
+from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
@@ -22,10 +27,16 @@ from pants.core.util_rules import config_files, source_files, stripped_source_fi
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.jvm import classpath
+from pants.jvm import classpath, testutil
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+)
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
 
@@ -48,13 +59,16 @@ def rule_runner() -> RuleRunner:
             *jdk_rules(),
             *target_types.rules(),
             *stripped_source_files.rules(),
+            *testutil.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateScalaFromThriftRequest]),
+            QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
         ],
         target_types=[
             ScalaSourceTarget,
             ScalaSourcesGeneratorTarget,
             ThriftSourcesGeneratorTarget,
+            JvmArtifactTarget,
         ],
     )
     rule_runner.set_options(
@@ -62,6 +76,21 @@ def rule_runner() -> RuleRunner:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
+
+
+@pytest.fixture
+def scrooge_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scrooge.test.lock",
+        ["org.apache.thrift:libthrift:0.15.0", "com.twitter:scrooge-core_2.13:21.12.0"],
+    )
+
+
+@pytest.fixture
+def scrooge_lockfile(
+    scrooge_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scrooge_lockfile_def.load(request)
 
 
 def assert_files_generated(
@@ -86,7 +115,7 @@ def assert_files_generated(
 
 
 @logging
-def test_generates_python(rule_runner: RuleRunner) -> None:
+def test_generates_scala(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Thrift files can import other thrift files, and those can import others
@@ -136,6 +165,17 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 """
             ),
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
+            "3rdparty/jvm/default.lock": scrooge_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scrooge_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "scala_sources(dependencies=['src/thrift/dir1'])",
+            "src/jvm/TestScroogeThriftScala.scala": dedent(
+                """\
+                package org.pantsbuild.example
+                trait TestScroogeThriftScala {
+                    val person: Person
+                }
+                """
+            ),
         }
     )
 
@@ -171,3 +211,11 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             "tests/thrift/org/pantsbuild/example/Executive.scala",
         ],
     )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    _ = rule_runner.request(RenderedClasspath, [request])
