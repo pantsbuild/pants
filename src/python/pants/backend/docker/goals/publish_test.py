@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Callable, cast
 
 import pytest
 
@@ -22,7 +22,9 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.process import Process
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -90,22 +92,15 @@ def assert_publish(
     publish: PublishPackages,
     expect_names: tuple[str, ...],
     expect_description: str | None,
-    expect_process,
+    expect_process: Callable[[Process], None] | None,
 ) -> None:
     assert publish.names == expect_names
     assert publish.description == expect_description
     if expect_process:
-        expect_process(publish.process)
+        assert publish.process
+        expect_process(publish.process.process)
     else:
         assert publish.process is None
-
-
-def process_assertion(**assertions):
-    def assert_process(process):
-        for attr, expected in assertions.items():
-            assert getattr(process, attr) == expected
-
-    return assert_process
 
 
 def test_docker_skip_push(rule_runner: RuleRunner) -> None:
