@@ -176,6 +176,38 @@ class DynamicRemoteOptions:
     cache_rpc_concurrency: int
     execution_rpc_concurrency: int
 
+    def _validate_store_addr(self) -> None:
+        if self.store_address:
+            return
+        if self.cache_read:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-address` to work properly."
+            )
+        if self.cache_write:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-address` or to work properly."
+            )
+
+    def _validate_exec_addr(self) -> None:
+        if not self.execution:
+            return
+        if not self.execution_address:
+            raise OptionsError(
+                "The `--remote-execution` option requires also setting "
+                "`--remote-execution-address` to work properly."
+            )
+        if not self.store_address:
+            raise OptionsError(
+                "The `--remote-execution-address` option requires also setting "
+                "`--remote-store-address`. Often these have the same value."
+            )
+
+    def __post_init__(self) -> None:
+        self._validate_store_addr()
+        self._validate_exec_addr()
+
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
         return DynamicRemoteOptions(
@@ -1660,28 +1692,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 """
             ),
         )
-
-        if opts.remote_execution and not opts.remote_execution_address:
-            raise OptionsError(
-                "The `--remote-execution` option requires also setting "
-                "`--remote-execution-address` to work properly."
-            )
-        if opts.remote_execution_address and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-execution-address` option requires also setting "
-                "`--remote-store-address`. Often these have the same value."
-            )
-
-        if opts.remote_cache_read and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-address` to work properly."
-            )
-        if opts.remote_cache_write and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-address` or to work properly."
-            )
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
