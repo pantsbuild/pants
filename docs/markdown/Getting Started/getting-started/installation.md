@@ -11,7 +11,7 @@ Most installations can use our one-step setup script to get a minimal version of
 Using our one-step setup script
 -------------------------------
 
-Pants has a launch script that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. 
+Pants has a launch script (called `./pants`) that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. 
 
 Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of Pants that you want to use. 
 
