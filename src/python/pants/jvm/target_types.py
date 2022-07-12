@@ -295,6 +295,33 @@ class JvmArtifactTarget(Target):
             )
 
 
+class JvmArtifactPackagesFieldSet(FieldSet):
+    group: JvmArtifactGroupField
+    artifact: JvmArtifactArtifactField
+    packages: JvmArtifactPackagesField
+
+    required_fields = (
+        JvmArtifactGroupField,
+        JvmArtifactArtifactField,
+        JvmArtifactPackagesField,
+    )
+
+
+class JvmArtifactPackagesTarget(Target):
+    alias = "jvm_artifact_packages"
+    core_fields = (*COMMON_TARGET_FIELDS, *JvmArtifactPackagesFieldSet.required_fields)
+    help = softwrap(
+        """
+        Provide the packages for a JVM artifact for the purposes of dependency inference.
+
+        The artifact identified by its `group` and `artifact` components.
+
+        This is an alternative for providing the packages within the `jvm_artifact`,
+        allow breaking down the packages of an artifact outside of `jvm_artifact`.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # JUnit test support field(s)
 # -----------------------------------------------------------------------------------------------

@@ -21,7 +21,12 @@ from pants.jvm.goals import lockfile
 from pants.jvm.package import deploy_jar
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
-from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.target_types import (
+    DeployJarTarget,
+    JvmArtifactPackagesTarget,
+    JvmArtifactTarget,
+    JvmWarTarget,
+)
 from pants.jvm.test import junit
 
 
@@ -33,6 +38,7 @@ def target_types():
         JunitTestTarget,
         JunitTestsGeneratorTarget,
         JvmArtifactTarget,
+        JvmArtifactPackagesTarget,
         JvmWarTarget,
     ]
 

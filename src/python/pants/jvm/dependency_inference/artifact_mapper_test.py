@@ -28,7 +28,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.target_types import JvmArtifactPackagesTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
@@ -58,6 +58,7 @@ def rule_runner() -> RuleRunner:
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
             JvmArtifactTarget,
+            JvmArtifactPackagesTarget,
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -456,3 +457,53 @@ def test_third_party_dep_inference_with_incorrect_provides(rule_runner: RuleRunn
     )
     with engine_error(JvmFirstPartyPackageMappingException):
         rule_runner.request(Addresses, [DependenciesRequest(lib1[Dependencies])])
+
+
+@maybe_skip_jdk_test
+def test_jvm_artifact_packages(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}"
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                jvm_artifact(
+                    name = "does.not_exist",
+                    group = "does.not",
+                    artifact = "exist",
+                    version = "0.0.1",
+                )
+
+                jvm_artifact_packages(
+                    name = "does.not_exist.packages",
+                    group = "does.not",
+                    artifact = "exist",
+                    packages = ["but.let.us.pretend.**"],
+                )
+                """
+            ),
+        }
+    )
+
+    mapping = rule_runner.request(ThirdPartySymbolMapping, [])
+    root_node = mapping["jvm-default"]
+
+    # Handy trie traversal function to placate mypy
+    def traverse(*children) -> FrozenTrieNode:
+        node = root_node
+        for child in children:
+            new_node = node.find_child(child)
+            if not new_node:
+                coord = ".".join(children)
+                raise Exception(f"Could not find the package specified by {coord}.")
+            node = new_node
+        return node
+
+    # Provided on the `jvm_artifact_packages`.
+    assert set(traverse("but", "let", "us", "pretend").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
+        Address("", target_name="does.not_exist"),
+    }

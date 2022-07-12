@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Iterable, Iterator, Tuple
+from typing import Any, DefaultDict, Iterable, Iterator, Mapping, Tuple
 
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.build_graph.address import Address
@@ -243,10 +243,39 @@ class AllJvmTypeProvidingTargets(Targets):
     pass
 
 
+class AllJvmArtifactPackagesTargets(Targets):
+    pass
+
+
+class JvmArtifactPackagesMapping(FrozenDict[UnversionedCoordinate, FrozenOrderedSet[str]]):
+    @classmethod
+    def from_dict(
+        cls, data: Mapping[UnversionedCoordinate, OrderedSet[str]]
+    ) -> JvmArtifactPackagesMapping:
+        return JvmArtifactPackagesMapping(
+            {key: FrozenOrderedSet(value) for key, value in data.items()}
+        )
+
+
 @rule(desc="Find all jvm_artifact targets in project", level=LogLevel.DEBUG)
 def find_all_jvm_artifact_targets(targets: AllTargets) -> AllJvmArtifactTargets:
     return AllJvmArtifactTargets(
-        tgt for tgt in targets if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField))
+        tgt
+        for tgt in targets
+        if tgt.has_fields((JvmArtifactGroupField, JvmArtifactArtifactField, JvmResolveField))
+    )
+
+
+@rule(desc="Find all jvm_artifact_packages targets in project", level=LogLevel.DEBUG)
+def find_all_jvm_artifact_packages_targets(targets: AllTargets) -> AllJvmArtifactPackagesTargets:
+    return AllJvmArtifactPackagesTargets(
+        tgt
+        for tgt in targets
+        if tgt.has_fields(
+            (JvmArtifactGroupField, JvmArtifactArtifactField, JvmArtifactPackagesField)
+        )
+        and not tgt.has_field(JvmResolveField)
+        and tgt[JvmArtifactPackagesField].value is not None
     )
 
 
@@ -257,6 +286,20 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
         for tgt in targets
         if tgt.has_field(JvmProvidesTypesField) and tgt[JvmProvidesTypesField].value is not None
     )
+
+
+@rule(desc="Compute packages by jvm_artifact_packages", level=LogLevel.DEBUG)
+def compute_jvm_artifact_packages(
+    all_jvm_artifact_packages_tgts: AllJvmArtifactPackagesTargets,
+) -> JvmArtifactPackagesMapping:
+    package_mapping: DefaultDict[UnversionedCoordinate, OrderedSet[str]] = defaultdict(OrderedSet)
+    for tgt in all_jvm_artifact_packages_tgts:
+        coord = UnversionedCoordinate(
+            group=tgt[JvmArtifactGroupField].value, artifact=tgt[JvmArtifactArtifactField].value
+        )
+        package_mapping[coord].update(tgt[JvmArtifactPackagesField].value or ())
+
+    return JvmArtifactPackagesMapping.from_dict(package_mapping)
 
 
 class ThirdPartySymbolMapping(FrozenDict[_ResolveName, FrozenTrieNode]):
@@ -293,6 +336,7 @@ async def find_available_third_party_artifacts(
 @rule
 async def compute_java_third_party_symbol_mapping(
     java_infer_subsystem: JavaInferSubsystem,
+    artifact_packages_mapping: JvmArtifactPackagesMapping,
     available_artifacts: AvailableThirdPartyArtifacts,
     all_jvm_type_providing_tgts: AllJvmTypeProvidingTargets,
 ) -> ThirdPartySymbolMapping:
@@ -320,6 +364,9 @@ async def compute_java_third_party_symbol_mapping(
     # Build mappings per resolve from packages to addresses.
     mappings: DefaultDict[_ResolveName, MutableTrieNode] = defaultdict(MutableTrieNode)
     for (resolve_name, coord), (addresses, packages) in available_artifacts.items():
+        if not packages:
+            # If no packages were explicitly defined try to retrieve from jvm_artifact_packages
+            packages = tuple(artifact_packages_mapping.get(coord) or ())
         if not packages:
             # If no packages were explicitly defined, fall back to our default mapping.
             packages = tuple(default_coords_to_packages[coord])
