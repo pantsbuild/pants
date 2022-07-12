@@ -11,15 +11,19 @@ Most installations can use our one-step setup script to get a minimal version of
 Using our one-step setup script
 -------------------------------
 
-Pants has a launch script that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of pants that you want to use. 
+Pants has a launch script that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. 
 
-We provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `./pants` launch script.
+Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of Pants that you want to use. 
+
+To streamline this, we provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `./pants` launch script.
 
 ```
 /bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/one_step_setup.sh)" 
 ```
 
 If the installation process was successful, you will see `Pants was installed successfully!` echoed to your terminal. 
+
+If you had difficulty installing Pants, see our [getting help](doc:getting-help) for community resources to help you resolve your issue.
 
 
 > 📘 Add `./pants` to version control

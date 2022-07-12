@@ -6,8 +6,7 @@ createdAt: "2022-07-12T00:00:00.000Z"
 updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
-If you want to make use of a non-standard Pants installation, for example, using a local source installation of Pants, follow these steps.
-
+If you want to make use of a non-standard Pants installation, for example, using a local source installation of Pants, follow these steps. For streamlined installations that work in most cases, see our [installation page](doc:installation).
 
 Manual installation
 -------------------
