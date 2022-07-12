@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf.python.additional_fields import ProtobufPythonResolveField
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufGrpcToggleField,
@@ -13,7 +14,6 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
@@ -100,12 +100,12 @@ def setup_mypy_protobuf_lockfile(
 class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         ProtobufDependenciesField,
-        PythonResolveField,
+        ProtobufPythonResolveField,
         ProtobufGrpcToggleField,
     )
 
     dependencies: ProtobufDependenciesField
-    resolve: PythonResolveField
+    python_resolve: ProtobufPythonResolveField
     grpc_toggle: ProtobufGrpcToggleField
 
 
@@ -124,7 +124,7 @@ async def infer_dependencies(
     if not python_protobuf.infer_runtime_dependency:
         return InferredDependencies([])
 
-    resolve = request.field_set.resolve.normalized_value(python_setup)
+    resolve = request.field_set.python_resolve.normalized_value(python_setup)
 
     result = [
         find_python_runtime_library_or_raise_error(

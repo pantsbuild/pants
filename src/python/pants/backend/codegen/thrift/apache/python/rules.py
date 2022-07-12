@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.python import subsystem
+from pants.backend.codegen.thrift.apache.python.additional_fields import ThriftPythonResolveField
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
@@ -15,7 +16,7 @@ from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, T
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.backend.python.target_types import PythonSourceField
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -66,10 +67,10 @@ async def generate_python_from_thrift(
 
 @dataclass(frozen=True)
 class ApacheThriftPythonDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (ThriftDependenciesField, PythonResolveField)
+    required_fields = (ThriftDependenciesField, ThriftPythonResolveField)
 
     dependencies: ThriftDependenciesField
-    resolve: PythonResolveField
+    python_resolve: ThriftPythonResolveField
 
 
 class InferApacheThriftPythonDependencies(InferDependenciesRequest):
@@ -87,7 +88,7 @@ async def find_apache_thrift_python_requirement(
     if not thrift_python.infer_runtime_dependency:
         return InferredDependencies([])
 
-    resolve = request.field_set.resolve.normalized_value(python_setup)
+    resolve = request.field_set.python_resolve.normalized_value(python_setup)
 
     addr = find_python_runtime_library_or_raise_error(
         module_mapping,

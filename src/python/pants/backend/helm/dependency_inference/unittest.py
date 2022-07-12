@@ -71,7 +71,7 @@ async def infer_chart_dependency_into_unittests(
     chart_dependencies: OrderedSet[Address] = OrderedSet()
 
     explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.depenencies)
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
 
     for candidate_chart in candidate_charts:

@@ -29,7 +29,7 @@ class KotlinJunitTestDependencyInferenceFieldSet(FieldSet):
 
 
 class InferKotlinJunitTestDependencyRequest(InferDependenciesRequest):
-    infer_from = KotlinJunitTestDependenciesField
+    infer_from = KotlinJunitTestDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
