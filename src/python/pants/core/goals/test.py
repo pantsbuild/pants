@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, TypeVar, cast
+from typing import Any, ClassVar, Optional, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -34,16 +34,18 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    IntField,
     NoApplicableTargetsBehavior,
     SourcesField,
     SpecialCasedDependencies,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    ValidNumbers,
     parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
+from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -390,6 +392,32 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    timeouts = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Enable test target timeouts. If timeouts are enabled then test targets with a
+            `timeout=` parameter set on their target will time out after the given number of
+            seconds if not completed. If no timeout is set, then either the default timeout
+            is used or no timeout is configured.
+            """
+        ),
+    )
+    timeout_default = IntOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            The default timeout (in seconds) for a test target if the `timeout` field is not
+            set on the target.
+            """
+        ),
+    )
+    timeout_maximum = IntOption(
+        default=None,
+        advanced=True,
+        help="The maximum timeout (in seconds) that may be used on a test target.",
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -399,6 +427,31 @@ class Test(Goal):
     subsystem_cls = TestSubsystem
 
     __test__ = False
+
+
+class TestTimeoutField(IntField, metaclass=ABCMeta):
+    """Base field class for implementing timeouts for test targets.
+
+    Each test target that wants to implement a timeout needs to provide with its own concrete field
+    class extending this one.
+    """
+
+    alias = "timeout"
+    required = False
+    valid_numbers = ValidNumbers.positive_only
+
+    def calculate_from_global_options(self, test: TestSubsystem) -> Optional[int]:
+        if not test.timeouts:
+            return None
+        if self.value is None:
+            if test.timeout_default is None:
+                return None
+            result = test.timeout_default
+        else:
+            result = self.value
+        if test.timeout_maximum is not None:
+            return min(result, test.timeout_maximum)
+        return result
 
 
 @rule_helper

@@ -142,7 +142,7 @@ async def setup_scalatest_for_target(
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run Scalatest runner for {request.field_set.address}",
-        timeout_seconds=request.field_set.timeout.value,
+        timeout_seconds=request.field_set.timeout.calculate_from_global_options(test_subsystem),
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
         use_nailgun=False,

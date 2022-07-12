@@ -17,7 +17,7 @@ from pants.engine.target import (
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JunitTimeoutField,
+    JunitTestTimeoutField,
     JvmDependenciesField,
     JvmJdkField,
     JvmProvidesTypesField,
@@ -61,7 +61,7 @@ class JunitTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
-        JunitTimeoutField,
+        JunitTestTimeoutField,
         JvmDependenciesField,
         JvmResolveField,
         JvmProvidesTypesField,
@@ -84,7 +84,7 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
         JavaTestsGeneratorSourcesField,
     )
     generated_target_cls = JunitTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, JunitTimeoutField)
+    copied_fields = (*COMMON_TARGET_FIELDS, JunitTestTimeoutField)
     moved_fields = (
         JvmDependenciesField,
         JvmJdkField,

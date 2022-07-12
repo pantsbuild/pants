@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.core.goals.test import TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -25,11 +26,10 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
-    JunitTimeoutField,
+    JunitTestTimeoutField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
-    JvmTimeoutField,
 )
 from pants.util.strutil import softwrap
 
@@ -100,7 +100,7 @@ class ScalatestTestSourceField(ScalaSourceField):
     pass
 
 
-class ScalatestTestTimeoutField(JvmTimeoutField):
+class ScalatestTestTimeoutField(TestTimeoutField):
     help = softwrap(
         """
         A timeout (in seconds) used by each ScalaTest test file belonging to this target.
@@ -170,7 +170,7 @@ class ScalaJunitTestTarget(Target):
         ScalaDependenciesField,
         ScalaJunitTestSourceField,
         ScalaConsumedPluginNamesField,
-        JunitTimeoutField,
+        JunitTestTimeoutField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,

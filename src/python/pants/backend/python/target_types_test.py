@@ -41,6 +41,7 @@ from pants.backend.python.target_types_rules import (
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.test import TestSubsystem
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
@@ -70,30 +71,56 @@ def test_pex_binary_validation() -> None:
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
+# TODO This test will not be necessary once the timeout-related deprecated options at the `pytest` subsystem are removed.
 def test_timeout_calculation() -> None:
     def assert_timeout_calculated(
         *,
         field_value: int | None,
         expected: int | None,
+        use_deprecated: bool,
         global_default: int | None = None,
         global_max: int | None = None,
         timeouts_enabled: bool = True,
     ) -> None:
         field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
-        pytest = create_subsystem(
-            PyTest,
-            timeouts=timeouts_enabled,
-            timeout_default=global_default,
-            timeout_maximum=global_max,
-        )
-        assert field.calculate_from_global_options(pytest) == expected
+        if use_deprecated:
+            test_subsystem = create_subsystem(TestSubsystem)
+            pytest = create_subsystem(
+                PyTest,
+                timeouts=timeouts_enabled,
+                timeout_default=global_default,
+                timeout_maximum=global_max,
+            )
+        else:
+            test_subsystem = create_subsystem(
+                TestSubsystem,
+                timeouts=timeouts_enabled,
+                timeout_default=global_default,
+                timeout_maximum=global_max,
+            )
+            pytest = create_subsystem(PyTest)
 
-    assert_timeout_calculated(field_value=10, expected=10)
-    assert_timeout_calculated(field_value=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=None, global_default=20, expected=20)
-    assert_timeout_calculated(field_value=None, expected=None)
-    assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+        assert field.calculate_from_global_options(test_subsystem, pytest) == expected
+
+    for use_deprecated in [True, False]:
+        assert_timeout_calculated(field_value=10, expected=10, use_deprecated=use_deprecated)
+        assert_timeout_calculated(
+            field_value=20, global_max=10, expected=10, use_deprecated=use_deprecated
+        )
+        assert_timeout_calculated(
+            field_value=None, global_default=20, expected=20, use_deprecated=use_deprecated
+        )
+        assert_timeout_calculated(field_value=None, expected=None, use_deprecated=use_deprecated)
+        assert_timeout_calculated(
+            field_value=None,
+            global_default=20,
+            global_max=10,
+            expected=10,
+            use_deprecated=use_deprecated,
+        )
+        assert_timeout_calculated(
+            field_value=10, timeouts_enabled=False, expected=None, use_deprecated=use_deprecated
+        )
 
 
 @pytest.mark.parametrize(
