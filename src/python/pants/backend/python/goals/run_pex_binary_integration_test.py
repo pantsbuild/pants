@@ -107,10 +107,10 @@ def test_run_sample_script(
     file = result.stdout.strip()
     if use_deprecated_semantics_args:
         assert file.endswith("src_root2/utils/strutil.py")
-        assert ".pants.d/tmp" in file
+        assert "pants-sandbox-" in file
     else:
         assert file.endswith("utils/strutil.py")
-        assert ".pants.d/tmp" not in file
+        assert "pants-sandbox-" not in file
     assert result.exit_code == 23
 
     if include_tools:
@@ -270,4 +270,4 @@ def test_filename_spec_ambiutity(use_deprecated_semantics_args) -> None:
         result = run_pants(args)
         file = result.stdout.strip()
         assert file.endswith("src/app.py")
-        assert ".pants.d/tmp" in file
+        assert "pants-sandbox-" in file

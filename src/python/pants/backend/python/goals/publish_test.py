@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Callable
 
 import pytest
 
@@ -20,6 +21,8 @@ from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.process import Process
+from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -95,22 +98,15 @@ def assert_package(
     package: PublishPackages,
     expect_names: tuple[str, ...],
     expect_description: str,
-    expect_process,
+    expect_process: Callable[[Process], None] | None,
 ) -> None:
     assert package.names == expect_names
     assert package.description == expect_description
     if expect_process:
-        expect_process(package.process)
+        assert package.process
+        expect_process(package.process.process)
     else:
         assert package.process is None
-
-
-def process_assertion(**assertions):
-    def assert_process(process):
-        for attr, expected in assertions.items():
-            assert getattr(process, attr) == expected
-
-    return assert_process
 
 
 def test_twine_upload(rule_runner, packages) -> None:
@@ -211,6 +207,6 @@ def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
     process = result[0].process
     assert process
     if cert_arg:
-        assert cert_arg in process.argv
+        assert cert_arg in process.process.argv
     else:
-        assert not any(arg.startswith("--cert") for arg in process.argv)
+        assert not any(arg.startswith("--cert") for arg in process.process.argv)

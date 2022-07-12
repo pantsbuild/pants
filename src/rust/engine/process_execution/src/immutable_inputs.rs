@@ -11,8 +11,7 @@ use tempfile::TempDir;
 
 use crate::WorkdirSymlink;
 
-/// Holds Digests materialized into a temporary directory, for symlinking into local sandboxes.
-pub struct ImmutableInputs {
+struct Inner {
   store: Store,
   // The TempDir that digests are materialized in.
   workdir: TempDir,
@@ -20,6 +19,12 @@ pub struct ImmutableInputs {
   // for cooperation between threads attempting to create Digests.
   contents: Mutex<HashMap<Digest, Arc<OnceCell<PathBuf>>>>,
 }
+
+///
+/// Holds Digests materialized into a temporary directory, for symlinking into local sandboxes.
+///
+#[derive(Clone)]
+pub struct ImmutableInputs(Arc<Inner>);
 
 impl ImmutableInputs {
   pub fn new(store: Store, base: &Path) -> Result<Self, String> {
@@ -32,17 +37,17 @@ impl ImmutableInputs {
           e
         )
       })?;
-    Ok(Self {
+    Ok(Self(Arc::new(Inner {
       store,
       workdir,
       contents: Mutex::default(),
-    })
+    })))
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
   async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, StoreError> {
     let digest = directory_digest.as_digest();
-    let cell = self.contents.lock().entry(digest).or_default().clone();
+    let cell = self.0.contents.lock().entry(digest).or_default().clone();
 
     // We (might) need to initialize the value.
     //
@@ -75,7 +80,7 @@ impl ImmutableInputs {
     // of approach 2 might eventually be worthwhile.
     cell
       .get_or_try_init(async {
-        let chroot = TempDir::new_in(self.workdir.path()).map_err(|e| {
+        let chroot = TempDir::new_in(self.0.workdir.path()).map_err(|e| {
           format!(
             "Failed to create a temporary directory for materialization of immutable input \
             digest {:?}: {}",
@@ -85,6 +90,7 @@ impl ImmutableInputs {
 
         let dest = chroot.path().join(digest.hash.to_hex());
         self
+          .0
           .store
           .materialize_directory(dest.clone(), directory_digest, Permissions::ReadOnly)
           .await?;
