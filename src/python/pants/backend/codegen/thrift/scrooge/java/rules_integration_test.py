@@ -85,18 +85,18 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.fixture
-def libthrift_lockfile_def() -> JVMLockfileFixtureDefinition:
+def scrooge_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
-        "libthrift.test.lock",
+        "scrooge.test.lock",
         ["org.apache.thrift:libthrift:0.15.0", "com.twitter:scrooge-core_2.13:21.12.0"],
     )
 
 
 @pytest.fixture
-def libthrift_lockfile(
-    libthrift_lockfile_def: JVMLockfileFixtureDefinition, request
+def scrooge_lockfile(
+    scrooge_lockfile_def: JVMLockfileFixtureDefinition, request
 ) -> JVMLockfileFixture:
-    return libthrift_lockfile_def.load(request)
+    return scrooge_lockfile_def.load(request)
 
 
 def assert_files_generated(
@@ -121,7 +121,7 @@ def assert_files_generated(
 
 
 @logging
-def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfileFixture) -> None:
+def test_generates_java(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Thrift files can import other thrift files, and those can import others
@@ -171,8 +171,8 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
                 """
             ),
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
-            "3rdparty/jvm/default.lock": libthrift_lockfile.serialized_lockfile,
-            "3rdparty/jvm/BUILD": libthrift_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scrooge_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scrooge_lockfile.requirements_as_jvm_artifact_targets(),
             "src/jvm/BUILD": "java_sources(dependencies=['src/thrift/dir1'])",
             "src/jvm/TestScroogeThriftJava.java": dedent(
                 """\

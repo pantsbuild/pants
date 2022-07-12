@@ -119,7 +119,7 @@ async def resolve_scrooge_thrift_java_runtime_for_resolve(
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
         subsystem="the Scrooge Java Thrift runtime",
-        target_type="protobuf_sources()",
+        target_type="thrift_sources",
     )
     return ScroogeThriftJavaRuntimeForResolve(addresses)
 
