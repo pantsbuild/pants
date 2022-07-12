@@ -347,7 +347,13 @@ async def compute_java_third_party_symbol_mapping(
 
 class ConflictingJvmArtifactVersionInResolveError(ValueError):
     def __init__(
-        self, *, subsystem: str, requirement_source: str | None = None, resolve_name: str, required_version: str, conflicting_coordinate: Coordinate
+        self,
+        *,
+        subsystem: str,
+        requirement_source: str | None = None,
+        resolve_name: str,
+        required_version: str,
+        conflicting_coordinate: Coordinate,
     ) -> None:
         source = f" from {requirement_source}" if requirement_source else ""
         msg = (
@@ -362,7 +368,14 @@ class ConflictingJvmArtifactVersionInResolveError(ValueError):
 
 
 class MissingRequiredJvmArtifactsInResolve(ValueError):
-    def __init__(self, coordinates: Iterable[Coordinate | UnversionedCoordinate], *, subsystem: str, resolve_name: str, target_type: str) -> None:
+    def __init__(
+        self,
+        coordinates: Iterable[Coordinate | UnversionedCoordinate],
+        *,
+        subsystem: str,
+        resolve_name: str,
+        target_type: str,
+    ) -> None:
         msg = (
             f"The JVM resolve `{resolve_name}` is missing one or more requirements for {subsystem}. "
             f"Since at least one JVM target type in this repository consumes a `{target_type}` target "
@@ -443,7 +456,12 @@ def find_jvm_artifacts_or_raise(
             addresses.add(tgt.address)
 
     if remaining_coordinates:
-        raise MissingRequiredJvmArtifactsInResolve(remaining_coordinates, subsystem=subsystem, resolve_name=resolve, target_type=target_type)
+        raise MissingRequiredJvmArtifactsInResolve(
+            remaining_coordinates,
+            subsystem=subsystem,
+            resolve_name=resolve,
+            target_type=target_type,
+        )
 
     return frozenset(addresses)
 
