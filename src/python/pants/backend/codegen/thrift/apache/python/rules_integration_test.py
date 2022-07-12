@@ -6,7 +6,9 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.codegen.thrift.apache.python import additional_fields
 from pants.backend.codegen.thrift.apache.python.rules import (
+    ApacheThriftPythonDependenciesInferenceFieldSet,
     GeneratePythonFromThriftRequest,
     InferApacheThriftPythonDependencies,
 )
@@ -28,7 +30,6 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
-    Dependencies,
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
@@ -51,6 +52,7 @@ def rule_runner() -> RuleRunner:
             *graph.rules(),
             *stripped_source_files.rules(),
             *module_mapper.rules(),
+            *additional_fields.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromThriftRequest]),
         ],
@@ -187,7 +189,9 @@ def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
         ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
     )
     thrift_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.thrift"))
-    request = InferApacheThriftPythonDependencies(thrift_tgt[Dependencies])
+    request = InferApacheThriftPythonDependencies(
+        ApacheThriftPythonDependenciesInferenceFieldSet.create(thrift_tgt)
+    )
 
     # Start with no relevant requirements.
     with engine_error(MissingPythonCodegenRuntimeLibrary):

@@ -3,7 +3,7 @@
 from textwrap import dedent
 
 from pants.backend.codegen.protobuf import target_types
-from pants.backend.codegen.protobuf.python import python_protobuf_subsystem
+from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     InferPythonProtobufDependencies,
     PythonProtobufDependenciesInferenceFieldSet,
@@ -28,6 +28,7 @@ def test_find_protobuf_python_requirement() -> None:
             *target_types.rules(),
             *module_mapper.rules(),
             *stripped_source_files.rules(),
+            *additional_fields.rules(),
             QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
         ],
         target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
