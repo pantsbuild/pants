@@ -6,7 +6,8 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
-#     "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6,url=not_provided,jar=not_provided"
+#     "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6,url=not_provided,jar=not_provided",
+#     "org.scala-lang:scala-library:2.13.6,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
