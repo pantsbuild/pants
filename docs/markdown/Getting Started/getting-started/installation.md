@@ -3,48 +3,24 @@ title: "Installing Pants"
 slug: "installation"
 hidden: false
 createdAt: "2020-02-21T17:44:53.022Z"
-updatedAt: "2022-05-03T20:48:35.453Z"
+updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
+Most installations can use our one-step setup script to get a minimal version of Pants set up. If you need to make use of an advanced or non-standard setup, see our [manual installation](doc:manual-installation) page.
 
-Installation using the 1-step setup script
-==========================================
+Using our one-step setup script
+-------------------------------
 
 Pants has a launch script that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of pants that you want to use. 
 
-We provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `pants` launch script.
+We provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `./pants` launch script.
 
 ```
 /bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/one_step_setup.sh)" 
 ```
 
+If the installation process was successful, you will see `Pants was installed successfully!` echoed to your terminal. 
 
-Installation using manual steps
-===============================
-
-
-Creating the launch script
---------------------------
-
-Pants is invoked via a launch script named `./pants` , saved at the root of the repository. This script will install Pants and handle upgrades.
-
-First, set up a minimal `pants.toml` config file to instruct the script to download the latest 2.13 release:
-
-```bash
-printf '[GLOBAL]\npants_version = "2.13.0.dev5"\n' > pants.toml
-```
-
-Then, download the script:
-
-```bash
-curl -L -O https://static.pantsbuild.org/setup/pants && chmod +x ./pants
-```
-
-Now, run this to bootstrap Pants and to verify the version it installs:
-
-```bash
-./pants --version
-```
 
 > 📘 Add `./pants` to version control
 > 
@@ -54,25 +30,3 @@ Now, run this to bootstrap Pants and to verify the version it installs:
 > 
 > The `./pants` script will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants is as simple as editing `pants_version` in that file.
 
-Running Pants from unreleased builds
-------------------------------------
-
-To use an unreleased build of Pants from the [pantsbuild/pants](https://github.com/pantsbuild/pants) main branch, locate the main branch SHA, set PANTS_SHA=<SHA> in the environment, and run `./pants` as usual:
-
-```bash
-PANTS_SHA=22c566e78b4dd982958429813c82e9f558957817 ./pants --version
-```
-
-Building Pants from sources
----------------------------
-
-We currently distribute Pants for Linux (x86_64) and macOS.
-
-If you need to run Pants on some other platform, such as Linux on ARM or Alpine Linux, you can try building it yourself by checking out the [Pants repo](https://github.com/pantsbuild/pants), and running `./pants package src/python/pants:pants-packaged` to build a wheel.
-
-Running Pants from sources
---------------------------
-
-See [here](doc:running-pants-from-sources) for instructions on how to run Pants directly from its sources.
-
-This is useful when making changes directly to Pants, to see how those changes impact your repo.
