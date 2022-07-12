@@ -12,17 +12,24 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
     JVMLockfileFixtureDefinition,
 )
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
-from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.java.rules import rules as java_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.util_rules import stripped_source_files
+from pants.backend.experimental.java.register import rules as java_backend_rules
+from pants.backend.java.compile.javac import CompileJavaSourceRequest
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm import testutil
 from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+)
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GRPC_PROTO_STANZA = """
@@ -67,14 +74,20 @@ def protobuf_java_lockfile(
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *protobuf_rules(),
-            *artifact_mapper.rules(),
-            *stripped_source_files.rules(),
+            *java_backend_rules(),
+            *java_protobuf_rules(),
             *target_types_rules(),
+            *testutil.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
+            QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget, JvmArtifactTarget],
+        target_types=[
+            ProtobufSourcesGeneratorTarget,
+            JavaSourceTarget,
+            JavaSourcesGeneratorTarget,
+            JvmArtifactTarget,
+        ],
     )
 
 
@@ -112,6 +125,7 @@ def test_generates_java(
             "src/protobuf/dir1/f.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.java.proto";
 
                 package dir1;
 
@@ -155,6 +169,16 @@ def test_generates_java(
             ),
             "3rdparty/jvm/default.lock": protobuf_java_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "java_sources(dependencies=['src/protobuf/dir1'])",
+            "src/jvm/TestJavaProtobuf.java": dedent(
+                """\
+                package org.pantsbuild.java.example;
+                import org.pantsbuild.java.proto.F.Person;
+                public class TestJavaProtobuf {
+                  Person person;
+                }
+                """
+            ),
         }
     )
 
@@ -167,7 +191,8 @@ def test_generates_java(
         )
 
     assert_gen(
-        Address("src/protobuf/dir1", relative_file_path="f.proto"), "src/protobuf/dir1/F.java"
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
+        "src/protobuf/org/pantsbuild/java/proto/F.java",
     )
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f2.proto"), "src/protobuf/dir1/F2.java"
@@ -179,3 +204,11 @@ def test_generates_java(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
         "tests/protobuf/test_protos/F.java",
     )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    _ = rule_runner.request(RenderedClasspath, [request])
