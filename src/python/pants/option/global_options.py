@@ -120,16 +120,16 @@ class AuthPluginState(Enum):
 
 @dataclass(frozen=True)
 class AuthPluginResult:
-    """The return type for a function specified via `--remote-auth-plugin`.
+    """The return type for a function specified via `[GLOBAL].remote_auth_plugin`.
 
     The returned `store_headers` and `execution_headers` will replace whatever headers Pants would
-    have used normally, e.g. what is set with `--remote-store-headers`. This allows you to control
+    have used normally, e.g. what is set with `[GLOBAL].remote_store_headers`. This allows you to control
     the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
     the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
 
-    If set, the returned `instance_name` will override by `--remote-instance-name`, `store_address`
-    will override `--remote-store-address`, and `execution_address` will override
-    `--remote-execution-address`. The store address and execution address must be prefixed with
+    If set, the returned `instance_name` will override by `[GLOBAL].remote_instance_name`, `store_address`
+    will override `[GLOBAL].remote_store_address`, and `execution_address` will override
+    ``[GLOBAL].remote_execution_address``. The store address and execution address must be prefixed with
     `grpc://` or `grpcs://`.
     """
 
@@ -140,14 +140,16 @@ class AuthPluginResult:
     execution_address: str | None = None
     instance_name: str | None = None
     expiration: datetime | None = None
+    plugin_name: str | None = None
 
     def __post_init__(self) -> None:
         def assert_valid_address(addr: str | None, field_name: str) -> None:
             valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
             if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
+                name = self.plugin_name or ""
                 raise ValueError(
                     f"Invalid `{field_name}` in `AuthPluginResult` returned from "
-                    f"`--remote-auth-plugin`. Must start with `grpc://` or `grpcs://`, but was "
+                    f"`[GLOBAL].remote_auth_plugin` {name}. Must start with `grpc://` or `grpcs://`, but was "
                     f"{addr}."
                 )
 
@@ -181,13 +183,13 @@ class DynamicRemoteOptions:
             return
         if self.cache_read:
             raise OptionsError(
-                "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-address` to work properly."
+                "The `[GLOBAL].remote_cache_read` option requires also setting "
+                "`[GLOBAL].remote_store_address` to work properly."
             )
         if self.cache_write:
             raise OptionsError(
-                "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-address` or to work properly."
+                "The `[GLOBAL].remote_cache_write` option requires also setting "
+                "`[GLOBAL].remote_store_address` or to work properly."
             )
 
     def _validate_exec_addr(self) -> None:
@@ -195,13 +197,13 @@ class DynamicRemoteOptions:
             return
         if not self.execution_address:
             raise OptionsError(
-                "The `--remote-execution` option requires also setting "
-                "`--remote-execution-address` to work properly."
+                "The `[GLOBAL].remote_execution` option requires also setting "
+                "`[GLOBAL].remote_execution_address` to work properly."
             )
         if not self.store_address:
             raise OptionsError(
-                "The `--remote-execution-address` option requires also setting "
-                "`--remote-store-address`. Often these have the same value."
+                "The `[GLOBAL].remote_execution_address` option requires also setting "
+                "`[GLOBAL].remote_store_address`. Often these have the same value."
             )
 
     def __post_init__(self) -> None:
@@ -268,7 +270,7 @@ class DynamicRemoteOptions:
         if bootstrap_options.remote_auth_plugin:
             if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
-                    "Invalid value for `--remote-auth-plugin`: "
+                    "Invalid value for `[GLOBAL].remote_auth_plugin`: "
                     f"{bootstrap_options.remote_auth_plugin}. Please use the format "
                     f"`path.to.module:my_func`."
                 )
@@ -285,33 +287,46 @@ class DynamicRemoteOptions:
                     prior_result=prior_result,
                 ),
             )
+            plugin_name = auth_plugin_result.plugin_name or bootstrap_options.remote_auth_plugin
             if not auth_plugin_result.is_available:
                 # NB: This is debug because we expect plugins to log more informative messages.
                 logger.debug(
                     "Disabling remote caching and remote execution because authentication was not "
-                    "available via the plugin from `--remote-auth-plugin`."
+                    f"available via the plugin {plugin_name} (from `[GLOBAL].remote_auth_plugin`)."
                 )
                 execution = False
                 cache_read = False
                 cache_write = False
             else:
                 logger.debug(
-                    "`--remote-auth-plugin` succeeded. Remote caching/execution will be attempted."
+                    f"`[GLOBAL].remote_auth_plugin` {plugin_name} succeeded. Remote caching/execution will be attempted."
                 )
                 execution_headers = auth_plugin_result.execution_headers
                 store_headers = auth_plugin_result.store_headers
-                plugin_provided_opt_log = "Setting `[GLOBAL].remote_{opt}` is not needed and will be ignored since it is provided by the auth plugin."
+                plugin_provided_opt_log = "Setting `[GLOBAL].remote_{opt}` is not needed and will be ignored since it is provided by the auth plugin: {plugin_name}."
                 if auth_plugin_result.instance_name is not None:
                     if instance_name is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="instance_name"))
+                        logger.warning(
+                            plugin_provided_opt_log.format(
+                                opt="instance_name", plugin_name=plugin_name
+                            )
+                        )
                     instance_name = auth_plugin_result.instance_name
                 if auth_plugin_result.store_address is not None:
                     if store_address is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="store_address"))
+                        logger.warning(
+                            plugin_provided_opt_log.format(
+                                opt="store_address", plugin_name=plugin_name
+                            )
+                        )
                     store_address = auth_plugin_result.store_address
                 if auth_plugin_result.execution_address is not None:
                     if execution_address is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="execution_address"))
+                        logger.warning(
+                            plugin_provided_opt_log.format(
+                                opt="execution_address", plugin_name=plugin_name
+                            )
+                        )
                     execution_address = auth_plugin_result.execution_address
         opts = cls(
             execution=execution,
@@ -1134,7 +1149,7 @@ class BootstrapOptions:
             """
             Enables remote workers for increased parallelism. (Alpha)
 
-            Alternatively, you can use `--remote-cache-read` and `--remote-cache-write` to still run
+            Alternatively, you can use `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write` to still run
             everything locally, but to use a remote cache.
             """
         ),
@@ -1145,7 +1160,7 @@ class BootstrapOptions:
             """
             Whether to enable reading from a remote cache.
 
-            This cannot be used at the same time as `--remote-execution`.
+            This cannot be used at the same time as `[GLOBAL].remote_execution`.
             """
         ),
     )
@@ -1155,7 +1170,7 @@ class BootstrapOptions:
             """
             Whether to enable writing results to a remote cache.
 
-            This cannot be used at the same time as `--remote-execution`.
+            This cannot be used at the same time as `[GLOBAL].remote_execution`.
             """
         ),
     )
@@ -1169,7 +1184,7 @@ class BootstrapOptions:
             This is used by some remote servers for routing. Consult your remote server for
             whether this should be set.
 
-            You can also use `--remote-auth-plugin` to provide a plugin to dynamically set this value.
+            You can also use `[GLOBAL].remote_auth_plugin` to provide a plugin to dynamically set this value.
             """
         ),
     )
@@ -1179,7 +1194,7 @@ class BootstrapOptions:
         help=softwrap(
             """
             Path to a PEM file containing CA certificates used for verifying secure
-            connections to `--remote-execution-address` and `--remote-store-address`.
+            connections to `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
 
             If unspecified, Pants will attempt to auto-discover root CA certificates when TLS
             is enabled with remote execution and caching.
@@ -1192,11 +1207,11 @@ class BootstrapOptions:
         help=softwrap(
             """
             Path to a file containing an oauth token to use for gGRPC connections to
-            `--remote-execution-address` and `--remote-store-address`.
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
 
             If specified, Pants will add a header in the format `authorization: Bearer <token>`.
-            You can also manually add this header via `--remote-execution-headers` and
-            `--remote-store-headers`, or use `--remote-auth-plugin` to provide a plugin to
+            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
+            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
             """
         ),
@@ -1220,9 +1235,9 @@ class BootstrapOptions:
             Pants will replace the headers it would normally use with whatever your plugin
             returns; usually, you should include the `initial_store_headers` and
             `initial_execution_headers` in your result so that options like
-            `--remote-store-headers` still work.
+            `[GLOBAL].remote_store_headers` still work.
 
-            If you return `instance_name`, Pants will replace `--remote-instance-name`
+            If you return `instance_name`, Pants will replace `[GLOBAL].remote_instance_name`
             with this value.
 
             If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable
@@ -1256,7 +1271,7 @@ class BootstrapOptions:
 
             Format: header=value. Pants may add additional headers.
 
-            See `--remote-execution-headers` as well.
+            See `[GLOBAL].remote_execution_headers` as well.
             """
         ),
         default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_store_headers).replace(
@@ -1332,7 +1347,7 @@ class BootstrapOptions:
             Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
             with TLS enabled. If `grpc` is used, TLS will be disabled.
 
-            You must also set `--remote-store-address`, which will often be the same value.
+            You must also set `[GLOBAL].remote_store_address`, which will often be the same value.
             """
         ),
     )
@@ -1355,7 +1370,7 @@ class BootstrapOptions:
             Headers to set on remote execution requests. Format: header=value. Pants
             may add additional headers.
 
-            See `--remote-store-headers` as well.
+            See `[GLOBAL].remote_store_headers` as well.
             """
         ),
         default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_execution_headers).replace(
@@ -1637,13 +1652,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         deprecated_conditional(
             lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
             removal_version="2.15.0.dev0",
-            entity="Setting `--remote-execution` at the same time as `--remote-cache-eager-fetch`.",
+            entity="Setting `[GLOBAL].remote_execution` at the same time as `[GLOBAL].remote_cache_eager-fetch`.",
             hint=softwrap(
                 """
-                Use of `--remote-execution` currently implies use of
-                `--remote-cache-eager-fetch=false`, but in future versions, use of eager fetch with
+                Use of `[GLOBAL].remote_execution` currently implies use of
+                `[GLOBAL].remote_cache_eager-fetch=false`, but in future versions, use of eager fetch with
                 remote execution will be optional. To preserve the current behavior in future
-                versions, `--remote-cache-eager-fetch` should be disabled.
+                versions, `[GLOBAL].remote_cache_eager-fetch` should be disabled.
                 """
             ),
         )
@@ -1656,13 +1671,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 and (not opts.remote_cache_read or not opts.remote_cache_write)
             ),
             removal_version="2.15.0.dev0",
-            entity="Using `--remote-execution` without setting `--remote-cache-read` and `--remote-cache-write`.",
+            entity="Using `[GLOBAL].remote_execution` without setting `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write`.",
             hint=softwrap(
                 """
-                Use of `--remote-execution` currently implies use of a remote cache, but in future
+                Use of `[GLOBAL].remote_execution` currently implies use of a remote cache, but in future
                 versions, use of the remote cache with remote execution will be optional. To
-                preserve the current behavior in future versions, both `--remote-cache-read` and
-                `--remote-cache-write` should be enabled.
+                preserve the current behavior in future versions, both `[GLOBAL].remote_cache_read` and
+                `[GLOBAL].remote_cache_write` should be enabled.
                 """
             ),
         )
