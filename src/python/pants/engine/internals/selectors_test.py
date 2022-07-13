@@ -94,7 +94,10 @@ def test_create_get() -> None:
     assert get.input == 42
 
     # Also test the equivalence of the 1-arg and 2-arg versions.
-    assert Get(AClass, BClass()) == Get(AClass, BClass, BClass())
+    get2 = Get(AClass, int(42))
+    assert get.output_type == get2.output_type
+    assert get.input_type == get2.input_type
+    assert get.input == get2.input
 
 
 def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
@@ -123,7 +126,7 @@ def test_invalid_get() -> None:
         ),
     )
     assert_invalid_get(
-        lambda: Get(AClass, 1, BClass),  # type: ignore[call-overload, no-any-return]
+        lambda: Get(AClass, 1, BClass),
         expected=(
             "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, "
             "input), the second argument must be a type, but given `1` of type "
