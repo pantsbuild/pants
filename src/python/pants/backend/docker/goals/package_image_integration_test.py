@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
@@ -59,5 +61,39 @@ def test_docker_build(rule_runner) -> None:
     assert len(result.artifacts) == 1
     assert len(result.artifacts[0].extra_log_lines) == 2
     assert "Built docker image: test-image:1.0" == result.artifacts[0].extra_log_lines[0]
+    assert "Docker image ID:" in result.artifacts[0].extra_log_lines[1]
+    assert "<unknown>" not in result.artifacts[0].extra_log_lines[1]
+
+
+def test_docker_build_with_args_and_labels(rule_runner) -> None:
+    """This test requires a running docker daemon."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                docker_image(
+                    name='test-ubuntu',
+                    extra_build_args=['UBUNTU_VERSION=20.04'],
+                    image_labels={
+                        'ubuntu': '{build_args.UBUNTU_VERSION}',
+                        'base_image': '{tags.baseimage}'
+                    },
+                    image_tags=['1.0']
+                )
+                """
+            ),
+            "src/Dockerfile": dedent(
+                """\
+                ARG UBUNTU_VERSION
+                FROM ubuntu:${UBUNTU_VERSION}
+                """
+            ),
+        }
+    )
+    target = rule_runner.get_target(Address("src", target_name="test-ubuntu"))
+    result = run_docker(rule_runner, target)
+    assert len(result.artifacts) == 1
+    assert len(result.artifacts[0].extra_log_lines) == 2
+    assert "Built docker image: test-ubuntu:1.0" == result.artifacts[0].extra_log_lines[0]
     assert "Docker image ID:" in result.artifacts[0].extra_log_lines[1]
     assert "<unknown>" not in result.artifacts[0].extra_log_lines[1]
