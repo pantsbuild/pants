@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Iterable,
     Iterator,
@@ -27,10 +28,11 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import RuntimePackageDependenciesField
+from pants.core.goals.test import RuntimePackageDependenciesField, TestSubsystem
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -797,6 +799,7 @@ class PythonTestsDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
+# TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
 class PythonTestsTimeoutField(IntField):
     alias = "timeout"
     help = softwrap(
@@ -810,18 +813,33 @@ class PythonTestsTimeoutField(IntField):
     )
     valid_numbers = ValidNumbers.positive_only
 
-    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
+    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""
-        if not pytest.timeouts_enabled:
+
+        def resolve_opt(*, old_option: str, new_option: str) -> Any:
+            return resolve_conflicting_options(
+                old_option=old_option,
+                new_option=new_option,
+                old_scope="pytest",
+                new_scope="test",
+                old_container=pytest.options,
+                new_container=test.options,
+            )
+
+        enabled = resolve_opt(old_option="timeouts", new_option="timeouts")
+        timeout_default = resolve_opt(old_option="timeout_default", new_option="timeout_default")
+        timeout_maximum = resolve_opt(old_option="timeout_maximum", new_option="timeout_maximum")
+
+        if not enabled:
             return None
         if self.value is None:
-            if pytest.timeout_default is None:
+            if timeout_default is None:
                 return None
-            result = pytest.timeout_default
+            result = cast(int, timeout_default)
         else:
             result = self.value
-        if pytest.timeout_maximum is not None:
-            return min(result, pytest.timeout_maximum)
+        if timeout_maximum is not None:
+            return min(result, cast(int, timeout_maximum))
         return result
 
 

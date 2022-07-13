@@ -30,6 +30,7 @@ from pants.core.goals.test import (
     TestFieldSet,
     TestResult,
     TestSubsystem,
+    TestTimeoutField,
     _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
@@ -66,6 +67,10 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.logging import LogLevel
+
+
+class MockTestTimeoutField(TestTimeoutField):
+    pass
 
 
 class MockTarget(Target):
@@ -533,3 +538,29 @@ def test_runtime_package_dependencies() -> None:
     built_package = result[0]
     snapshot = rule_runner.request(Snapshot, [built_package.digest])
     assert snapshot.files == ("src.py/main.pex",)
+
+
+def test_timeout_calculation() -> None:
+    def assert_timeout_calculated(
+        *,
+        field_value: int | None,
+        expected: int | None,
+        global_default: int | None = None,
+        global_max: int | None = None,
+        timeouts_enabled: bool = True,
+    ) -> None:
+        field = MockTestTimeoutField(field_value, Address("", target_name="tests"))
+        test_subsystem = create_subsystem(
+            TestSubsystem,
+            timeouts=timeouts_enabled,
+            timeout_default=global_default,
+            timeout_maximum=global_max,
+        )
+        assert field.calculate_from_global_options(test_subsystem) == expected
+
+    assert_timeout_calculated(field_value=10, expected=10)
+    assert_timeout_calculated(field_value=20, global_max=10, expected=10)
+    assert_timeout_calculated(field_value=None, global_default=20, expected=20)
+    assert_timeout_calculated(field_value=None, expected=None)
+    assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
+    assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)

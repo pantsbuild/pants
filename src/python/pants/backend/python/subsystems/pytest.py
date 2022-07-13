@@ -93,6 +93,8 @@ class PyTest(PythonToolBase):
             is used or no timeout is configured.
             """
         ),
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeouts` option in the `test` scope instead.",
     )
     timeout_default = IntOption(
         "--timeout-default",
@@ -104,12 +106,16 @@ class PyTest(PythonToolBase):
             set on the target.
             """
         ),
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeout_default` option in the `test` scope instead.",
     )
     timeout_maximum = IntOption(
         "--timeout-maximum",
         default=None,
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeout_maximum` option in the `test` scope instead.",
     )
     junit_family = StrOption(
         "--junit-family",

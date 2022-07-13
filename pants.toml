@@ -160,7 +160,6 @@ extra_requirements.add = [
   "pygments",
 ]
 lockfile = "3rdparty/python/pytest.lock"
-timeout_default = 60
 
 [test]
 extra_env_vars = [
@@ -173,6 +172,7 @@ extra_env_vars = [
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
 ]
+timeout_default = 60
 
 [mypy]
 interpreter_constraints = [">=3.7,<3.10"]
