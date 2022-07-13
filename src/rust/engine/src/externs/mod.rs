@@ -9,10 +9,10 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::PyException;
-use pyo3::import_exception;
+use pyo3::exceptions::{PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
+use pyo3::{import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 
 use logging::PythonLogLevel;
@@ -54,6 +54,16 @@ pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
     return false;
   }
   h1.eq(h2).unwrap()
+}
+
+pub fn is_union(py: Python, v: &PyType) -> PyResult<bool> {
+  let is_union_for_attr = intern!(py, "_is_union_for");
+  if !v.hasattr(is_union_for_attr)? {
+    return Ok(false);
+  }
+
+  let is_union_for = v.getattr(is_union_for_attr)?;
+  Ok(is_union_for.is(v))
 }
 
 pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
@@ -272,7 +282,7 @@ impl PyGeneratorResponseBreak {
   }
 }
 
-#[pyclass]
+#[pyclass(subclass)]
 pub struct PyGeneratorResponseGet {
   product: Py<PyType>,
   declared_subject: Py<PyType>,
@@ -282,12 +292,64 @@ pub struct PyGeneratorResponseGet {
 #[pymethods]
 impl PyGeneratorResponseGet {
   #[new]
-  fn __new__(product: Py<PyType>, declared_subject: Py<PyType>, subject: PyObject) -> Self {
-    Self {
-      product,
-      declared_subject,
-      subject,
-    }
+  fn __new__(
+    py: Python,
+    product: &PyAny,
+    input_arg0: &PyAny,
+    input_arg1: Option<&PyAny>,
+  ) -> PyResult<Self> {
+    let product = product.cast_as::<PyType>().map_err(|_| {
+      let actual_type = product.get_type();
+      PyTypeError::new_err(format!(
+        "Invalid Get. The first argument (the output type) must be a type, but given \
+        `{product}` with type {actual_type}."
+      ))
+    })?;
+
+    let (declared_subject, subject) = if let Some(input_arg1) = input_arg1 {
+      let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
+        let input_arg0_type = input_arg0.get_type();
+        PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
+          input), the second argument must be a type, but given `{input_arg0}` of type \
+          {input_arg0_type}."
+        ))
+      })?;
+
+      if input_arg1.is_instance_of::<PyType>()? {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form \
+          Get(OutputType, InputType, input), the third argument should be \
+          an object, rather than a type, but given {input_arg1}."
+        )));
+      }
+
+      let actual_type = input_arg1.get_type();
+      if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
+          second argument, {declared_type}, but had the type {actual_type}."
+        )));
+      }
+
+      (declared_type, input_arg1)
+    } else {
+      if input_arg0.is_instance_of::<PyType>()? {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the shorthand form \
+          Get(OutputType, InputType(constructor args)), the second argument should be \
+          a constructor call, rather than a type, but given {input_arg0}."
+        )));
+      }
+
+      (input_arg0.get_type(), input_arg0)
+    };
+
+    Ok(Self {
+      product: product.into_py(py),
+      declared_subject: declared_subject.into_py(py),
+      subject: subject.into_py(py),
+    })
   }
 }
 
