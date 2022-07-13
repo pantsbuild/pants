@@ -309,8 +309,8 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 # JAR support fields
 # -----------------------------------------------------------------------------------------------
 
-
-class ReproducibleJar(BoolField):
+# TODO: ReproducibleJarField can be deprecated once https://github.com/pantsbuild/pants/issues/16158 is fixed.
+class ReproducibleJarField(BoolField):
     alias = "reproducible"
     default = False
     help = softwrap(
@@ -342,6 +342,7 @@ class DeployJarTarget(Target):
         JvmJdkField,
         JvmResolveField,
         RestartableField,
+        ReproducibleJarField,
     )
     help = softwrap(
         """

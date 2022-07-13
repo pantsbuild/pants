@@ -44,8 +44,11 @@ class StripJarCompiledClassfiles:
 
 @rule(level=LogLevel.DEBUG)
 async def strip_jar(
-    processor_classfiles: StripJarCompiledClassfiles, jdk: InternalJdk, request: StripJarRequest
-) -> FallibleStripJarResult:
+    process_cleanup: ProcessCleanupOption,
+    processor_classfiles: StripJarCompiledClassfiles,
+    jdk: InternalJdk,
+    request: StripJarRequest,
+) -> Digest:
 
     filenames = list(request.filenames)
 
@@ -86,23 +89,13 @@ async def strip_jar(
         ),
     )
 
-    return FallibleStripJarResult(process_result=process_result)
-
-
-@rule(level=LogLevel.DEBUG)
-async def resolve_fallible_result_to_strip_jar(
-    fallible_result: FallibleStripJarResult,
-    process_cleanup: ProcessCleanupOption,
-) -> Digest:
-    if fallible_result.process_result.exit_code == 0:
-        digest = await Get(
-            Digest, RemovePrefix(fallible_result.process_result.output_digest, _OUTPUT_PATH)
-        )
+    if process_result.exit_code == 0:
+        digest = await Get(Digest, RemovePrefix(process_result.output_digest, _OUTPUT_PATH))
         return digest
     raise ProcessExecutionFailure(
-        fallible_result.process_result.exit_code,
-        fallible_result.process_result.stdout,
-        fallible_result.process_result.stderr,
+        process_result.exit_code,
+        process_result.stdout,
+        process_result.stderr,
         "Strip jar failed.",
         process_cleanup=process_cleanup.val,
     )
@@ -112,6 +105,7 @@ def _load_strip_jar_source() -> bytes:
     return pkg_resources.resource_string(__name__, _STRIP_JAR_BASENAME)
 
 
+# TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def build_processors(jdk: InternalJdk) -> StripJarCompiledClassfiles:
     dest_dir = "classfiles"
@@ -160,7 +154,7 @@ async def build_processors(jdk: InternalJdk) -> StripJarCompiledClassfiles:
             ],
             input_digest=merged_digest,
             output_directories=(dest_dir,),
-            description=f"Compile {_STRIP_JAR_BASENAME} import processors with javac",
+            description=f"Compile {_STRIP_JAR_BASENAME} with javac",
             level=LogLevel.DEBUG,
             # NB: We do not use nailgun for this process, since it is launched exactly once.
             use_nailgun=False,

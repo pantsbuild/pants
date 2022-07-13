@@ -23,7 +23,7 @@ from pants.jvm import jdk_rules
 from pants.jvm.classpath import Classpath
 from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -87,7 +87,7 @@ def test_strip_jar(rule_runner: RuleRunner) -> None:
                     )
                 """
             ),
-            "3rdparty/jvm/default.lock": CoursierResolvedLockfile(()).to_serialized().decode(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "Example.java": JAVA_MAIN_SOURCE,
         }
     )
@@ -96,7 +96,7 @@ def test_strip_jar(rule_runner: RuleRunner) -> None:
     classpath = rule_runner.request(Classpath, [Addresses((tgt.address,))])
 
     jar = rule_runner.request(Digest, [MergeDigests([*classpath.digests()])])
-    stripped_jar = rule_runner.request(Digest, [StripJarRequest(jar, classpath.args())])
+    stripped_jar = rule_runner.request(Digest, [StripJarRequest(jar, tuple(classpath.args()))])
     snapshot = rule_runner.request(Snapshot, [stripped_jar])
 
     assert len(snapshot.files) == 1

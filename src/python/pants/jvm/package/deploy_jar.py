@@ -36,7 +36,7 @@ from pants.jvm.target_types import (
     JvmDependenciesField,
     JvmJdkField,
     JvmMainClassNameField,
-    ReproducibleJar,
+    ReproducibleJarField,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,13 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,
-        ReproducibleJar,
+        ReproducibleJarField,
         JvmJdkField,
         Dependencies,
     )
 
     main_class: JvmMainClassNameField
-    reproducible: ReproducibleJar
+    reproducible: ReproducibleJarField
     output_path: OutputPathField
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
@@ -205,18 +205,21 @@ async def package_deploy_jar(
         ),
     )
 
-    renamed_output_digest = await Get(
-        Digest, AddPrefix(cat_and_repair.output_digest, str(output_filename.parent))
-    )
-
-    reproducible_digest = renamed_output_digest
+    reproducible_digest = cat_and_repair.output_digest
 
     if field_set.reproducible:
-        reproducible_digest = await Get(Digest, StripJarRequest(renamed_output_digest))
+        reproducible_digest = await Get(
+            Digest,
+            StripJarRequest(digest=cat_and_repair.output_digest, filenames=(output_filename.name,)),
+        )
+
+    renamed_output_digest = await Get(
+        Digest, AddPrefix(reproducible_digest, str(output_filename.parent))
+    )
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
 
-    return BuiltPackage(digest=reproducible_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
 
 
 def rules():
