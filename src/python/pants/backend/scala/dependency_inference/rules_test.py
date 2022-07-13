@@ -90,12 +90,12 @@ def test_infer_scala_imports_same_target(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
 
 @maybe_skip_jdk_test
@@ -143,12 +143,12 @@ def test_infer_scala_imports_with_cycle(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[target_a.address])
+    ) == InferredDependencies([target_a.address])
 
 
 @maybe_skip_jdk_test
@@ -198,7 +198,7 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
     assert len(caplog.records) == 1
     assert (
         "The target b/B.scala imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
@@ -207,7 +207,7 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_c))],
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.scala")])
+    ) == InferredDependencies([Address("a_one", relative_file_path="A.scala")])
 
 
 def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunner) -> None:
@@ -443,9 +443,9 @@ def test_recursive_objects(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_c))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target_d))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])

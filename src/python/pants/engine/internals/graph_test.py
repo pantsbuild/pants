@@ -1638,14 +1638,27 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     # addresses, one per line.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    all_lines = itertools.chain.from_iterable(
-        file_content.content.decode().splitlines() for file_content in digest_contents
-    )
-    resolved = await MultiGet(
+    all_lines = [
+        line.strip()
+        for line in itertools.chain.from_iterable(
+            file_content.content.decode().splitlines() for file_content in digest_contents
+        )
+    ]
+    include = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
         for line in all_lines
+        if not line.startswith("!")
     )
-    return InferredDependencies(resolved)
+    exclude = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
+        )
+        for line in all_lines
+        if line.startswith("!")
+    )
+    return InferredDependencies(include, exclude=exclude)
 
 
 @pytest.fixture
@@ -1808,6 +1821,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 //:inferred_but_ignored2
                 """
             ),
+            "demo/f3.st": dedent(
+                """\
+                //:inferred1
+                !:inferred_and_provided1
+                !//:inferred_and_provided2
+                """
+            ),
             "demo/BUILD": dedent(
                 """\
                 smalltalk_libraries(
@@ -1830,6 +1850,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
         expected=[
             Address("demo", relative_file_path="f1.st"),
             Address("demo", relative_file_path="f2.st"),
+            Address("demo", relative_file_path="f3.st"),
         ],
     )
 
@@ -1855,6 +1876,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 relative_file_path="inferred_and_provided2.st",
                 target_name="inferred_and_provided2",
             ),
+        ],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        Address("demo", relative_file_path="f3.st", target_name="demo"),
+        expected=[
+            Address("", target_name="inferred1"),
         ],
     )
 

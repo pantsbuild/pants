@@ -375,9 +375,9 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
             [InferInitDependencies(InitDependenciesInferenceFieldSet.create(target))],
         )
         if behavior == InitFilesInference.never:
-            assert not result
-        else:
-            assert result == InferredDependencies(expected)
+            expected = []
+
+        assert result == InferredDependencies(expected)
 
     check(
         Address("src/python/root/mid/leaf", relative_file_path="f.py"),

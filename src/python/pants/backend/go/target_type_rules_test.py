@@ -298,7 +298,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
                 )
             ],
         )
-        assert [main_addr] == list(inferred_addresses)
+        assert inferred_addresses == InferredDependencies([main_addr])
         return main_addr
 
     assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")

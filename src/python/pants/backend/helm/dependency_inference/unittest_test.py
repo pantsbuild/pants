@@ -71,8 +71,7 @@ def test_infers_single_chart(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert len(inferred_deps.dependencies) == 1
-    assert list(inferred_deps.dependencies)[0] == chart_tgt.address
+    assert inferred_deps == InferredDependencies([chart_tgt.address])
 
 
 def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
@@ -119,8 +118,5 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert len(chart1_inferred_deps.dependencies) == 1
-    assert len(chart2_inferred_deps.dependencies) == 1
-
-    assert list(chart1_inferred_deps.dependencies)[0] == chart1_tgt.address
-    assert list(chart2_inferred_deps.dependencies)[0] == chart2_tgt.address
+    assert chart1_inferred_deps == InferredDependencies([chart1_tgt.address])
+    assert chart2_inferred_deps == InferredDependencies([chart2_tgt.address])

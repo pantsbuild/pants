@@ -91,12 +91,12 @@ def test_infer_kotlin_imports_same_target(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
 
 @maybe_skip_jdk_test
@@ -140,12 +140,12 @@ def test_infer_kotlin_imports_with_cycle(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[target_b.address])
+    ) == InferredDependencies([target_b.address])
 
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[target_a.address])
+    ) == InferredDependencies([target_a.address])
 
 
 @maybe_skip_jdk_test
@@ -195,14 +195,14 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_b))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
     assert len(caplog.records) == 1
     assert "The target b/B.kt imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
 
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_c))],
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.kt")])
+    ) == InferredDependencies([Address("a_one", relative_file_path="A.kt")])
 
 
 @maybe_skip_jdk_test
@@ -242,7 +242,7 @@ def test_infer_same_package_via_consumed_symbol(rule_runner: RuleRunner) -> None
     assert rule_runner.request(
         InferredDependencies,
         [InferKotlinSourceDependencies(KotlinSourceDependenciesInferenceFieldSet.create(target_a))],
-    ) == InferredDependencies(dependencies=[])
+    ) == InferredDependencies([])
 
     assert rule_runner.request(
         InferredDependencies,
@@ -251,4 +251,4 @@ def test_infer_same_package_via_consumed_symbol(rule_runner: RuleRunner) -> None
                 KotlinSourceDependenciesInferenceFieldSet.create(target_main)
             )
         ],
-    ) == InferredDependencies(dependencies=[target_a.address])
+    ) == InferredDependencies([target_a.address])
