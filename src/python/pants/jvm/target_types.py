@@ -315,8 +315,8 @@ class ReproducibleJar(BoolField):
     default = False
     help = softwrap(
         """
-        Indicate if the deploy jar should be reproducible by stripping timestamps
-        and metadata from the deploy jar.
+        Indicate that the deploy jar should be made reproducible by stripping timestamps
+        and metadata.
         """
     )
 
