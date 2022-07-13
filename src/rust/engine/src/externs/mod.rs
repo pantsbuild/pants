@@ -351,6 +351,21 @@ impl PyGeneratorResponseGet {
       subject: subject.into_py(py),
     })
   }
+
+  #[getter]
+  fn output_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
+    self.product.as_ref(py)
+  }
+
+  #[getter]
+  fn input_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
+    self.declared_subject.as_ref(py)
+  }
+
+  #[getter]
+  fn input<'p>(&'p self, py: Python<'p>) -> &'p PyAny {
+    self.subject.as_ref(py)
+  }
 }
 
 #[pyclass]
