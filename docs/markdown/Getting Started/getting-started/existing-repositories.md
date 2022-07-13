@@ -60,8 +60,7 @@ python_tests(
 `./pants test ::` will only run the relevant tests. You can combine this with [`./pants peek`](doc:project-introspection) to get a list of test files that should be run with your original test runner:
 
 ```
-./pants list --filter-target-type=python_test :: | \
-  xargs ./pants peek | \
+./pants --filter-target-type=python_test peek :: | \
   jq -r '.[] | select(.skip_tests== true) | .["sources"][]'
 ```
 
