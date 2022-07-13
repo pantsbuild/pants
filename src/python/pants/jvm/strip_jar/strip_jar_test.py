@@ -49,8 +49,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(BashBinary, ()),
             QueryRule(UnzipBinary, ()),
             QueryRule(ExtractedArchive, (MaybeExtractArchiveRequest,)),
-            # QueryRule(InternalJdk, ()),
-            # QueryRule(ProcessResult, (JvmProcess,)),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(Classpath, (Addresses,)),
             QueryRule(Digest, (StripJarRequest,)),

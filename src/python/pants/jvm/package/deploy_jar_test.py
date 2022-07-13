@@ -13,7 +13,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.process import Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
@@ -22,11 +22,13 @@ from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.logging import LogLevel
 
 
 @pytest.fixture
@@ -43,6 +45,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *util_rules(),
             QueryRule(BashBinary, ()),
+            QueryRule(UnzipBinary, ()),
             QueryRule(InternalJdk, ()),
             QueryRule(BuiltPackage, (DeployJarFieldSet,)),
             QueryRule(ProcessResult, (JvmProcess,)),
@@ -312,6 +315,60 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
     )
 
     _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+
+
+@maybe_skip_jdk_test
+def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        output_path="dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
+                        reproducible=True
+                    )
+
+                    java_sources(
+                        name="example",
+                    )
+                """
+            ),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
+            "Example.java": JAVA_MAIN_SOURCE_NO_DEPS,
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="example_app_deploy_jar"))
+    fat_jar = rule_runner.request(
+        BuiltPackage,
+        [DeployJarFieldSet.create(tgt)],
+    )
+
+    bash = rule_runner.request(BashBinary, [])
+    unzip = rule_runner.request(UnzipBinary, [])
+
+    process_result = rule_runner.request(
+        ProcessResult,
+        [
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    f"{unzip.path} -qq {fat_jar.artifacts[0].relpath} && /bin/date -Idate -r META-INF/MANIFEST.MF",
+                ],
+                input_digest=fat_jar.digest,
+                description="Unzip jar and get date of classfile",
+                level=LogLevel.TRACE,
+            )
+        ],
+    )
+
+    assert process_result.stdout.decode() == "2000-01-01\n"
 
 
 def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
