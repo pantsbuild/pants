@@ -300,18 +300,18 @@ class DynamicRemoteOptions:
                 )
                 execution_headers = auth_plugin_result.execution_headers
                 store_headers = auth_plugin_result.store_headers
-                plugin_provided_opt_log = "Setting --remote-{opt} is not needed and will be ignored since it is provided by the auth plugin."
+                plugin_provided_opt_log = "Setting `[GLOBAL].remote_{opt}` is not needed and will be ignored since it is provided by the auth plugin."
                 if auth_plugin_result.instance_name is not None:
                     if instance_name is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="instance-name"))
+                        logger.warning(plugin_provided_opt_log.format(opt="instance_name"))
                     instance_name = auth_plugin_result.instance_name
                 if auth_plugin_result.store_address is not None:
                     if store_address is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="store-address"))
+                        logger.warning(plugin_provided_opt_log.format(opt="store_address"))
                     store_address = auth_plugin_result.store_address
                 if auth_plugin_result.execution_address is not None:
                     if execution_address is not None:
-                        logger.warning(plugin_provided_opt_log.format(opt="execution-address"))
+                        logger.warning(plugin_provided_opt_log.format(opt="execution_address"))
                     execution_address = auth_plugin_result.execution_address
         opts = cls(
             execution=execution,
