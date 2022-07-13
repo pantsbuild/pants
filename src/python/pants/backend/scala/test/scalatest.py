@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
-from pants.backend.scala.target_types import ScalatestTestSourceField
+from pants.backend.scala.target_types import ScalatestTestSourceField, ScalatestTestTimeoutField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
@@ -49,6 +49,7 @@ class ScalatestTestFieldSet(TestFieldSet):
     )
 
     sources: ScalatestTestSourceField
+    timeout: ScalatestTestTimeoutField
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
 
@@ -141,6 +142,7 @@ async def setup_scalatest_for_target(
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run Scalatest runner for {request.field_set.address}",
+        timeout_seconds=request.field_set.timeout.calculate_from_global_options(test_subsystem),
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
         use_nailgun=False,

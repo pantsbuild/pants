@@ -339,7 +339,9 @@ async def setup_pytest_for_target(
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
-            timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
+            timeout_seconds=request.field_set.timeout.calculate_from_global_options(
+                test_subsystem, pytest
+            ),
             execution_slot_variable=pytest.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,

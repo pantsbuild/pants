@@ -9,6 +9,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
+from pants.core.goals.test import TestTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
@@ -16,7 +17,6 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
-    IntField,
     InvalidFieldException,
     InvalidTargetException,
     MultipleSourcesField,
@@ -192,7 +192,7 @@ class GoTestExtraEnvVarsField(StringSequenceField):
     )
 
 
-class GoTestTimeoutField(IntField):
+class GoTestTimeoutField(TestTimeoutField):
     alias = "test_timeout"
     help = softwrap(
         """
