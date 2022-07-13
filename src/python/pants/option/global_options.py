@@ -300,42 +300,18 @@ class DynamicRemoteOptions:
                 )
                 execution_headers = auth_plugin_result.execution_headers
                 store_headers = auth_plugin_result.store_headers
-                overridden_opt_log = (
-                    "Overriding `{}` to instead be {} due to the plugin from "
-                    "`--remote-auth-plugin`."
-                )
-                if (
-                    auth_plugin_result.instance_name is not None
-                    and auth_plugin_result.instance_name != instance_name
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-instance-name={repr(instance_name)}",
-                            repr(auth_plugin_result.instance_name),
-                        )
-                    )
+                plugin_provided_opt_log = "Setting --remote-{opt} is not needed and will be ignored since it is provided by the auth plugin."
+                if auth_plugin_result.instance_name is not None:
+                    if instance_name is not None:
+                        logger.warning(plugin_provided_opt_log.format(opt="instance-name"))
                     instance_name = auth_plugin_result.instance_name
-                if (
-                    auth_plugin_result.store_address is not None
-                    and auth_plugin_result.store_address != store_address
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-store-address={repr(store_address)}",
-                            repr(auth_plugin_result.store_address),
-                        )
-                    )
+                if auth_plugin_result.store_address is not None:
+                    if store_address is not None:
+                        logger.warning(plugin_provided_opt_log.format(opt="store-address"))
                     store_address = auth_plugin_result.store_address
-                if (
-                    auth_plugin_result.execution_address is not None
-                    and auth_plugin_result.execution_address != execution_address
-                ):
-                    logger.debug(
-                        overridden_opt_log.format(
-                            f"--remote-execution-address={repr(execution_address)}",
-                            repr(auth_plugin_result.execution_address),
-                        )
-                    )
+                if auth_plugin_result.execution_address is not None:
+                    if execution_address is not None:
+                        logger.warning(plugin_provided_opt_log.format(opt="execution-address"))
                     execution_address = auth_plugin_result.execution_address
         opts = cls(
             execution=execution,
