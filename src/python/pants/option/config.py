@@ -89,7 +89,7 @@ class Config:
         cls, config_source: ConfigSource, normalized_seed_values: dict[str, Any]
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
-        toml_values = cast(Dict[str, Any], toml.loads(config_source.content.decode()))
+        toml_values = toml.loads(config_source.content.decode())
         toml_values[DEFAULT_SECTION] = {
             **normalized_seed_values,
             **toml_values.get(DEFAULT_SECTION, {}),
