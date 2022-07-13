@@ -112,7 +112,7 @@ def test_strip_jar(rule_runner: RuleRunner) -> None:
                 argv=[
                     bash.path,
                     "-c",
-                    f"{unzip.path} -qq {filename} && /bin/date -r org/pantsbuild/example/Example.class",
+                    f"{unzip.path} -qq {filename} && /bin/date -Idate -r org/pantsbuild/example/Example.class",
                 ],
                 input_digest=stripped_jar,
                 description="Unzip jar and get date of classfile",
@@ -121,4 +121,4 @@ def test_strip_jar(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert process_result.stdout.decode() == "Sat Jan  1 00:00:00 IST 2000\n"
+    assert process_result.stdout.decode() == "2000-01-01\n"

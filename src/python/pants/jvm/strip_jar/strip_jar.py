@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import Tuple
 
 import pkg_resources
 
@@ -29,7 +30,7 @@ class StripJarToolLockfileSentinel(GenerateToolLockfileSentinel):
 @dataclass(frozen=True)
 class StripJarRequest:
     digest: Digest
-    filenames: tuple[str, ...]
+    filenames: Tuple[str, ...]
 
 
 @dataclass(frozen=True)

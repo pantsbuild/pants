@@ -207,7 +207,7 @@ async def package_deploy_jar(
 
     reproducible_digest = cat_and_repair.output_digest
 
-    if field_set.reproducible:
+    if field_set.reproducible.value:
         reproducible_digest = await Get(
             Digest,
             StripJarRequest(digest=cat_and_repair.output_digest, filenames=(output_filename.name,)),

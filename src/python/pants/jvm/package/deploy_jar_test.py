@@ -22,6 +22,7 @@ from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *classpath_rules(),
             *jvm_tool.rules(),
+            *strip_jar.rules(),
             *deploy_jar_rules(),
             *javac_rules(),
             *jdk_rules.rules(),
