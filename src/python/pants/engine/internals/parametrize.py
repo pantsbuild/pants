@@ -208,14 +208,19 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             return instance
 
         def remaining_fields_match(candidate: Target) -> bool:
-            """Returns true if all Fields absent from the candidate's Address match the consumer."""
+            """Returns true if all Fields absent from the candidate's Address match the consumer.
+
+            TODO: This does not account for the computed default values of Fields:
+              see https://github.com/pantsbuild/pants/issues/16175
+            """
+
             unspecified_param_field_names = {
                 key for key in candidate.address.parameters.keys() if key not in address.parameters
             }
 
             return all(
-                consumer.has_field(field_type) and consumer[field_type] == field_value
-                for field_type, field_value in candidate.field_values.items()
+                consumer.has_field(field_type) and consumer[field_type].value == field.value
+                for field_type, field in candidate.field_values.items()
                 if field_type.alias in unspecified_param_field_names
             )
 
