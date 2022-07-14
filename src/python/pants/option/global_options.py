@@ -1864,7 +1864,14 @@ class NamedCachesDirOption:
 
 @dataclass(frozen=True)
 class ExperimentalCoalescedProcessBatchingOption:
-    """A wrapper around the global option `experimental_coalesced_process_batching`.
+    """A wrapper around the global option `experimental_coalesced_process_batching`."""
+
+    val: bool
+
+
+@dataclass(frozen=True)
+class UseDeprecatedPexBinaryRunSemanticsOption:
+    """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
 
     Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
     """
