@@ -16,6 +16,7 @@ from pants.backend.helm.target_types import (
     HelmUnitTestStrictField,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
+    HelmUnitTestTimeoutField,
 )
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -64,6 +65,7 @@ class HelmUnitTestFieldSet(TestFieldSet):
     source: HelmUnitTestSourceField
     dependencies: HelmUnitTestDependenciesField
     strict: HelmUnitTestStrictField
+    timeout: HelmUnitTestTimeoutField
 
 
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
@@ -135,6 +137,7 @@ async def run_helm_unittest(
             description=f"Running Helm unittest suite {field_set.address}",
             input_digest=input_digest,
             cache_scope=cache_scope,
+            timeout_seconds=field_set.timeout.calculate_from_global_options(test_subsystem),
             output_directories=(reports_dir,),
         ),
     )

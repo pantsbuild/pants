@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.core.goals.test import TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -25,6 +26,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
     JunitTestSourceField,
+    JunitTestTimeoutField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -98,6 +100,14 @@ class ScalatestTestSourceField(ScalaSourceField):
     pass
 
 
+class ScalatestTestTimeoutField(TestTimeoutField):
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each ScalaTest test file belonging to this target.
+        """
+    )
+
+
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
@@ -105,6 +115,7 @@ class ScalatestTestTarget(Target):
         ScalaDependenciesField,
         ScalatestTestSourceField,
         ScalaConsumedPluginNamesField,
+        ScalatestTestTimeoutField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -126,7 +137,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         ScalatestTestsGeneratorSourcesField,
     )
     generated_target_cls = ScalatestTestTarget
-    copied_fields = COMMON_TARGET_FIELDS
+    copied_fields = (*COMMON_TARGET_FIELDS, ScalatestTestTimeoutField)
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
@@ -159,6 +170,7 @@ class ScalaJunitTestTarget(Target):
         ScalaDependenciesField,
         ScalaJunitTestSourceField,
         ScalaConsumedPluginNamesField,
+        JunitTestTimeoutField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,

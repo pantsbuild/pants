@@ -36,7 +36,7 @@ class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help = "Python setuptools, used to package `python_distribution` targets."
 
-    default_version = "setuptools>=50.3.0,<58.0"
+    default_version = "setuptools>=63.1.0,<64.0"
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True

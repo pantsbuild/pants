@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.core.goals.package import OutputPathField
+from pants.core.goals.test import TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -213,6 +214,10 @@ class HelmUnitTestDependenciesField(Dependencies):
     pass
 
 
+class HelmUnitTestTimeoutField(TestTimeoutField):
+    help = "A timeout (in seconds) used by each Helm Unittest test file belonging to this target."
+
+
 class HelmUnitTestSourceField(SingleSourceField):
     expected_file_extensions = (
         ".yaml",
@@ -232,6 +237,7 @@ class HelmUnitTestTestTarget(Target):
         HelmUnitTestSourceField,
         HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
+        HelmUnitTestTimeoutField,
     )
     help = "A single helm-unittest suite file."
 
@@ -270,9 +276,10 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
+        HelmUnitTestTimeoutField,
     )
     generated_target_cls = HelmUnitTestTestTarget
-    copied_fields = COMMON_TARGET_FIELDS
+    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestTimeoutField, HelmUnitTestStrictField)
     moved_fields = (HelmUnitTestDependenciesField,)
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field."
 
