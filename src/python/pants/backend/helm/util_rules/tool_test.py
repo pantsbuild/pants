@@ -55,6 +55,7 @@ def test_create_helm_process(rule_runner: RuleRunner) -> None:
         extra_env={"FOO_ENV": "1"},
         output_directories=["foo_out"],
         cache_scope=ProcessCacheScope.ALWAYS,
+        timeout_seconds=30,
     )
     process = rule_runner.request(Process, [helm_process])
 
@@ -68,3 +69,4 @@ def test_create_helm_process(rule_runner: RuleRunner) -> None:
     assert process.env == FrozenDict({**helm_binary.env, **helm_process.extra_env})
     assert process.output_directories == helm_process.output_directories
     assert process.cache_scope == helm_process.cache_scope
+    assert process.timeout_seconds == helm_process.timeout_seconds

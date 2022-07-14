@@ -79,7 +79,6 @@ def test_timeout_calculation(use_deprecated: bool) -> None:
         *,
         field_value: int | None,
         expected: int | None,
-        use_deprecated: bool,
         global_default: int | None = None,
         global_max: int | None = None,
         timeouts_enabled: bool = True,
