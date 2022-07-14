@@ -54,32 +54,37 @@ class CreateArchive:
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
 async def create_archive(request: CreateArchive) -> Digest:
+
+    # #16091 -- if an arg list is really long, archive utilities tend to get upset.
+    # passing a list of filenames into the utilities fixes this.
+    FILE_LIST_FILENAME = "__pants_archive_filelist__"
+    file_list_file = FileContent(
+        FILE_LIST_FILENAME, "\n".join(request.snapshot.files).encode("utf-8")
+    )
+
     if request.format == ArchiveFormat.ZIP:
         zip_binary = await Get(ZipBinary, ZipBinaryRequest())
         bash_binary = await Get(BashBinary, BashBinaryRequest())
-
-        # #16091 -- if an arg list is really long, `zip` tends to get upset.
-        # passing a list of filenames into `zip` as stdin fixes this.
-        file_list_file = FileContent("filelist", "\n".join(request.snapshot.files).encode("utf-8"))
+        ZIP_SCRIPT_FILENAME = "__pants_zip_wrapper_script__.sh"
         zip_script = FileContent(
-            "zipper.sh",
+            ZIP_SCRIPT_FILENAME,
             # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
             textwrap.dedent(
                 f"""\
                 set -e
-                /bin/cat filelist | {zip_binary.path} --names-stdin {request.output_filename}
+                /bin/cat {FILE_LIST_FILENAME} | {zip_binary.path} --names-stdin {request.output_filename}
                 """
             ).encode("utf-8"),
         )
-        zip_script_digest = await Get(Digest, CreateDigest([file_list_file, zip_script]))
+        zip_script_digest = await Get(Digest, CreateDigest([zip_script]))
 
         env = {}
-        input_digest = await Get(Digest, MergeDigests([request.snapshot.digest, zip_script_digest]))
-        argv: tuple[str, ...] = (bash_binary.path, "zipper.sh")
+        input_digests = [request.snapshot.digest, zip_script_digest]
+        argv: tuple[str, ...] = (bash_binary.path, ZIP_SCRIPT_FILENAME)
     else:
         tar_binary = await Get(TarBinary, TarBinaryRequest())
         argv = tar_binary.create_archive_argv(
-            request.output_filename, request.snapshot.files, request.format
+            request.output_filename, ["--files-from", FILE_LIST_FILENAME], request.format
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
@@ -87,7 +92,10 @@ async def create_archive(request: CreateArchive) -> Digest:
         output_dir_digest = await Get(
             Digest, CreateDigest([Directory(os.path.dirname(request.output_filename))])
         )
-        input_digest = await Get(Digest, MergeDigests([output_dir_digest, request.snapshot.digest]))
+        input_digests = [output_dir_digest, request.snapshot.digest]
+
+    file_list_file_digest = await Get(Digest, CreateDigest([file_list_file]))
+    input_digest = await Get(Digest, MergeDigests([file_list_file_digest, *input_digests]))
 
     result = await Get(
         ProcessResult,
