@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -11,6 +13,8 @@ from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import SEARCH_PATHS
 from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
 from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BashBinaryRequest,
     GunzipBinary,
     GunzipBinaryRequest,
     TarBinary,
@@ -20,10 +24,20 @@ from pants.core.util_rules.system_binaries import (
     ZipBinary,
     ZipBinaryRequest,
 )
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -42,9 +56,26 @@ class CreateArchive:
 async def create_archive(request: CreateArchive) -> Digest:
     if request.format == ArchiveFormat.ZIP:
         zip_binary = await Get(ZipBinary, ZipBinaryRequest())
-        argv = zip_binary.create_archive_argv(request.output_filename, request.snapshot.files)
+        bash_binary = await Get(BashBinary, BashBinaryRequest())
+
+        # #16091 -- if an arg list is really long, `zip` tends to get upset.
+        # passing a list of filenames into `zip` as stdin fixes this.
+        file_list_file = FileContent("filelist", "\n".join(request.snapshot.files).encode("utf-8"))
+        zip_script = FileContent(
+            "zipper.sh",
+            # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
+            textwrap.dedent(
+                f"""\
+                set -e
+                /bin/cat filelist | {zip_binary.path} --names-stdin {request.output_filename}
+                """
+            ).encode("utf-8"),
+        )
+        zip_script_digest = await Get(Digest, CreateDigest([file_list_file, zip_script]))
+
         env = {}
-        input_digest = request.snapshot.digest
+        input_digest = await Get(Digest, MergeDigests([request.snapshot.digest, zip_script_digest]))
+        argv: tuple[str, ...] = (bash_binary.path, "zipper.sh")
     else:
         tar_binary = await Get(TarBinary, TarBinaryRequest())
         argv = tar_binary.create_archive_argv(
