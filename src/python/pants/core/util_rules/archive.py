@@ -61,6 +61,8 @@ async def create_archive(request: CreateArchive) -> Digest:
     file_list_file = FileContent(
         FILE_LIST_FILENAME, "\n".join(request.snapshot.files).encode("utf-8")
     )
+    file_list_file_digest = await Get(Digest, CreateDigest([file_list_file]))
+    files_digests = [file_list_file_digest, request.snapshot.digest]
 
     if request.format == ArchiveFormat.ZIP:
         zip_binary, bash_binary = await MultiGet(
@@ -81,7 +83,7 @@ async def create_archive(request: CreateArchive) -> Digest:
         zip_script_digest = await Get(Digest, CreateDigest([zip_script]))
 
         env = {}
-        input_digests = [request.snapshot.digest, zip_script_digest]
+        input_digests = [zip_script_digest]
         argv: tuple[str, ...] = (bash_binary.path, ZIP_SCRIPT_FILENAME)
     else:
         tar_binary = await Get(TarBinary, TarBinaryRequest())
@@ -96,10 +98,9 @@ async def create_archive(request: CreateArchive) -> Digest:
         output_dir_digest = await Get(
             Digest, CreateDigest([Directory(os.path.dirname(request.output_filename))])
         )
-        input_digests = [output_dir_digest, request.snapshot.digest]
+        input_digests = [output_dir_digest]
 
-    file_list_file_digest = await Get(Digest, CreateDigest([file_list_file]))
-    input_digest = await Get(Digest, MergeDigests([file_list_file_digest, *input_digests]))
+    input_digest = await Get(Digest, MergeDigests([*files_digests, *input_digests]))
 
     result = await Get(
         ProcessResult,
