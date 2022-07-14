@@ -84,7 +84,9 @@ async def create_archive(request: CreateArchive) -> Digest:
     else:
         tar_binary = await Get(TarBinary, TarBinaryRequest())
         argv = tar_binary.create_archive_argv(
-            request.output_filename, ["--files-from", FILE_LIST_FILENAME], request.format
+            request.output_filename,
+            request.format,
+            input_file_list_filename=FILE_LIST_FILENAME,
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
