@@ -85,7 +85,7 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
-class ResolveField(StringField):
+class ResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
 
 
@@ -1076,7 +1076,7 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRunner) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1105,7 +1105,9 @@ def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> 
     )
 
 
-def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_generator_to_generator(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1130,6 +1132,49 @@ def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner
             "demo/f1.ext:t1@resolve=b": set(),
             "demo/f2.ext:t2@resolve=a": {"demo:t1@resolve=a"},
             "demo/f2.ext:t2@resolve=b": {"demo:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f2.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f2.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
+def test_parametrize_partial_generator_to_generated(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f2.ext'],
+              dependencies=['./f1.ext:t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t2@resolve=a": {"demo/f1.ext:t1@resolve=a"},
+            "demo/f2.ext:t2@resolve=b": {"demo/f1.ext:t1@resolve=b"},
             "demo:t1@resolve=a": {
                 "demo/f1.ext:t1@resolve=a",
             },
