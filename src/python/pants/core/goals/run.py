@@ -3,7 +3,6 @@
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
@@ -25,7 +24,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
@@ -102,7 +100,6 @@ class RunSubsystem(GoalSubsystem):
         passthrough=True,
     )
     cleanup = BoolOption(
-        "--cleanup",
         default=True,
         help=softwrap(
             """
@@ -117,7 +114,6 @@ class RunSubsystem(GoalSubsystem):
     )
     # See also `test.py`'s same option
     debug_adapter = BoolOption(
-        "--debug-adapter",
         default=False,
         help=softwrap(
             """
@@ -166,41 +162,29 @@ async def run(
     # Cleanup is the default, so we want to preserve the chroot if either option is off.
     cleanup = run_subsystem.cleanup and global_options.process_cleanup
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=cleanup) as tmpdir:
-        if not cleanup:
-            logger.info(f"Preserving running binary chroot {tmpdir}")
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
-        )
-
-        args = (arg.format(chroot=tmpdir) for arg in request.args)
-        env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
-        if run_subsystem.debug_adapter:
-            logger.info(
-                softwrap(
-                    f"""
-                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
-                    which will wait for a client connection...
-                    """
-                )
+    if run_subsystem.debug_adapter:
+        logger.info(
+            softwrap(
+                f"""
+                Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                which will wait for a client connection...
+                """
             )
-
-        result = await Effect(
-            InteractiveProcessResult,
-            InteractiveProcess(
-                argv=(*args, *run_subsystem.args),
-                env=env,
-                run_in_workspace=True,
-                restartable=restartable,
-            ),
         )
-        exit_code = result.exit_code
 
-    return Run(exit_code)
+    result = await Effect(
+        InteractiveProcessResult,
+        InteractiveProcess(
+            argv=(*request.args, *run_subsystem.args),
+            env={**complete_env, **request.extra_env},
+            input_digest=request.digest,
+            run_in_workspace=True,
+            restartable=restartable,
+            cleanup=cleanup,
+        ),
+    )
+
+    return Run(result.exit_code)
 
 
 def rules():

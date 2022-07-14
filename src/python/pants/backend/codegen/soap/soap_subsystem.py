@@ -12,7 +12,6 @@ class SoapSubsystem(Subsystem):
     help = "General SOAP/WSDL codegen settings."
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `wsdl_sources` targets with the `tailor` goal.",
         advanced=True,

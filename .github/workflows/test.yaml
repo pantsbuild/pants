@@ -7,13 +7,16 @@ env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
-  bootstrap_pants_linux:
+  bootstrap_pants_linux_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
-    needs: check_labels
+    needs:
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -54,7 +57,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        path: '~/.rustup/toolchains/1.62.0-*
 
           ~/.rustup/update-hashes
 
@@ -149,13 +152,16 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  bootstrap_pants_macos:
+  bootstrap_pants_macos_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, test Rust (macOS10-x86_64)
-    needs: check_labels
+    needs:
+    - check_labels
+    - docs_only_check
     runs-on:
     - macos-10.15
     steps:
@@ -196,7 +202,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        path: '~/.rustup/toolchains/1.62.0-*
 
           ~/.rustup/update-hashes
 
@@ -286,9 +292,12 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Build wheels and fs_util (Linux-x86_64)
-    needs: check_labels
+    needs:
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -355,7 +364,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-linux-x86_64
+        name: pants-log-wheels-Linux-x86_64
         path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -369,9 +378,12 @@ jobs:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Bootstrap Pants, build wheels and fs_util (macOS11-ARM64)
-    needs: check_labels
+    needs:
+    - check_labels
+    - docs_only_check
     runs-on:
     - self-hosted
     - macOS11
@@ -410,7 +422,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        path: '~/.rustup/toolchains/1.62.0-*
 
           ~/.rustup/update-hashes
 
@@ -486,7 +498,7 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - if: (github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]'))
-        && (${{ github.repository_owner == 'pantsbuild' }})
+        && (github.repository_owner == 'pantsbuild')
       name: Build wheels
       run: USE_PY39=true arch -arm64 ./build-support/bin/release.sh build-wheels
     - if: github.event_name == 'push'
@@ -507,9 +519,12 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS10-x86_64)
-    needs: check_labels
+    needs:
+    - check_labels
+    - docs_only_check
     runs-on:
     - macos-10.15
     steps:
@@ -546,7 +561,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.61.0-*
+        path: '~/.rustup/toolchains/1.62.0-*
 
           ~/.rustup/update-hashes
 
@@ -594,7 +609,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macos-x86_64
+        name: pants-log-wheels-macOS10-x86_64
         path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -604,7 +619,7 @@ jobs:
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 80
   check_labels:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
     runs-on:
     - ubuntu-20.04
@@ -619,10 +634,36 @@ jobs:
         labels: category:new feature, category:user api change, category:plugin api
           change, category:performance, category:bugfix, category:documentation, category:internal
         mode: exactly
+  docs_only_check:
+    if: github.repository_owner == 'pantsbuild'
+    name: Check for docs-only change
+    outputs:
+      docs_only: ${{ steps.docs_only_check.outputs.docs_only }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - id: files
+      name: Get changed files
+      uses: tj-actions/changed-files@v23.1
+      with:
+        files_ignore: docs/**
+        files_ignore_separator: '|'
+    - id: docs_only_check
+      if: steps.files.outputs.any_changed != 'true'
+      name: Check for docs-only changes
+      run: echo '::set-output name=docs_only::DOCS_ONLY'
   lint_python:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Lint Python and Shell
-    needs: bootstrap_pants_linux
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -669,7 +710,7 @@ jobs:
 
         '
     - name: Lint
-      run: './pants update-build-files --check
+      run: './pants update-build-files --check ::
 
         ./pants lint check ''**''
 
@@ -678,17 +719,71 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-lint
+        name: pants-log-lint-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
         - '3.7'
     timeout-minutes: 30
-  test_python_linux_0:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+  merge_ok:
+    if: always()
+    name: Merge OK
+    needs:
+    - set_merge_ok_docs_only
+    - set_merge_ok_not_docs_only
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - run: "merge_ok_docs_only=\"${{ needs.set_merge_ok_docs_only.outputs.merge_ok\
+        \ }}\"\nmerge_ok_not_docs_only=\"${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok\
+        \ }}\"\nif [[ \"${merge_ok_docs_only}\" == \"true\" || \"${merge_ok_not_docs_only}\"\
+        \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
+        \ \"Merge NOT OK\"\n    exit 1\nfi\n"
+  set_merge_ok_docs_only:
+    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+    name: Set Merge OK
+    needs:
+    - docs_only_check
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
+  set_merge_ok_not_docs_only:
+    if: needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY'
+    name: Set Merge OK
+    needs:
+    - docs_only_check
+    - bootstrap_pants_linux_x86_64
+    - bootstrap_pants_macos_x86_64
+    - build_wheels_linux_x86_64
+    - build_wheels_macos_arm64
+    - build_wheels_macos_x86_64
+    - check_labels
+    - docs_only_check
+    - lint_python
+    - test_python_linux_x86_64_0
+    - test_python_linux_x86_64_1
+    - test_python_linux_x86_64_2
+    - test_python_macos_x86_64
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
+  test_python_linux_x86_64_0:
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 0/3
-    needs: bootstrap_pants_linux
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -765,17 +860,21 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-0_3
+        name: pants-log-python-test-0_3-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_linux_1:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+  test_python_linux_x86_64_1:
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 1/3
-    needs: bootstrap_pants_linux
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -852,17 +951,21 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-1_3
+        name: pants-log-python-test-1_3-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_linux_2:
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+  test_python_linux_x86_64_2:
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (Linux-x86_64) Shard 2/3
-    needs: bootstrap_pants_linux
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - check_labels
+    - docs_only_check
     runs-on:
     - ubuntu-20.04
     steps:
@@ -939,19 +1042,23 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux-2_3
+        name: pants-log-python-test-2_3-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_macos:
+  test_python_macos_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
-    if: ${{ github.repository_owner == 'pantsbuild' }}
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
     name: Test Python (macOS10-x86_64)
-    needs: bootstrap_pants_macos
+    needs:
+    - bootstrap_pants_macos_x86_64
+    - check_labels
+    - docs_only_check
     runs-on:
     - macos-10.15
     steps:
@@ -1010,7 +1117,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-macos
+        name: pants-log-python-test-macOS10-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:

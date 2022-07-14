@@ -169,35 +169,56 @@ By default, `protobuf_source` / `protobuf_sources` targets use the resolve set b
 
 You must also make sure that any resolves that use codegen include `python_requirement` targets for the `protobuf` and `grpcio` runtime libraries from Step 2. Pants will eagerly validate this for you.
 
+If the same Protobuf files should work with multiple resolves, you can use the
+[`parametrize`](doc:targets#parametrizing-targets) mechanism.
+
 For example:
 
 ```python BUILD
 python_requirement(
-    name="protobuf_resolve-a",
+    name="protobuf",
+    # Here, we use the same version of Protobuf in both resolves. You could instead create
+    # a distinct target per resolve so that they have different versions.
     requirements=["protobuf==3.19.4"],
-    resolve="resolve-a",
+    resolve=parametrize("resolve-a", "resolve-b"),
 )
 
-python_requirement(
-    name="protobuf_resolve-b",
-    # Note that this version can be different than what we use 
-    # above for `resolve-a`.
-    requirements=["protobuf==3.17.2"],
-    resolve="resolve-b",
-)
-
-protobuf_source(
-    name="data_science_models",
-    source="data_science_models.proto",
-    resolve="resolve-a",
-)
-
-
-protobuf_source(
-    name="mobile_app_models",
-    source="mobile_app_models.proto",
-    resolve="resolve-b",
+protobuf_sources(
+    name="protos",
+    python_resolve=parametrize("resolve-a", "resolve-b")
 )
 ```
 
-Pants 2.11 will be adding support for using the same `protobuf_source` target with multiple resolves through a new `parametrize()` feature.
+Buf: format and lint Protobuf
+-----------------------------
+
+Pants integrates with the [`Buf`](https://buf.build/blog/introducing-buf-format) formatter and linter for Protobuf files.
+
+To activate, add this to `pants.toml`:
+
+```toml pants.toml
+[GLOBAL]
+backend_packages = [
+  "pants.backend.codegen.protobuf.lint.buf",
+]
+```
+
+Now you can run `./pants fmt` and `./pants lint`:
+
+```
+❯ ./pants lint src/protos/user.proto
+```
+
+Use `./pants fmt lint dir:` to run on all files in the directory, and `./pants fmt lint dir::` to run on all files in the directory and subdirectories.
+
+Temporarily disable Buf with `--buf-fmt-skip` and `--buf-lint-skip`:
+
+```bash
+❯ ./pants --buf-fmt-skip fmt ::
+```
+
+Only run Buf with `--lint-only=buf-fmt` or `--lint-only=buf-lint`, and `--fmt-only=buf-fmt`:
+
+```bash
+❯ ./pants fmt --only=buf-fmt ::
+```

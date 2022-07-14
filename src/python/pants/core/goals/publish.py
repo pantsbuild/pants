@@ -172,7 +172,6 @@ class PublishSubsystem(GoalSubsystem):
         return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
     output = StrOption(
-        "--output",
         default=None,
         help="Filename for JSON structured publish information.",
     )

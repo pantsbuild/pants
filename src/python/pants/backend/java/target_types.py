@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Dependencies,
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
@@ -18,6 +17,7 @@ from pants.engine.target import (
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
+    JvmDependenciesField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -60,7 +60,7 @@ class JunitTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
-        Dependencies,
+        JvmDependenciesField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -84,7 +84,7 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        Dependencies,
+        JvmDependenciesField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -101,7 +101,7 @@ class JavaSourceTarget(Target):
     alias = "java_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        JvmDependenciesField,
         JavaSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
@@ -126,7 +126,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JavaSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        Dependencies,
+        JvmDependenciesField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,

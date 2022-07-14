@@ -191,11 +191,9 @@ class LintSubsystem(GoalSubsystem):
         return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
     only = StrListOption(
-        "--only",
         help=only_option_help("lint", "linter", "flake8", "shellcheck"),
     )
     skip_formatters = BoolOption(
-        "--skip-formatters",
         default=False,
         help=softwrap(
             f"""
@@ -207,7 +205,6 @@ class LintSubsystem(GoalSubsystem):
         ),
     )
     batch_size = IntOption(
-        "--batch-size",
         advanced=True,
         default=128,
         help=style_batch_size_help(uppercase="Linter", lowercase="linter"),

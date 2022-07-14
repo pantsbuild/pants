@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.project_info import filter_targets, list_targets
-from pants.backend.project_info.filter_targets import FilterGoal, TargetGranularity
+from pants.backend.project_info import list_targets
+from pants.backend.project_info.filter_targets import TargetGranularity
 from pants.backend.project_info.list_targets import List
 from pants.engine.rules import rule
 from pants.engine.target import (
@@ -34,15 +34,23 @@ class MockTarget(Target):
     deprecated_alias_removal_version = "99.9.0.dev0"
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockGeneratedFileTarget(Target):
     alias = "file_generated"
-    core_fields = (SingleSourceField, Tags)
+    core_fields = (MockSingleSourceField, Tags)
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
 
 
 class MockFileTargetGenerator(TargetFilesGenerator):
     alias = "file_generator"
     generated_target_cls = MockGeneratedFileTarget
-    core_fields = (MultipleSourcesField, Tags)
+    core_fields = (MockMultipleSourcesField, Tags)
     copied_fields = (Tags,)
     moved_fields = ()
 
@@ -79,7 +87,6 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *filter_targets.rules(),
             *list_targets.rules(),
             generate_mock_generated_target,
             UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
@@ -97,19 +104,6 @@ def assert_targets(
     tag_regex: list[str] | None = None,
     granularity: TargetGranularity = TargetGranularity.all_targets,
 ) -> None:
-    filter_result = rule_runner.run_goal_rule(
-        FilterGoal,
-        args=[
-            f"--target-type={target_type or []}",
-            f"--address-regex={address_regex or []}",
-            f"--tag-regex={tag_regex or []}",
-            f"--granularity={granularity.value}",
-            "::",
-        ],
-    )
-    assert set(filter_result.stdout.splitlines()) == expected
-
-    # Also run with `list` to prove that the filters work from any goal.
     list_result = rule_runner.run_goal_rule(
         List,
         global_args=[

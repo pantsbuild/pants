@@ -26,9 +26,14 @@ class OptionsInitializerTest(unittest.TestCase):
     def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
-            env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
+            env={},
+            args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
+            allow_pantsrc=False,
         )
         env = CompleteEnvironment({})
         with self.assertRaises(ExecutionError) as exc:
             OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
-        self.assertIn("The `--remote-execution` option requires", str(exc.exception))
+        self.assertIn(
+            "The `--no-watch-filesystem` option may not be set if `--pantsd` or `--loop` is set.",
+            str(exc.exception),
+        )

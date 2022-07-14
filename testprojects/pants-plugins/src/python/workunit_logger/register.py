@@ -28,7 +28,7 @@ class WorkunitsLoggerOptions(Subsystem):
     options_scope = "workunit-logger"
     help = """Example plugin that logs workunits to a file."""
 
-    dest = StrOption("--dest", default=None, help="A filename to log workunits to.")
+    dest = StrOption(default=None, help="A filename to log workunits to.")
 
 
 class WorkunitsLoggerRequest:

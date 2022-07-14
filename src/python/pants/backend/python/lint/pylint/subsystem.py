@@ -90,7 +90,6 @@ class Pylint(PythonToolBase):
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -104,7 +103,6 @@ class Pylint(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -118,7 +116,6 @@ class Pylint(PythonToolBase):
         ),
     )
     _source_plugins = TargetListOption(
-        "--source-plugins",
         advanced=True,
         help=softwrap(
             f"""

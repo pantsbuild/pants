@@ -10,7 +10,7 @@ use pyo3::types::PyType;
 
 use testutil_mock::{StubCAS, StubCASBuilder};
 
-use crate::externs::fs::PyFileDigest;
+use crate::externs::fs::{PyDigest, PyFileDigest};
 use crate::externs::scheduler::PyExecutor;
 
 pub fn register(m: &PyModule) -> PyResult<()> {
@@ -67,8 +67,12 @@ impl PyStubCAS {
     self.0.address()
   }
 
-  fn remove(&self, digest: PyFileDigest) -> bool {
-    self.0.remove(digest.0.hash)
+  fn remove(&self, digest: &PyAny) -> PyResult<bool> {
+    let digest = digest
+      .extract::<PyFileDigest>()
+      .map(|fd| fd.0)
+      .or_else(|_| digest.extract::<PyDigest>().map(|d| d.0.as_digest()))?;
+    Ok(self.0.remove(digest.hash))
   }
 
   fn action_cache_len(&self) -> usize {

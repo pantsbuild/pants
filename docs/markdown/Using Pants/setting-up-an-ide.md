@@ -31,8 +31,8 @@ $ python3 -c "print('PYTHONPATH=\"./' + ':./'.join(\"${ROOTS}\".split()) + ':\$P
 
 See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/environments#_use-of-the-pythonpath-variable) to learn more about using the `PYTHONPATH` variable in VSCode.
 
-Third-party dependencies (Python)
----------------------------------
+Python third-party dependencies and tools
+-----------------------------------------
 
 To get your editor to understand the repo's third-party dependencies, you will probably want to point it at a virtualenv containing those dependencies.
 
@@ -44,6 +44,19 @@ Wrote virtualenv for the resolve 'python-default' (using CPython==3.9.*) to dist
 ```
 
 If you are using the ["resolves" feature for Python lockfiles](doc:python-third-party-dependencies)—which we strongly recommend—Pants will write the virtualenv to `dist/export/python/virtualenvs/<resolve-name>`. If you have multiple resolves, this means that Pants will create one virtualenv per resolve. You can then point your IDE to whichever resolve you want to load at the time.
+
+### Tool virtualenvs
+
+`./pants export` will also create a virtualenv for certain Python tools you use via Pants, like
+formatters like Black and Isort. This allows you to configure your editor to use the same version
+of the tool that Pants uses for workflows like formatting on save.
+
+To disable a certain tool, set its `export` option to `false`, e.g.:
+
+```toml pants.toml
+[black]
+export = false
+```
 
 Generated code
 --------------

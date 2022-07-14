@@ -2,7 +2,7 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-"${REPO_ROOT}/cargo" install cargo-ensure-prefix "=0.1.7"
+"${REPO_ROOT}/cargo" install cargo-ensure-prefix --locked "=0.1.7"
 
 if ! out="$("${REPO_ROOT}/cargo" ensure-prefix \
   --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" \

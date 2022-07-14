@@ -82,7 +82,6 @@ class Flake8(PythonToolBase):
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -96,7 +95,6 @@ class Flake8(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -110,7 +108,6 @@ class Flake8(PythonToolBase):
         ),
     )
     _source_plugins = TargetListOption(
-        "--source-plugins",
         advanced=True,
         help=softwrap(
             f"""

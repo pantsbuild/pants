@@ -43,7 +43,6 @@ class ScalaPBSubsystem(JvmToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     _jvm_plugins = StrListOption(
-        "--jvm-plugins",
         help=softwrap(
             """
             A list of JVM-based `protoc` plugins to invoke when generating Scala code from protobuf files.

@@ -34,7 +34,6 @@ class IPython(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     ignore_cwd = BoolOption(
-        "--ignore-cwd",
         advanced=True,
         default=True,
         help=softwrap(

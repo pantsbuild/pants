@@ -230,7 +230,7 @@ def test_get_all_help_info():
         options_scope = GLOBAL_SCOPE
         help = "Global options."
 
-        opt1 = IntOption("--opt1", default=42, help="Option 1")
+        opt1 = IntOption(default=42, help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.
         level = LogLevelOption()
 
@@ -238,7 +238,7 @@ def test_get_all_help_info():
         options_scope = "foo"
         help = "A foo."
 
-        opt2 = BoolOption("--opt2", default=True, advanced=True, help="Option 2")
+        opt2 = BoolOption(default=True, advanced=True, help="Option 2")
 
     class Bar(GoalSubsystem):
         name = "bar"

@@ -31,7 +31,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
-from pants.jvm.target_types import JvmJdkField, JvmMainClassNameField
+from pants.jvm.target_types import JvmDependenciesField, JvmJdkField, JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
 
     main_class: JvmMainClassNameField
     output_path: OutputPathField
-    dependencies: Dependencies
+    dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
 
 

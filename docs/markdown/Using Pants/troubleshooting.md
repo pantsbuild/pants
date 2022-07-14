@@ -87,7 +87,7 @@ To see what dependencies Pants knows about, run `./pants dependencies path/to/fi
 Is the missing import from a third-party dependency? Common issues:
 
 - Pants does know about your third-party requirements, e.g. missing `python_requirements` and `go_mod` target generators.
-  - To see all third-party requirement targets Pants knows, run `./pants filter --target-type=$tgt ::`, where Python: `python_requirement`, Go: `go_third_party_package`, and JVM: `jvm_artifact`.
+  - To see all third-party requirement targets Pants knows, run `./pants list --filter-target-type=$tgt ::`, where Python: `python_requirement`, Go: `go_third_party_package`, and JVM: `jvm_artifact`.
   - Run `./pants tailor ::`, or manually add the relevant targets.
 - The dependency is missing from your third-party requirements list, e.g. `go.mod` or `requirements.txt`.
 - The dependency exposes a module different than the default Pants uses, e.g. Python's `ansicolors` exposing `colors`.
@@ -195,7 +195,7 @@ You can use `./pants peek` to help identify why the same requirement is being us
 
 ```shell Shell
 # Check the `requirements` key to see if it has the problematic requirement.
-./pants filter --target-type=python_requirement | xargs ./pants peek
+./pants list --filter-target-type=python_requirement | xargs ./pants peek
 ```
 
 macOS users: issues with system Python interpreters

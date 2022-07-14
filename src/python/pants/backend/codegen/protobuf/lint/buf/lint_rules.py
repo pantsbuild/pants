@@ -41,7 +41,7 @@ class BufLintRequest(LintTargetsRequest):
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
-    if buf.skip_lint:
+    if buf.lint_skip:
         return LintResults([], linter_name=request.name)
 
     transitive_targets = await Get(

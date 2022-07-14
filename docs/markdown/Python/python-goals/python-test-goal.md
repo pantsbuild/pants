@@ -6,7 +6,7 @@ hidden: false
 createdAt: "2020-03-16T16:19:56.071Z"
 updatedAt: "2022-05-12T05:33:10.060Z"
 ---
-Pants uses the popular [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
+Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
 
 > 👍 Benefit of Pants: runs each file in parallel
 >
@@ -54,13 +54,16 @@ Alternatively, if you only want to install the plugin for certain tests, you can
 ```text requirements.txt
 pytest-django==3.10.0
 ```
+```python BUILD
+python_requirements(name="reqs")
+```
 ```python helloworld/util/BUILD
 python_tests(
    name="tests",
    # Normally, Pants infers dependencies based on imports.
    # Here, we don't actually import our plugin, though, so
    # we need to explicitly list it.
-   dependencies=["//:pytest-django"],
+   dependencies=["//:reqs#pytest-django"],
 )
 ```
 
@@ -425,17 +428,23 @@ Coverage will report data on any files encountered during the tests. You can fil
 ❯ ./pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter='["helloworld.util.lang", "helloworld.util.lang_test"]'
 ```
 
-> 🚧 Coverage will not report on unencountered files
+> 📘 Set `global_report` to include un-encountered files
 >
-> Coverage will only report on files encountered during the tests' run. This means that your coverage score may be misleading; even with a score of 100%, you may have files without any tests. You can overcome this as follows:
+> By default, coverage.py will only report on files encountered during the tests' run. This means
+> that your coverage score may be misleading; even with a score of 100%, you may have files
+> without any tests.
+> 
+> Instead, you can set `global_report = true`:
 >
-> ```toml
-> # pants.toml
+> ```toml pants.toml
 > [coverage-py]
 > global_report = true
 > ```
 >
-> In this case, Coverage will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html), i.e. files at the root of the tree, or in directories with a `__init__.py` file, possibly omitting files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `__init__.py` files. This is a shortcoming of Coverage itself.
+> Coverage.py will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html),
+> i.e. files at the root of the tree, or in directories with a `__init__.py` file. It may still omit
+> files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `__init__.py` files.
+> This is a shortcoming of Coverage.py itself.
 
 Pants will default to writing the results to the console, but you can also output in HTML, XML, JSON, or the raw SQLite file:
 
@@ -463,11 +472,11 @@ JUnit XML results
 
 Pytest can generate [JUnit XML result files](https://docs.pytest.org/en/6.2.x/usage.html#creating-junitxml-format-files). This allows you to hook up your results, for example, to dashboards.
 
-To save JUnit XML result files, set the option `[test].xml_dir`, like this:
+To save JUnit XML result files, set the option `[test].report`, like this:
 
 ```toml pants.toml
 [test]
-xml_dir = "dist/test_results"
+report = true
 ```
 
-You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
+This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.

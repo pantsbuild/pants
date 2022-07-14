@@ -7,7 +7,7 @@ from collections import namedtuple
 
 import pytest
 
-from pants.core.target_types import GenericTarget
+from pants.core.target_types import GenericTarget, GenericTargetDependenciesField
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -38,7 +38,7 @@ class TestGenTargetGenerator(TargetGenerator):
     generated_target_cls = TestGenTarget
     core_fields = COMMON_TARGET_FIELDS
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (GenericTargetDependenciesField,)
 
 
 @pytest.fixture

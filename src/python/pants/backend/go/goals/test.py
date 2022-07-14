@@ -10,6 +10,7 @@ from typing import Sequence
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
     GoPackageSourcesField,
+    GoTestExtraEnvVarsField,
     GoTestTimeoutField,
     SkipGoTestsField,
 )
@@ -31,12 +32,14 @@ from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, Genera
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
+    TestExtraEnv,
     TestFieldSet,
     TestResult,
     TestSubsystem,
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -85,6 +88,7 @@ class GoTestFieldSet(TestFieldSet):
     sources: GoPackageSourcesField
     dependencies: Dependencies
     timeout: GoTestTimeoutField
+    extra_env_vars: GoTestExtraEnvVarsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -148,7 +152,10 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
-    field_set: GoTestFieldSet, test_subsystem: TestSubsystem, go_test_subsystem: GoTestSubsystem
+    field_set: GoTestFieldSet,
+    test_subsystem: TestSubsystem,
+    go_test_subsystem: GoTestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestResult:
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
@@ -289,7 +296,10 @@ async def run_go_tests(
     # This allows tests to open dependencies on `file` targets regardless of where they are
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
-    binary_with_prefix, files_sources = await MultiGet(
+    field_set_extra_env_get = Get(
+        Environment, EnvironmentRequest(field_set.extra_env_vars.value or ())
+    )
+    binary_with_prefix, files_sources, field_set_extra_env = await MultiGet(
         Get(Digest, AddPrefix(binary.digest, working_dir)),
         Get(
             SourceFiles,
@@ -299,10 +309,18 @@ async def run_go_tests(
                 enable_codegen=True,
             ),
         ),
+        field_set_extra_env_get,
     )
     test_input_digest = await Get(
         Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
     )
+
+    extra_env = {
+        **test_extra_env.env,
+        # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
+        # `go_package`.
+        **field_set_extra_env,
+    }
 
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
@@ -315,6 +333,7 @@ async def run_go_tests(
                 "./test_runner",
                 *transform_test_args(go_test_subsystem.args, field_set.timeout.value),
             ],
+            env=extra_env,
             input_digest=test_input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,

@@ -29,7 +29,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
     help = "List all source and BUILD files a target depends on."
 
     absolute = BoolOption(
-        "--absolute",
         default=False,
         help=softwrap(
             """
@@ -39,7 +38,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     globs = BoolOption(
-        "--globs",
         default=False,
         help=softwrap(
             """
@@ -49,7 +47,6 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
         ),
     )
     transitive = BoolOption(
-        "--transitive",
         default=False,
         help=softwrap(
             """

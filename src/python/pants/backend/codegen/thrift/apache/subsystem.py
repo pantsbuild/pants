@@ -16,7 +16,6 @@ class ApacheThriftSubsystem(Subsystem):
     help = "Apache Thrift IDL compiler (https://thrift.apache.org/)."
 
     _thrift_search_paths = StrListOption(
-        "--thrift-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """
@@ -30,7 +29,6 @@ class ApacheThriftSubsystem(Subsystem):
         ),
     )
     expected_version = StrOption(
-        "--expected-version",
         default="0.15",
         help=softwrap(
             """

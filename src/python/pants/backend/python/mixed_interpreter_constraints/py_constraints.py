@@ -34,7 +34,6 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
     help = "Determine what Python interpreter constraints are used by files/targets."
 
     summary = BoolOption(
-        "--summary",
         default=False,
         help=softwrap(
             """

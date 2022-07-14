@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from abc import ABC
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
 from pants.base.build_root import BuildRoot
@@ -14,14 +13,12 @@ from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
-from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -38,10 +35,9 @@ class ReplImplementation(ABC):
     name: ClassVar[str]
 
     targets: Sequence[Target]
-    chroot: str  # Absolute path of the chroot the sources will be materialized to.
 
     def in_chroot(self, relpath: str) -> str:
-        return os.path.join(self.chroot, relpath)
+        return os.path.join("{chroot}", relpath)
 
     @memoized_property
     def addresses(self) -> Addresses:
@@ -57,12 +53,10 @@ class ReplSubsystem(GoalSubsystem):
         return ReplImplementation in union_membership
 
     shell = StrOption(
-        "--shell",
         default=None,
         help="Override the automatically-detected REPL program for the target(s) specified.",
     )
     restartable = BoolOption(
-        "--restartable",
         default=False,
         help="True if the REPL should be restarted if its inputs have changed.",
     )
@@ -78,6 +72,7 @@ class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    immutable_input_digests: FrozenDict[str, Digest]
     append_only_caches: FrozenDict[str, str]
     run_in_workspace: bool
 
@@ -87,12 +82,14 @@ class ReplRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         run_in_workspace: bool = True,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
+        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
         self.append_only_caches = FrozenDict(append_only_caches or {})
         self.run_in_workspace = run_in_workspace
 
@@ -121,33 +118,22 @@ async def run_repl(
         )
         return Repl(-1)
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
-        repl_impl = repl_implementation_cls(targets=specified_targets, chroot=tmpdir)
-        request = await Get(ReplRequest, ReplImplementation, repl_impl)
+    repl_impl = repl_implementation_cls(targets=specified_targets)
+    request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
-        input_digest = request.digest
-        if request.run_in_workspace:
-            workspace.write_digest(
-                request.digest,
-                path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-                # We don't want to influence whether the InteractiveProcess is able to restart. Because
-                # we're writing into a temp directory, we can safely mark this side_effecting=False.
-                side_effecting=False,
-            )
-            input_digest = EMPTY_DIGEST
-
-        env = {**complete_env, **request.extra_env}
-        result = await Effect(
-            InteractiveProcessResult,
-            InteractiveProcess(
-                argv=request.args,
-                env=env,
-                input_digest=input_digest,
-                run_in_workspace=request.run_in_workspace,
-                restartable=repl_subsystem.restartable,
-                append_only_caches=request.append_only_caches,
-            ),
-        )
+    env = {**complete_env, **request.extra_env}
+    result = await Effect(
+        InteractiveProcessResult,
+        InteractiveProcess(
+            argv=request.args,
+            env=env,
+            input_digest=request.digest,
+            run_in_workspace=request.run_in_workspace,
+            restartable=repl_subsystem.restartable,
+            immutable_input_digests=request.immutable_input_digests,
+            append_only_caches=request.append_only_caches,
+        ),
+    )
     return Repl(result.exit_code)
 
 

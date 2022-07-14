@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -50,6 +50,8 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @union
@@ -277,7 +279,6 @@ class TailorSubsystem(GoalSubsystem):
         return PutativeTargetsRequest in union_membership
 
     check = BoolOption(
-        "--check",
         default=False,
         help=softwrap(
             """
@@ -287,7 +288,6 @@ class TailorSubsystem(GoalSubsystem):
         ),
     )
     build_file_name = StrOption(
-        "--build-file-name",
         default="BUILD",
         help=softwrap(
             """
@@ -299,19 +299,16 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     build_file_header = StrOption(
-        "--build-file-header",
         default=None,
         help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
         advanced=True,
     )
     build_file_indent = StrOption(
-        "--build-file-indent",
         default="    ",
         help="The indent to use when auto-editing BUILD files.",
         advanced=True,
     )
     _alias_mapping = DictOption[str](
-        "--alias-mapping",
         help=softwrap(
             f"""
             A mapping from standard target type to custom type to use instead. The custom
@@ -322,7 +319,6 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     ignore_paths = StrListOption(
-        "--ignore-paths",
         help=softwrap(
             """
             Do not edit or create BUILD files at these paths.
@@ -337,7 +333,6 @@ class TailorSubsystem(GoalSubsystem):
         advanced=True,
     )
     _ignore_adding_targets = StrListOption(
-        "--ignore-adding-targets",
         help=softwrap(
             """
             Do not add these target definitions.
@@ -633,34 +628,31 @@ async def tailor(
     global_options: GlobalOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
+    if not specs:
+        if not specs.includes.from_change_detection:
+            logger.warning(
+                softwrap(
+                    f"""\
+                    No arguments specified with `{bin_name()} tailor`, so the goal will do nothing.
+
+                    Instead, you should provide arguments like this:
+
+                      * `{bin_name()} tailor ::` to run on everything
+                      * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                      * `{bin_name()} tailor dir` to run on `dir`
+                      * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
+                    """
+                )
+            )
+        return TailorGoal(exit_code=0)
 
     dir_search_paths: tuple[str, ...] = ()
     recursive_search_paths: tuple[str, ...] = ()
-    if specs:
-        if global_options.use_deprecated_directory_cli_args_semantics:
-            recursive_search_paths = specs_to_dirs(specs.includes)
-        else:
-            specs_paths = await Get(SpecsPaths, Specs, specs)
-            dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+    if global_options.use_deprecated_directory_cli_args_semantics:
+        recursive_search_paths = specs_to_dirs(specs.includes)
     else:
-        warn_or_error(
-            "2.14.0.dev1",
-            f"running `{bin_name()} tailor` without arguments",
-            softwrap(
-                f"""
-                Currently, `{bin_name()} tailor` without arguments will run against
-                every file in the project.
-
-                In Pants 2.14, you must use CLI arguments. Use:
-
-                  * `{bin_name()} tailor ::` to run on everything
-                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
-                  * `{bin_name()} tailor dir` to run on `dir`
-                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
-                """
-            ),
-        )
-        recursive_search_paths = ("",)
+        specs_paths = await Get(SpecsPaths, Specs, specs)
+        dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
 
     putative_targets_results = await MultiGet(
         Get(

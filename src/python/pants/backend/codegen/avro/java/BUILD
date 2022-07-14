@@ -5,4 +5,6 @@ python_sources(dependencies=[":lockfile"])
 
 resource(name="lockfile", source="avro-tools.default.lockfile.txt")
 
-python_tests(name="tests")
+python_tests(name="tests", dependencies=[":test_lockfiles"])
+
+resources(name="test_lockfiles", sources=["*.test.lock"])

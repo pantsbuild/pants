@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any
 
 from pants.build_graph.address import (
@@ -21,7 +22,7 @@ from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaults
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
@@ -159,11 +160,16 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
-    parent_dir = os.path.dirname(directory.path)
-    if parent_dir != directory.path:
-        maybe_parent = await Get(OptionalAddressFamily, AddressFamilyDir(parent_dir))
-        if maybe_parent.address_family is not None:
-            defaults = maybe_parent.address_family.defaults
+    parent_dirs = tuple(PurePath(directory.path).parents)
+    if parent_dirs:
+        maybe_parents = await MultiGet(
+            Get(OptionalAddressFamily, AddressFamilyDir(str(parent_dir)))
+            for parent_dir in parent_dirs
+        )
+        for maybe_parent in maybe_parents:
+            if maybe_parent.address_family is not None:
+                defaults = maybe_parent.address_family.defaults
+                break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership

@@ -81,7 +81,7 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
                 )
             )
         if all_interpreter_constraints.requires_python38_or_newer(
-            python_setup.interpreter_universe
+            python_setup.interpreter_versions_universe
         ):
             tool_interpreter_constraints = all_interpreter_constraints
 

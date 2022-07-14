@@ -30,10 +30,10 @@ class BufSubsystem(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    skip_format = SkipOption("fmt", "lint", flag_name="--format-skip")
-    skip_lint = SkipOption("lint", flag_name="--lint-skip")
-    format_args = ArgsListOption(example="--error-format json", flag_name="--format-args")
-    lint_args = ArgsListOption(example="--error-format json", flag_name="--lint-args")
+    format_skip = SkipOption("fmt", "lint")
+    lint_skip = SkipOption("lint")
+    format_args = ArgsListOption(example="--error-format json")
+    lint_args = ArgsListOption(example="--error-format json")
 
     def generate_exe(self, plat: Platform) -> str:
         return "./buf/bin/buf"

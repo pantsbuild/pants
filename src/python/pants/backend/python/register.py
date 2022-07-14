@@ -16,6 +16,7 @@ from pants.backend.python.goals import (
     pytest_runner,
     repl,
     run_pex_binary,
+    run_python_source,
     setup_py,
     tailor,
 )
@@ -78,6 +79,7 @@ def rules():
         *python_sources.rules(),
         *repl.rules(),
         *run_pex_binary.rules(),
+        *run_python_source.rules(),
         *setup_py.rules(),
         *setuptools.rules(),
         *tailor.rules(),

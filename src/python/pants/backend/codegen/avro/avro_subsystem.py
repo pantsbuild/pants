@@ -12,7 +12,6 @@ class AvroSubsystem(Subsystem):
     help = "General Avro codegen settings."
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `avro_sources` targets with the `tailor` goal.",
         advanced=True,

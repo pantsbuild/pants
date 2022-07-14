@@ -297,8 +297,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             or KnownUserResolveNamesRequest in union_membership
         )
 
-    resolve_names = StrListOption(
-        "--resolve",
+    resolve = StrListOption(
         advanced=False,
         help=softwrap(
             f"""
@@ -322,7 +321,6 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         ),
     )
     custom_command = StrOption(
-        "--custom-command",
         advanced=True,
         default=None,
         help=softwrap(
@@ -351,7 +349,7 @@ async def generate_lockfiles_goal(
     requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
         known_user_resolve_names,
         union_membership.get(GenerateToolLockfileSentinel),
-        set(generate_lockfiles_subsystem.resolve_names),
+        set(generate_lockfiles_subsystem.resolve),
     )
 
     all_specified_user_requests = await MultiGet(
@@ -364,7 +362,7 @@ async def generate_lockfiles_goal(
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
         specified_tool_requests,
-        resolve_specified=bool(generate_lockfiles_subsystem.resolve_names),
+        resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
     results = await MultiGet(

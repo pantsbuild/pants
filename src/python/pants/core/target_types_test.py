@@ -371,7 +371,10 @@ def test_url_assets(asset_type) -> None:
     with mock_console(rule_runner.options_bootstrapper) as (console, stdout_reader):
         rule_runner.run_goal_rule(
             run.Run,
-            args=["app/app.py"],
+            args=[
+                "app/app.py",
+                f"--use-deprecated-pex-binary-run-semantics={asset_type == 'file'}",
+            ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
         stdout = stdout_reader.get_stdout()

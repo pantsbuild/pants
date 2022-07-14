@@ -19,7 +19,6 @@ class ListSubsystem(LineOriented, GoalSubsystem):
     help = "Lists all targets matching the file or target arguments."
 
     documented = BoolOption(
-        "--documented",
         default=False,
         help="Print only targets that are documented with a description.",
     )

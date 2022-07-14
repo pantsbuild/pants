@@ -11,6 +11,7 @@ from pants.option.global_options import (
     NamedCachesDirOption,
     ProcessCleanupOption,
     ExperimentalCoalescedProcessBatchingOption,
+    UseDeprecatedPexBinaryRunSemanticsOption,
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -74,6 +75,15 @@ def extract_experimental_coalesced_process_batch(
 ) -> ExperimentalCoalescedProcessBatchingOption:
     return ExperimentalCoalescedProcessBatchingOption(
         global_options.experimental_coalesced_process_batching
+    )
+
+
+@rule
+def extract_use_deprecated_pex_binary_run_semantics(
+    global_options: GlobalOptions,
+) -> UseDeprecatedPexBinaryRunSemanticsOption:
+    return UseDeprecatedPexBinaryRunSemanticsOption(
+        global_options.use_deprecated_pex_binary_run_semantics
     )
 
 

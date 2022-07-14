@@ -24,7 +24,7 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
@@ -48,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            get_filtered_environment,
             QueryRule(TestResult, [GoTestFieldSet]),
             QueryRule(ProcessResult, [GoSdkProcess]),
         ],
@@ -541,6 +542,74 @@ def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
     assert "PASS: FuzzFoo" in result.stdout
+
+
+def test_extra_env_vars(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": textwrap.dedent(
+                """
+                go_mod(name='mod')
+                go_package(
+                    test_extra_env_vars=(
+                        "GO_PACKAGE_VAR_WITHOUT_VALUE",
+                        "GO_PACKAGE_VAR_WITH_VALUE=go_package_var_with_value",
+                        "GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR=go_package_override_with_value_var_override",
+                    )
+                )
+                """
+            ),
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                import "os"
+                func envIs(e, v string) bool {
+                  return (os.Getenv(e) == v)
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                func TestEnvs(t *testing.T) {
+                  if !envIs("ARG_WITH_VALUE_VAR", "arg_with_value_var") {
+                      t.Fail()
+                  }
+                  if !envIs("ARG_WITHOUT_VALUE_VAR", "arg_without_value_var") {
+                      t.Fail()
+                  }
+                  if !envIs("GO_PACKAGE_VAR_WITH_VALUE", "go_package_var_with_value") {
+                      t.Fail()
+                  }
+                  if !envIs("GO_PACKAGE_VAR_WITHOUT_VALUE", "go_package_var_without_value") {
+                      t.Fail()
+                  }
+                  if !envIs("GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR", "go_package_override_with_value_var_override") {
+                      t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    rule_runner.set_options(
+        args=[
+            "--go-test-args=-v -bench=.",
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "GO_PACKAGE_OVERRIDE_ARG_WITH_VALUE_VAR"]',
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_var",
+            "GO_PACKAGE_VAR_WITHOUT_VALUE": "go_package_var_without_value",
+            "GO_PACKAGE_OVERRIDE_WITH_VALUE_VAR": "go_package_override_with_value_var",
+        },
+        env_inherit={"PATH"},
+    )
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+    assert "PASS: TestEnvs" in result.stdout
 
 
 def test_skip_tests(rule_runner: RuleRunner) -> None:

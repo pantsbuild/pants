@@ -307,7 +307,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             }
             with environment_as(**env):
                 result = ctx.runner(
-                    ["run", "testprojects/src/python/print_env", "--", expected_key]
+                    ["run", "testprojects/src/python/print_env:binary", "--", expected_key]
                 )
                 ctx.checker.assert_running()
 
@@ -322,7 +322,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 checker.assert_started()
 
             self.run_pants_with_workdir(
-                ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
+                ["run", "testprojects/src/python/print_env:binary", "--", "NO_LEAKS"],
                 workdir=workdir,
                 config=pantsd_config,
             ).assert_failure()

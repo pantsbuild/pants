@@ -45,11 +45,15 @@ use tempfile::TempDir;
 
 use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
+fn executor() -> Executor {
+  Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
+}
+
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   // Create an executor, store containing the stuff to materialize, and a digest for the stuff.
   // To avoid benchmarking the deleting of things, we create a parent temporary directory (which
   // will be deleted at the end of the benchmark) and then skip deletion of the per-run directories.
-  let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
+  let executor = executor();
 
   let mut cgroup = c.benchmark_group("materialize_directory");
 
@@ -84,7 +88,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 /// filesystem traversal overheads and focuses on digesting/capturing.
 ///
 pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
-  let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
+  let executor = executor();
 
   let mut cgroup = c.benchmark_group("snapshot_capture");
 
@@ -127,7 +131,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
 }
 
 pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
-  let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
+  let executor = executor();
   // NB: We use a much larger snapshot size compared to the materialize benchmark!
   let (store, _tempdir, digest) = snapshot(&executor, 1000, 100);
 
@@ -155,7 +159,7 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
 }
 
 pub fn criterion_benchmark_merge(c: &mut Criterion) {
-  let executor = Executor::global(num_cpus::get(), num_cpus::get() * 4).unwrap();
+  let executor = executor();
   let num_files: usize = 4000;
   let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 

@@ -67,7 +67,6 @@ class Bandit(PythonToolBase):
     args = ArgsListOption(example="--skip B101,B308 --confidence")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help="Path to a Bandit YAML config file (https://bandit.readthedocs.io/en/latest/config.html).",

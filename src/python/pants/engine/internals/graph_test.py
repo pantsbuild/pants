@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, List, Set, Tuple, Type, cast
@@ -38,14 +39,13 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -67,6 +67,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
 class MockDependencies(Dependencies):
     supports_transitive_excludes = True
     deprecated_alias = "deprecated_field"
@@ -85,11 +89,15 @@ class ResolveField(StringField):
     alias = "resolve"
 
 
+class MockMultipleSourcesField(MultipleSourcesField):
+    pass
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
         MockDependencies,
-        MultipleSourcesField,
+        MockMultipleSourcesField,
         SpecialCasedDeps1,
         SpecialCasedDeps2,
         ResolveField,
@@ -101,12 +109,12 @@ class MockTarget(Target):
 
 class MockGeneratedTarget(Target):
     alias = "generated"
-    core_fields = (MockDependencies, Tags, SingleSourceField, ResolveField)
+    core_fields = (MockDependencies, Tags, MockSingleSourceField, ResolveField)
 
 
 class MockTargetGenerator(TargetFilesGenerator):
     alias = "generator"
-    core_fields = (MultipleSourcesField, OverridesField)
+    core_fields = (MockMultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
     copied_fields = ()
     moved_fields = (Dependencies, Tags, ResolveField)
@@ -1569,9 +1577,12 @@ def test_transitive_excludes_error() -> None:
         alias = "valid2"
         core_fields = (MockDependencies,)
 
+    class InvalidDepsField(Dependencies):
+        pass
+
     class Invalid(Target):
         alias = "invalid"
-        core_fields = (Dependencies,)
+        core_fields = (InvalidDepsField,)
 
     exc = TransitiveExcludesNotSupportedError(
         bad_value="!!//:bad",
@@ -1589,26 +1600,6 @@ class SmalltalkDependencies(Dependencies):
 
 class CustomSmalltalkDependencies(SmalltalkDependencies):
     pass
-
-
-class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
-
-
-class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
-
-
-@rule
-def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies(
-        [Address("", target_name="injected1"), Address("", target_name="injected2")]
-    )
-
-
-@rule
-def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address("", target_name="custom_injected")])
 
 
 class SmalltalkLibrarySource(SmalltalkSource):
@@ -1630,37 +1621,53 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
+@dataclass(frozen=True)
+class SmalltalkDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (SmalltalkLibrarySource,)
+
+    source: SmalltalkLibrarySource
+
+
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkLibrarySource
+    infer_from = SmalltalkDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    all_lines = itertools.chain.from_iterable(
-        file_content.content.decode().splitlines() for file_content in digest_contents
-    )
-    resolved = await MultiGet(
+    all_lines = [
+        line.strip()
+        for line in itertools.chain.from_iterable(
+            file_content.content.decode().splitlines() for file_content in digest_contents
+        )
+    ]
+    include = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
         for line in all_lines
+        if not line.startswith("!")
     )
-    return InferredDependencies(resolved)
+    exclude = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
+        )
+        for line in all_lines
+        if line.startswith("!")
+    )
+    return InferredDependencies(include, exclude=exclude)
 
 
 @pytest.fixture
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            inject_smalltalk_deps,
-            inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibraryGenerator, MockTarget],
@@ -1775,33 +1782,6 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
     )
 
 
-def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files(
-        {
-            "src/smalltalk/util/f1.st": "",
-            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
-        }
-    )
-
-    def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
-        provided_deps = ["//:provided"]
-        if injected:
-            provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
-        result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
-
-    assert_injected(Dependencies, injected=[])
-    assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])
-    assert_injected(
-        CustomSmalltalkDependencies,
-        injected=[
-            Address("", target_name="custom_injected"),
-            Address("", target_name="injected1"),
-        ],
-    )
-
-
 def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     """We test that dependency inference works generally and that we merge it correctly with
     explicitly provided dependencies.
@@ -1841,6 +1821,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 //:inferred_but_ignored2
                 """
             ),
+            "demo/f3.st": dedent(
+                """\
+                //:inferred1
+                !:inferred_and_provided1
+                !//:inferred_and_provided2
+                """
+            ),
             "demo/BUILD": dedent(
                 """\
                 smalltalk_libraries(
@@ -1863,6 +1850,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
         expected=[
             Address("demo", relative_file_path="f1.st"),
             Address("demo", relative_file_path="f2.st"),
+            Address("demo", relative_file_path="f3.st"),
         ],
     )
 
@@ -1888,6 +1876,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 relative_file_path="inferred_and_provided2.st",
                 target_name="inferred_and_provided2",
             ),
+        ],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        Address("demo", relative_file_path="f3.st", target_name="demo"),
+        expected=[
+            Address("", target_name="inferred1"),
         ],
     )
 

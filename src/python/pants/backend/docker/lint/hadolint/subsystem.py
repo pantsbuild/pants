@@ -34,7 +34,6 @@ class Hadolint(TemplatedExternalTool):
     skip = SkipOption("lint")
     args = ArgsListOption(example="--format json")
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -48,7 +47,6 @@ class Hadolint(TemplatedExternalTool):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(

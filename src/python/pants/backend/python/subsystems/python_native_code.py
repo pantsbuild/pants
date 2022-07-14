@@ -16,13 +16,11 @@ class PythonNativeCode(Subsystem):
 
     # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
     cpp_flags = StrListOption(
-        "--cpp-flags",
         default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
         help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
         advanced=True,
     )
     ld_flags = StrListOption(
-        "--ld-flags",
         default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
         help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
         advanced=True,

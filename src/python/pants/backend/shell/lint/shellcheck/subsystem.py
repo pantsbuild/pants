@@ -40,7 +40,6 @@ class Shellcheck(TemplatedExternalTool):
     skip = SkipOption("lint")
     args = ArgsListOption(example="-e SC20529")
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=softwrap(

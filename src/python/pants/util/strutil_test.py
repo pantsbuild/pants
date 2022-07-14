@@ -28,6 +28,8 @@ def test_pluralize() -> None:
     assert "2 bosses" == pluralize(2, "boss")
     assert "0 bats" == pluralize(0, "bat")
     assert "0 bosses" == pluralize(0, "boss")
+    assert "1 dependency" == pluralize(1, "dependency")
+    assert "2 dependencies" == pluralize(2, "dependency")
 
 
 def test_ensure_text() -> None:

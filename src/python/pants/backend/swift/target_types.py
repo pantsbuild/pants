@@ -15,6 +15,10 @@ from pants.engine.target import (
 SWIFT_FILE_EXTENSIONS = (".swift",)
 
 
+class SwiftDependenciesField(Dependencies):
+    pass
+
+
 class SwiftSourceField(SingleSourceField):
     expected_file_extensions = SWIFT_FILE_EXTENSIONS
 
@@ -32,7 +36,7 @@ class SwiftSourceTarget(Target):
     alias = "swift_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        SwiftDependenciesField,
         SwiftSourceField,
     )
     help = "A single Swift source file."
@@ -50,5 +54,5 @@ class SwiftSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = SwiftSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (SwiftDependenciesField,)
     help = "Generate a `swift_source` target for each file in the `sources` field."

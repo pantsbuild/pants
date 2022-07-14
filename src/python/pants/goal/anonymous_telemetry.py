@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from typing import cast
 
 from humbug.consent import HumbugConsent
@@ -38,7 +39,6 @@ class AnonymousTelemetry(Subsystem):
     help = "Options related to sending anonymous stats to the Pants project, to aid development."
 
     enabled = BoolOption(
-        "--enabled",
         default=False,
         help=softwrap(
             f"""
@@ -53,7 +53,6 @@ class AnonymousTelemetry(Subsystem):
         advanced=True,
     )
     repo_id = StrOption(
-        "--repo-id",
         default=None,
         help=softwrap(
             f"""
@@ -153,6 +152,7 @@ class AnonymousTelemetryCallback(WorkunitsCallback):
         reporter.publish(report)
 
 
+@dataclass(frozen=True)
 class AnonymousTelemetryCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 

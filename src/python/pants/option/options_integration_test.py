@@ -54,7 +54,6 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
             options_scope = "mock-options"
 
             deprecated = StrOption(
-                "--deprecated",
                 default=None,
                 help="doens't matter",
                 removal_version="999.99.9.dev0",

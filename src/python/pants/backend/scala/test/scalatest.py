@@ -27,12 +27,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    Dependencies,
-    SourcesField,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
@@ -40,7 +35,7 @@ from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmJdkField
+from pants.jvm.target_types import JvmDependenciesField, JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -55,7 +50,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
     sources: ScalatestTestSourceField
     jdk_version: JvmJdkField
-    dependencies: Dependencies
+    dependencies: JvmDependenciesField
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):

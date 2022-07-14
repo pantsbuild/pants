@@ -45,7 +45,7 @@ use workunit_store::{
   WorkunitStoreHandle,
 };
 
-use crate::externs::fs::{todo_possible_store_missing_digest, PyFileDigest};
+use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -54,6 +54,7 @@ use crate::{
 
 #[pymodule]
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
+  externs::register(py, m)?;
   externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
@@ -65,9 +66,9 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_class::<PyExecutionRequest>()?;
   m.add_class::<PyExecutionStrategyOptions>()?;
+  m.add_class::<PyLocalStoreOptions>()?;
   m.add_class::<PyNailgunServer>()?;
   m.add_class::<PyRemotingOptions>()?;
-  m.add_class::<PyLocalStoreOptions>()?;
   m.add_class::<PyResult>()?;
   m.add_class::<PyScheduler>()?;
   m.add_class::<PySession>()?;
@@ -812,7 +813,7 @@ async fn workunit_to_py_value(
           })?;
         let snapshot = store::Snapshot::from_digest(store, digest.clone())
           .await
-          .map_err(todo_possible_store_missing_digest)?;
+          .map_err(possible_store_missing_digest)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -1430,7 +1431,7 @@ fn lease_files_in_graph(
         .executor
         .block_on(core.store().lease_all_recursively(digests.iter()))
     })
-    .map_err(todo_possible_store_missing_digest)
+    .map_err(possible_store_missing_digest)
   })
 }
 
@@ -1517,7 +1518,7 @@ fn ensure_remote_has_recursive(
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
     })
-    .map_err(todo_possible_store_missing_digest)?;
+    .map_err(possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1537,7 +1538,7 @@ fn ensure_directory_digest_persisted(
         .executor
         .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
-    .map_err(todo_possible_store_missing_digest)?;
+    .map_err(possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1566,7 +1567,7 @@ fn single_file_digests_to_bytes<'py>(
     let bytes_values: Vec<PyObject> = py
       .allow_threads(|| core.executor.block_on(future::try_join_all(digest_futures)))
       .map(|values| values.into_iter().map(|val| val.into()).collect())
-      .map_err(todo_possible_store_missing_digest)?;
+      .map_err(possible_store_missing_digest)?;
 
     let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
@@ -1603,7 +1604,7 @@ fn write_digest(
         )
         .await
     })
-    .map_err(todo_possible_store_missing_digest)
+    .map_err(possible_store_missing_digest)
   })
 }
 

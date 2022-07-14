@@ -9,10 +9,13 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import (
+    ConftestDependenciesInferenceFieldSet,
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
+    InitDependenciesInferenceFieldSet,
     InitFilesInference,
+    PythonImportDependenciesInferenceFieldSet,
     PythonInferSubsystem,
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -24,7 +27,6 @@ from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
-    PythonSourceField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
@@ -99,7 +101,12 @@ def test_infer_python_imports(caplog) -> None:
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
+            InferredDependencies,
+            [
+                InferPythonImportDependencies(
+                    PythonImportDependenciesInferenceFieldSet.create(target)
+                )
+            ],
         )
 
     assert run_dep_inference(
@@ -227,7 +234,12 @@ def test_infer_python_assets(caplog) -> None:
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
+            InferredDependencies,
+            [
+                InferPythonImportDependencies(
+                    PythonImportDependenciesInferenceFieldSet.create(target)
+                )
+            ],
         )
 
     assert run_dep_inference(
@@ -360,12 +372,12 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
         target = rule_runner.get_target(address)
         result = rule_runner.request(
             InferredDependencies,
-            [InferInitDependencies(target[PythonSourceField])],
+            [InferInitDependencies(InitDependenciesInferenceFieldSet.create(target))],
         )
         if behavior == InitFilesInference.never:
-            assert not result
-        else:
-            assert result == InferredDependencies(expected)
+            expected = []
+
+        assert result == InferredDependencies(expected)
 
     check(
         Address("src/python/root/mid/leaf", relative_file_path="f.py"),
@@ -426,7 +438,7 @@ def test_infer_python_conftests() -> None:
         target = rule_runner.get_target(address)
         return rule_runner.request(
             InferredDependencies,
-            [InferConftestDependencies(target[PythonSourceField])],
+            [InferConftestDependencies(ConftestDependenciesInferenceFieldSet.create(target))],
         )
 
     assert run_dep_inference(
@@ -490,7 +502,11 @@ def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
         )
         return imports_rule_runner.request(
             InferredDependencies,
-            [InferPythonImportDependencies(target[PythonSourceField])],
+            [
+                InferPythonImportDependencies(
+                    PythonImportDependenciesInferenceFieldSet.create(target)
+                )
+            ],
         )
 
     run_dep_inference("warning")
@@ -605,5 +621,6 @@ def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) 
     )
     with engine_error(UnownedDependencyError, contains=expected_error):
         imports_rule_runner.request(
-            InferredDependencies, [InferPythonImportDependencies(tgt[PythonSourceField])]
+            InferredDependencies,
+            [InferPythonImportDependencies(PythonImportDependenciesInferenceFieldSet.create(tgt))],
         )

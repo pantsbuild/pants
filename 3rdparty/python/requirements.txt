@@ -15,7 +15,7 @@ humbug==0.2.7
 
 ijson==3.1.4
 packaging==21.3
-pex==2.1.90
+pex==2.1.96
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -38,6 +38,9 @@ types-toml==0.10.3
 typing-extensions==4.0.1
 mypy-typing-asserts==0.1.1
 
+
+# This dependency is only for debugging Pants itself, and should never be imported
+debugpy==1.6.0
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.

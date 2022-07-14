@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
 )
-from pants.base.deprecated import warn_or_error
+from pants.base.specs import Specs
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -131,7 +131,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         return RewrittenBuildFileRequest in union_membership
 
     check = BoolOption(
-        "--check",
         default=False,
         help=softwrap(
             """
@@ -141,7 +140,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         ),
     )
     fmt = BoolOption(
-        "--fmt",
         default=True,
         help=softwrap(
             """
@@ -157,12 +155,10 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         ),
     )
     formatter = EnumOption(
-        "--formatter",
         default=Formatter.BLACK,
         help="Which formatter Pants should use to format BUILD files.",
     )
     fix_safe_deprecations = BoolOption(
-        "--fix-safe-deprecations",
         default=True,
         help=softwrap(
             """
@@ -184,41 +180,45 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    specs_paths: SpecsPaths,
+    specs: Specs,
 ) -> UpdateBuildFilesGoal:
-    build_file_path_globs = PathGlobs(
-        globs=(
-            *(os.path.join("**", p) for p in build_file_options.patterns),
-            *(f"!{p}" for p in build_file_options.ignores),
-        )
-    )
-    if specs_paths.files:
-        all_build_file_paths = await Get(Paths, PathGlobs, build_file_path_globs)
-        specified_paths = set(specs_paths.files)
-        specified_build_files = await Get(
-            DigestContents,
-            PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
-        )
-    else:
-        warn_or_error(
-            "2.14.0.dev1",
-            f"running `{bin_name()} update-build-files` without arguments",
-            softwrap(
-                f"""
-                Currently, `{bin_name()} update-build-files` without arguments will run against
-                every BUILD file in the project.
+    if not specs:
+        if not specs.includes.from_change_detection:
+            logger.warning(
+                softwrap(
+                    f"""\
+                    No arguments specified with `{bin_name()} update-build-files`, so the goal will
+                    do nothing.
 
-                In Pants 2.14, you must use CLI arguments. Use:
+                    Instead, you should provide arguments like this:
 
-                  * `{bin_name()} update-build-files ::` to run on everything
-                  * `{bin_name()} update-build-files dir::` to run on `dir` and subdirs
-                  * `{bin_name()} update-build-files dir` to run on `dir`
-                  * `{bin_name()} update-build-files dir/BUILD` to run on that single BUILD file
-                  * `{bin_name()} --changed-since=HEAD update-build-files` to run only on changed BUILD files
-                """
+                      * `{bin_name()} update-build-files ::` to run on everything
+                      * `{bin_name()} update-build-files dir::` to run on `dir` and subdirs
+                      * `{bin_name()} update-build-files dir` to run on `dir`
+                      * `{bin_name()} update-build-files dir/BUILD` to run on that single BUILD file
+                      * `{bin_name()} --changed-since=HEAD update-build-files` to run only on changed BUILD files
+                    """
+                )
+            )
+        return UpdateBuildFilesGoal(exit_code=0)
+
+    all_build_file_paths, specs_paths = await MultiGet(
+        Get(
+            Paths,
+            PathGlobs(
+                globs=(
+                    *(os.path.join("**", p) for p in build_file_options.patterns),
+                    *(f"!{p}" for p in build_file_options.ignores),
+                )
             ),
-        )
-        specified_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
+        ),
+        Get(SpecsPaths, Specs, specs),
+    )
+    specified_paths = set(specs_paths.files)
+    specified_build_files = await Get(
+        DigestContents,
+        PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
+    )
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:

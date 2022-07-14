@@ -21,7 +21,6 @@ class SubprocessEnvironment(Subsystem):
     help = "Environment settings for forked subprocesses."
 
     _env_vars = StrListOption(
-        "--env-vars",
         default=["LANG", "LC_CTYPE", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"],
         help=softwrap(
             f"""

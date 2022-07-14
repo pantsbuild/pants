@@ -6,9 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Iterator, cast
+from typing import DefaultDict, Iterable, Iterator
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -27,6 +28,8 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonDependenciesField,
     PythonResolveField,
     PythonSourceField,
     PythonTestSourceField,
@@ -41,14 +44,12 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule, rule_helper
 from pants.engine.target import (
-    Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
     Targets,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
@@ -85,7 +86,6 @@ class PythonInferSubsystem(Subsystem):
     help = "Options controlling which dependencies will be inferred for Python targets."
 
     imports = BoolOption(
-        "--imports",
         default=True,
         help=softwrap(
             """
@@ -97,7 +97,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports = BoolOption(
-        "--string-imports",
         default=False,
         help=softwrap(
             """
@@ -110,7 +109,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     string_imports_min_dots = IntOption(
-        "--string-imports-min-dots",
         default=2,
         help=softwrap(
             """
@@ -121,7 +119,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets = BoolOption(
-        "--assets",
         default=False,
         help=softwrap(
             """
@@ -134,7 +131,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets_min_slashes = IntOption(
-        "--assets-min-slashes",
         default=1,
         help=softwrap(
             """
@@ -144,9 +140,7 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
     )
-
     init_files = EnumOption(
-        "--init-files",
         help=softwrap(
             f"""
             Infer a target's dependencies on any `__init__.py` files in the packages
@@ -166,34 +160,7 @@ class PythonInferSubsystem(Subsystem):
         ),
         default=InitFilesInference.content_only,
     )
-    inits = BoolOption(
-        "--inits",
-        default=False,
-        help=softwrap(
-            f"""
-            Infer a target's dependencies on any `__init__.py` files in the packages
-            it is located in (recursively upward in the directory structure).
-
-            Even if this is disabled, Pants will still include any ancestor `__init__.py` files,
-            only they will not be 'proper' dependencies, e.g. they will not show up in
-            `{bin_name()} dependencies` and their own dependencies will not be used.
-
-            If you have empty `__init__.py` files, it's safe to leave this option off; otherwise,
-            you should enable this option.
-            """
-        ),
-        removal_version="2.14.0.dev1",
-        removal_hint=softwrap(
-            """
-            Use the more powerful option `[python-infer].init_files`. For identical
-            behavior, set to 'always'. Otherwise, we recommend the default of `content_only`
-            (simply delete the option `[python-infer].inits` to trigger the default).
-            """
-        ),
-    )
-
     conftests = BoolOption(
-        "--conftests",
         default=True,
         help=softwrap(
             """
@@ -203,7 +170,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     entry_points = BoolOption(
-        "--entry-points",
         default=True,
         help=softwrap(
             """
@@ -214,7 +180,6 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     unowned_dependency_behavior = EnumOption(
-        "--unowned-dependency-behavior",
         default=UnownedDependencyUsage.DoNothing,
         help=softwrap(
             """
@@ -232,8 +197,23 @@ class PythonInferSubsystem(Subsystem):
     )
 
 
+@dataclass(frozen=True)
+class PythonImportDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (
+        PythonSourceField,
+        PythonDependenciesField,
+        PythonResolveField,
+        InterpreterConstraintsField,
+    )
+
+    source: PythonSourceField
+    dependencies: PythonDependenciesField
+    resolve: PythonResolveField
+    interpreter_constraints: InterpreterConstraintsField
+
+
 class InferPythonImportDependencies(InferDependenciesRequest):
-    infer_from = PythonSourceField
+    infer_from = PythonImportDependenciesInferenceFieldSet
 
 
 def _get_inferred_asset_deps(
@@ -388,21 +368,14 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    _wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(request.sources_field.address, description_of_origin="<infallible>"),
+    address = request.field_set.address
+    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+        [request.field_set.interpreter_constraints], python_setup
     )
-    tgt = _wrapped_tgt.target
-    interpreter_constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
-    if interpreter_constraints is None:
-        # TODO: This would represent a target with a PythonSource field, but no
-        # InterpreterConstraints field. #15400 would allow inference to require both
-        # fields.
-        return InferredDependencies([])
     parsed_dependencies = await Get(
         ParsedPythonDependencies,
         ParsePythonDependenciesRequest(
-            cast(PythonSourceField, request.sources_field),
+            request.field_set.source,
             interpreter_constraints,
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
@@ -419,14 +392,14 @@ async def infer_python_dependencies_via_source(
         parsed_imports = ParsedPythonImports([])
 
     explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
 
-    resolve = tgt[PythonResolveField].normalized_value(python_setup)
+    resolve = request.field_set.resolve.normalized_value(python_setup)
 
     if parsed_imports:
         import_deps, unowned_imports = _get_imports_info(
-            address=tgt.address,
+            address=address,
             owners_per_import=await MultiGet(
                 Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
                 for imported_module in parsed_imports
@@ -441,8 +414,8 @@ async def infer_python_dependencies_via_source(
         assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
         inferred_deps.update(
             _get_inferred_asset_deps(
-                tgt.address,
-                request.sources_field.file_path,
+                address,
+                request.field_set.source.file_path,
                 assets_by_path,
                 parsed_assets,
                 explicitly_provided_deps,
@@ -450,7 +423,7 @@ async def infer_python_dependencies_via_source(
         )
 
     _ = await _handle_unowned_imports(
-        tgt.address,
+        address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
         unowned_imports,
@@ -461,8 +434,16 @@ async def infer_python_dependencies_via_source(
     return InferredDependencies(sorted(inferred_deps))
 
 
+@dataclass(frozen=True)
+class InitDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (PythonSourceField, PythonResolveField)
+
+    source: PythonSourceField
+    resolve: PythonResolveField
+
+
 class InferInitDependencies(InferDependenciesRequest):
-    infer_from = PythonSourceField
+    infer_from = InitDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring dependencies on `__init__.py` files")
@@ -471,16 +452,11 @@ async def infer_python_init_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> InferredDependencies:
-    if (
-        not python_infer_subsystem.options.is_default("inits") and not python_infer_subsystem.inits
-    ) or python_infer_subsystem.init_files is InitFilesInference.never:
+    if python_infer_subsystem.init_files is InitFilesInference.never:
         return InferredDependencies([])
 
-    ignore_empty_files = (
-        python_infer_subsystem.options.is_default("inits")
-        and python_infer_subsystem.init_files is InitFilesInference.content_only
-    )
-    fp = request.sources_field.file_path
+    ignore_empty_files = python_infer_subsystem.init_files is InitFilesInference.content_only
+    fp = request.field_set.source.file_path
     assert fp is not None
     init_files = await Get(
         AncestorFiles,
@@ -492,16 +468,8 @@ async def infer_python_init_dependencies(
     )
     owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
 
-    original_tgt, owner_tgts = await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(
-                request.sources_field.address, description_of_origin="<infallible>"
-            ),
-        ),
-        Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
-    )
-    resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)
+    owner_tgts = await Get(Targets, Addresses(itertools.chain.from_iterable(owners)))
+    resolve = request.field_set.resolve.normalized_value(python_setup)
     python_owners = [
         tgt.address
         for tgt in owner_tgts
@@ -513,8 +481,16 @@ async def infer_python_init_dependencies(
     return InferredDependencies(python_owners)
 
 
+@dataclass(frozen=True)
+class ConftestDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (PythonTestSourceField, PythonResolveField)
+
+    source: PythonTestSourceField
+    resolve: PythonResolveField
+
+
 class InferConftestDependencies(InferDependenciesRequest):
-    infer_from = PythonTestSourceField
+    infer_from = ConftestDependenciesInferenceFieldSet
 
 
 @rule(desc="Inferring dependencies on `conftest.py` files")
@@ -526,7 +502,7 @@ async def infer_python_conftest_dependencies(
     if not python_infer_subsystem.conftests:
         return InferredDependencies([])
 
-    fp = request.sources_field.file_path
+    fp = request.field_set.source.file_path
     assert fp is not None
     conftest_files = await Get(
         AncestorFiles,
@@ -539,16 +515,8 @@ async def infer_python_conftest_dependencies(
         for f in conftest_files.snapshot.files
     )
 
-    original_tgt, owner_tgts = await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(
-                request.sources_field.address, description_of_origin="<infallible>"
-            ),
-        ),
-        Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
-    )
-    resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)
+    owner_tgts = await Get(Targets, Addresses(itertools.chain.from_iterable(owners)))
+    resolve = request.field_set.resolve.normalized_value(python_setup)
     python_owners = [
         tgt.address
         for tgt in owner_tgts

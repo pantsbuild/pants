@@ -27,7 +27,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            get_filtered_environment,
             QueryRule(TestResult, [GoTestFieldSet]),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourceTarget],

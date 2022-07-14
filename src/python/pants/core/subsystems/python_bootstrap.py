@@ -37,7 +37,6 @@ class PythonBootstrapSubsystem(Subsystem):
     )
 
     search_path = StrListOption(
-        "--search-path",
         default=["<PYENV>", "<PATH>"],
         help=softwrap(
             """
@@ -66,7 +65,6 @@ class PythonBootstrapSubsystem(Subsystem):
         metavar="<binary-paths>",
     )
     names = StrListOption(
-        "--names",
         default=["python", "python3"],
         help=softwrap(
             """

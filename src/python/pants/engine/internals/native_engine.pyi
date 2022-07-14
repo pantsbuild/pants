@@ -18,6 +18,12 @@ from pants.engine.process import InteractiveProcessResult
 # flake8: noqa: E302
 
 # ------------------------------------------------------------------------------
+# (core)
+# ------------------------------------------------------------------------------
+
+class PyFailure: ...
+
+# ------------------------------------------------------------------------------
 # Address (parsing)
 # ------------------------------------------------------------------------------
 
@@ -187,7 +193,7 @@ class PyStubCAS:
     def builder(cls) -> PyStubCASBuilder: ...
     @property
     def address(self) -> str: ...
-    def remove(self, digest: FileDigest) -> bool: ...
+    def remove(self, digest: FileDigest | Digest) -> bool: ...
     def action_cache_len(self) -> int: ...
 
 # ------------------------------------------------------------------------------

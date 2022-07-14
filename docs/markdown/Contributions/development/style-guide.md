@@ -22,7 +22,6 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     "--pants-bin-name",
 >     default="./pants",
 >     help="The name of the script or binary used to invoke pants. "
 >     "Useful when printing help messages.",
@@ -33,7 +32,6 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     "--pants-bin-name",
 >     default="./pants",
 >     help=(
 >         "The name of the script or binary used to invoke pants. "

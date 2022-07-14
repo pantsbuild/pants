@@ -33,6 +33,10 @@ from pants.util.strutil import softwrap
 # -----------------------------------------------------------------------------------------------
 
 
+class JvmDependenciesField(Dependencies):
+    pass
+
+
 class JvmResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
@@ -320,7 +324,7 @@ class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        JvmDependenciesField,
         OutputPathField,
         JvmMainClassNameField,
         JvmJdkField,

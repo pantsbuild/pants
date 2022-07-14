@@ -213,3 +213,9 @@ Create a Google Cloud Function
 ------------------------------
 
 See [Google Cloud Functions](doc:google-cloud-function-python) for how to build a zip file that works with Google Cloud Functions.
+
+Create a PyOxidizer binary
+--------------------------
+
+See [PyOxidizer](doc:pyoxidizer) for how to distribute your code as a binary, like PEX, but with 
+the Python interpreter included.

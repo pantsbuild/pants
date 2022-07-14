@@ -11,7 +11,7 @@ The [Pants community](doc:the-pants-community) is friendly, welcoming, and passi
 Slack
 -----
 
-The best place to get help is the Pants project's Slack workspace. You can join using [this link](https://join.slack.com/t/pantsbuild/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA).
+The best place to get help is the Pants project's Slack workspace. You can join using [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link).
 
 We encourage you to introduce yourself in `#welcome`. You can use `#general` to ask questions or to share feedback.
 

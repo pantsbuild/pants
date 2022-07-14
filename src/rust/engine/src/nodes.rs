@@ -517,7 +517,10 @@ impl ExecuteProcess {
       .map_err(|e| e.enrich("Failed to merge input digests for process"))
   }
 
-  pub fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
+  fn lift_process_fields(
+    value: &PyAny,
+    input_digests: InputDigests,
+  ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
@@ -594,10 +597,15 @@ impl ExecuteProcess {
     })
   }
 
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
+  pub async fn lift_process(store: &Store, value: Value) -> Result<Process, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
-    let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
-    Ok(Self { process })
+    Python::with_gil(|py| Self::lift_process_fields((*value).as_ref(py), input_digests))
+  }
+
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
+    Ok(Self {
+      process: Self::lift_process(store, value).await?,
+    })
   }
 
   async fn run_node(
@@ -1276,23 +1284,23 @@ impl Task {
     entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
-    let mut input = {
-      let gil = Python::acquire_gil();
-      Value::from(gil.python().None())
-    };
+    let mut input: Option<Value> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
+      let response = Python::with_gil(|py| {
+        let input = input.unwrap_or_else(|| Value::from(py.None()));
+        externs::generator_send(py, &generator, &input)
+      })?;
       match response {
         externs::GeneratorResponse::Get(get) => {
           let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = values.into_iter().next().unwrap();
+          input = Some(values.into_iter().next().unwrap());
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
           let gil = Python::acquire_gil();
-          input = externs::store_tuple(gil.python(), values);
+          input = Some(externs::store_tuple(gil.python(), values));
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));

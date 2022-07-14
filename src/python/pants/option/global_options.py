@@ -176,9 +176,41 @@ class DynamicRemoteOptions:
     cache_rpc_concurrency: int
     execution_rpc_concurrency: int
 
+    def _validate_store_addr(self) -> None:
+        if self.store_address:
+            return
+        if self.cache_read:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-address` to work properly."
+            )
+        if self.cache_write:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-address` or to work properly."
+            )
+
+    def _validate_exec_addr(self) -> None:
+        if not self.execution:
+            return
+        if not self.execution_address:
+            raise OptionsError(
+                "The `--remote-execution` option requires also setting "
+                "`--remote-execution-address` to work properly."
+            )
+        if not self.store_address:
+            raise OptionsError(
+                "The `--remote-execution-address` option requires also setting "
+                "`--remote-store-address`. Often these have the same value."
+            )
+
+    def __post_init__(self) -> None:
+        self._validate_store_addr()
+        self._validate_exec_addr()
+
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
-        return DynamicRemoteOptions(
+        return cls(
             execution=False,
             cache_read=False,
             cache_write=False,
@@ -205,6 +237,10 @@ class DynamicRemoteOptions:
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
+
+        if not (execution or cache_read or cache_write):
+            return cls.disabled(), None
+
         store_address = cast("str | None", bootstrap_options.remote_store_address)
         execution_address = cast("str | None", bootstrap_options.remote_execution_address)
         instance_name = cast("str | None", bootstrap_options.remote_instance_name)
@@ -229,11 +265,7 @@ class DynamicRemoteOptions:
             store_headers.update(token_header)
 
         auth_plugin_result: AuthPluginResult | None = None
-        if (
-            bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_auth_plugin.strip()
-            and (execution or cache_read or cache_write)
-        ):
+        if bootstrap_options.remote_auth_plugin:
             if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
                     "Invalid value for `--remote-auth-plugin`: "
@@ -305,22 +337,13 @@ class DynamicRemoteOptions:
                         )
                     )
                     execution_address = auth_plugin_result.execution_address
-
-        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
-        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
-        # but then normalize to `http`/`https`.
-        execution_address = (
-            re.sub(r"^grpc", "http", execution_address) if execution_address else None
-        )
-        store_address = re.sub(r"^grpc", "http", store_address) if store_address else None
-
-        opts = DynamicRemoteOptions(
+        opts = cls(
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
             instance_name=instance_name,
-            store_address=store_address,
-            execution_address=execution_address,
+            store_address=cls._normalize_address(store_address),
+            execution_address=cls._normalize_address(execution_address),
             store_headers=store_headers,
             execution_headers=execution_headers,
             parallelism=parallelism,
@@ -329,6 +352,13 @@ class DynamicRemoteOptions:
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
         return opts, auth_plugin_result
+
+    @classmethod
+    def _normalize_address(cls, address: str | None) -> str | None:
+        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
+        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
+        # but then normalize to `http`/`https`.
+        return re.sub(r"^grpc", "http", address) if address else None
 
 
 @dataclass(frozen=True)
@@ -522,7 +552,6 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
     def __new__(cls) -> LogLevelOption:
         self = super().__new__(
             cls,  # type: ignore[arg-type]
-            "--level",
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",
@@ -545,7 +574,6 @@ class BootstrapOptions:
     _default_rel_distdir = f"/{_default_distdir_name}/"
 
     backend_packages = StrListOption(
-        "--backend-packages",
         advanced=True,
         help=softwrap(
             """
@@ -557,7 +585,6 @@ class BootstrapOptions:
         ),
     )
     plugins = StrListOption(
-        "--plugins",
         advanced=True,
         help=softwrap(
             """
@@ -569,14 +596,12 @@ class BootstrapOptions:
         ),
     )
     plugins_force_resolve = BoolOption(
-        "--plugins-force-resolve",
         advanced=True,
         default=False,
         help="Re-resolve plugins, even if previously resolved.",
     )
     level = LogLevelOption()
     show_log_target = BoolOption(
-        "--show-log-target",
         default=False,
         daemon=True,
         advanced=True,
@@ -588,7 +613,6 @@ class BootstrapOptions:
         ),
     )
     log_levels_by_target = DictOption[str](
-        "--log-levels-by-target",
         daemon=True,
         advanced=True,
         help=softwrap(
@@ -602,14 +626,12 @@ class BootstrapOptions:
         ),
     )
     log_show_rust_3rdparty = BoolOption(
-        "--log-show-rust-3rdparty",
         default=False,
         daemon=True,
         advanced=True,
         help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants engine.",
     )
     ignore_warnings = StrListOption(
-        "--ignore-warnings",
         daemon=True,
         advanced=True,
         help=softwrap(
@@ -628,7 +650,6 @@ class BootstrapOptions:
         ),
     )
     pants_version = StrOption(
-        "--pants-version",
         advanced=True,
         default=pants_version(),
         default_help_repr="<pants_version>",
@@ -647,14 +668,12 @@ class BootstrapOptions:
         ),
     )
     pants_bin_name = StrOption(
-        "--pants-bin-name",
         advanced=True,
         default="./pants",  # noqa: PANTSBIN
         help="The name of the script or binary used to invoke Pants. "
         "Useful when printing help messages.",
     )
     pants_workdir = StrOption(
-        "--pants-workdir",
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), ".pants.d"),
@@ -662,7 +681,6 @@ class BootstrapOptions:
         help="Write intermediate logs and output files to this dir.",
     )
     pants_physical_workdir_base = StrOption(
-        "--pants-physical-workdir-base",
         advanced=True,
         metavar="<dir>",
         default=None,
@@ -676,14 +694,12 @@ class BootstrapOptions:
         ),
     )
     pants_distdir = StrOption(
-        "--pants-distdir",
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), "dist"),
         help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
-        "--pants-subprocessdir",
         advanced=True,
         default=lambda _: os.path.join(get_buildroot(), ".pids"),
         daemon=True,
@@ -696,7 +712,6 @@ class BootstrapOptions:
         ),
     )
     pants_config_files = StrListOption(
-        "--pants-config-files",
         advanced=True,
         # NB: We don't fingerprint the list of config files, because the content of the config
         # files independently affects fingerprints.
@@ -711,7 +726,6 @@ class BootstrapOptions:
         ),
     )
     pantsrc = BoolOption(
-        "--pantsrc",
         advanced=True,
         default=True,
         # NB: See `--pants-config-files`.
@@ -719,7 +733,6 @@ class BootstrapOptions:
         help="Use pantsrc files located at the paths specified in the global option `pantsrc_files`.",
     )
     pantsrc_files = StrListOption(
-        "--pantsrc-files",
         advanced=True,
         metavar="<path>",
         # NB: See `--pants-config-files`.
@@ -728,7 +741,6 @@ class BootstrapOptions:
         help="Override config with values from these files, using syntax matching that of `--pants-config-files`.",
     )
     pythonpath = StrListOption(
-        "--pythonpath",
         advanced=True,
         help=softwrap(
             """
@@ -738,7 +750,6 @@ class BootstrapOptions:
         ),
     )
     spec_files = StrListOption(
-        "--spec-files",
         # NB: We don't fingerprint spec files because the content of the files independently
         # affects fingerprints.
         fingerprint=False,
@@ -750,13 +761,11 @@ class BootstrapOptions:
         ),
     )
     verify_config = BoolOption(
-        "--verify-config",
         default=True,
         advanced=True,
         help="Verify that all config file values correspond to known options.",
     )
     stats_record_option_scopes = StrListOption(
-        "--stats-record-option-scopes",
         advanced=True,
         default=["*"],
         help=softwrap(
@@ -769,7 +778,6 @@ class BootstrapOptions:
         ),
     )
     pants_ignore = StrListOption(
-        "--pants-ignore",
         advanced=True,
         default=[".*/", _default_rel_distdir, "__pycache__"],
         help=softwrap(
@@ -784,7 +792,6 @@ class BootstrapOptions:
         ),
     )
     pants_ignore_use_gitignore = BoolOption(
-        "--pants-ignore-use-gitignore",
         advanced=True,
         default=True,
         help=softwrap(
@@ -798,7 +805,6 @@ class BootstrapOptions:
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
     logdir = StrOption(
-        "--logdir",
         advanced=True,
         default=None,
         metavar="<dir>",
@@ -806,7 +812,6 @@ class BootstrapOptions:
         help="Write logs to files under this directory.",
     )
     pantsd = BoolOption(
-        "--pantsd",
         default=True,
         daemon=True,
         help=softwrap(
@@ -821,7 +826,6 @@ class BootstrapOptions:
     # In practice, this means that if this is set, a run will not even try to use pantsd.
     # NB: Eventually, we would like to deprecate this flag in favor of making pantsd runs parallelizable.
     concurrent = BoolOption(
-        "--concurrent",
         default=False,
         help=softwrap(
             """
@@ -836,7 +840,6 @@ class BootstrapOptions:
     # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
     # a project in the background, while a user might want a shorter timeout for interactivity.
     pantsd_timeout_when_multiple_invocations = FloatOption(
-        "--pantsd-timeout-when-multiple-invocations",
         advanced=True,
         default=60.0,
         help=softwrap(
@@ -850,7 +853,6 @@ class BootstrapOptions:
         ),
     )
     pantsd_max_memory_usage = MemorySizeOption(
-        "--pantsd-max-memory-usage",
         advanced=True,
         default=memory_size("1GiB"),
         default_help_repr="1GiB",
@@ -874,13 +876,11 @@ class BootstrapOptions:
 
     # These facilitate configuring the native engine.
     print_stacktrace = BoolOption(
-        "--print-stacktrace",
         advanced=True,
         default=False,
         help="Print the full exception stack trace for any errors.",
     )
     engine_visualize_to = DirOption(
-        "--engine-visualize-to",
         advanced=True,
         default=None,
         help=softwrap(
@@ -892,14 +892,14 @@ class BootstrapOptions:
     )
     # Pants Daemon options.
     pantsd_nailgun_port = IntOption(
+        # TODO: The name "pailgun" is likely historical, and this should be renamed to "nailgun".
         "--pantsd-pailgun-port",
         advanced=True,
         default=0,
         daemon=True,
         help="The port to bind the Pants nailgun server to. Defaults to a random port.",
     )
-    pantsd_invalidation_glob = StrListOption(
-        "--pantsd-invalidation-globs",
+    pantsd_invalidation_globs = StrListOption(
         advanced=True,
         daemon=True,
         help=softwrap(
@@ -909,52 +909,39 @@ class BootstrapOptions:
             """
         ),
     )
-
-    _rule_threads_core_flag = "--rule-threads-core"
-    _process_execution_local_parallelism_flag = "--process-execution-local-parallelism"
-    _rule_threads_max_flag = "--rule-threads-max"
-
     rule_threads_core = IntOption(
-        _rule_threads_core_flag,
         default=max(2, CPU_COUNT // 2),
         default_help_repr="max(2, #cores/2)",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The number of threads to keep active and ready to execute `@rule` logic (see
-            also: `{_rule_threads_max_flag}`).
+            also: `--rule-threads-max`).
 
             Values less than 2 are not currently supported.
 
             This value is independent of the number of processes that may be spawned in
-            parallel locally (controlled by `{_process_execution_local_parallelism_flag}`).
+            parallel locally (controlled by `--process-execution-local-parallelism`).
             """
         ),
     )
     rule_threads_max = IntOption(
-        _rule_threads_max_flag,
         default=None,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum number of threads to use to execute `@rule` logic. Defaults to
-            a small multiple of `{_rule_threads_core_flag}`.
+            a small multiple of `--rule-threads-core`.
             """
         ),
     )
-
-    local_store_dir_flag = "--local-store-dir"
-    local_store_shard_count_flag = "--local-store-shard-count"
-    local_store_files_max_size_bytes_flag = "--local-store-files-max-size-bytes"
     cache_instructions = softwrap(
         """
         The path may be absolute or relative. If the directory is within the build root, be
         sure to include it in `--pants-ignore`.
         """
     )
-
     local_store_dir = StrOption(
-        local_store_dir_flag,
         advanced=True,
         help=softwrap(
             f"""
@@ -970,12 +957,11 @@ class BootstrapOptions:
         default=DEFAULT_LOCAL_STORE_OPTIONS.store_dir,
     )
     local_store_shard_count = IntOption(
-        local_store_shard_count_flag,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The number of LMDB shards created for the local store. This setting also impacts
-            the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}`
+            the maximum size of stored files: see `--local-store-files-max-size-bytes`
             for more information.
 
             Because LMDB allows only one simultaneous writer per database, the store is split
@@ -983,33 +969,31 @@ class BootstrapOptions:
             are, the fewer shards you are likely to need for performance.
 
             NB: After changing this value, you will likely want to manually clear the
-            `{local_store_dir_flag}` directory to clear the space used by old shard layouts.
+            `--local-store-dir` directory to clear the space used by old shard layouts.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
     )
     local_store_processes_max_size_bytes = IntOption(
-        "--local-store-processes-max-size-bytes",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing process cache entries.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
     )
     local_store_files_max_size_bytes = IntOption(
-        local_store_files_max_size_bytes_flag,
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing files.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
 
             NB: This size value bounds the total size of all files, but (due to sharding of the
             store on disk) it also bounds the per-file size to (VALUE /
-            `{local_store_shard_count_flag}`).
+            `--local-store-shard-count`).
 
             This value doesn't reflect space allocated on disk, or RAM allocated (it
             may be reflected in VIRT but not RSS). However, the default is lower than you
@@ -1021,18 +1005,16 @@ class BootstrapOptions:
         default=DEFAULT_LOCAL_STORE_OPTIONS.files_max_size_bytes,
     )
     local_store_directories_max_size_bytes = IntOption(
-        "--local-store-directories-max-size-bytes",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             The maximum size in bytes of the local store containing directories.
-            Stored below `{local_store_dir_flag}`.
+            Stored below `--local-store-dir`.
             """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.directories_max_size_bytes,
     )
     _named_caches_dir = StrOption(
-        "--named-caches-dir",
         advanced=True,
         help=softwrap(
             f"""
@@ -1045,7 +1027,6 @@ class BootstrapOptions:
         default=os.path.join(get_pants_cachedir(), "named_caches"),
     )
     local_execution_root_dir = StrOption(
-        "--local-execution-root-dir",
         advanced=True,
         help=softwrap(
             f"""
@@ -1058,7 +1039,6 @@ class BootstrapOptions:
         default_help_repr="<tmp_dir>",
     )
     local_cache = BoolOption(
-        "--local-cache",
         default=DEFAULT_EXECUTION_OPTIONS.local_cache,
         help=softwrap(
             """
@@ -1068,7 +1048,6 @@ class BootstrapOptions:
         ),
     )
     process_cleanup = BoolOption(
-        "--process-cleanup",
         default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
         help=softwrap(
             """
@@ -1080,7 +1059,6 @@ class BootstrapOptions:
         ),
     )
     ca_certs_path = StrOption(
-        "--ca-certs-path",
         advanced=True,
         default=None,
         help=softwrap(
@@ -1090,20 +1068,16 @@ class BootstrapOptions:
             """
         ),
     )
-
-    _process_total_child_memory_usage = "--process-total-child-memory-usage"
-    _process_per_child_memory_usage_flag = "--process-per-child-memory-usage"
     process_total_child_memory_usage = MemorySizeOption(
-        _process_total_child_memory_usage,
         advanced=True,
         default=None,
         help=softwrap(
-            f"""
+            """
             The maximum memory usage for all "pooled" child processes.
 
             When set, this value participates in precomputing the pool size of child processes
             used by Pants (pooling is currently used only for the JVM). When not set, Pants will
-            default to spawning `2 * {_process_execution_local_parallelism_flag}` pooled processes.
+            default to spawning `2 * --process-execution-local-parallelism` pooled processes.
 
             A high value would result in a high number of child processes spawned, potentially
             overconsuming your resources and triggering the OS' OOM killer. A low value would
@@ -1111,7 +1085,7 @@ class BootstrapOptions:
             tasks that need those processes.
 
             If setting this value, consider also adjusting the value of the
-            `{_process_per_child_memory_usage_flag}` option.
+            `--process-per-child-memory-usage` option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
             `2GiB` or `2.12GiB`. A bare number will be in bytes.
@@ -1119,15 +1093,14 @@ class BootstrapOptions:
         ),
     )
     process_per_child_memory_usage = MemorySizeOption(
-        _process_per_child_memory_usage_flag,
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.process_per_child_memory_usage,
         default_help_repr=_PER_CHILD_MEMORY_USAGE,
         help=softwrap(
-            f"""
+            """
             The default memory usage for a single "pooled" child process.
 
-            Check the documentation for the `{_process_total_child_memory_usage}` for advice on
+            Check the documentation for the `--process-total-child-memory-usage` for advice on
             how to choose an appropriate value for this option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
@@ -1136,27 +1109,24 @@ class BootstrapOptions:
         ),
     )
     process_execution_local_parallelism = IntOption(
-        _process_execution_local_parallelism_flag,
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
         default_help_repr="#cores",
         advanced=True,
         help=softwrap(
-            f"""
+            """
             Number of concurrent processes that may be executed locally.
 
             This value is independent of the number of threads that may be used to
-            execute the logic in `@rules` (controlled by `{_rule_threads_core_flag}`).
+            execute the logic in `@rules` (controlled by `--rule-threads-core`).
             """
         ),
     )
     process_execution_remote_parallelism = IntOption(
-        "--process-execution-remote-parallelism",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
         advanced=True,
         help="Number of concurrent processes that may be executed remotely.",
     )
     process_execution_cache_namespace = StrOption(
-        "--process-execution-cache-namespace",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace),
         help=softwrap(
@@ -1168,13 +1138,11 @@ class BootstrapOptions:
         ),
     )
     process_execution_local_enable_nailgun = BoolOption(
-        "--process-execution-local-enable-nailgun",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
         help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
         advanced=True,
     )
     process_execution_graceful_shutdown_timeout = IntOption(
-        "--process-execution-graceful-shutdown-timeout",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_graceful_shutdown_timeout,
         help=softwrap(
             f"""
@@ -1185,7 +1153,6 @@ class BootstrapOptions:
         advanced=True,
     )
     remote_execution = BoolOption(
-        "--remote-execution",
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
         help=softwrap(
             """
@@ -1197,7 +1164,6 @@ class BootstrapOptions:
         ),
     )
     remote_cache_read = BoolOption(
-        "--remote-cache-read",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
         help=softwrap(
             """
@@ -1208,7 +1174,6 @@ class BootstrapOptions:
         ),
     )
     remote_cache_write = BoolOption(
-        "--remote-cache-write",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
         help=softwrap(
             """
@@ -1219,7 +1184,6 @@ class BootstrapOptions:
         ),
     )
     remote_instance_name = StrOption(
-        "--remote-instance-name",
         default=None,
         advanced=True,
         help=softwrap(
@@ -1234,7 +1198,6 @@ class BootstrapOptions:
         ),
     )
     remote_ca_certs_path = StrOption(
-        "--remote-ca-certs-path",
         default=None,
         advanced=True,
         help=softwrap(
@@ -1247,8 +1210,7 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_oath_bearer_token_path = StrOption(
-        "--remote-oauth-bearer-token-path",
+    remote_oauth_bearer_token_path = StrOption(
         default=None,
         advanced=True,
         help=softwrap(
@@ -1264,7 +1226,6 @@ class BootstrapOptions:
         ),
     )
     remote_auth_plugin = StrOption(
-        "--remote-auth-plugin",
         default=None,
         advanced=True,
         help=softwrap(
@@ -1299,7 +1260,6 @@ class BootstrapOptions:
         ),
     )
     remote_store_address = StrOption(
-        "--remote-store-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
         help=softwrap(
@@ -1312,7 +1272,6 @@ class BootstrapOptions:
         ),
     )
     remote_store_headers = DictOption(
-        "--remote-store-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
         help=softwrap(
@@ -1329,37 +1288,31 @@ class BootstrapOptions:
         ),
     )
     remote_store_chunk_bytes = IntOption(
-        "--remote-store-chunk-bytes",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
         help="Size in bytes of chunks transferred to/from the remote file store.",
     )
     remote_store_chunk_upload_timeout_seconds = IntOption(
-        "--remote-store-chunk-upload-timeout-seconds",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
         help="Timeout (in seconds) for uploads of individual chunks to the remote file store.",
     )
     remote_store_rpc_retries = IntOption(
-        "--remote-store-rpc-retries",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
         help="Number of times to retry any RPC to the remote store before giving up.",
     )
     remote_store_rpc_concurrency = IntOption(
-        "--remote-store-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote store service.",
     )
     remote_store_batch_api_size_limit = IntOption(
-        "--remote-store-batch-api-size-limit",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
         help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
     )
     remote_cache_warnings = EnumOption(
-        "--remote-cache-warnings",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
         advanced=True,
         help=softwrap(
@@ -1372,7 +1325,6 @@ class BootstrapOptions:
         ),
     )
     remote_cache_eager_fetch = BoolOption(
-        "--remote-cache-eager-fetch",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
         help=softwrap(
@@ -1385,19 +1337,16 @@ class BootstrapOptions:
         ),
     )
     remote_cache_rpc_concurrency = IntOption(
-        "--remote-cache-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote cache service.",
     )
-    remote_cache_rwad_timeout_millis = IntOption(
-        "--remote-cache-read-timeout-millis",
+    remote_cache_read_timeout_millis = IntOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read_timeout_millis,
         help="Timeout value for remote cache lookups in milliseconds.",
     )
     remote_execution_address = StrOption(
-        "--remote-execution-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
         help=softwrap(
@@ -1412,7 +1361,6 @@ class BootstrapOptions:
         ),
     )
     remote_execution_extra_platform_properties = StrListOption(
-        "--remote-execution-extra-platform-properties",
         advanced=True,
         help=softwrap(
             """
@@ -1424,7 +1372,6 @@ class BootstrapOptions:
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
     )
     remote_execution_headers = DictOption(
-        "--remote-execution-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
         help=softwrap(
@@ -1440,19 +1387,16 @@ class BootstrapOptions:
         ),
     )
     remote_execution_overall_deadline_secs = IntOption(
-        "--remote-execution-overall-deadline-secs",
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
         advanced=True,
         help="Overall timeout in seconds for each remote execution request from time of submission",
     )
     remote_execution_rpc_concurrency = IntOption(
-        "--remote-execution-rpc-concurrency",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote execution service.",
     )
     watch_filesystem = BoolOption(
-        "--watch-filesystem",
         default=True,
         advanced=True,
         help=softwrap(
@@ -1471,7 +1415,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     help = "Options to control the overall behavior of Pants."
 
     colors = BoolOption(
-        "--colors",
         default=sys.stdout.isatty(),
         help=softwrap(
             """
@@ -1483,7 +1426,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
     dynamic_ui = BoolOption(
-        "--dynamic-ui",
         default=(("CI" not in os.environ) and sys.stderr.isatty()),
         help=softwrap(
             """
@@ -1494,13 +1436,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
     dynamic_ui_renderer = EnumOption(
-        "--dynamic-ui-renderer",
         default=DynamicUIRenderer.indicatif_spinner,
         help="If `--dynamic-ui` is enabled, selects the renderer.",
     )
 
     tag = StrListOption(
-        "--tag",
         help=softwrap(
             f"""
             Include only targets with these tags (optional '+' prefix) or without these
@@ -1511,7 +1451,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     unmatched_build_file_globs = EnumOption(
-        "--unmatched-build-file-globs",
         default=UnmatchedBuildFileGlobs.warn,
         help=softwrap(
             """
@@ -1526,7 +1465,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     unmatched_cli_globs = EnumOption(
-        "--unmatched-cli-globs",
         default=UnmatchedCliGlobs.error,
         help=softwrap(
             """
@@ -1542,7 +1480,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     build_patterns = StrListOption(
-        "--build-patterns",
         default=["BUILD", "BUILD.*"],
         help=softwrap(
             """
@@ -1559,7 +1496,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     build_ignore = StrListOption(
-        "--build-ignore",
         help=softwrap(
             """
             Path globs or literals to ignore when identifying BUILD files.
@@ -1571,7 +1507,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     build_file_prelude_globs = StrListOption(
-        "--build-file-prelude-globs",
         help=softwrap(
             f"""
             Python files to evaluate and whose symbols should be exposed to all BUILD files.
@@ -1581,30 +1516,23 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     subproject_roots = StrListOption(
-        "--subproject-roots",
         help="Paths that correspond with build roots for any subproject that this project depends on.",
         advanced=True,
     )
 
-    _loop_flag = "--loop"
-    loop = BoolOption(
-        _loop_flag, default=False, help="Run goals continuously as file changes are detected."
-    )
+    loop = BoolOption(default=False, help="Run goals continuously as file changes are detected.")
     loop_max = IntOption(
-        "--loop-max",
         default=2**32,
-        help=f"The maximum number of times to loop when `{_loop_flag}` is specified.",
+        help="The maximum number of times to loop when `--loop` is specified.",
         advanced=True,
     )
 
     streaming_workunits_report_interval = FloatOption(
-        "--streaming-workunits-report-interval",
         default=1.0,
         help="Interval in seconds between when streaming workunit event receivers will be polled.",
         advanced=True,
     )
     streaming_workunits_level = EnumOption(
-        "--streaming-workunits-level",
         default=LogLevel.DEBUG,
         help=softwrap(
             """
@@ -1618,7 +1546,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     streaming_workunits_complete_async = BoolOption(
-        "--streaming-workunits-complete-async",
         default=not is_in_container(),
         help=softwrap(
             """
@@ -1632,7 +1559,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     use_deprecated_directory_cli_args_semantics = BoolOption(
-        "--use-deprecated-directory-cli-args-semantics",
         default=False,
         help=softwrap(
             f"""
@@ -1665,6 +1591,38 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         "--experimental-coalesced-process-batching",
         default=False,
         help="@TODO: Help goes here!",
+    )
+
+    use_deprecated_pex_binary_run_semantics = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If `true`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
+            a sandbox (while still using a PEX for thirdparty dependencies). Additionally, you can
+            refer to the `pex_binary` using the value of its `entry_point` field (if it is a filename).
+
+            If `false`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
+            This makes `run` equivalent to using `package` and running the artifact. Additionally,
+            the binary must be `run` using the `pex_binary`'s address, as passing a filename to `run`
+            will run the `python_source`.
+
+            Note that support has been added to Pants to allow you to `run` any `python_source`,
+            so setting this to `true` should be reserved for maintaining backwards-compatibility
+            with previous versions of Pants. Additionally, you can remove any `pex_binary` targets
+            that exist solely for running Python code (and aren't meant to be packaged).
+            """
+        ),
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            """
+            If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
+            simply delete the option from `pants.toml` because `false` is now the default.
+
+            If set to `true`, removing the option will cause `run` on a `pex_binary` to package and
+            run the built PEX file. Additionally, the `pex_binary` must be referred to by its address.
+            To keep the old `run` semantics, use `run` on the relevant `python_source` target.
+            """
+        ),
     )
 
     @classmethod
@@ -1737,28 +1695,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 """
             ),
         )
-
-        if opts.remote_execution and not opts.remote_execution_address:
-            raise OptionsError(
-                "The `--remote-execution` option requires also setting "
-                "`--remote-execution-address` to work properly."
-            )
-        if opts.remote_execution_address and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-execution-address` option requires also setting "
-                "`--remote-store-address`. Often these have the same value."
-            )
-
-        if opts.remote_cache_read and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-address` to work properly."
-            )
-        if opts.remote_cache_write and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-address` or to work properly."
-            )
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(

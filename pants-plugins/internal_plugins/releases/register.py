@@ -32,7 +32,6 @@ class PantsReleases(Subsystem):
     help = "Options for Pants's release process."
 
     _release_notes = DictOption[str](
-        "--release-notes",
         help="A dict from branch name to release notes rst-file location.",
     )
 
@@ -128,9 +127,9 @@ async def pants_setup_kwargs(
             "Tracker": "https://github.com/pantsbuild/pants/issues",
             "Changelog": "https://www.pantsbuild.org/docs/changelog",
             "Twitter": "https://twitter.com/pantsbuild",
-            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "Slack": "https://www.pantsbuild.org/docs/getting-help",
             "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
-            "Mailing lists": "https://groups.google.com/g/pants-devel",
+            "Mailing lists": "https://www.pantsbuild.org/docs/getting-help",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,

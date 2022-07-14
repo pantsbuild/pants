@@ -102,7 +102,7 @@ You can, of course, pipe multiple times:
 
 ```bash
 $ ./pants dependees helloworld/util | \
-   xargs ./pants filter --target-type=python_source | \
+   xargs ./pants list --filter-target-type=python_source | \
    xargs ./pants lint
 ```
 
@@ -132,5 +132,5 @@ You can leverage shell piping to partition the input targets into multiple shard
 For example, to split your Python tests into 10 shards, and select shard 0:
 
 ```bash
-./pants list :: | xargs ./pants filter --target-type=python_test | awk 'NR % 10 == 0' | ./pants test
+./pants list :: | xargs ./pants list --filter-target-type=python_test | awk 'NR % 10 == 0' | ./pants test
 ```

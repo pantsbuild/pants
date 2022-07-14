@@ -38,7 +38,6 @@ class CliOptions(Subsystem):
     help = "Options for configuring CLI behavior, such as command line aliases."
 
     alias = DictOption[str](
-        "--alias",
         help=softwrap(
             f"""
             Register command line aliases.

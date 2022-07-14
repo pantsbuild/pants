@@ -97,7 +97,6 @@ class Outputting:
     """
 
     output_file = StrOption(
-        "--output-file",
         default=None,
         metavar="<path>",
         help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
@@ -132,7 +131,6 @@ class Outputting:
 
 class LineOriented(Outputting):
     sep = StrOption(
-        "--sep",
         default="\\n",
         metavar="<separator>",
         help="String to use to separate lines in line-oriented output.",

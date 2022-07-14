@@ -193,9 +193,13 @@ class FileSourceField(AssetSourceField):
     uses_source_roots = False
 
 
+class FileDependenciesField(Dependencies):
+    pass
+
+
 class FileTarget(Target):
     alias = "file"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
+    core_fields = (*COMMON_TARGET_FIELDS, FileDependenciesField, FileSourceField)
     help = softwrap(
         """
         A single loose file that lives outside of code packages.
@@ -248,7 +252,7 @@ class FilesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = FileTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (FileDependenciesField,)
     help = "Generate a `file` target for each file in the `sources` field."
 
 
@@ -403,13 +407,17 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
+class ResourceDependenciesField(Dependencies):
+    pass
+
+
 class ResourceSourceField(AssetSourceField):
     uses_source_roots = True
 
 
 class ResourceTarget(Target):
     alias = "resource"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
+    core_fields = (*COMMON_TARGET_FIELDS, ResourceDependenciesField, ResourceSourceField)
     help = softwrap(
         """
         A single resource file embedded in a code package and accessed in a
@@ -462,7 +470,7 @@ class ResourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = ResourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (ResourceDependenciesField,)
     help = "Generate a `resource` target for each file in the `sources` field."
 
 
@@ -485,9 +493,13 @@ class ResourcesGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
+class GenericTargetDependenciesField(Dependencies):
+    pass
+
+
 class GenericTarget(Target):
     alias = "target"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies)
+    core_fields = (*COMMON_TARGET_FIELDS, GenericTargetDependenciesField)
     help = softwrap(
         """
         A generic target with no specific type.
@@ -503,6 +515,7 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
 class AllAssetTargetsRequest:
     pass
 

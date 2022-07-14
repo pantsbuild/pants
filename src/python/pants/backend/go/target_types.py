@@ -21,6 +21,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
     ValidNumbers,
@@ -179,6 +180,18 @@ class SkipGoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
+class GoTestExtraEnvVarsField(StringSequenceField):
+    alias = "test_extra_env_vars"
+    help = softwrap(
+        """
+         Additional environment variables to include in test processes.
+         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+         This will be merged with and override values from [test].extra_env_vars.
+        """
+    )
+
+
 class GoTestTimeoutField(IntField):
     alias = "test_timeout"
     help = softwrap(
@@ -197,6 +210,7 @@ class GoPackageTarget(Target):
         *COMMON_TARGET_FIELDS,
         GoPackageDependenciesField,
         GoPackageSourcesField,
+        GoTestExtraEnvVarsField,
         GoTestTimeoutField,
         SkipGoTestsField,
     )

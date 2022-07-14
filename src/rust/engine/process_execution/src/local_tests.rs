@@ -348,13 +348,13 @@ async fn jdk_symlink() {
 
 #[tokio::test]
 #[cfg(unix)]
-async fn test_update_env() {
+async fn test_apply_chroot() {
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
 
   let work_dir = TempDir::new().unwrap();
   let mut req = Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone());
-  local::update_env(&work_dir.path(), &mut req);
+  local::apply_chroot(work_dir.path().to_str().unwrap(), &mut req);
 
   let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
 

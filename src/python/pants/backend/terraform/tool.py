@@ -10,7 +10,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolVersion,
     TemplatedExternalTool,
 )
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -62,7 +62,6 @@ class TerraformTool(TemplatedExternalTool):
         ]
 
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
         advanced=True,
@@ -87,14 +86,12 @@ async def setup_terraform_process(request: TerraformProcess, terraform: Terrafor
         terraform.get_request(Platform.current),
     )
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((request.input_digest, downloaded_terraform.digest)),
-    )
+    immutable_input_digests = {"__terraform": downloaded_terraform.digest}
 
     return Process(
-        argv=("./terraform",) + request.args,
-        input_digest=input_digest,
+        argv=("__terraform/terraform",) + request.args,
+        input_digest=request.input_digest,
+        immutable_input_digests=immutable_input_digests,
         output_files=request.output_files,
         description=request.description,
         level=LogLevel.DEBUG,

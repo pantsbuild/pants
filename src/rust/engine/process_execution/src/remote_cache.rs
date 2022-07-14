@@ -530,6 +530,7 @@ async fn check_action_cache(
     |workunit| async move {
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
+      let start = Instant::now();
       let client = action_cache_client.as_ref().clone();
       let response = retry_call(
         client,
@@ -588,6 +589,11 @@ async fn check_action_cache(
         Ok(response)
       })
       .await;
+
+      workunit.record_observation(
+        ObservationMetric::RemoteCacheGetActionResultTimeMicros,
+        start.elapsed().as_micros() as u64,
+      );
 
       match response {
         Ok(response) => {

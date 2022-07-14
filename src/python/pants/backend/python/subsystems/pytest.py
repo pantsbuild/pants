@@ -82,8 +82,7 @@ class PyTest(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
-    timeouts_enabled = BoolOption(
-        "--timeouts",
+    timeouts = BoolOption(
         default=True,
         help=softwrap(
             """
@@ -95,7 +94,6 @@ class PyTest(PythonToolBase):
         ),
     )
     timeout_default = IntOption(
-        "--timeout-default",
         default=None,
         advanced=True,
         help=softwrap(
@@ -106,13 +104,11 @@ class PyTest(PythonToolBase):
         ),
     )
     timeout_maximum = IntOption(
-        "--timeout-maximum",
         default=None,
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
     )
     junit_family = StrOption(
-        "--junit-family",
         default="xunit2",
         advanced=True,
         help=softwrap(
@@ -123,7 +119,6 @@ class PyTest(PythonToolBase):
         ),
     )
     execution_slot_var = StrOption(
-        "--execution-slot-var",
         default=None,
         advanced=True,
         help=softwrap(
@@ -134,7 +129,6 @@ class PyTest(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=softwrap(

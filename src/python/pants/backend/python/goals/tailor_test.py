@@ -272,6 +272,7 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
             "src/python/foo/__main__.py": "",
         }
     )
+    rule_runner.set_options(["--python-tailor-pex-binary-targets"])
     pts = rule_runner.request(
         PutativeTargets,
         [

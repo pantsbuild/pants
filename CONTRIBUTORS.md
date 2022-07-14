@@ -48,6 +48,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Goldman
 + Daniel Moran
 + Daniel Peebles
 + Daniel Wagner-Hall
@@ -248,6 +249,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
 + Win Wang

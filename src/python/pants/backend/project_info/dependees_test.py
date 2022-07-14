@@ -15,9 +15,13 @@ class SpecialDeps(SpecialCasedDependencies):
     alias = "special_deps"
 
 
+class MockDepsField(Dependencies):
+    pass
+
+
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (Dependencies, SpecialDeps)
+    core_fields = (MockDepsField, SpecialDeps)
 
 
 @pytest.fixture

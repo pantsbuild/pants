@@ -11,12 +11,10 @@ class ThriftSubsystem(Subsystem):
     help = "General Thrift IDL settings (https://thrift.apache.org/)."
 
     dependency_inference = BoolOption(
-        "--dependency-inference",
         default=True,
         help="Infer Thrift dependencies on other Thrift files by analyzing import statements.",
     )
     tailor = BoolOption(
-        "--tailor",
         default=True,
         help="If true, add `thrift_sources` targets with the `tailor` goal.",
         advanced=True,

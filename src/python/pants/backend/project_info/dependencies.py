@@ -23,12 +23,10 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     help = "List the dependencies of the input files/targets."
 
     transitive = BoolOption(
-        "--transitive",
         default=False,
         help="List all transitive dependencies. If unspecified, list direct dependencies only.",
     )
     closed = BoolOption(
-        "--closed",
         default=False,
         help="Include the input targets in the output, along with the dependencies.",
     )

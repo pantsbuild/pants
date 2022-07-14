@@ -41,7 +41,6 @@ class Isort(PythonToolBase):
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
     export = ExportToolOption()
     config = FileListOption(
-        "--config",
         # TODO: Figure out how to deprecate this being a list in favor of a single string.
         #  Thanks to config autodiscovery, this option should only be used because you want
         #  Pants to explicitly set `--settings`, which only works w/ 1 config file.
@@ -66,7 +65,6 @@ class Isort(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(

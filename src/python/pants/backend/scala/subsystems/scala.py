@@ -19,7 +19,6 @@ class ScalaSubsystem(Subsystem):
     help = "Scala programming language"
 
     _version_for_resolve = DictOption[str](
-        "--version-for-resolve",
         help=softwrap(
             """
             A dictionary mapping the name of a resolve to the Scala version to use for all Scala
@@ -34,7 +33,6 @@ class ScalaSubsystem(Subsystem):
         ),
     )
     tailor_source_targets = BoolOption(
-        "--tailor-source-targets",
         default=True,
         help=softwrap(
             """

@@ -46,7 +46,6 @@ class TwineSubsystem(PythonToolBase):
     skip = SkipOption("publish")
     args = ArgsListOption(example="--skip-existing")
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -60,7 +59,6 @@ class TwineSubsystem(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -72,7 +70,6 @@ class TwineSubsystem(PythonToolBase):
         ),
     )
     ca_certs_path = StrOption(
-        "--ca-certs-path",
         advanced=True,
         default="<inherit>",
         help=softwrap(

@@ -19,11 +19,15 @@ class MockSourceField(OptionalSingleSourceField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = (".txt",)
 
 
+class MockDepsField(Dependencies):
+    pass
+
+
 class MockTarget(Target):
     alias = "tgt"
     core_fields = (
         MockSourceField,
-        Dependencies,
+        MockDepsField,
     )
 
 

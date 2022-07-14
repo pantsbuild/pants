@@ -32,7 +32,6 @@ class PexRuntimeEnvironment(Subsystem):
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
     _executable_search_paths = StrListOption(
-        "--executable-search-paths",
         default=["<PATH>"],
         help=softwrap(
             """
@@ -46,13 +45,11 @@ class PexRuntimeEnvironment(Subsystem):
         metavar="<binary-paths>",
     )
     _verbosity = IntOption(
-        "--verbosity",
         default=0,
         help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
         advanced=True,
     )
     venv_use_symlinks = BoolOption(
-        "--venv-use-symlinks",
         default=False,
         help=softwrap(
             """

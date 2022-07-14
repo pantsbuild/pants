@@ -84,7 +84,6 @@ class RegexLintSubsystem(Subsystem):
     )
 
     _config = DictOption[Any](
-        "--config",
         help=softwrap(
             """
             Config schema is as follows:
@@ -126,7 +125,6 @@ class RegexLintSubsystem(Subsystem):
         fromfile=True,
     )
     detail_level = EnumOption(
-        "--detail-level",
         default=DetailLevel.nonmatching,
         help="How much detail to include in the result.",
     )

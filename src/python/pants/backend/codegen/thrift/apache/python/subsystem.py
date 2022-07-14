@@ -24,7 +24,6 @@ class ThriftPythonSubsystem(Subsystem):
         ),
     )
     infer_runtime_dependency = BoolOption(
-        "--infer-runtime-dependency",
         default=True,
         help=softwrap(
             """

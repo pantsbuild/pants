@@ -23,7 +23,6 @@ class PythonRepos(Subsystem):
     pypi_index = "https://pypi.org/simple/"
 
     repos = StrListOption(
-        "--repos",
         help=softwrap(
             """
             URLs of code repositories to look for requirements. In Pip and Pex, this option
@@ -33,7 +32,6 @@ class PythonRepos(Subsystem):
         advanced=True,
     )
     indexes = StrListOption(
-        "--indexes",
         default=[pypi_index],
         help=softwrap(
             """

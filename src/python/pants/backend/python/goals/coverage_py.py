@@ -124,7 +124,6 @@ class CoverageSubsystem(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     filter = StrListOption(
-        "--filter",
         help=softwrap(
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
@@ -141,19 +140,16 @@ class CoverageSubsystem(PythonToolBase):
             """
         ),
     )
-    reports = EnumListOption(
-        "--report",
+    report = EnumListOption(
         default=[CoverageReportType.CONSOLE],
         help="Which coverage report type(s) to emit.",
     )
     _output_dir = StrOption(
-        "--output-dir",
         default=str(PurePath("{distdir}", "coverage", "python")),
         advanced=True,
         help="Path to write the Pytest Coverage report to. Must be relative to the build root.",
     )
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -167,7 +163,6 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -181,7 +176,6 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     global_report = BoolOption(
-        "--global-report",
         default=False,
         help=softwrap(
             """
@@ -193,7 +187,6 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
     fail_under = FloatOption(
-        "--fail-under",
         default=None,
         help=softwrap(
             """
@@ -526,7 +519,7 @@ async def generate_coverage_reports(
     result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: list[CoverageReport] = []
     output_dir: PurePath = coverage_subsystem.output_dir(distdir)
-    for report_type in coverage_subsystem.reports:
+    for report_type in coverage_subsystem.report:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
                 FilesystemCoverageReport(

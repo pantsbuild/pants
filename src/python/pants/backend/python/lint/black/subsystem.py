@@ -30,7 +30,7 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.1.0"
+    default_version = "black==22.6.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
@@ -46,7 +46,6 @@ class Black(PythonToolBase):
     args = ArgsListOption(example="--target-version=py37 --quiet")
     export = ExportToolOption()
     config = FileOption(
-        "--config",
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
@@ -60,7 +59,6 @@ class Black(PythonToolBase):
         ),
     )
     config_discovery = BoolOption(
-        "--config-discovery",
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
@@ -97,7 +95,7 @@ async def _black_interpreter_constraints(
             (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
         )
         if code_constraints is not None and code_constraints.requires_python38_or_newer(
-            python_setup.interpreter_universe
+            python_setup.interpreter_versions_universe
         ):
             constraints = code_constraints
     return constraints

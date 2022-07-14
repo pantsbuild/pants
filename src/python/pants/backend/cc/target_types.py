@@ -20,6 +20,10 @@ from pants.engine.target import (
 CC_FILE_EXTENSIONS = (".c", ".h", ".cc", ".cpp", ".hpp")
 
 
+class CCDependenciesField(Dependencies):
+    pass
+
+
 class CCSourceField(SingleSourceField):
     expected_file_extensions = CC_FILE_EXTENSIONS
 
@@ -51,7 +55,7 @@ class CCSourceTarget(Target):
     alias = "cc_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        CCDependenciesField,
         CCSourceField,
     )
     help = "A single C/C++ source file or header file."

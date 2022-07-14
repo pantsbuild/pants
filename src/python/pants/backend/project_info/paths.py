@@ -28,14 +28,12 @@ class PathsSubsystem(Outputting, GoalSubsystem):
     name = "paths"
     help = "List the paths between two addresses."
 
-    path_from = StrOption(
-        "--from",
+    from_ = StrOption(
         default=None,
         help="The path starting address",
     )
 
-    path_to = StrOption(
-        "--to",
+    to = StrOption(
         default=None,
         help="The path end address",
     )
@@ -86,8 +84,8 @@ async def paths(
     console: Console, paths_subsystem: PathsSubsystem, global_options: GlobalOptions
 ) -> PathsGoal:
 
-    path_from = paths_subsystem.path_from
-    path_to = paths_subsystem.path_to
+    path_from = paths_subsystem.from_
+    path_to = paths_subsystem.to
 
     if path_from is None:
         raise ValueError("Must set --from")

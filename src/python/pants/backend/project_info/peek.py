@@ -32,7 +32,6 @@ class PeekSubsystem(Outputting, GoalSubsystem):
     help = "Display BUILD target info"
 
     exclude_defaults = BoolOption(
-        "--exclude-defaults",
         default=False,
         help="Whether to leave off values that match the target-defined default values.",
     )

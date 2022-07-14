@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import logging
 from collections import Counter
+from dataclasses import dataclass
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -29,7 +30,6 @@ class StatsAggregatorSubsystem(Subsystem):
     help = "An aggregator for Pants stats, such as cache metrics."
 
     log = BoolOption(
-        "--log",
         default=False,
         help=softwrap(
             """
@@ -43,7 +43,6 @@ class StatsAggregatorSubsystem(Subsystem):
         advanced=True,
     )
     memory_summary = BoolOption(
-        "--memory-summary",
         default=False,
         help=softwrap(
             """
@@ -151,6 +150,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             )
 
 
+@dataclass(frozen=True)
 class StatsAggregatorCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 

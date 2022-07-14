@@ -18,11 +18,8 @@ class DebugAdapterSubsystem(Subsystem):
         """
     )
 
-    host = StrOption(
-        "--host", default="127.0.0.1", help="The hostname to use when launching the server."
-    )
+    host = StrOption(default="127.0.0.1", help="The hostname to use when launching the server.")
     port = IntOption(
-        "--port",
         default=5678,
         help="The port to use when launching the server.",
     )
