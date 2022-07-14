@@ -81,7 +81,7 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
-class ResolveField(StringField):
+class ResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
 
 
@@ -831,9 +831,9 @@ def assert_generated(
     address: Address,
     build_content: str,
     files: list[str],
-    expected: set[Target],
+    expected_targets: set[Target] | None = None,
     *,
-    dependencies: dict[str, set[str]] | None = None,
+    expected_dependencies: dict[str, set[str]] | None = None,
 ) -> None:
     rule_runner.write_files(
         {
@@ -845,11 +845,14 @@ def assert_generated(
         _TargetParametrizations,
         [_TargetParametrizationsRequest(address, description_of_origin="tests")],
     )
-    assert expected == {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    if expected_targets is not None:
+        assert expected_targets == {
+            t
+            for parametrization in parametrizations
+            for t in parametrization.parametrization.values()
+        }
 
-    if dependencies is not None:
+    if expected_dependencies is not None:
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
         #   see https://github.com/pantsbuild/pants/issues/11270
         specs = SpecsParser(rule_runner.build_root).parse_specs(
@@ -867,7 +870,7 @@ def assert_generated(
         )
         assert {
             k.spec: {a.spec for a in v} for k, v in dependency_mapping.mapping.items()
-        } == dependencies
+        } == expected_dependencies
 
 
 def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
@@ -956,7 +959,7 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo@tags=t1": {"demo/f1.ext@tags=t1"},
             "demo@tags=t2": {"demo/f1.ext@tags=t2"},
             "demo/f1.ext@tags=t1": set(),
@@ -1027,7 +1030,7 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo:demo": {
                 "demo/f1.ext@resolve=a",
                 "demo/f1.ext@resolve=b",
@@ -1058,14 +1061,14 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo@resolve=a": set(),
             "demo@resolve=b": set(),
         },
     )
 
 
-def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRunner) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1085,27 +1088,7 @@ def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> 
             """
         ),
         ["f1.ext", "f2.ext"],
-        {
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "a",
-                    Dependencies.alias: [":t1"],
-                },
-                Address("demo", target_name="t2", parameters={"resolve": "a"}),
-                residence_dir="demo",
-            ),
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "b",
-                    Dependencies.alias: [":t1"],
-                },
-                Address("demo", target_name="t2", parameters={"resolve": "b"}),
-                residence_dir="demo",
-            ),
-        },
-        dependencies={
+        expected_dependencies={
             "demo:t1@resolve=a": set(),
             "demo:t1@resolve=b": set(),
             "demo:t2@resolve=a": {"demo:t1@resolve=a"},
@@ -1114,7 +1097,9 @@ def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> 
     )
 
 
-def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_generator_to_generator(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1134,41 +1119,54 @@ def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner
             """
         ),
         ["f1.ext", "f2.ext"],
-        {
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "a",
-                    Dependencies.alias: [":t1"],
-                },
-                Address(
-                    "demo",
-                    relative_file_path="f2.ext",
-                    target_name="t2",
-                    parameters={"resolve": "a"},
-                ),
-                residence_dir="demo",
-            ),
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "b",
-                    Dependencies.alias: [":t1"],
-                },
-                Address(
-                    "demo",
-                    relative_file_path="f2.ext",
-                    target_name="t2",
-                    parameters={"resolve": "b"},
-                ),
-                residence_dir="demo",
-            ),
-        },
-        dependencies={
+        expected_dependencies={
             "demo/f1.ext:t1@resolve=a": set(),
             "demo/f1.ext:t1@resolve=b": set(),
             "demo/f2.ext:t2@resolve=a": {"demo:t1@resolve=a"},
             "demo/f2.ext:t2@resolve=b": {"demo:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f2.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f2.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
+def test_parametrize_partial_generator_to_generated(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f2.ext'],
+              dependencies=['./f1.ext:t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t2@resolve=a": {"demo/f1.ext:t1@resolve=a"},
+            "demo/f2.ext:t2@resolve=b": {"demo/f1.ext:t1@resolve=b"},
             "demo:t1@resolve=a": {
                 "demo/f1.ext:t1@resolve=a",
             },
