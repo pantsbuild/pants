@@ -63,8 +63,10 @@ async def create_archive(request: CreateArchive) -> Digest:
     )
 
     if request.format == ArchiveFormat.ZIP:
-        zip_binary = await Get(ZipBinary, ZipBinaryRequest())
-        bash_binary = await Get(BashBinary, BashBinaryRequest())
+        zip_binary, bash_binary = await MultiGet(
+            Get(ZipBinary, ZipBinaryRequest()),
+            Get(BashBinary, BashBinaryRequest()),
+        )
         ZIP_SCRIPT_FILENAME = "__pants_zip_wrapper_script__.sh"
         zip_script = FileContent(
             ZIP_SCRIPT_FILENAME,
