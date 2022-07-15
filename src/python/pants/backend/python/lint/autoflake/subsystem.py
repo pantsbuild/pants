@@ -35,6 +35,8 @@ class Autoflake(PythonToolBase):
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
         example="--remove-all-unused-imports --target-version=py37 --quiet",
+        # This argument was previously hardcoded. Moved it a default argument
+        # to allow it to be overridden while maintaining the existing api.
         default=["--remove-all-unused-imports"],
     )
     export = ExportToolOption()
