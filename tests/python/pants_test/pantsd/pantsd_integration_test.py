@@ -553,6 +553,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert not child_process.is_running()
             checker.assert_running()
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/16194")
     def test_pantsd_graceful_shutdown(self):
         """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
