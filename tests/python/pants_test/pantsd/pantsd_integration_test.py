@@ -554,6 +554,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_running()
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/16194")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_graceful_shutdown(self):
         """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
@@ -566,7 +567,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ],
             cleanup_wait_time=0,
         )
-
+    
     def test_pantsd_graceful_shutdown_deadline(self):
         """Test that a child process that does not respond to SIGINT within 5 seconds, is forcibly
         cleaned up with a SIGKILL."""
