@@ -63,7 +63,6 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  read_timeout: Duration,
 }
 
 impl CommandRunner {
@@ -100,6 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
+      Some(read_timeout),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
@@ -117,7 +117,6 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-      read_timeout,
     })
   }
 
@@ -604,13 +603,7 @@ async fn check_action_cache(
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
-          async move {
-            let lookup_fut = client.get_action_result(request);
-            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
-            timeout_fut
-              .await
-              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
-          }
+          async move { client.get_action_result(request).await }
         },
         status_is_retryable,
       )

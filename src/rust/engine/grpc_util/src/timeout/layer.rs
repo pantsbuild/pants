@@ -10,8 +10,7 @@ pub struct TimeoutLayer {
 
 impl TimeoutLayer {
     /// Create a timeout from a duration
-    pub fn new(timeout: Option<Duration>) -> Self {
-        let timeout = timeout.unwrap_or_else(|| Duration::from_secs(60 * 60));
+    pub fn new(timeout: Duration) -> Self {
         TimeoutLayer { timeout }
     }
 }

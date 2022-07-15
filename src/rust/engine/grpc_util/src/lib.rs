@@ -30,6 +30,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use either::Either;
 use http::header::{HeaderName, USER_AGENT};
@@ -44,6 +45,7 @@ use workunit_store::ObservationMetric;
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
+use crate::timeout::{Timeout, TimeoutLayer};
 
 pub mod headers;
 pub mod hyper;
@@ -56,17 +58,20 @@ pub mod tls;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<Channel>>>;
+pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<Timeout<Channel>>>>;
 
 pub fn layered_service(
   channel: Channel,
   concurrency_limit: usize,
   http_headers: HeaderMap,
+  timeout: Option<Duration>,
 ) -> LayeredService {
+  let timeout = timeout.unwrap_or_else(|| Duration::from_secs(60 * 60));
   ServiceBuilder::new()
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .layer(NetworkMetricsLayer::new(&METRIC_FOR_REAPI_PATH))
+    .layer(TimeoutLayer::new(timeout))
     .service(channel)
 }
 

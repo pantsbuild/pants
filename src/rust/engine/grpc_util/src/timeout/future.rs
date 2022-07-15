@@ -8,6 +8,7 @@ use std::{
   task::{Context, Poll},
 };
 use tokio::time::Sleep;
+use workunit_store::{get_workunit_store_handle, Metric};
 
 pin_project! {
     /// [`Timeout`] response future
@@ -47,7 +48,15 @@ where
     // Now check the sleep
     match this.sleep.poll(cx) {
       Poll::Pending => Poll::Pending,
-      Poll::Ready(_) => Poll::Ready(Err(Elapsed(()).into())),
+      Poll::Ready(_) => {
+        if let Some(mut workunit_store_handle) = get_workunit_store_handle() {
+          workunit_store_handle
+            .store
+            .increment_counter(Metric::RemoteCacheRequestTimeouts, 1)
+        }
+
+        Poll::Ready(Err(Elapsed(()).into()))
+      },
     }
   }
 }
