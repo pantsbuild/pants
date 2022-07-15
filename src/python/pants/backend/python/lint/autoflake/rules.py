@@ -47,7 +47,6 @@ async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtR
             autoflake_pex,
             argv=(
                 "--in-place",
-                "--remove-all-unused-imports",
                 *autoflake.args,
                 *request.snapshot.files,
             ),

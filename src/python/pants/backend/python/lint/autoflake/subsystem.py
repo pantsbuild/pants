@@ -33,7 +33,10 @@ class Autoflake(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="--target-version=py37 --quiet")
+    args = ArgsListOption(
+        example="--remove-all-unused-imports --target-version=py37 --quiet",
+        default=["--remove-all-unused-imports"],
+    )
     export = ExportToolOption()
 
 
