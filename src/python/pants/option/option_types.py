@@ -803,6 +803,7 @@ class ArgsListOption(ShellStrListOption):
                     """
                 )
             ),
+            default=default,
         )
         if passthrough is not None:
             instance._extra_kwargs["passthrough"] = passthrough
