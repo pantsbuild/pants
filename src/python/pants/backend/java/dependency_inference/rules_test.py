@@ -29,6 +29,7 @@ from pants.engine.target import (
 )
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -46,6 +47,7 @@ def rule_runner() -> RuleRunner:
             *dep_inference_rules(),
             *java_target_rules(),
             *java_util_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *junit_rules(),
             *source_files.rules(),
