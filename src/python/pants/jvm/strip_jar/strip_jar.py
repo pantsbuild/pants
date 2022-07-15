@@ -53,6 +53,9 @@ async def strip_jar(
 
     filenames = list(request.filenames)
 
+    if len(filenames) == 0:
+        return request.digest
+
     input_path = "__jars_to_strip"
     toolcp_relpath = "__toolcp"
     processorcp_relpath = "__processorcp"
