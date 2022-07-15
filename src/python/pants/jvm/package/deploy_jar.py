@@ -32,12 +32,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
-from pants.jvm.target_types import (
-    JvmDependenciesField,
-    JvmJdkField,
-    JvmMainClassNameField,
-    ReproducibleJarField,
-)
+from pants.jvm.target_types import JvmDependenciesField, JvmJdkField, JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +46,11 @@ _PANTS_CAT_AND_REPAIR_ZIP_FILENAME = "_cat_and_repair_zip_files.sh"
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,
-        ReproducibleJarField,
         JvmJdkField,
         Dependencies,
     )
 
     main_class: JvmMainClassNameField
-    reproducible: ReproducibleJarField
     output_path: OutputPathField
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
@@ -157,7 +150,13 @@ async def package_deploy_jar(
         ),
     )
 
-    manifest_jar = manifest_jar_result.output_digest
+    manifest_jar = await Get(
+        Digest,
+        StripJarRequest(
+            digest=manifest_jar_result.output_digest,
+            filenames=(_PANTS_MANIFEST_PARTIAL_JAR_FILENAME,),
+        ),
+    )
 
     #
     # 3/4. Create broken deploy JAR, then repair it with `zip -FF`
@@ -205,16 +204,8 @@ async def package_deploy_jar(
         ),
     )
 
-    reproducible_digest = cat_and_repair.output_digest
-
-    if field_set.reproducible.value:
-        reproducible_digest = await Get(
-            Digest,
-            StripJarRequest(digest=cat_and_repair.output_digest, filenames=(output_filename.name,)),
-        )
-
     renamed_output_digest = await Get(
-        Digest, AddPrefix(reproducible_digest, str(output_filename.parent))
+        Digest, AddPrefix(cat_and_repair.output_digest, str(output_filename.parent))
     )
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))

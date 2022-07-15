@@ -330,7 +330,6 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
                         dependencies=[
                             ":example",
                         ],
-                        reproducible=True
                     )
 
                     java_sources(
@@ -359,7 +358,7 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
                 argv=[
                     bash.path,
                     "-c",
-                    f"{unzip.path} -qq {fat_jar.artifacts[0].relpath} && /bin/date -Idate -r META-INF/MANIFEST.MF",
+                    f"{unzip.path} -qq {fat_jar.artifacts[0].relpath} && /bin/date -Idate -r META-INF/MANIFEST.MF && /bin/date -Idate -r org/pantsbuild/example/Example.class",
                 ],
                 input_digest=fat_jar.digest,
                 description="Unzip jar and get date of classfile",
@@ -368,7 +367,7 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert process_result.stdout.decode() == "2000-01-01\n"
+    assert process_result.stdout.decode() == "2000-01-01\n2000-01-01\n"
 
 
 def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:

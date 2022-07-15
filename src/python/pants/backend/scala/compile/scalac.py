@@ -37,6 +37,7 @@ from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -205,8 +206,12 @@ async def compile_scala_source(
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
+        stripped_digest = await Get(
+            Digest, StripJarRequest(digest=process_result.output_digest, filenames=(output_file,))
+        )
+
         output = ClasspathEntry(
-            process_result.output_digest, (output_file,), direct_dependency_classpath_entries
+            stripped_digest, (output_file,), direct_dependency_classpath_entries
         )
 
     return FallibleClasspathEntry.from_fallible_process_result(

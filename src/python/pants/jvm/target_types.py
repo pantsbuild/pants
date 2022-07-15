@@ -13,7 +13,6 @@ from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
-    BoolField,
     Dependencies,
     FieldSet,
     InvalidFieldException,
@@ -309,17 +308,6 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 # JAR support fields
 # -----------------------------------------------------------------------------------------------
 
-# TODO: ReproducibleJarField can be deprecated once https://github.com/pantsbuild/pants/issues/16158 is fixed.
-class ReproducibleJarField(BoolField):
-    alias = "reproducible"
-    default = False
-    help = softwrap(
-        """
-        Indicate that the deploy jar should be made reproducible by stripping timestamps
-        and metadata.
-        """
-    )
-
 
 class JvmMainClassNameField(StringField):
     alias = "main"
@@ -342,7 +330,6 @@ class DeployJarTarget(Target):
         JvmJdkField,
         JvmResolveField,
         RestartableField,
-        ReproducibleJarField,
     )
     help = softwrap(
         """
