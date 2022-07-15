@@ -7,16 +7,16 @@ use std::{error, fmt};
 pub struct Elapsed(pub(super) ());
 
 impl Elapsed {
-    /// Construct a new elapsed error
-    pub fn new() -> Self {
-        Elapsed(())
-    }
+  /// Construct a new elapsed error
+  pub fn new() -> Self {
+    Elapsed(())
+  }
 }
 
 impl fmt::Display for Elapsed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.pad("request timed out")
-    }
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.pad("request timed out")
+  }
 }
 
 impl error::Error for Elapsed {}
