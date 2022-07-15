@@ -26,6 +26,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,10 @@ async def assemble_resources_jar(
         ),
     )
 
-    cpe = ClasspathEntry(resources_jar_result.output_digest, output_files, [])
+    stripped_jar = await Get(
+        Digest, StripJarRequest(resources_jar_result.output_digest, tuple(output_files))
+    )
+    cpe = ClasspathEntry(stripped_jar, output_files, [])
 
     merged_cpe_digest = await Get(
         Digest,

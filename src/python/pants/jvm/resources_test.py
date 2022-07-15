@@ -9,10 +9,12 @@ from pants.build_graph.address import Address
 from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Addresses
-from pants.jvm import classpath, resources, testutil
+from pants.jvm import classpath, jdk_rules, resources, testutil
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -25,6 +27,9 @@ def rule_runner() -> RuleRunner:
             *core_target_types_rules(),
             *coursier_fetch_rules(),
             *lockfile.rules(),
+            *jvm_tool.rules(),
+            *jdk_rules.rules(),
+            *strip_jar.rules(),
             *resources.rules(),
             *classpath.rules(),
             *util_rules(),
