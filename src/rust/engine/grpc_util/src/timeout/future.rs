@@ -31,9 +31,9 @@ impl<T> ResponseFuture<T> {
 impl<F, T, E> Future for ResponseFuture<F>
 where
     F: Future<Output = Result<T, E>>,
-    E: Into<crate::BoxError>,
+    E: Into<tower::BoxError>,
 {
-    type Output = Result<T, crate::BoxError>;
+    type Output = Result<T, tower::BoxError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();

@@ -48,10 +48,10 @@ impl<T> Timeout<T> {
 impl<S, Request> Service<Request> for Timeout<S>
 where
     S: Service<Request>,
-    S::Error: Into<crate::BoxError>,
+    S::Error: Into<tower::BoxError>,
 {
     type Response = S::Response;
-    type Error = crate::BoxError;
+    type Error = tower::BoxError;
     type Future = ResponseFuture<S::Future>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
