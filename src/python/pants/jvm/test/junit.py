@@ -35,7 +35,12 @@ from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JunitTestSourceField, JvmDependenciesField, JvmJdkField
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JunitTestTimeoutField,
+    JvmDependenciesField,
+    JvmJdkField,
+)
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -49,6 +54,7 @@ class JunitTestFieldSet(TestFieldSet):
     )
 
     sources: JunitTestSourceField
+    timeout: JunitTestTimeoutField
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
 
@@ -138,6 +144,7 @@ async def setup_junit_for_target(
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",
+        timeout_seconds=request.field_set.timeout.calculate_from_global_options(test_subsystem),
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
         use_nailgun=False,

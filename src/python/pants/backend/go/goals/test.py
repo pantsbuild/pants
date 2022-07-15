@@ -331,7 +331,10 @@ async def run_go_tests(
         Process(
             [
                 "./test_runner",
-                *transform_test_args(go_test_subsystem.args, field_set.timeout.value),
+                *transform_test_args(
+                    go_test_subsystem.args,
+                    field_set.timeout.calculate_from_global_options(test_subsystem),
+                ),
             ],
             env=extra_env,
             input_digest=test_input_digest,

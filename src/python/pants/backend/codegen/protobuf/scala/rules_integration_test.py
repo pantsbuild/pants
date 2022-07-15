@@ -19,7 +19,9 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.scala import target_types
+from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, distdir, source_files, stripped_source_files
@@ -27,13 +29,18 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.jvm import classpath
+from pants.jvm import classpath, testutil
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.testutil import (
+    RenderedClasspath,
+    expect_single_expanded_coarsened_target,
+    make_resolve,
+)
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -64,7 +71,10 @@ message HelloReply {
 def scalapb_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "scalapb.test.lock",
-        ["com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6"],
+        [
+            "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6",
+            "org.scala-lang:scala-library:2.13.6",
+        ],
     )
 
 
@@ -87,6 +97,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *strip_jar.rules(),
             *scalac_rules(),
+            *scala_dep_inf_rules(),
             *util_rules(),
             *jdk_rules(),
             *target_types.rules(),
@@ -95,9 +106,11 @@ def rule_runner() -> RuleRunner:
             *scala_protobuf_rules(),
             *artifact_mapper.rules(),
             *distdir.rules(),
+            *testutil.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateScalaFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
+            QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -131,9 +144,6 @@ def assert_files_generated(
         GeneratedSources,
         [GenerateScalaFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
-    sources_contents = rule_runner.request(DigestContents, [generated_sources.snapshot.digest])
-    for sc in sources_contents:
-        print(f"{sc.path}:\n{sc.content.decode()}")
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
@@ -148,6 +158,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
             "src/protobuf/dir1/f.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir1;
 
@@ -161,6 +172,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
             "src/protobuf/dir1/f2.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir1;
                 """
@@ -169,6 +181,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
             "src/protobuf/dir2/f.proto": dedent(
                 """\
                 syntax = "proto3";
+                option java_package = "org.pantsbuild.scala.proto";
 
                 package dir2;
 
@@ -191,6 +204,16 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
             ),
             "3rdparty/jvm/default.lock": scalapb_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": scalapb_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "scala_sources(dependencies=['src/protobuf/dir1'])",
+            "src/jvm/ScalaPBExample.scala": dedent(
+                """\
+                package org.pantsbuild.scala.example
+                import org.pantsbuild.scala.proto.f.Person
+                trait TestScrooge {
+                  val person: Person
+                }
+                """
+            ),
         }
     )
 
@@ -204,19 +227,30 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
 
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f.proto"),
-        ("src/protobuf/dir1/f/FProto.scala", "src/protobuf/dir1/f/Person.scala"),
+        (
+            "src/protobuf/org/pantsbuild/scala/proto/f/FProto.scala",
+            "src/protobuf/org/pantsbuild/scala/proto/f/Person.scala",
+        ),
     )
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f2.proto"),
-        ["src/protobuf/dir1/f2/F2Proto.scala"],
+        ["src/protobuf/org/pantsbuild/scala/proto/f2/F2Proto.scala"],
     )
     assert_gen(
         Address("src/protobuf/dir2", relative_file_path="f.proto"),
-        ["src/protobuf/dir2/f/FProto.scala"],
+        ["src/protobuf/org/pantsbuild/scala/proto/f/FProto.scala"],
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
         ["tests/protobuf/test_protos/f/FProto.scala"],
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="src/jvm")
+    )
+    _ = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
     )
 
 

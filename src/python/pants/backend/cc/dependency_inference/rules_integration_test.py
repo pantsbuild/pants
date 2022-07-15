@@ -7,12 +7,13 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.cc.dependency_inference.rules import (
+    CCDependencyInferenceFieldSet,
     CCIncludeDirective,
     InferCCDependenciesRequest,
     parse_includes,
 )
 from pants.backend.cc.dependency_inference.rules import rules as cc_dep_inf_rules
-from pants.backend.cc.target_types import CCSourceField, CCSourcesGeneratorTarget, CCSourceTarget
+from pants.backend.cc.target_types import CCSourcesGeneratorTarget, CCSourceTarget
 from pants.backend.cc.target_types import rules as target_type_rules
 from pants.build_graph.address import Address
 from pants.engine.target import InferredDependencies
@@ -117,7 +118,8 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferCCDependenciesRequest(tgt[CCSourceField])]
+            InferredDependencies,
+            [InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(tgt))],
         )
 
     assert run_dep_inference(

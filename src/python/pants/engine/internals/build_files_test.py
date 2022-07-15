@@ -118,6 +118,19 @@ def test_prelude_parsing_illegal_import() -> None:
         run_prelude_parsing_rule(prelude_content)
 
 
+def test_prelude_exceptions() -> None:
+    prelude_content = dedent(
+        """\
+        def abort():
+            raise ValueError
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert "ValueError" not in result.symbols
+    with pytest.raises(ValueError):
+        result.symbols["abort"]()
+
+
 class ResolveField(StringField):
     alias = "resolve"
 

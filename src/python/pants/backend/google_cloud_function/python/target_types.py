@@ -24,15 +24,14 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    FieldSet,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
     SecondaryOwnerMixin,
     StringField,
     Target,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
@@ -135,41 +134,47 @@ class PythonGoogleCloudFunctionDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class InjectPythonCloudFunctionHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonGoogleCloudFunctionDependencies
+@dataclass(frozen=True)
+class PythonCloudFunctionHandlerInferenceFieldSet(FieldSet):
+    required_fields = (
+        PythonGoogleCloudFunctionDependencies,
+        PythonGoogleCloudFunctionHandlerField,
+        PythonResolveField,
+    )
+
+    dependencies: PythonGoogleCloudFunctionDependencies
+    handler: PythonGoogleCloudFunctionHandlerField
+    resolve: PythonResolveField
+
+
+class InferPythonCloudFunctionHandlerDependency(InferDependenciesRequest):
+    infer_from = PythonCloudFunctionHandlerInferenceFieldSet
 
 
 @rule(desc="Inferring dependency from the python_google_cloud_function `handler` field")
-async def inject_cloud_function_handler_dependency(
-    request: InjectPythonCloudFunctionHandlerDependency,
+async def infer_cloud_function_handler_dependency(
+    request: InferPythonCloudFunctionHandlerDependency,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
-    original_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
+        return InferredDependencies([])
+
     explicitly_provided_deps, handler = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             ResolvedPythonGoogleHandler,
-            ResolvePythonGoogleHandlerRequest(
-                original_tgt.target[PythonGoogleCloudFunctionHandlerField]
-            ),
+            ResolvePythonGoogleHandlerRequest(request.field_set.handler),
         ),
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup)
+            module, resolve=request.field_set.resolve.normalized_value(python_setup)
         ),
     )
-    address = original_tgt.target.address
+    address = request.field_set.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
         address,
@@ -179,7 +184,7 @@ async def inject_cloud_function_handler_dependency(
         import_reference="module",
         context=(
             f"The python_google_cloud_function target {address} has the field "
-            f"`handler={repr(original_tgt.target[PythonGoogleCloudFunctionHandlerField].value)}`, which maps "
+            f"`handler={repr(request.field_set.handler.value)}`, which maps "
             f"to the Python module `{module}`"
         ),
     )
@@ -189,7 +194,7 @@ async def inject_cloud_function_handler_dependency(
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )
-    return InjectedDependencies(unambiguous_owners)
+    return InferredDependencies(unambiguous_owners)
 
 
 class PythonGoogleCloudFunctionRuntimes(Enum):
@@ -286,5 +291,5 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonCloudFunctionHandlerDependency),
+        UnionRule(InferDependenciesRequest, InferPythonCloudFunctionHandlerDependency),
     )

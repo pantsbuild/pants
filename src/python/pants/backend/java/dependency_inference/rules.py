@@ -19,6 +19,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
     SourcesField,
@@ -33,8 +34,15 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
+@dataclass(frozen=True)
+class JavaSourceDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (JavaSourceField,)
+
+    source: JavaSourceField
+
+
 class InferJavaSourceDependencies(InferDependenciesRequest):
-    infer_from = JavaSourceField
+    infer_from = JavaSourceDependenciesInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -52,12 +60,11 @@ class JavaInferredDependenciesAndExportsRequest:
 async def infer_java_dependencies_via_source_analysis(
     request: InferJavaSourceDependencies,
 ) -> InferredDependencies:
-
     jids = await Get(
         JavaInferredDependencies,
-        JavaInferredDependenciesAndExportsRequest(request.sources_field),
+        JavaInferredDependenciesAndExportsRequest(request.field_set.source),
     )
-    return InferredDependencies(dependencies=jids.dependencies)
+    return InferredDependencies(jids.dependencies)
 
 
 @rule(desc="Inferring Java dependencies and exports by source analysis")

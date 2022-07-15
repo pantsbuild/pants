@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
+from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, List, Set, Tuple, Type, cast
@@ -38,14 +39,13 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -85,7 +85,7 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
-class ResolveField(StringField):
+class ResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
 
 
@@ -839,9 +839,9 @@ def assert_generated(
     address: Address,
     build_content: str,
     files: list[str],
-    expected: set[Target],
+    expected_targets: set[Target] | None = None,
     *,
-    dependencies: dict[str, set[str]] | None = None,
+    expected_dependencies: dict[str, set[str]] | None = None,
 ) -> None:
     rule_runner.write_files(
         {
@@ -853,11 +853,14 @@ def assert_generated(
         _TargetParametrizations,
         [_TargetParametrizationsRequest(address, description_of_origin="tests")],
     )
-    assert expected == {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    if expected_targets is not None:
+        assert expected_targets == {
+            t
+            for parametrization in parametrizations
+            for t in parametrization.parametrization.values()
+        }
 
-    if dependencies is not None:
+    if expected_dependencies is not None:
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
         #   see https://github.com/pantsbuild/pants/issues/11270
         specs = SpecsParser(rule_runner.build_root).parse_specs(
@@ -875,7 +878,7 @@ def assert_generated(
         )
         assert {
             k.spec: {a.spec for a in v} for k, v in dependency_mapping.mapping.items()
-        } == dependencies
+        } == expected_dependencies
 
 
 def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
@@ -964,7 +967,7 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo@tags=t1": {"demo/f1.ext@tags=t1"},
             "demo@tags=t2": {"demo/f1.ext@tags=t2"},
             "demo/f1.ext@tags=t1": set(),
@@ -1035,7 +1038,7 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo:demo": {
                 "demo/f1.ext@resolve=a",
                 "demo/f1.ext@resolve=b",
@@ -1066,14 +1069,14 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
                 residence_dir="demo",
             ),
         },
-        dependencies={
+        expected_dependencies={
             "demo@resolve=a": set(),
             "demo@resolve=b": set(),
         },
     )
 
 
-def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRunner) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1093,27 +1096,7 @@ def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> 
             """
         ),
         ["f1.ext", "f2.ext"],
-        {
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "a",
-                    Dependencies.alias: [":t1"],
-                },
-                Address("demo", target_name="t2", parameters={"resolve": "a"}),
-                residence_dir="demo",
-            ),
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "b",
-                    Dependencies.alias: [":t1"],
-                },
-                Address("demo", target_name="t2", parameters={"resolve": "b"}),
-                residence_dir="demo",
-            ),
-        },
-        dependencies={
+        expected_dependencies={
             "demo:t1@resolve=a": set(),
             "demo:t1@resolve=b": set(),
             "demo:t2@resolve=a": {"demo:t1@resolve=a"},
@@ -1122,7 +1105,9 @@ def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> 
     )
 
 
-def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_partial_generator_to_generator(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t2"),
@@ -1142,41 +1127,54 @@ def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner
             """
         ),
         ["f1.ext", "f2.ext"],
-        {
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "a",
-                    Dependencies.alias: [":t1"],
-                },
-                Address(
-                    "demo",
-                    relative_file_path="f2.ext",
-                    target_name="t2",
-                    parameters={"resolve": "a"},
-                ),
-                residence_dir="demo",
-            ),
-            MockGeneratedTarget(
-                {
-                    SingleSourceField.alias: "f2.ext",
-                    ResolveField.alias: "b",
-                    Dependencies.alias: [":t1"],
-                },
-                Address(
-                    "demo",
-                    relative_file_path="f2.ext",
-                    target_name="t2",
-                    parameters={"resolve": "b"},
-                ),
-                residence_dir="demo",
-            ),
-        },
-        dependencies={
+        expected_dependencies={
             "demo/f1.ext:t1@resolve=a": set(),
             "demo/f1.ext:t1@resolve=b": set(),
             "demo/f2.ext:t2@resolve=a": {"demo:t1@resolve=a"},
             "demo/f2.ext:t2@resolve=b": {"demo:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f2.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f2.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
+def test_parametrize_partial_generator_to_generated(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f2.ext'],
+              dependencies=['./f1.ext:t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t2@resolve=a": {"demo/f1.ext:t1@resolve=a"},
+            "demo/f2.ext:t2@resolve=b": {"demo/f1.ext:t1@resolve=b"},
             "demo:t1@resolve=a": {
                 "demo/f1.ext:t1@resolve=a",
             },
@@ -1602,26 +1600,6 @@ class CustomSmalltalkDependencies(SmalltalkDependencies):
     pass
 
 
-class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
-
-
-class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
-
-
-@rule
-def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies(
-        [Address("", target_name="injected1"), Address("", target_name="injected2")]
-    )
-
-
-@rule
-def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address("", target_name="custom_injected")])
-
-
 class SmalltalkLibrarySource(SmalltalkSource):
     pass
 
@@ -1641,37 +1619,53 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
+@dataclass(frozen=True)
+class SmalltalkDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (SmalltalkLibrarySource,)
+
+    source: SmalltalkLibrarySource
+
+
 class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkLibrarySource
+    infer_from = SmalltalkDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    all_lines = itertools.chain.from_iterable(
-        file_content.content.decode().splitlines() for file_content in digest_contents
-    )
-    resolved = await MultiGet(
+    all_lines = [
+        line.strip()
+        for line in itertools.chain.from_iterable(
+            file_content.content.decode().splitlines() for file_content in digest_contents
+        )
+    ]
+    include = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
         for line in all_lines
+        if not line.startswith("!")
     )
-    return InferredDependencies(resolved)
+    exclude = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
+        )
+        for line in all_lines
+        if line.startswith("!")
+    )
+    return InferredDependencies(include, exclude=exclude)
 
 
 @pytest.fixture
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            inject_smalltalk_deps,
-            inject_custom_smalltalk_deps,
             infer_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
-            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibraryGenerator, MockTarget],
@@ -1786,33 +1780,6 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
     )
 
 
-def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files(
-        {
-            "src/smalltalk/util/f1.st": "",
-            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
-        }
-    )
-
-    def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
-        provided_deps = ["//:provided"]
-        if injected:
-            provided_deps.append("!//:injected2")
-        deps_field = deps_cls(provided_deps, Address("", target_name="target"))
-        result = dependencies_rule_runner.request(Addresses, [DependenciesRequest(deps_field)])
-        assert result == Addresses(sorted((*injected, Address("", target_name="provided"))))
-
-    assert_injected(Dependencies, injected=[])
-    assert_injected(SmalltalkDependencies, injected=[Address("", target_name="injected1")])
-    assert_injected(
-        CustomSmalltalkDependencies,
-        injected=[
-            Address("", target_name="custom_injected"),
-            Address("", target_name="injected1"),
-        ],
-    )
-
-
 def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
     """We test that dependency inference works generally and that we merge it correctly with
     explicitly provided dependencies.
@@ -1852,6 +1819,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 //:inferred_but_ignored2
                 """
             ),
+            "demo/f3.st": dedent(
+                """\
+                //:inferred1
+                !:inferred_and_provided1
+                !//:inferred_and_provided2
+                """
+            ),
             "demo/BUILD": dedent(
                 """\
                 smalltalk_libraries(
@@ -1874,6 +1848,7 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
         expected=[
             Address("demo", relative_file_path="f1.st"),
             Address("demo", relative_file_path="f2.st"),
+            Address("demo", relative_file_path="f3.st"),
         ],
     )
 
@@ -1899,6 +1874,13 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 relative_file_path="inferred_and_provided2.st",
                 target_name="inferred_and_provided2",
             ),
+        ],
+    )
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        Address("demo", relative_file_path="f3.st", target_name="demo"),
+        expected=[
+            Address("", target_name="inferred1"),
         ],
     )
 

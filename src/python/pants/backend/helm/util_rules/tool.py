@@ -71,6 +71,7 @@ class HelmProcess:
     extra_env: FrozenDict[str, str]
     extra_immutable_input_digests: FrozenDict[str, Digest]
     cache_scope: ProcessCacheScope | None
+    timeout_seconds: int | None
     output_directories: tuple[str, ...]
     output_files: tuple[str, ...]
 
@@ -86,6 +87,7 @@ class HelmProcess:
         extra_env: Mapping[str, str] | None = None,
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         cache_scope: ProcessCacheScope | None = None,
+        timeout_seconds: int | None = None,
     ):
         self.argv = tuple(argv)
         self.input_digest = input_digest
@@ -96,6 +98,7 @@ class HelmProcess:
         self.extra_env = FrozenDict(extra_env or {})
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.cache_scope = cache_scope
+        self.timeout_seconds = timeout_seconds
 
 
 @rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
@@ -191,6 +194,7 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
         output_directories=request.output_directories,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+        timeout_seconds=request.timeout_seconds,
     )
 
 

@@ -65,6 +65,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -588,8 +589,15 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
     return _SetupGoProtocPlugin(plugin_digest)
 
 
+@dataclass(frozen=True)
+class GoProtobufDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (GoPackageSourcesField,)
+
+    sources: GoPackageSourcesField
+
+
 class InferGoProtobufDependenciesRequest(InferDependenciesRequest):
-    infer_from = GoPackageSourcesField
+    infer_from = GoProtobufDependenciesInferenceFieldSet
 
 
 @rule(
@@ -599,7 +607,7 @@ async def infer_go_dependencies(
     request: InferGoProtobufDependenciesRequest,
     go_protobuf_mapping: GoProtobufImportPathMapping,
 ) -> InferredDependencies:
-    address = request.sources_field.address
+    address = request.field_set.address
     maybe_pkg_analysis = await Get(
         FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(address)
     )

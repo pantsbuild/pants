@@ -40,7 +40,7 @@ from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
-from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     GlobExpansionConjunction,
@@ -2296,7 +2296,7 @@ class SecondaryOwnerMixin(ABC):
     dependency inference and hydrating sources, but file arguments will still work.
 
     There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency injection rule to infer a dep on that primary
+    Typically, you will want to add a dependency inference rule to infer a dep on that primary
     owner.
 
     All associated files must live in the BUILD target's directory or a subdirectory to work
@@ -2341,8 +2341,8 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency injection and inference—use
-    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    To resolve all dependencies—including the results of dependency inference—use either `await
+    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
     DependenciesRequest(tgt[Dependencies])`.
     """
 
@@ -2401,8 +2401,8 @@ class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
     Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency injection and inference and apply ignores. However, this type can be
-    useful particularly within inference/injection rules to see if a user already explicitly
+    consider dependency inference and apply ignores. However, this type can be
+    useful particularly within inference rules to see if a user already explicitly
     provided a dependency.
 
     Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
@@ -2509,78 +2509,32 @@ class ExplicitlyProvidedDependencies:
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
-@union
-@dataclass(frozen=True)
-class InjectDependenciesRequest(EngineAwareParameter, ABC):
-    """A request to inject dependencies, in addition to those explicitly provided.
-
-    To set up a new injection, subclass this class. Set the class property `inject_for` to the
-    type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
-    cause the class, and any subclass, to have the injection. Register this subclass with
-    `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
-
-    Then, create a rule that takes the subclass as a parameter and returns `InjectedDependencies`.
-
-    For example:
-
-        class FortranDependencies(Dependencies):
-            pass
-
-        class InjectFortranDependencies(InjectDependenciesRequest):
-            inject_for = FortranDependencies
-
-        @rule
-        async def inject_fortran_dependencies(
-            request: InjectFortranDependencies
-        ) -> InjectedDependencies:
-            addresses = await Get(
-                Addresses, UnparsedAddressInputs(["//:injected"], owning_address=None)
-            )
-            return InjectedDependencies(addresses)
-
-        def rules():
-            return [
-                *collect_rules(),
-                UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
-            ]
-    """
-
-    dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies]]
-
-    def debug_hint(self) -> str:
-        return self.dependencies_field.address.spec
-
-
-class InjectedDependencies(DeduplicatedCollection[Address]):
-    sort_input = True
-
-
-SF = TypeVar("SF", bound="SourcesField")
+FS = TypeVar("FS", bound="FieldSet")
 
 
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
+class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
-    `infer_from` to the type of `SourcesField` you are able to infer from, such as
-    `FortranSources`. This will cause the class, and any subclass, to use your inference
-    implementation. Note that there cannot be more than one implementation for a particular
-    `SourcesField` class. Register this subclass with
-    `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
+    `infer_from` to the FieldSet subclass you are able to infer from. This will cause the FieldSet
+    class, and any subclass, to use your inference implementation.
+
+    Note that there cannot be more than one implementation for a particular `FieldSet` class.
+
+    Register this subclass with `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
 
     Then, create a rule that takes the subclass as a parameter and returns `InferredDependencies`.
 
     For example:
 
         class InferFortranDependencies(InferDependenciesRequest):
-            from_sources = FortranSources
+            infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources_field))
+            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources))
             ...
             return InferredDependencies(...)
 
@@ -2591,30 +2545,26 @@ class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
             ]
     """
 
-    sources_field: SF
-    infer_from: ClassVar[Type[SourcesField]]
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
 
-    def debug_hint(self) -> str:
-        return self.sources_field.address.spec
+    field_set: FS
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class InferredDependencies:
-    dependencies: FrozenOrderedSet[Address]
+    include: FrozenOrderedSet[Address]
+    exclude: FrozenOrderedSet[Address]
 
-    def __init__(self, dependencies: Iterable[Address]) -> None:
+    def __init__(
+        self,
+        include: Iterable[Address],
+        *,
+        exclude: Iterable[Address] = (),
+    ) -> None:
         """The result of inferring dependencies."""
-        self.dependencies = FrozenOrderedSet(sorted(dependencies))
-
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
-
-    def __iter__(self) -> Iterator[Address]:
-        return iter(self.dependencies)
-
-
-FS = TypeVar("FS", bound="FieldSet")
+        self.include = FrozenOrderedSet(sorted(include))
+        self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
 @union

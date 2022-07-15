@@ -176,9 +176,41 @@ class DynamicRemoteOptions:
     cache_rpc_concurrency: int
     execution_rpc_concurrency: int
 
+    def _validate_store_addr(self) -> None:
+        if self.store_address:
+            return
+        if self.cache_read:
+            raise OptionsError(
+                "The `--remote-cache-read` option requires also setting "
+                "`--remote-store-address` to work properly."
+            )
+        if self.cache_write:
+            raise OptionsError(
+                "The `--remote-cache-write` option requires also setting "
+                "`--remote-store-address` or to work properly."
+            )
+
+    def _validate_exec_addr(self) -> None:
+        if not self.execution:
+            return
+        if not self.execution_address:
+            raise OptionsError(
+                "The `--remote-execution` option requires also setting "
+                "`--remote-execution-address` to work properly."
+            )
+        if not self.store_address:
+            raise OptionsError(
+                "The `--remote-execution-address` option requires also setting "
+                "`--remote-store-address`. Often these have the same value."
+            )
+
+    def __post_init__(self) -> None:
+        self._validate_store_addr()
+        self._validate_exec_addr()
+
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
-        return DynamicRemoteOptions(
+        return cls(
             execution=False,
             cache_read=False,
             cache_write=False,
@@ -205,6 +237,10 @@ class DynamicRemoteOptions:
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
+
+        if not (execution or cache_read or cache_write):
+            return cls.disabled(), None
+
         store_address = cast("str | None", bootstrap_options.remote_store_address)
         execution_address = cast("str | None", bootstrap_options.remote_execution_address)
         instance_name = cast("str | None", bootstrap_options.remote_instance_name)
@@ -229,11 +265,7 @@ class DynamicRemoteOptions:
             store_headers.update(token_header)
 
         auth_plugin_result: AuthPluginResult | None = None
-        if (
-            bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_auth_plugin.strip()
-            and (execution or cache_read or cache_write)
-        ):
+        if bootstrap_options.remote_auth_plugin:
             if ":" not in bootstrap_options.remote_auth_plugin:
                 raise OptionsError(
                     "Invalid value for `--remote-auth-plugin`: "
@@ -305,22 +337,13 @@ class DynamicRemoteOptions:
                         )
                     )
                     execution_address = auth_plugin_result.execution_address
-
-        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
-        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
-        # but then normalize to `http`/`https`.
-        execution_address = (
-            re.sub(r"^grpc", "http", execution_address) if execution_address else None
-        )
-        store_address = re.sub(r"^grpc", "http", store_address) if store_address else None
-
-        opts = DynamicRemoteOptions(
+        opts = cls(
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
             instance_name=instance_name,
-            store_address=store_address,
-            execution_address=execution_address,
+            store_address=cls._normalize_address(store_address),
+            execution_address=cls._normalize_address(execution_address),
             store_headers=store_headers,
             execution_headers=execution_headers,
             parallelism=parallelism,
@@ -329,6 +352,13 @@ class DynamicRemoteOptions:
             execution_rpc_concurrency=execution_rpc_concurrency,
         )
         return opts, auth_plugin_result
+
+    @classmethod
+    def _normalize_address(cls, address: str | None) -> str | None:
+        # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
+        # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
+        # but then normalize to `http`/`https`.
+        return re.sub(r"^grpc", "http", address) if address else None
 
 
 @dataclass(frozen=True)
@@ -1660,28 +1690,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 """
             ),
         )
-
-        if opts.remote_execution and not opts.remote_execution_address:
-            raise OptionsError(
-                "The `--remote-execution` option requires also setting "
-                "`--remote-execution-address` to work properly."
-            )
-        if opts.remote_execution_address and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-execution-address` option requires also setting "
-                "`--remote-store-address`. Often these have the same value."
-            )
-
-        if opts.remote_cache_read and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-read` option requires also setting "
-                "`--remote-store-address` to work properly."
-            )
-        if opts.remote_cache_write and not opts.remote_store_address:
-            raise OptionsError(
-                "The `--remote-cache-write` option requires also setting "
-                "`--remote-store-address` or to work properly."
-            )
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
