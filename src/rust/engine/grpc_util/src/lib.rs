@@ -50,6 +50,7 @@ pub mod hyper;
 pub mod metrics;
 pub mod prost;
 pub mod retry;
+pub mod timeout;
 pub mod tls;
 
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
