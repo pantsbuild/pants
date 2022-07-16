@@ -122,7 +122,7 @@ def test_expand_interpreter_search_paths() -> None:
         }
     )
     with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
-        with fake_asdf_root(all_python_versions, asdf_home_versions, asdf_local_versions) as (
+        with fake_asdf_root(all_python_versions, asdf_home_versions, asdf_local_versions, tool_name="python") as (
             home_dir,
             asdf_dir,
             expected_asdf_paths,

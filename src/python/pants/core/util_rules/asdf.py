@@ -112,6 +112,7 @@ async def _resolve_asdf_tool_paths(
         # The definition of a tool-versions file can be found here:
         # https://asdf-vm.com/#/core-configuration?id=tool-versions
         tool_versions_lines = tool_versions_file.read_text().splitlines()
+        print(f"tool_versions_lines = {tool_versions_lines}")
         last_line = None
         for line in tool_versions_lines:
             # Find the last line for this tool.
@@ -144,7 +145,7 @@ async def _resolve_asdf_tool_paths(
                     asdf_versions[v] = str(tool_versions_file)
 
     for version, source in asdf_versions.items():
-        install_dir = asdf_installs_dir / version / "bin"
+        install_dir = asdf_installs_dir / version / bin_relpath
         if install_dir.exists():
             asdf_paths.append(str(install_dir))
         else:

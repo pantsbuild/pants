@@ -3,26 +3,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-from dataclasses import dataclass
 
-from pants.core.util_rules.system_binaries import (
-    BinaryNotFoundError,
-    BinaryPathRequest,
-    BinaryPaths,
-    BinaryPathTest,
-)
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
-from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +25,12 @@ class GolangSubsystem(Subsystem):
             Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
             Earlier entries will be searched first.
 
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            The following special strings are supported:
+
+              * `<PATH>`, the contents of the PATH environment variable
+              * `<ASDF>`, all Go versions currently configured by ASDF \
+                  `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
+              * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
             """
         ),
     )
@@ -103,171 +93,35 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
 
-    def go_search_paths(self, env: Environment) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._go_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
+    asdf_tool_name = StrOption(
+        default="go-sdk",
+        help=softwrap(
+            """
+            The ASDF tool name to use when searching for installed Go distributions using the ASDF tool
+            manager (https://asdf-vm.com/). The default value for this option is for the `go-sdk` ASDF plugin
+            (https://github.com/yacchi/asdf-go-sdk.git). There are other plugins. If you wish to use one of them,
+            then set this option to the ASDF tool name under which that other plugin was installed into ASDF.
+            """
+        ),
+        advanced=True,
+    )
 
-        return tuple(OrderedSet(iter_path_entries()))
+    asdf_bin_relpath = StrOption(
+        default="bin",
+        help=softwrap(
+            """
+            The path relative to an ASDF install directory to use to find the `bin` directory within an installed
+            Go distribution. The default value for this option works for the `go-sdk` ASDF plugin. Other ASDF
+            plugins that install Go may have a different relative path to use. 
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def raw_go_search_paths(self) -> tuple[str, ...]:
+        return tuple(self._go_search_paths)
 
     @property
     def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._subprocess_env_vars)))
-
-
-def compatible_go_version(*, compiler_version: str, target_version: str) -> bool:
-    """Can the Go compiler handle the target version?
-
-    Inspired by
-    https://github.com/golang/go/blob/30501bbef9fcfc9d53e611aaec4d20bb3cdb8ada/src/cmd/go/internal/work/exec.go#L429-L445.
-
-    Input expected in the form `1.17`.
-    """
-    if target_version == "1.0":
-        return True
-
-    def parse(v: str) -> tuple[int, int]:
-        major, minor = v.split(".", maxsplit=1)
-        return int(major), int(minor)
-
-    return parse(target_version) <= parse(compiler_version)
-
-
-@dataclass(frozen=True)
-class GoRoot:
-    """Path to the Go installation (the `GOROOT`)."""
-
-    path: str
-    version: str
-
-    _raw_metadata: FrozenDict[str, str]
-
-    def is_compatible_version(self, version: str) -> bool:
-        """Can this Go compiler handle the target version?"""
-        return compatible_go_version(compiler_version=self.version, target_version=version)
-
-    @property
-    def full_version(self) -> str:
-        return self._raw_metadata["GOVERSION"]
-
-    @property
-    def goos(self) -> str:
-        return self._raw_metadata["GOOS"]
-
-    @property
-    def goarch(self) -> str:
-        return self._raw_metadata["GOARCH"]
-
-
-@rule(desc="Find Go binary", level=LogLevel.DEBUG)
-async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_paths = golang_subsystem.go_search_paths(env)
-    all_go_binary_paths = await Get(
-        BinaryPaths,
-        BinaryPathRequest(
-            search_path=search_paths,
-            binary_name="go",
-            test=BinaryPathTest(["version"]),
-        ),
-    )
-    if not all_go_binary_paths.paths:
-        raise BinaryNotFoundError(
-            softwrap(
-                f"""
-                Cannot find any `go` binaries using the option `[golang].go_search_paths`:
-                {list(search_paths)}
-
-                To fix, please install Go (https://golang.org/doc/install) with the version
-                {golang_subsystem.minimum_expected_version} or newer (set by
-                `[golang].minimum_expected_version`). Then ensure that it is discoverable via
-                `[golang].go_search_paths`.
-                """
-            )
-        )
-
-    # `go env GOVERSION` does not work in earlier Go versions (like 1.15), so we must run
-    # `go version` and `go env GOROOT` to calculate both the version and GOROOT.
-    version_results = await MultiGet(
-        Get(
-            ProcessResult,
-            Process(
-                (binary_path.path, "version"),
-                description=f"Determine Go version for {binary_path.path}",
-                level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
-            ),
-        )
-        for binary_path in all_go_binary_paths.paths
-    )
-
-    invalid_versions = []
-    for binary_path, version_result in zip(all_go_binary_paths.paths, version_results):
-        try:
-            _raw_version = version_result.stdout.decode("utf-8").split()[
-                2
-            ]  # e.g. go1.17 or go1.17.1
-            _version_components = _raw_version[2:].split(".")  # e.g. [1, 17] or [1, 17, 1]
-            version = f"{_version_components[0]}.{_version_components[1]}"
-        except IndexError:
-            raise AssertionError(
-                f"Failed to parse `go version` output for {binary_path}. Please open a bug at "
-                f"https://github.com/pantsbuild/pants/issues/new/choose with the below data."
-                f"\n\n"
-                f"{version_result}"
-            )
-
-        if compatible_go_version(
-            compiler_version=version, target_version=golang_subsystem.minimum_expected_version
-        ):
-            env_result = await Get(
-                ProcessResult,
-                Process(
-                    (binary_path.path, "env", "-json"),
-                    description=f"Determine Go SDK metadata for {binary_path.path}",
-                    level=LogLevel.DEBUG,
-                    cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
-                    env={"GOPATH": "/does/not/matter"},
-                ),
-            )
-            sdk_metadata = json.loads(env_result.stdout.decode())
-            return GoRoot(
-                path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
-            )
-
-        logger.debug(
-            f"Go binary at {binary_path.path} has version {version}, but this "
-            f"repository expects at least {golang_subsystem.minimum_expected_version} "
-            "(set by `[golang].expected_minimum_version`). Ignoring."
-        )
-
-        invalid_versions.append((binary_path.path, version))
-
-    invalid_versions_str = bullet_list(
-        f"{path}: {version}" for path, version in sorted(invalid_versions)
-    )
-    raise BinaryNotFoundError(
-        softwrap(
-            f"""
-            Cannot find a `go` binary compatible with the minimum version of
-            {golang_subsystem.minimum_expected_version} (set by `[golang].minimum_expected_version`).
-
-            Found these `go` binaries, but they had incompatible versions:
-
-            {invalid_versions_str}
-
-            To fix, please install the expected version or newer (https://golang.org/doc/install)
-            and ensure that it is discoverable via the option `[golang].go_search_paths`, or change
-            `[golang].expected_minimum_version`.
-            """
-        )
-    )
-
-
-def rules():
-    return collect_rules()

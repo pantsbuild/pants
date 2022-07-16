@@ -22,7 +22,11 @@ def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> tuple
 
 @contextmanager
 def fake_asdf_root(
-    fake_versions: list[str], fake_home_versions: list[int], fake_local_versions: list[int]
+    fake_versions: list[str],
+    fake_home_versions: list[int],
+    fake_local_versions: list[int],
+    *,
+    tool_name: str,
 ):
     with temporary_dir() as home_dir, temporary_dir() as asdf_dir:
 
@@ -32,11 +36,11 @@ def fake_asdf_root(
         fake_home_dir = Path(home_dir)
         fake_tool_versions = fake_home_dir / ".tool-versions"
         fake_home_versions_str = " ".join(materialize_indices(fake_versions, fake_home_versions))
-        fake_tool_versions.write_text(f"nodejs lts\njava 8\npython {fake_home_versions_str}\n")
+        fake_tool_versions.write_text(f"nodejs lts\njava 8\n{tool_name} {fake_home_versions_str}\n")
 
         fake_asdf_dir = Path(asdf_dir)
-        fake_asdf_plugin_dir = fake_asdf_dir / "plugins" / "python"
-        fake_asdf_installs_dir = fake_asdf_dir / "installs" / "python"
+        fake_asdf_plugin_dir = fake_asdf_dir / "plugins" / tool_name
+        fake_asdf_installs_dir = fake_asdf_dir / "installs" / tool_name
 
         fake_dirs.extend(
             [fake_home_dir, fake_asdf_dir, fake_asdf_plugin_dir, fake_asdf_installs_dir]
@@ -125,7 +129,9 @@ def test_get_asdf_paths() -> None:
         }
     )
 
-    with fake_asdf_root(all_python_versions, asdf_home_versions, asdf_local_versions) as (
+    with fake_asdf_root(
+        all_python_versions, asdf_home_versions, asdf_local_versions, tool_name="python"
+    ) as (
         home_dir,
         asdf_dir,
         expected_asdf_paths,

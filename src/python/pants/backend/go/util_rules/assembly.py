@@ -7,7 +7,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.subsystems.golang import GoRoot
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
