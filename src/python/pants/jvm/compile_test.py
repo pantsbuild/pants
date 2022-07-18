@@ -362,7 +362,7 @@ def test_allow_files_dependency(
             "Example.scala": dedent(
                 """\
                 package org.pantsbuild.example
-              
+
                 object Main {
                     def main(args: Array[String]): Unit = {
                         println("Hello World")
