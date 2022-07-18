@@ -12,12 +12,12 @@ from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.dependency_inference.deployment import (
     AnalyseHelmDeploymentRequest,
     FirstPartyHelmDeploymentMappings,
+    HelmDeploymentDependenciesInferenceFieldSet,
     HelmDeploymentReport,
-    InjectHelmDeploymentDependenciesRequest,
+    InferHelmDeploymentDependenciesRequest,
 )
 from pants.backend.helm.target_types import (
     HelmChartTarget,
-    HelmDeploymentDependenciesField,
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
 )
@@ -35,7 +35,7 @@ from pants.engine import process
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
 from pants.engine.rules import QueryRule
-from pants.engine.target import InjectedDependencies
+from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
@@ -55,7 +55,7 @@ def rule_runner() -> RuleRunner:
             *tool.rules(),
             QueryRule(FirstPartyHelmDeploymentMappings, ()),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
-            QueryRule(InjectedDependencies, (InjectHelmDeploymentDependenciesRequest,)),
+            QueryRule(InferredDependencies, (InferHelmDeploymentDependenciesRequest,)),
         ],
     )
 
@@ -152,10 +152,14 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     mappings = rule_runner.request(FirstPartyHelmDeploymentMappings, [])
     assert mappings.referenced_by(deployment_addr) == [expected_dependency_addr]
 
-    dependencies = rule_runner.request(
-        InjectedDependencies,
-        [InjectHelmDeploymentDependenciesRequest(tgt[HelmDeploymentDependenciesField])],
+    inferred_dependencies = rule_runner.request(
+        InferredDependencies,
+        [
+            InferHelmDeploymentDependenciesRequest(
+                HelmDeploymentDependenciesInferenceFieldSet.create(tgt)
+            )
+        ],
     )
 
-    assert len(dependencies) == 1
-    assert list(dependencies)[0] == expected_dependency_addr
+    assert len(inferred_dependencies.include) == 1
+    assert list(inferred_dependencies.include)[0] == expected_dependency_addr

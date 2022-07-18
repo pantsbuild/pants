@@ -90,7 +90,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
 
     assert len(deploy_processes) == 1
     assert deploy_processes[0].process
-    assert deploy_processes[0].process.argv == (
+    assert deploy_processes[0].process.process.argv == (
         helm.path,
         "upgrade",
         "foo",

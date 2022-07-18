@@ -23,9 +23,9 @@ from pants.backend.helm.util_rules.renderer import (
     RenderedFiles,
 )
 from pants.backend.helm.util_rules.yaml_utils import YamlElements
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -124,21 +124,27 @@ async def first_party_helm_deployment_mappings(
     return FirstPartyHelmDeploymentMappings(docker_images=FrozenDict(docker_images_mapping))
 
 
-class InjectHelmDeploymentDependenciesRequest(InjectDependenciesRequest):
-    inject_for = HelmDeploymentDependenciesField
+class HelmDeploymentDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (HelmDeploymentDependenciesField,)
+
+    dependencies = HelmDeploymentDependenciesField
+
+
+class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
+    infer_from = HelmDeploymentDependenciesInferenceFieldSet
 
 
 @rule(desc="Find the dependencies needed by a Helm deployment", level=LogLevel.DEBUG)
 async def inject_deployment_dependencies(
-    request: InjectHelmDeploymentDependenciesRequest, mapping: FirstPartyHelmDeploymentMappings
-) -> InjectedDependencies:
-    docker_images = mapping.referenced_by(request.dependencies_field.address)
+    request: InferHelmDeploymentDependenciesRequest, mapping: FirstPartyHelmDeploymentMappings
+) -> InferredDependencies:
+    docker_images = mapping.referenced_by(request.field_set.address)
 
     logging.debug(
-        f"Found {pluralize(len(docker_images), 'dependency')} for target {request.dependencies_field.address}"
+        f"Found {pluralize(len(docker_images), 'dependency')} for target {request.field_set.address}"
     )
 
-    return InjectedDependencies(Addresses(docker_images))
+    return InferredDependencies(docker_images)
 
 
 def rules():
@@ -148,5 +154,5 @@ def rules():
         *k8s_manifest.rules(),
         *helm_target_types_rules(),
         *docker_target_types_rules(),
-        UnionRule(InjectDependenciesRequest, InjectHelmDeploymentDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferHelmDeploymentDependenciesRequest),
     ]
