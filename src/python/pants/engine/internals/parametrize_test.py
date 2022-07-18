@@ -169,70 +169,40 @@ def test_concrete_fields_are_equivalent() -> None:
     parent_tgt = ParentTarget({"parent": "val"}, Address("parent"))
     child_tgt = ChildTarget({"child": "val"}, Address("child"))
 
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=parent_tgt, candidate_field=ParentField("val", unused_addr)
-        )
-        is True
+    assert _concrete_fields_are_equivalent(
+        field_defaults, consumer=parent_tgt, candidate_field=ParentField("val", unused_addr)
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults,
-            consumer=parent_tgt,
-            candidate_field=ParentField("different", unused_addr),
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults,
+        consumer=parent_tgt,
+        candidate_field=ParentField("different", unused_addr),
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=parent_tgt, candidate_field=ChildField("val", unused_addr)
-        )
-        is True
+    assert _concrete_fields_are_equivalent(
+        field_defaults, consumer=parent_tgt, candidate_field=ChildField("val", unused_addr)
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults,
-            consumer=parent_tgt,
-            candidate_field=ChildField("different", unused_addr),
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults,
+        consumer=parent_tgt,
+        candidate_field=ChildField("different", unused_addr),
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=parent_tgt, candidate_field=UnrelatedField("val", unused_addr)
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults, consumer=parent_tgt, candidate_field=UnrelatedField("val", unused_addr)
     )
 
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=child_tgt, candidate_field=ParentField("val", unused_addr)
-        )
-        is True
+    assert _concrete_fields_are_equivalent(
+        field_defaults, consumer=child_tgt, candidate_field=ParentField("val", unused_addr)
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults,
-            consumer=child_tgt,
-            candidate_field=ParentField("different", unused_addr),
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults,
+        consumer=child_tgt,
+        candidate_field=ParentField("different", unused_addr),
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=child_tgt, candidate_field=ChildField("val", unused_addr)
-        )
-        is True
+    assert _concrete_fields_are_equivalent(
+        field_defaults, consumer=child_tgt, candidate_field=ChildField("val", unused_addr)
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=child_tgt, candidate_field=ChildField("different", unused_addr)
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults, consumer=child_tgt, candidate_field=ChildField("different", unused_addr)
     )
-    assert (
-        _concrete_fields_are_equivalent(
-            field_defaults, consumer=child_tgt, candidate_field=UnrelatedField("val", unused_addr)
-        )
-        is False
+    assert not _concrete_fields_are_equivalent(
+        field_defaults, consumer=child_tgt, candidate_field=UnrelatedField("val", unused_addr)
     )
