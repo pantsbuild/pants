@@ -144,10 +144,12 @@ def test_get_superset_targets() -> None:
 def test_concrete_fields_are_equivalent() -> None:
     class ParentField(Field):
         alias = "parent"
+        default = None
         help = "foo"
 
     class ChildField(ParentField):
         alias = "child"
+        default = None
         help = "foo"
 
     class UnrelatedField(Field):
@@ -164,45 +166,78 @@ def test_concrete_fields_are_equivalent() -> None:
         help = "foo"
         core_fields = (ChildField,)
 
-    field_defaults = FieldDefaults(FrozenDict())
+    # Validate literal value matches.
+    empty_defaults = FieldDefaults(FrozenDict())
     unused_addr = Address("unused")
     parent_tgt = ParentTarget({"parent": "val"}, Address("parent"))
     child_tgt = ChildTarget({"child": "val"}, Address("child"))
 
     assert _concrete_fields_are_equivalent(
-        field_defaults, consumer=parent_tgt, candidate_field=ParentField("val", unused_addr)
+        empty_defaults, consumer=parent_tgt, candidate_field=ParentField("val", unused_addr)
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults,
+        empty_defaults,
         consumer=parent_tgt,
         candidate_field=ParentField("different", unused_addr),
     )
     assert _concrete_fields_are_equivalent(
-        field_defaults, consumer=parent_tgt, candidate_field=ChildField("val", unused_addr)
+        empty_defaults, consumer=parent_tgt, candidate_field=ChildField("val", unused_addr)
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults,
+        empty_defaults,
         consumer=parent_tgt,
         candidate_field=ChildField("different", unused_addr),
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults, consumer=parent_tgt, candidate_field=UnrelatedField("val", unused_addr)
+        empty_defaults, consumer=parent_tgt, candidate_field=UnrelatedField("val", unused_addr)
     )
 
     assert _concrete_fields_are_equivalent(
-        field_defaults, consumer=child_tgt, candidate_field=ParentField("val", unused_addr)
+        empty_defaults, consumer=child_tgt, candidate_field=ParentField("val", unused_addr)
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults,
+        empty_defaults,
         consumer=child_tgt,
         candidate_field=ParentField("different", unused_addr),
     )
     assert _concrete_fields_are_equivalent(
-        field_defaults, consumer=child_tgt, candidate_field=ChildField("val", unused_addr)
+        empty_defaults, consumer=child_tgt, candidate_field=ChildField("val", unused_addr)
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults, consumer=child_tgt, candidate_field=ChildField("different", unused_addr)
+        empty_defaults, consumer=child_tgt, candidate_field=ChildField("different", unused_addr)
     )
     assert not _concrete_fields_are_equivalent(
-        field_defaults, consumer=child_tgt, candidate_field=UnrelatedField("val", unused_addr)
+        empty_defaults, consumer=child_tgt, candidate_field=UnrelatedField("val", unused_addr)
+    )
+
+    # Validate field defaulting.
+    parent_field_defaults = FieldDefaults(
+        FrozenDict(
+            {
+                ParentField: lambda f: f.value or "val",
+            }
+        )
+    )
+    child_field_defaults = FieldDefaults(
+        FrozenDict(
+            {
+                ChildField: lambda f: f.value or "val",
+            }
+        )
+    )
+    assert _concrete_fields_are_equivalent(
+        parent_field_defaults, consumer=child_tgt, candidate_field=ParentField(None, unused_addr)
+    )
+    assert _concrete_fields_are_equivalent(
+        parent_field_defaults,
+        consumer=ParentTarget({}, Address("parent")),
+        candidate_field=ChildField("val", unused_addr),
+    )
+    assert _concrete_fields_are_equivalent(
+        child_field_defaults, consumer=parent_tgt, candidate_field=ChildField(None, unused_addr)
+    )
+    assert _concrete_fields_are_equivalent(
+        child_field_defaults,
+        consumer=ChildTarget({}, Address("child")),
+        candidate_field=ParentField("val", unused_addr),
     )
