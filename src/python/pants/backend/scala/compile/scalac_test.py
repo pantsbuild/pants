@@ -28,6 +28,7 @@ from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -46,6 +47,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *jdk_rules.rules(),
             *scalac_check_rules(),
+            *strip_jar.rules(),
             *scalac_rules(),
             *source_files.rules(),
             *target_types_rules(),

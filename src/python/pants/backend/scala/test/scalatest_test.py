@@ -30,6 +30,7 @@ from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -49,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *jdk_util_rules(),
             *non_jvm_dependencies_rules(),
+            *strip_jar.rules(),
             *scalac_rules(),
             *scalatest_rules(),
             *scala_target_types_rules(),

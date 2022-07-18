@@ -46,6 +46,7 @@ from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -96,6 +97,7 @@ def jvm_rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *scala_dep_inf_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *jdk_rules.rules(),
             *scalac_rules(),

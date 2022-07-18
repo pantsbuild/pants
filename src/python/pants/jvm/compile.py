@@ -223,6 +223,9 @@ class ClasspathEntry:
     This class additionally keeps filenames in order to preserve classpath ordering for the
     `classpath_arg` method: although Digests encode filenames, they are stored sorted.
 
+    If `[jvm].reproducible_jars`, then all JARs in a classpath entry must have had timestamps
+    stripped -- either natively, or via the `pants.jvm.strip_jar` rules.
+
     TODO: Move to `classpath.py`.
     TODO: Generalize via https://github.com/pantsbuild/pants/issues/13112.
     """

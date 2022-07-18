@@ -197,6 +197,8 @@ async def compile_kotlin_source(
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
+        # NB: `kotlinc` produces reproducible JARs by default, so there is no need for an additional
+        # stripping step.
         output = ClasspathEntry(
             process_result.output_digest, (output_file,), direct_dependency_classpath_entries
         )

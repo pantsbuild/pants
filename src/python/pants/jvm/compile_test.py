@@ -70,6 +70,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -108,6 +109,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *java_dep_inf_rules(),
             *scala_dep_inf_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *jdk_rules.rules(),
             *scalac_rules(),

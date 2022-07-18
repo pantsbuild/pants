@@ -29,6 +29,7 @@ from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEn
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -48,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *jvm_tool.rules(),
             *source_files.rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *javac_check_rules(),
             *util_rules(),
