@@ -57,6 +57,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    Field,
     FieldSet,
     FilteredTargets,
     GeneratedSources,
@@ -1377,6 +1378,50 @@ def test_parametrize_partial_generator_to_generated(
             "demo:t2@resolve=b": {
                 "demo/f2.ext:t2@resolve=b",
             },
+        },
+    )
+
+
+def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
+    class ParentField(Field):
+        alias = "parent"
+        help = "foo"
+
+    class ChildField(ParentField):
+        alias = "child"
+        help = "foo"
+
+    class ParentTarget(Target):
+        alias = "parent_tgt"
+        help = "foo"
+        core_fields = (ParentField, Dependencies)
+
+    class ChildTarget(Target):
+        alias = "child_tgt"
+        help = "foo"
+        core_fields = (ChildField, Dependencies)
+
+    rule_runner = RuleRunner(
+        rules=generated_targets_rule_runner.rules,
+        target_types=[ParentTarget, ChildTarget],
+        objects={"parametrize": Parametrize},
+    )
+    build_content = dedent(
+        """\
+        child_tgt(name="child", child=parametrize("a", "b"))
+        parent_tgt(name="parent", parent=parametrize("a", "b"), dependencies=[":child"])
+        """
+    )
+    assert_generated(
+        rule_runner,
+        Address("demo", target_name="child"),
+        build_content,
+        [],
+        expected_dependencies={
+            "demo:child@child=a": set(),
+            "demo:child@child=b": set(),
+            "demo:parent@parent=a": {"demo:child@child=a"},
+            "demo:parent@parent=b": {"demo:child@child=b"},
         },
     )
 
