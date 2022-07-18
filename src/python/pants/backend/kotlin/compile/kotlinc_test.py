@@ -28,7 +28,6 @@ from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEn
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -51,7 +50,6 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *jdk_rules.rules(),
             *kotlin_check_rules(),
-            *strip_jar.rules(),
             *kotlinc_rules(),
             *kotlinc_plugins.rules(),
             *kotlin_dep_inf_rules(),

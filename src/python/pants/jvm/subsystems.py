@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.option.option_types import DictOption, StrListOption, StrOption
+from pants.option.option_types import DictOption, StrListOption, StrOption, BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -82,6 +82,18 @@ class JvmSubsystem(Subsystem):
             Options set here will be used by any JVM processes required by Pants, with
             the exception of heap memory settings like `-Xmx`, which need to be set
             using `[GLOBAL].process_total_child_memory_usage` and `[GLOBAL].process_per_child_memory_usage`.
+            """
+        ),
+        advanced=True,
+    )
+    reproducible_jars = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            When enabled, JAR files produced by JVM tools will have timestamps stripped.
+
+            Because some compilers do not support this step as a native operation, it can have a
+            performance cost, and is not enabled by default.
             """
         ),
         advanced=True,

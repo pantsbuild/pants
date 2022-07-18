@@ -34,6 +34,7 @@ from pants.jvm.compile import (
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ async def compile_java_source(
     bash: BashBinary,
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
+    jvm: JvmSubsystem,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
@@ -221,11 +223,12 @@ async def compile_java_source(
         output_files = ()
         jar_output_digest = EMPTY_DIGEST
 
-    stripped_jar_output_digest = await Get(
-        Digest, StripJarRequest(digest=jar_output_digest, filenames=output_files)
-    )
+    if jvm.reproducible_jars:
+        jar_output_digest = await Get(
+            Digest, StripJarRequest(digest=jar_output_digest, filenames=output_files)
+        )
     output_classpath = ClasspathEntry(
-        stripped_jar_output_digest, output_files, direct_dependency_classpath_entries
+        jar_output_digest, output_files, direct_dependency_classpath_entries
     )
 
     if export_classpath_entries:

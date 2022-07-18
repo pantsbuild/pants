@@ -32,6 +32,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmDependenciesField, JvmJdkField, JvmMainClassNameField
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ async def deploy_jar_classpath(
 async def package_deploy_jar(
     bash: BashBinary,
     zip: ZipBinary,
+    jvm: JvmSubsystem,
     field_set: DeployJarFieldSet,
 ) -> BuiltPackage:
     """
@@ -150,13 +152,15 @@ async def package_deploy_jar(
         ),
     )
 
-    manifest_jar = await Get(
-        Digest,
-        StripJarRequest(
-            digest=manifest_jar_result.output_digest,
-            filenames=(_PANTS_MANIFEST_PARTIAL_JAR_FILENAME,),
-        ),
-    )
+    manifest_jar = manifest_jar_result.output_digest
+    if jvm.reproducible_jars:
+        manifest_jar = await Get(
+            Digest,
+            StripJarRequest(
+                digest=manifest_jar,
+                filenames=(_PANTS_MANIFEST_PARTIAL_JAR_FILENAME,),
+            ),
+        )
 
     #
     # 3/4. Create broken deploy JAR, then repair it with `zip -FF`
