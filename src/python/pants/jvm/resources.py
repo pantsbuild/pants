@@ -26,6 +26,8 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ class JvmResourcesRequest(ClasspathEntryRequest):
 @rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
+    jvm: JvmSubsystem,
     request: JvmResourcesRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
@@ -89,7 +92,10 @@ async def assemble_resources_jar(
         ),
     )
 
-    cpe = ClasspathEntry(resources_jar_result.output_digest, output_files, [])
+    output_digest = resources_jar_result.output_digest
+    if jvm.reproducible_jars:
+        output_digest = await Get(Digest, StripJarRequest(output_digest, tuple(output_files)))
+    cpe = ClasspathEntry(output_digest, output_files, [])
 
     merged_cpe_digest = await Get(
         Digest,

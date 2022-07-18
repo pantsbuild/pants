@@ -30,6 +30,7 @@ from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestFieldSet
 from pants.jvm.test.junit import rules as jvm_junit_rules
@@ -68,6 +69,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *java_util_rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *source_files.rules(),
             *target_types_rules(),

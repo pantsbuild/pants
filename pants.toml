@@ -205,6 +205,7 @@ java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parse
 # Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
 # in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
+strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
