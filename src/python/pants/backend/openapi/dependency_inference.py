@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import contextlib
 import json
 import os.path
 from dataclasses import dataclass
@@ -47,9 +48,11 @@ async def parse_openapi_sources(request: ParseOpenApiSources) -> OpenApiDependen
         spec = None
 
         if digest_content.path.endswith(".json"):
-            spec = json.loads(digest_content.content)
+            with contextlib.suppress(json.JSONDecodeError):
+                spec = json.loads(digest_content.content)
         elif digest_content.path.endswith(".yaml"):
-            spec = yaml.safe_load(digest_content.content)
+            with contextlib.suppress(yaml.YAMLError):
+                spec = yaml.safe_load(digest_content.content)
 
         if not spec or not isinstance(spec, dict):
             dependencies[digest_content.path] = frozenset()
