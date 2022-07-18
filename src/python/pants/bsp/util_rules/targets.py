@@ -251,18 +251,18 @@ async def resolve_bsp_build_target_addresses(
             f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
         )
 
-    resolve_field_default_factories = {
-        impl.resolve_field: field_defaults.factory(impl.resolve_field)
+    resolve_fields = {
+        impl.resolve_field
         for impl in union_membership.get(BSPBuildTargetsMetadataRequest)
-        if impl.resolve_prefix == resolve_prefix and field_defaults.factory(impl.resolve_field)
+        if impl.resolve_prefix == resolve_prefix
     }
 
     return Targets(
         t
         for t in targets
         if any(
-            t.has_field(field) and factory(t[field]) == resolve_value
-            for field, factory in resolve_field_default_factories.items()
+            t.has_field(field) and field_defaults.value_or_default(t[field]) == resolve_value
+            for field in resolve_fields
         )
     )
 

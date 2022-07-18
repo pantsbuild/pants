@@ -323,6 +323,9 @@ class FieldDefaults:
 
         return lambda f: f.value
 
+    def value_or_default(self, field: Field) -> Any:
+        return (self.factory(type(field)))(field)
+
 
 # -----------------------------------------------------------------------------------------------
 # Core Target abstractions

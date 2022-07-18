@@ -1061,6 +1061,7 @@ async def resolve_dependencies(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
+    field_defaults: FieldDefaults,
 ) -> Addresses:
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(
@@ -1124,7 +1125,7 @@ async def resolve_dependencies(
         )
 
         explicitly_provided_includes = [
-            parametrizations.get_subset(address, tgt).address
+            parametrizations.get_subset(address, tgt, field_defaults).address
             for address, parametrizations in zip(
                 explicitly_provided_includes, explicit_dependency_parametrizations
             )
