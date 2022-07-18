@@ -45,6 +45,9 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
+    FieldDefaults,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
@@ -1070,6 +1073,7 @@ async def resolve_dependencies(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
+    field_defaults: FieldDefaults,
 ) -> Addresses:
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(
@@ -1140,7 +1144,7 @@ async def resolve_dependencies(
         )
 
         explicitly_provided_includes = [
-            parametrizations.get_subset(address, tgt).address
+            parametrizations.get_subset(address, tgt, field_defaults).address
             for address, parametrizations in zip(
                 explicitly_provided_includes, explicit_dependency_parametrizations
             )
@@ -1262,6 +1266,25 @@ async def resolve_unparsed_address_inputs(
         for addr in addresses
     )
     return Addresses(addresses)
+
+
+# -----------------------------------------------------------------------------------------------
+# Dynamic Field defaults
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def field_defaults(union_membership: UnionMembership) -> FieldDefaults:
+    requests = list(union_membership.get(FieldDefaultFactoryRequest))
+    factories = await MultiGet(
+        Get(FieldDefaultFactoryResult, FieldDefaultFactoryRequest, impl()) for impl in requests
+    )
+    return FieldDefaults(
+        FrozenDict(
+            (request.field_type, factory.default_factory)
+            for request, factory in zip(requests, factories)
+        )
+    )
 
 
 # -----------------------------------------------------------------------------------------------

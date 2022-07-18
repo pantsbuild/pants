@@ -24,6 +24,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
     JunitTestSourceField,
     JvmJdkField,
@@ -316,5 +317,6 @@ class ScalacPluginTarget(Target):
 def rules():
     return (
         *collect_rules(),
+        *jvm_target_types.rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )
