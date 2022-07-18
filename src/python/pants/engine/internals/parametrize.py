@@ -6,13 +6,13 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.target import Target
+from pants.engine.target import Field, Target
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, softwrap
@@ -301,11 +301,11 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
 
 
 def _concrete_fields_are_equivalent(
-    *, consumer: Target, candidate_field_value: Any, candidate_field_type: type
+    *, consumer: Target, candidate_field_value: Any, candidate_field_type: type[Field]
 ) -> bool:
     # TODO(#16175): Does not account for the computed default values of Fields.
     if consumer.has_field(candidate_field_type):
-        return consumer[candidate_field_type].value == candidate_field_value
+        return cast(bool, consumer[candidate_field_type].value == candidate_field_value)
     # Else, see if the consumer has a field that is a superclass of `candidate_field_value`, to
     # handle https://github.com/pantsbuild/pants/issues/16190. This is only safe because we are
     # confident that both `candidate_field_type` and the fields from `consumer` are _concrete_,
@@ -320,4 +320,4 @@ def _concrete_fields_are_equivalent(
     )
     if superclass is None:
         return False
-    return consumer[superclass].value == candidate_field_value
+    return cast(bool, consumer[superclass].value == candidate_field_value)
