@@ -1103,6 +1103,31 @@ def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRun
             "demo:t2@resolve=b": {"demo:t1@resolve=b"},
         },
     )
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generated(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              source='f1.ext',
+            )
+            generated(
+              name='t2',
+              resolve='a',
+              source='f2.ext',
+              dependencies=[':t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        expected_dependencies={
+            "demo:t1@resolve=a": set(),
+            "demo:t1@resolve=b": set(),
+            "demo:t2": {"demo:t1@resolve=a"},
+        },
+    )
 
 
 def test_parametrize_partial_generator_to_generator(
@@ -1725,11 +1750,22 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     dependencies_rule_runner.write_files(
         {
-            "src/smalltalk/BUILD": "target(dependencies=['//:dep1', '//:dep2', ':sibling'])",
+            "src/smalltalk/BUILD": dedent(
+                """\
+                target(dependencies=['//:dep1', '//:dep2', ':sibling'])
+                target(name='sibling')
+                """
+            ),
             "no_deps/BUILD": "target()",
             # An ignore should override an include.
             "ignore/BUILD": (
                 "target(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
+            ),
+            "BUILD": dedent(
+                """\
+                target(name='dep1')
+                target(name='dep2')
+                """
             ),
         }
     )
@@ -1801,8 +1837,8 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 smalltalk_libraries(name='inferred2')
                 smalltalk_libraries(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
                 smalltalk_libraries(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
-                smalltalk_libraries(name='inferred_and_provided1')
-                smalltalk_libraries(name='inferred_and_provided2')
+                target(name='inferred_and_provided1')
+                target(name='inferred_and_provided2')
                 """
             ),
             "demo/f1.st": dedent(
