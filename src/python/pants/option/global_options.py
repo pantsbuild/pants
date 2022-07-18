@@ -127,7 +127,7 @@ class AuthPluginResult:
     the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
     the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
 
-    If set, the returned `instance_name` will override by `[GLOBAL].remote_instance_name`, `store_address`
+    If set, the returned `instance_name` will override `[GLOBAL].remote_instance_name`, `store_address`
     will override `[GLOBAL].remote_store_address`, and `execution_address` will override
     ``[GLOBAL].remote_execution_address``. The store address and execution address must be prefixed with
     `grpc://` or `grpcs://`.
@@ -183,13 +183,13 @@ class DynamicRemoteOptions:
             return
         if self.cache_read:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_read` option requires also setting "
-                "`[GLOBAL].remote_store_address` to work properly."
+                "The `[GLOBAL].remote_cache_read` option requires also setting the"
+                "`[GLOBAL].remote_store_address` option in order to work properly."
             )
         if self.cache_write:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_write` option requires also setting "
-                "`[GLOBAL].remote_store_address` or to work properly."
+                "The `[GLOBAL].remote_cache_write` option requires also setting the "
+                "`[GLOBAL].remote_store_address` option in order to work properly."
             )
 
     def _validate_exec_addr(self) -> None:
@@ -197,13 +197,13 @@ class DynamicRemoteOptions:
             return
         if not self.execution_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution` option requires also setting "
-                "`[GLOBAL].remote_execution_address` to work properly."
+                "The `[GLOBAL].remote_execution` option requires also setting the "
+                "`[GLOBAL].remote_execution_address` option in order to work properly."
             )
         if not self.store_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution_address` option requires also setting "
-                "`[GLOBAL].remote_store_address`. Often these have the same value."
+                "The `[GLOBAL].remote_execution_address` option requires also setting the "
+                "`[GLOBAL].remote_store_address` option. Often these have the same value."
             )
 
     def __post_init__(self) -> None:
