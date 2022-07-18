@@ -319,6 +319,7 @@ def test_deploy_jar_coursier_deps(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(args=["--jvm-reproducible-jars"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     rule_runner.write_files(
         {
             "BUILD": dedent(

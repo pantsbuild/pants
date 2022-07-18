@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.option.option_types import DictOption, StrListOption, StrOption, BoolOption
+from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
