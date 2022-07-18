@@ -34,7 +34,7 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import final
+from typing_extensions import Protocol, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
@@ -262,9 +262,73 @@ class AsyncFieldMixin(Field):
         )
 
 
+@union
+@dataclass(frozen=True)
+class FieldDefaultFactoryRequest:
+    """Registers a dynamic default for a Field.
+
+    See `FieldDefaults`.
+    """
+
+    field_type: ClassVar[type[Field]]
+
+
+# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
+# a Callable.
+class FieldDefaultFactory(Protocol):
+    def __call__(self, field: Field) -> Any:
+        pass
+
+
+@dataclass(frozen=True)
+class FieldDefaultFactoryResult:
+    """A wrapper for a function which computes the default value of a Field."""
+
+    default_factory: FieldDefaultFactory
+
+
+@dataclass(frozen=True)
+class FieldDefaults:
+    """Generic Field default values. To install a default, see `FieldDefaultFactoryRequest`.
+
+    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
+    subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
+    which compute the true value of the field given a subsytem argument. Consumers need to
+    be type aware, and `@rules` cannot have dynamic requirements.
+
+    Additionally, `__defaults__` should mean that computed default Field values should become
+    more rare: i.e. `JvmResolveField` and `PythonResolveField` could potentially move to
+    hardcoded default values which users override with `__defaults__` if they'd like to change
+    the default resolve names.
+
+    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
+    (including Field registrations) to have `@rule_helper` methods, which would allow the
+    computation of an AsyncField to directly require a subsystem.
+    """
+
+    _factories: FrozenDict[type[Field], FieldDefaultFactory]
+
+    @memoized_method
+    def factory(self, field_type: type[Field]) -> FieldDefaultFactory:
+        """Looks up a Field default factory in a subclass-aware way."""
+        factory = self._factories.get(field_type, None)
+        if factory is not None:
+            return factory
+
+        for ft, factory in self._factories.items():
+            if issubclass(field_type, ft):
+                return factory
+
+        return lambda f: f.value
+
+    def value_or_default(self, field: Field) -> Any:
+        return (self.factory(type(field)))(field)
+
+
 # -----------------------------------------------------------------------------------------------
 # Core Target abstractions
 # -----------------------------------------------------------------------------------------------
+
 
 # NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
 # the precise Field returned.
