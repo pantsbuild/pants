@@ -1109,10 +1109,10 @@ async def resolve_dependencies(
         )
         generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
 
-    # If the target is parametrized, see whether any explicitly provided dependencies are also
-    # parametrized, but with partial/no parameters. If so, fill them in.
+    # See whether any explicitly provided dependencies are parametrized, but with partial/no
+    # parameters. If so, fill them in.
     explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
-    if request.field.address.is_parametrized and explicitly_provided_includes:
+    if explicitly_provided_includes:
         explicit_dependency_parametrizations = await MultiGet(
             Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
             for address in explicitly_provided_includes
