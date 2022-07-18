@@ -294,7 +294,12 @@ class GunzipBinary:
 
 class TarBinary(BinaryPath):
     def create_archive_argv(
-        self, output_filename: str, input_files: Sequence[str], tar_format: ArchiveFormat
+        self,
+        output_filename: str,
+        tar_format: ArchiveFormat,
+        *,
+        input_files: Sequence[str] = (),
+        input_file_list_filename: str | None = None,
     ) -> tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
         #
@@ -304,7 +309,9 @@ class TarBinary(BinaryPath):
         compression = {ArchiveFormat.TGZ: "z", ArchiveFormat.TBZ2: "j", ArchiveFormat.TXZ: "J"}.get(
             tar_format, ""
         )
-        return (self.path, f"c{compression}f", output_filename, *input_files)
+
+        files_from = ("--files-from", input_file_list_filename) if input_file_list_filename else ()
+        return (self.path, f"c{compression}f", output_filename, *input_files) + files_from
 
     def extract_archive_argv(
         self, archive_path: str, extract_path: str, *, archive_suffix: str
