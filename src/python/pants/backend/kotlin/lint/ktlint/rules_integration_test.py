@@ -22,6 +22,7 @@ from pants.engine.target import Target
 from pants.jvm import classpath, jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *coursier_setup_rules(),
             *jdk_rules.rules(),
+            *strip_jar.rules(),
             *kotlinc_rules(),
             *kotlinc_plugins.rules(),
             *util_rules(),

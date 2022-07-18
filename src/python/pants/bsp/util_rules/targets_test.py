@@ -16,6 +16,7 @@ from pants.engine.target import Targets
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -25,6 +26,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *bsp_rules(),
             *java_bsp_rules.rules(),
+            *strip_jar.rules(),
             *javac.rules(),
             *jvm_tool.rules(),
             *jvm_util_rules.rules(),

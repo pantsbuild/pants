@@ -39,6 +39,7 @@ from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import expect_single_expanded_coarsened_target
 from pants.jvm.util_rules import rules as util_rules
@@ -62,6 +63,7 @@ def rule_runner() -> RuleRunner:
             *graph.rules(),
             *jvm_compile_rules(),
             *stripped_source_files.rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *javac_check_rules(),
             *java_dep_inf_rules(),
