@@ -53,37 +53,9 @@ You can specify a file, which will find the target(s) owning that file:
 helloworld/greet/greeting_test.py:tests
 ```
 
-`filter` - find targets that match a predicate
-----------------------------------------------
-
-`filter` is like `list`, but will only include targets that match the predicate(s).
-
-Specify a predicate by using one of the below `filter` options, like `--target-type`. You can use a comma to OR multiple values, meaning that at least one member must be matched. You can repeat the option multiple times to AND each filter. You can prefix the filter with `-` to negate the filter, meaning that the target must not be true for the filter.
-
-Some examples:
-
-```bash
-# Only `python_source` targets.
-./pants filter --target-type=python_source ::
-
-# `python_source` or `python_test` targets.
-./pants filter --target-type='python_source,python_test' ::
-
-# Any target except for `python_source` targets
-./pants filter --target-type='-python_source' ::
-```
-
-### `filter --target-type`
-
-Each value should be the name of a target type, e.g. `python_source` or `resource`. Run `./pants help targets` to see what targets are registered.
-
-### `filter --address-regex`
-
-Regex strings for the address, such as `^dir` or `:util$`.
-
-### `filter --tag-regex`
-
-Regex strings for the `tags` field. Alternatively, you can use the global `--tags` option, which uses exact string matches instead of regex. See [Advanced target selection](doc:advanced-target-selection).
+`list` often works well when paired with the `--filter` options from
+[Advanced Target Selection](doc:advanced-target-selection), e.g.
+`./pants --filter-target-type=python_test list ::` to find all your `python_test` targets.
 
 `dependencies` - find a target's dependencies
 ---------------------------------------------
