@@ -1813,7 +1813,12 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
     dependencies_rule_runner.write_files(
         {
             "src/smalltalk/util/f1.st": "",
-            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
+            "BUILD": dedent(
+                """\
+                smalltalk_libraries(name='target', sources=['*.st'])
+                target(name='provided')
+                """
+            ),
         }
     )
 
