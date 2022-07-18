@@ -11,9 +11,11 @@ from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import (
     Parametrize,
+    _concrete_fields_are_equivalent,
     _TargetParametrization,
     _TargetParametrizations,
 )
+from pants.engine.target import Field, Target
 from pants.util.frozendict import FrozenDict
 
 
@@ -137,3 +139,91 @@ def test_get_superset_targets() -> None:
     assert_gets(Address("fake"), set())
     assert_gets(Address("dir1", parameters={"fake": "a"}), set())
     assert_gets(Address("dir1", parameters={"k1": "fake"}), set())
+
+
+def test_concrete_fields_are_equivalent() -> None:
+    class ParentField(Field):
+        alias = "parent"
+        help = "foo"
+
+    class ChildField(ParentField):
+        alias = "child"
+        help = "foo"
+
+    class UnrelatedField(Field):
+        alias = "unrelated"
+        help = "foo"
+
+    class ParentTarget(Target):
+        alias = "parent_tgt"
+        help = "foo"
+        core_fields = (ParentField,)
+
+    class ChildTarget(Target):
+        alias = "child_tgt"
+        help = "foo"
+        core_fields = (ChildField,)
+
+    parent_tgt = ParentTarget({"parent": "val"}, Address("parent"))
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=parent_tgt, candidate_field_type=ParentField, candidate_field_value="val"
+        )
+        is True
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=parent_tgt, candidate_field_type=ParentField, candidate_field_value="different"
+        )
+        is False
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=parent_tgt, candidate_field_type=ChildField, candidate_field_value="val"
+        )
+        is True
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=parent_tgt, candidate_field_type=ChildField, candidate_field_value="different"
+        )
+        is False
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=parent_tgt, candidate_field_type=UnrelatedField, candidate_field_value="val"
+        )
+        is False
+    )
+
+    child_tgt = ChildTarget({"child": "val"}, Address("child"))
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=child_tgt, candidate_field_type=ParentField, candidate_field_value="val"
+        )
+        is True
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=child_tgt, candidate_field_type=ParentField, candidate_field_value="different"
+        )
+        is False
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=child_tgt, candidate_field_type=ChildField, candidate_field_value="val"
+        )
+        is True
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=child_tgt, candidate_field_type=ChildField, candidate_field_value="different"
+        )
+        is False
+    )
+    assert (
+        _concrete_fields_are_equivalent(
+            consumer=child_tgt, candidate_field_type=UnrelatedField, candidate_field_value="val"
+        )
+        is False
+    )
