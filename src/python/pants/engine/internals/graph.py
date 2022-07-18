@@ -45,6 +45,9 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
+    FieldDefaults,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
@@ -1245,6 +1248,25 @@ async def resolve_unparsed_address_inputs(
         for addr in addresses
     )
     return Addresses(addresses)
+
+
+# -----------------------------------------------------------------------------------------------
+# Dynamic Field defaults
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def field_defaults(union_membership: UnionMembership) -> FieldDefaults:
+    requests = list(union_membership.get(FieldDefaultFactoryRequest))
+    factories = await MultiGet(
+        Get(FieldDefaultFactoryResult, FieldDefaultFactoryRequest, impl()) for impl in requests
+    )
+    return FieldDefaults(
+        FrozenDict(
+            (request.field_type, factory.default_factory)
+            for request, factory in zip(requests, factories)
+        )
+    )
 
 
 # -----------------------------------------------------------------------------------------------
