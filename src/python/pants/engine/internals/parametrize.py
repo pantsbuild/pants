@@ -308,7 +308,6 @@ def _concrete_fields_are_equivalent(
     candidate_field_type = type(candidate_field)
     candidate_field_value = field_defaults.value_or_default(candidate_field)
 
-    # TODO(#16175): Does not account for the computed default values of Fields.
     if consumer.has_field(candidate_field_type):
         return cast(
             bool,
