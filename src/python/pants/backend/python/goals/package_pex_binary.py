@@ -14,6 +14,7 @@ from pants.backend.python.target_types import (
     PexExecutionModeField,
     PexIgnoreErrorsField,
     PexIncludeRequirementsField,
+    PexIncludeSourcesField,
     PexIncludeToolsField,
     PexInheritPathField,
     PexLayout,
@@ -69,6 +70,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
+    include_sources: PexIncludeSourcesField
     include_tools: PexIncludeToolsField
 
     @property
@@ -148,6 +150,7 @@ async def package_pex_binary(
             layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),
             include_requirements=field_set.include_requirements.value,
+            include_source_files=field_set.include_sources.value,
             include_local_dists=True,
         ),
     )

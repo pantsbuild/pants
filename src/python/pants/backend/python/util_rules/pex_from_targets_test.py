@@ -41,6 +41,7 @@ from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Addresses
+from pants.engine.fs import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
@@ -396,6 +397,38 @@ def test_exclude_requirements(
     pex_request = rule_runner.request(PexRequest, [request])
     assert isinstance(pex_request.requirements, PexRequirements)
     assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
+
+
+@pytest.mark.parametrize("include_sources", [False, True])
+def test_exclude_sources(include_sources: bool, rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                python_sources(name="app", sources=["app.py"])
+                """
+            ),
+            "app.py": "",
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-repos-indexes=[]",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    request = PexFromTargetsRequest(
+        [Address("", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=True,
+        include_source_files=include_sources,
+    )
+    pex_request = rule_runner.request(PexRequest, [request])
+    snapshot = rule_runner.request(Snapshot, [pex_request.sources])
+    assert len(snapshot.files) == (1 if include_sources else 0)
 
 
 @pytest.mark.parametrize("enable_resolves", [False, True])
