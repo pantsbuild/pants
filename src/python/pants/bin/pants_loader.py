@@ -13,11 +13,9 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
-    PANTSC_PROFILE,
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
-from pants.util.contextutil import maybe_profiled
 
 
 class PantsLoader:
@@ -86,14 +84,13 @@ class PantsLoader:
 
     @staticmethod
     def run_default_entrypoint() -> None:
-        with maybe_profiled(os.environ.get(PANTSC_PROFILE)):
-            start_time = time.time()
-            try:
-                runner = PantsRunner(args=sys.argv, env=os.environ)
-                exit_code = runner.run(start_time)
-            except KeyboardInterrupt as e:
-                print(f"Interrupted by user:\n{e}", file=sys.stderr)
-                exit_code = PANTS_FAILED_EXIT_CODE
+        start_time = time.time()
+        try:
+            runner = PantsRunner(args=sys.argv, env=os.environ)
+            exit_code = runner.run(start_time)
+        except KeyboardInterrupt as e:
+            print(f"Interrupted by user:\n{e}", file=sys.stderr)
+            exit_code = PANTS_FAILED_EXIT_CODE
         sys.exit(exit_code)
 
     @classmethod
