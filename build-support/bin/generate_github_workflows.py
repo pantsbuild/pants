@@ -334,11 +334,11 @@ class Helper:
 
     def runs_on(self) -> list[str]:
         if self.platform == Platform.MACOS10_X86_64:
-            return ["macos-10.15"]
+            return ["macos-12"]
         if self.platform == Platform.MACOS11_ARM64:
             return ["self-hosted", "macOS11", "ARM64"]
         if self.platform == Platform.LINUX_X86_64:
-            return ["ubuntu-20.04"]
+            return ["ubuntu-22.04"]
         raise ValueError(f"Unsupported platform: {self.platform_name()}")
 
     def platform_env(self):
