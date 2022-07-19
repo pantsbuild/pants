@@ -348,7 +348,6 @@ def test_compile_mixed_cycle(
 def test_allow_files_dependency(
     rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
-    # Add an extra import to the Java file which will force a cycle between them.
     rule_runner.write_files(
         {
             "BUILD": dedent(
