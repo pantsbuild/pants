@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
+from pants.core.target_types import FilesGeneratingSourcesField, FileSourceField
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest
@@ -415,12 +416,19 @@ def classpath_dependency_requests(
         them = coarsened_dep.representative.address
         return us.spec_path == them.spec_path and us.target_name == them.target_name
 
+    def ignore_because_file(coarsened_dep: CoarsenedTarget) -> bool:
+        return sum(
+            1
+            for t in coarsened_dep.members
+            if t.has_field(FileSourceField) or t.has_field(FilesGeneratingSourcesField)
+        ) == len(coarsened_dep.members)
+
     return ClasspathEntryRequests(
         classpath_entry_request.for_targets(
             component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
-        if not ignore_because_generated(coarsened_dep)
+        if not ignore_because_generated(coarsened_dep) and not ignore_because_file(coarsened_dep)
     )
 
 
