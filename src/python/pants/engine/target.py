@@ -2119,7 +2119,8 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
                 softwrap(
                     f"""
                     The {repr(cls.alias)} field in target {address} must not have globs with the
-                    pattern `../`. It was set to: {sorted(value or ())}
+                    pattern `../` because targets can only have sources in the current directory
+                    or subdirectories. It was set to: {sorted(value or ())}
                     """
                 )
             )
@@ -2172,8 +2173,9 @@ class OptionalSingleSourceField(SourcesField, StringField):
                 softwrap(
                     f"""\
                     The {repr(cls.alias)} field in target {address} should not include `../`
-                    patterns, but was set to {value_or_default}. Instead, use a normalized literal
-                    file path (relative to the BUILD file).
+                    patterns because targets can only have sources in the current directory or
+                    subdirectories. It was set to {value_or_default}. Instead, use a normalized
+                    literal file path (relative to the BUILD file).
                     """
                 )
             )
