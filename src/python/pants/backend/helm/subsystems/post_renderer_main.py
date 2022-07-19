@@ -18,7 +18,24 @@ from yamlpath.wrappers import ConsolePrinter  # pants: no-infer-dep
 _SOURCE_FILENAME_PREFIX = "# Source: "
 
 
-def build_template_map(input_file: str) -> dict[str, list[str]]:
+def build_manifest_map(input_file: str) -> dict[str, list[str]]:
+    """Parses the contents that are being received from Helm.
+
+    Helm will send us input that follows the following format:
+
+    ```yaml
+    ---
+    # Source: filename.yaml
+    data:
+      key: value
+    ```
+
+    Since there are cases in which the same source may produce more than
+    one YAML structure, the returned type represents this with a dictionary
+    of lists, in which the key is the source filename and each item in the list
+    is th content following the `# Source: ...` header.
+    """
+
     result = defaultdict(list)
     template_files = []
     with open(input_file, "r", encoding="utf-8") as f:
@@ -41,7 +58,10 @@ def dump_yaml_data(yaml: YAML, data: Any) -> str:
     return stream.getvalue()
 
 
-def output_templates(templates: dict[str, list[str]]) -> None:
+def print_manifests(templates: dict[str, list[str]]) -> None:
+    """Outputs to standard out the contents of the different manifests following the same format
+    used by Helm when sending them into us."""
+
     if not templates:
         return
 
@@ -54,46 +74,53 @@ def output_templates(templates: dict[str, list[str]]) -> None:
 
 def main(args: list[str]) -> None:
     cfg_file = args[0]
-    templates_file = args[1]
+    manifests_stdin_file = args[1]
 
     logging_args = SimpleNamespace(quiet=True, verbose=False, debug=False)
     log = ConsolePrinter(logging_args)
 
     yaml = Parsers.get_yaml_editor(explicit_start=False, preserve_quotes=False)
 
-    input_template_map = build_template_map(templates_file)
-    output_template_map: dict[str, list[str]] = defaultdict(list)
+    input_manifest_map = build_manifest_map(manifests_stdin_file)
+    output_manifest_map: dict[str, list[str]] = defaultdict(list)
 
+    # `cfg_yaml` is the data structure parsed from the YAML index built while preparing this
+    # post-renderer instance.
     (cfg_yaml, doc_loaded) = Parsers.get_yaml_data(yaml, log, cfg_file)
     if not doc_loaded:
         exit(1)
 
-    # Go through the items in the configuration file and apply the replacements requested
-    for filename, doc_changes_list in cfg_yaml.items():
-        file_contents = input_template_map.get(filename)
-        if not file_contents:
+    # Go through the items in the configuration file and apply the replacements requested.
+    for source_filename, source_changes_list in cfg_yaml.items():
+        input_manifests = input_manifest_map.get(source_filename)
+        if not input_manifests:
             continue
 
-        for document, doc_change_spec in zip(file_contents, doc_changes_list):
-            doc_change_paths = doc_change_spec["paths"]
-            if not doc_change_paths:
-                output_template_map[filename].append(document)
+        for input_manifest, manifest_change_spec in zip(input_manifests, source_changes_list):
+            manifest_change_paths = manifest_change_spec["paths"]
+
+            # Manifests that require no changes will have an empty `paths` element in the change spec,
+            # so we add to the output map the manifest document unchanged.
+            if not manifest_change_paths:
+                output_manifest_map[source_filename].append(input_manifest)
                 continue
 
-            (document_yaml, doc_loaded) = Parsers.get_yaml_data(yaml, log, document, literal=True)
+            (manifest_yaml, doc_loaded) = Parsers.get_yaml_data(
+                yaml, log, input_manifest, literal=True
+            )
             if not doc_loaded:
                 continue
 
-            processor = Processor(log, document_yaml)
-            for path_spec, replacement in doc_change_paths.items():
+            processor = Processor(log, manifest_yaml)
+            for path_spec, replacement in manifest_change_paths.items():
                 try:
                     processor.set_value(path_spec, replacement)
                 except YAMLPathException as ex:
                     log.critical(ex, 119)
 
-            output_template_map[filename].append(dump_yaml_data(yaml, document_yaml))
+            output_manifest_map[source_filename].append(dump_yaml_data(yaml, manifest_yaml))
 
-    output_templates(output_template_map)
+    print_manifests(output_manifest_map)
 
 
 if __name__ == "__main__":
