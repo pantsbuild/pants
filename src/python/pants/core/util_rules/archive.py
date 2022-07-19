@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
-import textwrap
+import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -69,22 +69,17 @@ async def create_archive(request: CreateArchive) -> Digest:
             Get(ZipBinary, ZipBinaryRequest()),
             Get(BashBinary, BashBinaryRequest()),
         )
-        ZIP_SCRIPT_FILENAME = "__pants_zip_wrapper_script__.sh"
-        zip_script = FileContent(
-            ZIP_SCRIPT_FILENAME,
-            # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
-            textwrap.dedent(
-                f"""\
-                set -e
-                /bin/cat {FILE_LIST_FILENAME} | {zip_binary.path} --names-stdin {request.output_filename}
-                """
-            ).encode("utf-8"),
-        )
-        zip_script_digest = await Get(Digest, CreateDigest([zip_script]))
-
         env = {}
-        input_digests = [zip_script_digest]
-        argv: tuple[str, ...] = (bash_binary.path, ZIP_SCRIPT_FILENAME)
+        input_digests = []
+        shlex.join
+        argv: tuple[str, ...] = (
+            bash_binary.path,
+            "-c",
+            (
+                f"{zip_binary.path} --names-stdin {shlex.quote(request.output_filename)} "
+                f"< {FILE_LIST_FILENAME}"
+            ),
+        )
     else:
         tar_binary = await Get(TarBinary, TarBinaryRequest())
         argv = tar_binary.create_archive_argv(
