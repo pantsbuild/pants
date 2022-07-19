@@ -239,7 +239,7 @@ class DynamicRemoteOptions:
             )
         if bootstrap_options.remote_auth_plugin:
             raise OptionsError(
-                "OAuth bearer token path can not be used when setting the remote_auth_plugin option"
+                "OAuth bearer token path can not be used when setting the `[GLOBAL].remote_auth_plugin` option"
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -286,8 +286,16 @@ class DynamicRemoteOptions:
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
+        if (
+            bootstrap_options.remote_auth_plugin
+            and bootstrap_options.remote_oauth_bearer_token_path
+        ):
+            raise OptionsError(
+                "Both `[GLOBAL].remote_auth_plugin` and `[GLOBAL].remote_auth_plugin` `[GLOBAL].remote_oauth_bearer_token_path` are set. This is not supported. Only one of those should be set in order to provide auth information for remote cache."
+            )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
+
         if bootstrap_options.remote_auth_plugin:
             return cls._use_auth_plugin(
                 bootstrap_options, full_options=full_options, env=env, prior_result=prior_result
@@ -336,7 +344,7 @@ class DynamicRemoteOptions:
             raise OptionsError(
                 "Invalid value for `[GLOBAL].remote_auth_plugin`: "
                 f"{bootstrap_options.remote_auth_plugin}. Please use the format "
-                f"`path.to.module:my_func`."
+                "`path.to.module:my_func`."
             )
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
@@ -350,7 +358,7 @@ class DynamicRemoteOptions:
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
-        auth_plugin_path, auth_plugin_func = bootstrap_options.remote_auth_plugin.split(":")
+        auth_plugin_path, _, auth_plugin_func = bootstrap_options.remote_auth_plugin.partition(":")
         auth_plugin_module = importlib.import_module(auth_plugin_path)
         auth_plugin_func = getattr(auth_plugin_module, auth_plugin_func)
         auth_plugin_result = cast(
