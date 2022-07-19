@@ -71,7 +71,6 @@ async def create_archive(request: CreateArchive) -> Digest:
         )
         env = {}
         input_digests = []
-        shlex.join
         argv: tuple[str, ...] = (
             bash_binary.path,
             "-c",
