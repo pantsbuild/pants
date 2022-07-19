@@ -31,7 +31,6 @@ from pants.init.specs_calculator import calculate_specs
 from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.contextutil import maybe_profiled
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,6 @@ class LocalPantsRunner:
     run_tracker: A tracker for metrics for the run.
     specs: The specs for this run, i.e. either the address or filesystem specs.
     graph_session: A LegacyGraphSession instance for graph reuse.
-    profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
     """
 
     options: Options
@@ -56,7 +54,6 @@ class LocalPantsRunner:
     specs: Specs
     graph_session: GraphSession
     union_membership: UnionMembership
-    profile_path: str | None
 
     @classmethod
     def _init_graph_session(
@@ -162,8 +159,6 @@ class LocalPantsRunner:
             session=graph_session.scheduler_session,
         )
 
-        profile_path = env.get("PANTS_PROFILE")
-
         return cls(
             options=options,
             options_bootstrapper=options_bootstrapper,
@@ -172,7 +167,6 @@ class LocalPantsRunner:
             specs=specs,
             graph_session=graph_session,
             union_membership=union_membership,
-            profile_path=profile_path,
         )
 
     def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
@@ -246,35 +240,34 @@ class LocalPantsRunner:
             return PANTS_FAILED_EXIT_CODE
 
     def run(self, start_time: float) -> ExitCode:
-        with maybe_profiled(self.profile_path):
-            spec_parser = SpecsParser()
-            specs = []
-            for spec_str in self.options.specs:
-                spec, is_ignore = spec_parser.parse_spec(spec_str)
-                specs.append(f"-{spec}" if is_ignore else str(spec))
+        spec_parser = SpecsParser()
+        specs = []
+        for spec_str in self.options.specs:
+            spec, is_ignore = spec_parser.parse_spec(spec_str)
+            specs.append(f"-{spec}" if is_ignore else str(spec))
 
-            self.run_tracker.start(run_start_time=start_time, specs=specs)
-            global_options = self.options.for_global_scope()
+        self.run_tracker.start(run_start_time=start_time, specs=specs)
+        global_options = self.options.for_global_scope()
 
-            streaming_reporter = StreamingWorkunitHandler(
-                self.graph_session.scheduler_session,
-                run_tracker=self.run_tracker,
-                specs=self.specs,
-                options_bootstrapper=self.options_bootstrapper,
-                callbacks=self._get_workunits_callbacks(),
-                report_interval_seconds=global_options.streaming_workunits_report_interval,
-                allow_async_completion=(
-                    global_options.pantsd and global_options.streaming_workunits_complete_async
-                ),
-                max_workunit_verbosity=global_options.streaming_workunits_level,
-            )
-            with streaming_reporter:
-                engine_result = PANTS_FAILED_EXIT_CODE
-                try:
-                    engine_result = self._run_inner()
-                finally:
-                    metrics = self.graph_session.scheduler_session.metrics()
-                    self.run_tracker.set_pantsd_scheduler_metrics(metrics)
-                    self.run_tracker.end_run(engine_result)
+        streaming_reporter = StreamingWorkunitHandler(
+            self.graph_session.scheduler_session,
+            run_tracker=self.run_tracker,
+            specs=self.specs,
+            options_bootstrapper=self.options_bootstrapper,
+            callbacks=self._get_workunits_callbacks(),
+            report_interval_seconds=global_options.streaming_workunits_report_interval,
+            allow_async_completion=(
+                global_options.pantsd and global_options.streaming_workunits_complete_async
+            ),
+            max_workunit_verbosity=global_options.streaming_workunits_level,
+        )
+        with streaming_reporter:
+            engine_result = PANTS_FAILED_EXIT_CODE
+            try:
+                engine_result = self._run_inner()
+            finally:
+                metrics = self.graph_session.scheduler_session.metrics()
+                self.run_tracker.set_pantsd_scheduler_metrics(metrics)
+                self.run_tracker.end_run(engine_result)
 
-                return engine_result
+            return engine_result
