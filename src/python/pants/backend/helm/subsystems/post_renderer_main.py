@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from types import SimpleNamespace
 from typing import Any
 
@@ -18,7 +19,7 @@ _SOURCE_FILENAME_PREFIX = "# Source: "
 
 
 def build_template_map(input_file: str) -> dict[str, list[str]]:
-    result = {}
+    result = defaultdict(list)
     template_files = []
     with open(input_file, "r", encoding="utf-8") as f:
         template_files = f.read().split("---")
@@ -29,13 +30,7 @@ def build_template_map(input_file: str) -> dict[str, list[str]]:
             continue
 
         template_name = lines[0][len(_SOURCE_FILENAME_PREFIX) :]
-
-        current_contents = result.get(template_name, None)
-        if not current_contents:
-            current_contents = []
-            result[template_name] = current_contents
-
-        current_contents.append("\n".join(lines[1:]))
+        result[template_name].append("\n".join(lines[1:]))
 
     return result
 
@@ -46,14 +41,15 @@ def dump_yaml_data(yaml: YAML, data: Any) -> str:
     return stream.getvalue()
 
 
-def output_templates(templates: dict[str, str]) -> None:
+def output_templates(templates: dict[str, list[str]]) -> None:
     if not templates:
         return
 
-    for filename, content in templates.items():
-        print("---")
-        print(f"{_SOURCE_FILENAME_PREFIX}{filename}")
-        print(content)
+    for filename, documents in templates.items():
+        for content in documents:
+            print("---")
+            print(f"{_SOURCE_FILENAME_PREFIX}{filename}")
+            print(content)
 
 
 def main(args: list[str]) -> None:
@@ -65,34 +61,39 @@ def main(args: list[str]) -> None:
 
     yaml = Parsers.get_yaml_editor(explicit_start=False, preserve_quotes=False)
 
-    template_map = build_template_map(templates_file)
+    input_template_map = build_template_map(templates_file)
+    output_template_map: dict[str, list[str]] = defaultdict(list)
 
-    (cfg_data, doc_loaded) = Parsers.get_yaml_data(yaml, log, cfg_file)
+    (cfg_yaml, doc_loaded) = Parsers.get_yaml_data(yaml, log, cfg_file)
     if not doc_loaded:
         exit(1)
 
     # Go through the items in the configuration file and apply the replacements requested
-    for filename, changes in cfg_data.items():
-        file_contents = template_map.get(filename)
+    for filename, doc_changes_list in cfg_yaml.items():
+        file_contents = input_template_map.get(filename)
         if not file_contents:
             continue
 
-        (template_data, doc_loaded) = Parsers.get_yaml_data(
-            yaml, log, "---\n".join(file_contents), literal=True
-        )
-        if not doc_loaded:
-            continue
+        for document, doc_change_spec in zip(file_contents, doc_changes_list):
+            doc_change_paths = doc_change_spec["paths"]
+            if not doc_change_paths:
+                output_template_map[filename].append(document)
+                continue
 
-        processor = Processor(log, template_data)
-        for path_spec, replacement in changes.items():
-            try:
-                processor.set_value(path_spec, replacement)
-            except YAMLPathException as ex:
-                log.critical(ex, 119)
+            (document_yaml, doc_loaded) = Parsers.get_yaml_data(yaml, log, document, literal=True)
+            if not doc_loaded:
+                continue
 
-        template_map[filename] = dump_yaml_data(yaml, template_data)
+            processor = Processor(log, document_yaml)
+            for path_spec, replacement in doc_change_paths.items():
+                try:
+                    processor.set_value(path_spec, replacement)
+                except YAMLPathException as ex:
+                    log.critical(ex, 119)
 
-    output_templates(template_map)
+            output_template_map[filename].append(dump_yaml_data(yaml, document_yaml))
+
+    output_templates(output_template_map)
 
 
 if __name__ == "__main__":

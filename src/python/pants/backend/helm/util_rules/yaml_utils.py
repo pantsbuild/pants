@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 from abc import ABCMeta
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Generic, Iterable, Iterator, Mapping, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Type, TypeVar
 
+from pants.engine.collection import Collection
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -19,11 +21,11 @@ class YamlPath:
     the root."""
 
     _elements: tuple[str, ...]
-    absolute: bool
+    _absolute: bool
 
     def __init__(self, elements: Iterable[str], *, absolute: bool) -> None:
         self._elements = tuple(elements)
-        self.absolute = absolute
+        self._absolute = absolute
 
     @classmethod
     def parse(cls, path: str) -> YamlPath:
@@ -38,12 +40,18 @@ class YamlPath:
 
         return cls([], absolute=True)
 
+    @classmethod
+    def index(cls, idx: int) -> YamlPath:
+        """Returns a relative YamlPath for the index value provided."""
+
+        return cls([str(idx)], absolute=False)
+
     @property
     def parent(self) -> YamlPath | None:
         """Returns the path to the parent element unless this path is already the root."""
 
         if not self.is_root:
-            return YamlPath(self._elements[:-1], absolute=self.absolute)
+            return YamlPath(self._elements[:-1], absolute=self._absolute)
         return None
 
     @property
@@ -58,10 +66,16 @@ class YamlPath:
         return self._elements[len(self._elements) - 1]
 
     @property
+    def is_absolute(self) -> bool:
+        """Returns `True` if this is an absolute path."""
+
+        return self._absolute
+
+    @property
     def is_root(self) -> bool:
         """Returns `True` if this path represents the root element."""
 
-        return len(self._elements) == 0
+        return len(self._elements) == 0 and self._absolute
 
     @property
     def is_index(self) -> bool:
@@ -73,20 +87,32 @@ class YamlPath:
         except ValueError:
             return False
 
-    def __add__(self, other: YamlPath) -> YamlPath:
-        if other.absolute:
-            raise ValueError("Can not append an absolute path to another path.")
-        return YamlPath(self._elements + other._elements, absolute=self.absolute)
+    def to_relative(self) -> YamlPath:
+        """Transforms this YamlPath instance into a relative path."""
 
-    def __truediv__(self, other: str) -> YamlPath:
-        return self + YamlPath.parse(other)
+        if not self._absolute:
+            return self
+        return YamlPath(self._elements, absolute=False)
+
+    def __truediv__(self, other: str | int | YamlPath) -> YamlPath:
+        if isinstance(other, str):
+            other_path = YamlPath.parse(other)
+        elif isinstance(other, int):
+            other_path = YamlPath.index(other)
+        else:
+            other_path = other
+
+        if other_path._absolute:
+            raise ValueError("Can not append an absolute path to another path.")
+
+        return YamlPath(self._elements + other_path._elements, absolute=self._absolute)
 
     def __iter__(self):
         return iter(self._elements)
 
     def __str__(self) -> str:
         path = "/".join(self._elements)
-        if self.absolute:
+        if self._absolute:
             path = f"/{path}"
         return path
 
@@ -102,39 +128,124 @@ class YamlElement(metaclass=ABCMeta):
 
 
 T = TypeVar("T")
+R = TypeVar("R")
 
 
-@dataclass(unsafe_hash=True)
+class MutableYamlIndex(Generic[T]):
+    """Represents a mutable collection of items that is indexed by the following keys:
+
+    - the relative path of the YAML file
+    - the document index inside the YAML file
+    - the YAML path of the item
+    """
+
+    _data: dict[PurePath, dict[int, dict[YamlPath, T]]]
+
+    def __init__(self) -> None:
+        self._data = defaultdict(dict)
+
+    def insert(
+        self, *, file_path: PurePath, yaml_path: YamlPath, item: T, document_index: int = 0
+    ) -> None:
+        """Inserts an item at the given position in the index."""
+
+        doc_index = self._data[file_path].get(document_index, {})
+        if not doc_index:
+            self._data[file_path][document_index] = doc_index
+
+        doc_index[yaml_path] = item
+
+    def frozen(self) -> FrozenYamlIndex[T]:
+        """Transforms this collection into a frozen (immutable) one."""
+
+        return FrozenYamlIndex(self)
+
+
+@dataclass(frozen=True)
+class _YamlDocumentIndexNode(Generic[T]):
+    """Helper node item for the `FrozenYamlIndex` type."""
+
+    paths: FrozenDict[YamlPath, T]
+
+    @classmethod
+    def empty(cls: Type[_YamlDocumentIndexNode[T]]) -> _YamlDocumentIndexNode[T]:
+        return cls(paths=FrozenDict())
+
+    def to_json_dict(self) -> dict[str, dict[str, str]]:
+        items_dict: dict[str, str] = {}
+        for path, item in self.paths.items():
+            items_dict[str(path)] = str(item)
+        return {"paths": items_dict}
+
+
 @frozen_after_init
-class YamlElements(Generic[T]):
-    """Collection of values that are indexed by a file name and a YAML path inside the given
-    file."""
+class FrozenYamlIndex(Generic[T]):
+    """Represents a frozen collection of items that is indexed by the following keys:
 
-    _data: FrozenDict[PurePath, FrozenDict[YamlPath, T]]
+    - the relative path of the YAML file
+    - the document index inside the YAML file
+    - the YAML path of the item
+    """
 
-    def __init__(self, data: Mapping[PurePath, Mapping[YamlPath, T]] = {}) -> None:
-        self._data = FrozenDict(
-            {filename: FrozenDict(mapping) for filename, mapping in data.items() if mapping}
-        )
+    _data: FrozenDict[PurePath, Collection[_YamlDocumentIndexNode[T]]]
 
-    def items(self) -> Iterator[tuple[PurePath, YamlPath, T]]:
-        for filename, path_mapping in self._data.items():
-            for path, value in path_mapping.items():
-                yield filename, path, value
+    def __init__(self, other: MutableYamlIndex[T]) -> None:
+        data: dict[PurePath, Collection[_YamlDocumentIndexNode[T]]] = {}
+        for file_path, doc_index in other._data.items():
+            max_index = max(doc_index.keys())
+            doc_list: list[_YamlDocumentIndexNode[T]] = [_YamlDocumentIndexNode.empty()] * (
+                max_index + 1
+            )
 
-    def file_paths(self) -> Iterable[PurePath]:
-        return self._data.keys()
+            for idx, item_map in doc_index.items():
+                doc_list[idx] = _YamlDocumentIndexNode(paths=FrozenDict(item_map))
 
-    def yaml_items(self, path: PurePath) -> Iterable[tuple[YamlPath, T]]:
-        return self._data.get(path, {}).items()
+            data[file_path] = Collection(doc_list)
+        self._data = FrozenDict(data)
+
+    def _items(self) -> Iterator[tuple[PurePath, int, YamlPath, T]]:
+        for file_path, doc_indexes in self._data.items():
+            for idx, doc_index in enumerate(doc_indexes):
+                for yaml_path, item in doc_index.paths.items():
+                    yield file_path, idx, yaml_path, item
+
+    def transform_values(self, func: Callable[[T], Optional[R]]) -> FrozenYamlIndex[R]:
+        """Transforms the values of the given indexed collection into those that are returned from
+        the received function.
+
+        The items that map to `None` in the given function are not included in the result.
+        """
+
+        mutable_index: MutableYamlIndex[R] = MutableYamlIndex()
+        for file_path, doc_index, yaml_path, item in self._items():
+            new_item = func(item)
+            if new_item is not None:
+                mutable_index.insert(
+                    file_path=file_path,
+                    document_index=doc_index,
+                    yaml_path=yaml_path,
+                    item=new_item,
+                )
+        return mutable_index.frozen()
 
     def values(self) -> Iterator[T]:
-        for _, _, value in self.items():
-            yield value
+        """Returns an iterator over the values of this index."""
+
+        for _, _, _, item in self._items():
+            yield item
+
+    def to_json_dict(self) -> dict[str, Any]:
+        """Transforms this collection into a JSON-like dictionary that can be dumped later."""
+
+        result = {}
+        for file_path, documents in self._data.items():
+            result[str(file_path)] = [doc_idx.to_json_dict() for doc_idx in documents]
+        return result
 
 
 def _to_snake_case(str: str) -> str:
-    """Translates an camel-case or kebab-case identifier by a snake-case one."""
+    """Translates a camel-case or kebab-case identifier into a snake-case one."""
+
     base_string = str.replace("-", "_")
 
     result = ""

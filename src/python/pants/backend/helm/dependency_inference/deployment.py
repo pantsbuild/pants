@@ -22,7 +22,7 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererRequest,
     RenderedFiles,
 )
-from pants.backend.helm.util_rules.yaml_utils import YamlElements
+from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
@@ -42,7 +42,7 @@ class AnalyseHelmDeploymentRequest:
 
 @dataclass(frozen=True)
 class HelmDeploymentReport:
-    image_refs: YamlElements[ImageRef]
+    image_refs: FrozenYamlIndex[ImageRef]
 
     @property
     def all_image_refs(self) -> FrozenOrderedSet[ImageRef]:
@@ -68,28 +68,28 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
         ParseKubeManifests(rendered_deployment.snapshot.digest, request.field_set.address.spec),
     )
 
-    return HelmDeploymentReport(
-        image_refs=YamlElements(
-            {
-                manifest.filename: {
-                    container.element_path / "image": container.image
-                    for container in manifest.all_containers
-                }
-                for manifest in manifests
-                if manifest.pod_spec
-            }
-        )
-    )
+    # Build YAML index of `ImageRef`s for future processing during post-rendering.
+    image_refs_index: MutableYamlIndex[ImageRef] = MutableYamlIndex()
+    for manifest in manifests:
+        for container in manifest.all_containers:
+            image_refs_index.insert(
+                file_path=manifest.filename,
+                document_index=manifest.document_index,
+                yaml_path=container.element_path / "image",
+                item=container.image,
+            )
+
+    return HelmDeploymentReport(image_refs=image_refs_index.frozen())
 
 
 @dataclass(frozen=True)
 class FirstPartyHelmDeploymentMappings:
-    docker_images: FrozenDict[Address, YamlElements[Address]]
+    deployment_to_docker_addresses: FrozenDict[Address, FrozenYamlIndex[Address]]
 
     def referenced_by(self, address: Address) -> list[Address]:
-        if address not in self.docker_images:
+        if address not in self.deployment_to_docker_addresses:
             return []
-        return list(self.docker_images[address].values())
+        return list(self.deployment_to_docker_addresses[address].values())
 
 
 @rule
@@ -102,26 +102,24 @@ async def first_party_helm_deployment_mappings(
         for field_set in field_sets
     )
 
-    def image_refs_to_addresses(info: HelmDeploymentReport) -> YamlElements[Address]:
-        """Filters the `ImageRef`s that are in fact `docker_image` addresses and returns those."""
+    docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
 
-        return YamlElements(
-            {
-                filename: {
-                    elem_path: tgt.address
-                    for tgt in docker_targets
-                    for elem_path, ref in info.image_refs.yaml_items(filename)
-                    if str(ref) == str(tgt.address)
-                }
-                for filename in info.image_refs.file_paths()
-            }
+    def image_refs_to_addresses(info: HelmDeploymentReport) -> FrozenYamlIndex[Address]:
+        """Maps and filters the `ImageRef`s that are in fact `docker_image` addresses and returns a
+        YAML index of those addresses."""
+
+        return info.image_refs.transform_values(
+            lambda image_ref: docker_target_addresses.get(str(image_ref), None)
         )
 
-    docker_images_mapping = {
+    # Builds a mapping between `helm_deployment` addresses and a YAML index of `docker_image` addresses.
+    address_mapping = {
         fs.address: image_refs_to_addresses(info)
         for fs, info in zip(field_sets, all_deployments_info)
     }
-    return FirstPartyHelmDeploymentMappings(docker_images=FrozenDict(docker_images_mapping))
+    return FirstPartyHelmDeploymentMappings(
+        deployment_to_docker_addresses=FrozenDict(address_mapping)
+    )
 
 
 class HelmDeploymentDependenciesInferenceFieldSet(FieldSet):

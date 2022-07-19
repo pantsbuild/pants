@@ -18,11 +18,7 @@ from pants.backend.helm.target_types import (
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
 )
-from pants.backend.helm.testutil import (
-    HELM_CHART_FILE,
-    HELM_TEMPLATE_HELPERS_FILE,
-    HELM_VALUES_FILE,
-)
+from pants.backend.helm.testutil import HELM_CHART_FILE, HELM_TEMPLATE_HELPERS_FILE
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
@@ -57,30 +53,58 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
         {
             "src/mychart/BUILD": "helm_chart()",
             "src/mychart/Chart.yaml": HELM_CHART_FILE,
-            "src/mychart/values.yaml": HELM_VALUES_FILE,
+            "src/mychart/values.yaml": dedent(
+                """\
+                pods: []
+                """
+            ),
             "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "src/mychart/templates/pod.yaml": dedent(
                 """\
+                {{- $root := . -}}
+                {{- range $pod := .Values.pods }}
+                ---
                 apiVersion: v1
                 kind: Pod
                 metadata:
-                  name: {{ template "fullname" . }}
+                  name: {{ template "fullname" $root }}-{{ $pod.name }}
                   labels:
-                    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+                    chart: "{{ $root.Chart.Name }}-{{ $root.Chart.Version | replace "+" "_" }}"
                 spec:
                   initContainers:
                     - name: myapp-init-container
-                      image: src/image:myapp
+                      image: {{ $pod.initContainerImage }}
                   containers:
                     - name: busy
                       image: busybox:1.29
                     - name: myapp-container
-                      image: src/image:myapp
+                      image: {{ $pod.appImage }}
+                {{- end }}
                 """
             ),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
-            "src/image/BUILD": "docker_image(name='myapp')",
-            "src/image/Dockerfile": "FROM busybox:1.28",
+            "src/deployment/BUILD": "helm_deployment(name='test', dependencies=['//src/mychart'])",
+            "src/deployment/values.yaml": dedent(
+                """\
+                pods:
+                  - name: foo
+                    initContainerImage: src/image:init_foo
+                    appImage: src/image:app_foo
+                  - name: bar
+                    initContainerImage: src/image:init_bar
+                    appImage: src/image:app_bar
+                """
+            ),
+            "src/image/BUILD": dedent(
+                """\
+                docker_image(name="init_foo", source="Dockerfile.init")
+                docker_image(name="app_foo", source="Dockerfile.app")
+
+                docker_image(name="init_bar", source="Dockerfile.init")
+                docker_image(name="app_bar", source="Dockerfile.app")
+                """
+            ),
+            "src/image/Dockerfile.init": "FROM busybox:1.28",
+            "src/image/Dockerfile.app": "FROM busybox:1.28",
         }
     )
 
@@ -93,9 +117,13 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     expected_config_file = dedent(
         """\
         ---
-        "mychart/templates/pod.yaml":
-          "/spec/containers/1/image": "myapp:latest"
-          "/spec/initContainers/0/image": "myapp:latest"
+        mychart/templates/pod.yaml:
+        - paths:
+            /spec/containers/1/image: app_foo:latest
+            /spec/initContainers/0/image: init_foo:latest
+        - paths:
+            /spec/containers/1/image: app_bar:latest
+            /spec/initContainers/0/image: init_bar:latest
         """
     )
 
@@ -106,22 +134,39 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
         apiVersion: v1
         kind: Pod
         metadata:
-          name: foo-mychart
+          name: test-mychart-foo
           labels:
             chart: mychart-0.1.0
         spec:
           initContainers:
             - name: myapp-init-container
-              image: myapp:latest
+              image: init_foo:latest
           containers:
             - name: busy
               image: busybox:1.29
             - name: myapp-container
-              image: myapp:latest
+              image: app_foo:latest
+        ---
+        # Source: mychart/templates/pod.yaml
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: test-mychart-bar
+          labels:
+            chart: mychart-0.1.0
+        spec:
+          initContainers:
+            - name: myapp-init-container
+              image: init_bar:latest
+          containers:
+            - name: busy
+              image: busybox:1.29
+            - name: myapp-container
+              image: app_bar:latest
         """
     )
 
-    deployment_addr = Address("src/deployment", target_name="foo")
+    deployment_addr = Address("src/deployment", target_name="test")
     tgt = rule_runner.get_target(deployment_addr)
     field_set = HelmDeploymentFieldSet.create(tgt)
 
@@ -151,4 +196,5 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     rendered_pod_file = _read_file_from_digest(
         rule_runner, digest=rendered_output.snapshot.digest, filename="mychart/templates/pod.yaml"
     )
+    print(rendered_pod_file)
     assert rendered_pod_file == expected_rendered_pod

@@ -13,7 +13,7 @@ from pants.backend.helm.subsystems.post_renderer import (
     HelmPostRendererRunnable,
     SetupHelmPostRenderer,
 )
-from pants.backend.helm.util_rules.yaml_utils import YamlElements, YamlPath
+from pants.backend.helm.util_rules.yaml_utils import MutableYamlIndex, YamlPath
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -37,14 +37,19 @@ def rule_runner() -> RuleRunner:
 
 
 def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
-    replacements = YamlElements(
-        {PurePath("file.yaml"): {YamlPath.parse("/root/element"): "replaced_value"}}
+    replacements = MutableYamlIndex[str]()
+    replacements.insert(
+        file_path=PurePath("file.yaml"),
+        yaml_path=YamlPath.parse("/root/element"),
+        item="replaced_value",
     )
+
     expected_cfg_file = dedent(
         """\
       ---
-      "file.yaml":
-        "/root/element": "replaced_value"
+      file.yaml:
+      - paths:
+          /root/element: replaced_value
       """
     )
 
@@ -52,7 +57,7 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
         HelmPostRendererRunnable,
         [
             SetupHelmPostRenderer(
-                replacements, description_of_origin="test_post_renderer_is_runnable"
+                replacements.frozen(), description_of_origin="test_post_renderer_is_runnable"
             )
         ],
     )

@@ -27,7 +27,6 @@ from pants.backend.helm.subsystems.post_renderer import (
     SetupHelmPostRenderer,
 )
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
-from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -52,7 +51,7 @@ async def prepare_post_renderer_for_helm_deployment(
     mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
 ) -> HelmPostRendererRunnable:
-    docker_addresses = mappings.docker_images[request.field_set.address]
+    docker_addresses = mappings.deployment_to_docker_addresses[request.field_set.address]
     logger.debug(
         softwrap(
             f"""
@@ -111,15 +110,8 @@ async def prepare_post_renderer_for_helm_deployment(
         for addr, ctx in zip(docker_addresses.values(), docker_contexts)
     }
 
-    replacements = YamlElements(
-        {
-            manifest: {
-                path: str(docker_addr_ref_mapping[address])
-                for path, address in docker_addresses.yaml_items(manifest)
-                if docker_addr_ref_mapping[address]
-            }
-            for manifest in docker_addresses.file_paths()
-        }
+    replacements = docker_addresses.transform_values(
+        lambda addr: docker_addr_ref_mapping[addr] if addr in docker_addr_ref_mapping else None
     )
 
     return await Get(

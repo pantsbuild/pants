@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 
-from pants.backend.helm.util_rules.yaml_utils import YamlElements
+import yaml
+
+from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
@@ -32,7 +34,7 @@ from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
-_HELM_POSTRENDERER_SOURCE = "post_renderer_launcher.py"
+_HELM_POSTRENDERER_SOURCE = "post_renderer_main.py"
 _HELM_POSTRENDERER_PACKAGE = "pants.backend.helm.subsystems"
 
 
@@ -108,7 +110,7 @@ _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 @dataclass(frozen=True)
 class SetupHelmPostRenderer(EngineAwareParameter):
-    replacements: YamlElements[str]
+    replacements: FrozenYamlIndex[str]
     description_of_origin: str
 
     def debug_hint(self) -> str | None:
@@ -138,12 +140,9 @@ async def setup_post_renderer_launcher(
     cat_binary: CatBinary,
 ) -> HelmPostRendererRunnable:
     # Build post-renderer configuration file and create a digest containing it.
-    post_renderer_config = "---\n"
-    for manifest in request.replacements.file_paths():
-        post_renderer_config += f'"{manifest}":\n'
-        for path, replacement in request.replacements.yaml_items(manifest):
-            post_renderer_config += f'  "{path}": "{replacement}"\n'
-
+    post_renderer_config = yaml.safe_dump(
+        request.replacements.to_json_dict(), explicit_start=True, sort_keys=True
+    )
     post_renderer_cfg_digest = await Get(
         Digest,
         CreateDigest(

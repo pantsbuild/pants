@@ -11,17 +11,17 @@ python_requirement(
 )
 
 python_sources(
-    sources=["*.py", "!*_test.py", "!post_renderer_launcher.py"],
+    sources=["*.py", "!*_test.py", "!post_renderer_main.py"],
     dependencies=[":post_renderer"],
 )
 
 python_sources(
-    name="__post_renderer_launcher",
-    sources=["post_renderer_launcher.py"],
+    name="__post_renderer_mainr",
+    sources=["post_renderer_main.py"],
     resolve="helm-post-renderer",
     skip_mypy=True,
 )
 
 python_tests(name="tests")
 
-resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_launcher.py"])
+resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_main.py"])

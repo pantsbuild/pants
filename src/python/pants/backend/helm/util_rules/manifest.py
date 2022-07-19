@@ -82,11 +82,12 @@ class ImageRef:
 
 @dataclass(frozen=True)
 class KubeContainer(YamlElement):
+    name: str
     image: ImageRef
 
     @classmethod
     def from_dict(cls, path: YamlPath, d: dict[str, Any]) -> KubeContainer:
-        return cls(element_path=path, image=ImageRef.parse(d["image"]))
+        return cls(element_path=path, name=d["name"], image=ImageRef.parse(d["image"]))
 
 
 @dataclass(frozen=True)
