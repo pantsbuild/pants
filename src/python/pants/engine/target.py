@@ -2113,6 +2113,17 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
         value = super().compute_value(raw_value, address)
+        invalid_globs = [glob for glob in (value or ()) if glob.startswith("../") or "/../" in glob]
+        if invalid_globs:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The {repr(cls.alias)} field in target {address} must not have globs with the
+                    pattern `../` because targets can only have sources in the current directory
+                    or subdirectories. It was set to: {sorted(value or ())}
+                    """
+                )
+            )
         if cls.ban_subdirectories:
             invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
             if invalid_globs:
@@ -2157,17 +2168,36 @@ class OptionalSingleSourceField(SourcesField, StringField):
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
+        if value_or_default.startswith("../") or "/../" in value_or_default:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `../`
+                    patterns because targets can only have sources in the current directory or
+                    subdirectories. It was set to {value_or_default}. Instead, use a normalized
+                    literal file path (relative to the BUILD file).
+                    """
+                )
+            )
         if "*" in value_or_default:
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not include `*` globs, "
-                f"but was set to {value_or_default}. Instead, use a literal file path (relative "
-                "to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `*` globs,
+                    but was set to {value_or_default}. Instead, use a literal file path (relative
+                    to the BUILD file).
+                    """
+                )
             )
         if value_or_default.startswith("!"):
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not start with `!`, which "
-                f"is usually used in the `sources` field to exclude certain files. Instead, use a "
-                "literal file path (relative to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not start with `!`,
+                    which is usually used in the `sources` field to exclude certain files. Instead,
+                    use a literal file path (relative to the BUILD file).
+                    """
+                )
             )
         return value_or_default
 
