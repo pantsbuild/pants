@@ -24,6 +24,7 @@ from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
+from pants.util.ordered_set import OrderedSet
 
 
 @dataclass(frozen=True)
@@ -55,8 +56,8 @@ class ScalaPluginsRequest:
         seq: Iterable[ScalaPluginTargetsForTarget],
         resolve: CoursierResolveKey,
     ) -> ScalaPluginsRequest:
-        plugins: set[Target] = set()
-        artifacts: set[Target] = set()
+        plugins: OrderedSet[Target] = OrderedSet()
+        artifacts: OrderedSet[Target] = OrderedSet()
 
         for spft in seq:
             plugins.update(spft.plugins)
@@ -74,7 +75,7 @@ class ScalaPlugins:
         p = f"{prefix}/" if prefix else ""
         for scalac_plugin_path in self.classpath.filenames:
             yield f"-Xplugin:{p}{scalac_plugin_path}"
-        for name in sorted(self.names):
+        for name in self.names:
             yield f"-Xplugin-require:{name}"
 
 
