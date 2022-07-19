@@ -51,6 +51,8 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
     FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -442,6 +444,23 @@ async def inject_python_distribution_dependencies(
 
 
 # -----------------------------------------------------------------------------------------------
+# Dynamic Field defaults
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
+    field_type = PythonResolveField
+
+
+@rule
+def python_resolve_field_default_factory(
+    request: PythonResolveFieldDefaultFactoryRequest,
+    python_setup: PythonSetup,
+) -> FieldDefaultFactoryResult:
+    return FieldDefaultFactoryResult(lambda f: f.normalized_value(python_setup))
+
+
+# -----------------------------------------------------------------------------------------------
 # Dependency validation
 # -----------------------------------------------------------------------------------------------
 
@@ -509,6 +528,7 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
+        UnionRule(FieldDefaultFactoryRequest, PythonResolveFieldDefaultFactoryRequest),
         UnionRule(TargetFilesGeneratorSettingsRequest, PythonFilesGeneratorSettingsRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),

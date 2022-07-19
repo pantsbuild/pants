@@ -58,6 +58,8 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
     FieldSet,
     FilteredTargets,
     GeneratedSources,
@@ -106,6 +108,25 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
+class ResolveField(StringField, AsyncFieldMixin):
+    alias = "resolve"
+    default = None
+
+
+_DEFAULT_RESOLVE = "default_test_resolve"
+
+
+class ResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
+    field_type = ResolveField
+
+
+@rule
+def resolve_field_default_factory(
+    request: ResolveFieldDefaultFactoryRequest,
+) -> FieldDefaultFactoryResult:
+    return FieldDefaultFactoryResult(lambda f: f.value or _DEFAULT_RESOLVE)
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
@@ -117,10 +138,6 @@ class MockTarget(Target):
     )
     deprecated_alias = "deprecated_target"
     deprecated_alias_removal_version = "9.9.9.dev0"
-
-
-class ResolveField(StringField, AsyncFieldMixin):
-    alias = "resolve"
 
 
 class MockGeneratedTarget(Target):
@@ -999,6 +1016,8 @@ def generated_targets_rule_runner() -> RuleRunner:
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
             QueryRule(_TargetParametrizations, [Address]),
+            UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
+            resolve_field_default_factory,
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -1276,12 +1295,11 @@ def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRun
             """\
             generated(
               name='t1',
-              resolve=parametrize('a', 'b'),
+              resolve=parametrize('default_test_resolve', 'b'),
               source='f1.ext',
             )
             generated(
               name='t2',
-              resolve='a',
               source='f2.ext',
               dependencies=[':t1'],
             )
@@ -1289,9 +1307,9 @@ def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRun
         ),
         ["f1.ext", "f2.ext"],
         expected_dependencies={
-            "demo:t1@resolve=a": set(),
+            "demo:t1@resolve=default_test_resolve": set(),
             "demo:t1@resolve=b": set(),
-            "demo:t2": {"demo:t1@resolve=a"},
+            "demo:t2": {"demo:t1@resolve=default_test_resolve"},
         },
     )
 
