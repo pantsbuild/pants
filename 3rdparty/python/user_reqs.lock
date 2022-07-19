@@ -19,7 +19,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.98",
+//     "pex==2.1.99",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -783,13 +783,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a4ae2cd7c19f21dbb91b350b58fd1dd474b2571639a9bb1902a805a38d1885a3",
-              "url": "https://files.pythonhosted.org/packages/35/e8/159621495705543286f7d1ad4e30f169271364590fb7629fed3252cd384c/pex-2.1.98-py2.py3-none-any.whl"
+              "hash": "b9e7a1070c4f616b9114e10475e9c49f3ff9332789e581edf4b5646ae477d0b1",
+              "url": "https://files.pythonhosted.org/packages/cf/44/b4bddb5599370e86a8366e21fb6b2bb2a703e0d0d7a594e20d70f7082940/pex-2.1.99-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6abdc6b16d147a32de25812c5095c7d211fc63cd6d77e212c9c71319c60e8b4",
-              "url": "https://files.pythonhosted.org/packages/bc/74/287adfa37d7be93d3183305f3f1e9685ecf1f6dae715b25bef0d69553bfc/pex-2.1.98.tar.gz"
+              "hash": "3feaf424e495c0855691044ebec6e9528730078c741eb572cbda18f4274d8fab",
+              "url": "https://files.pythonhosted.org/packages/f8/76/7e17f82344dd14a5a9cf76391cdf6edeede0e409432a319db98512d11375/pex-2.1.99.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -797,7 +797,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.98"
+          "version": "2.1.99"
         },
         {
           "artifacts": [
@@ -2154,13 +2154,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c4f6e5bbf48e74f7a38e7cc5b0480ff42b0ae5178957d564d18932525d5cf099",
-              "url": "https://files.pythonhosted.org/packages/80/0e/16a7ee38617aab6a624e95948d314097cc2669edae9b02ded53309941cfc/zipp-3.8.0-py3-none-any.whl"
+              "hash": "47c40d7fe183a6f21403a199b3e4192cca5774656965b0a4988ad2f8feb5f009",
+              "url": "https://files.pythonhosted.org/packages/f0/36/639d6742bcc3ffdce8b85c31d79fcfae7bb04b95f0e5c4c6f8b206a038cc/zipp-3.8.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "56bf8aadb83c24db6c4b577e13de374ccfb67da2078beba1d037c17980bf43ad",
-              "url": "https://files.pythonhosted.org/packages/cc/3c/3e8c69cd493297003da83f26ccf1faea5dd7da7892a0a7c965ac3bcba7bf/zipp-3.8.0.tar.gz"
+              "hash": "05b45f1ee8f807d0cc928485ca40a07cb491cf092ff587c0df9cb1fd154848d2",
+              "url": "https://files.pythonhosted.org/packages/3b/e3/fb79a1ea5f3a7e9745f688855d3c673f2ef7921639a380ec76f7d4d83a85/zipp-3.8.1.tar.gz"
             }
           ],
           "project_name": "zipp",
@@ -2168,10 +2168,11 @@
             "func-timeout; extra == \"testing\"",
             "jaraco.itertools; extra == \"testing\"",
             "jaraco.packaging>=9; extra == \"docs\"",
+            "jaraco.tidelift>=1.4; extra == \"docs\"",
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
@@ -2179,14 +2180,14 @@
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.8"
+          "version": "3.8.1"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.98",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -2199,7 +2200,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.98",
+    "pex==2.1.99",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
