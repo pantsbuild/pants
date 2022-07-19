@@ -16,6 +16,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
     JunitTestSourceField,
     JvmJdkField,
@@ -135,4 +136,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *jvm_target_types.rules(),
+    ]
