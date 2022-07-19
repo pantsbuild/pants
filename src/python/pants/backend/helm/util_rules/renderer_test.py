@@ -77,7 +77,7 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
                 ---
                 {{- with $configMap }}
                 apiVersion: v1
-                kind: Pod
+                kind: ConfigMap
                 metadata:
                   name: {{ template "fullname" $root }}-{{ .name }}
                   labels:
@@ -100,7 +100,7 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         ---
         # Source: mychart/templates/configmap.yaml
         apiVersion: v1
-        kind: Pod
+        kind: ConfigMap
         metadata:
           name: foo-mychart-foo
           labels:
@@ -110,7 +110,7 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         ---
         # Source: mychart/templates/configmap.yaml
         apiVersion: v1
-        kind: Pod
+        kind: ConfigMap
         metadata:
           name: foo-mychart-bar
           labels:

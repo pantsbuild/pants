@@ -150,7 +150,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-args = ["--no-header", "-vv"]
+args = ["--no-header"]
 extra_requirements.add = [
   "ipdb",
   "pytest-asyncio",

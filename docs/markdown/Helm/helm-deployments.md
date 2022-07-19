@@ -133,6 +133,15 @@ This should work any kind of Kubernetes resource that will result in Docker imag
 > 
 > You can still use typical Docker registry addresses in your Helm charts and deployments if you want to use off-the-shelf images published with other means. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
 
+Value override files
+--------------------
+
+As seen in the initial examples of the usage of the `helm_deployment` target, it can be seen that some of the source value files used the word `override` in the file name.
+
+When using deployments that may have more than one YAML file as the source of configuration values, it is recommended use the `override` word in those filenames that are meant to override values coming from other more common or general sources.
+
+This approach is an accepted good practice in the community and Pants' makes use of it to ensure that the list of value file sources is in the right order every single time.
+
 Deploying
 ---------
 

@@ -114,7 +114,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.95",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
     "ruamel.yaml!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21,>=0.15.96",

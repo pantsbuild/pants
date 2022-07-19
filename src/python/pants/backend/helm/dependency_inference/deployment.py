@@ -68,7 +68,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
         ParseKubeManifests(rendered_deployment.snapshot.digest, request.field_set.address.spec),
     )
 
-    # Build YAML index of `ImageRef`s for future processing during post-rendering.
+    # Build YAML index of `ImageRef`s for future processing during depedendecy inference or post-rendering.
     image_refs_index: MutableYamlIndex[ImageRef] = MutableYamlIndex()
     for manifest in manifests:
         for container in manifest.all_containers:
