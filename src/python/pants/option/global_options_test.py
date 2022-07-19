@@ -102,7 +102,7 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
     }
     assert opts.execution_headers == {"exec": "xyz", "foo": "baz"}
     assert opts.cache_read is True
-    assert opts.cache_write is True
+    assert opts.cache_write is False
     assert opts.execution is False
     assert opts.instance_name == "custom_instance"
     # Note that the grpc:// prefix will be converted to http://.
