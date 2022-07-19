@@ -74,7 +74,7 @@ class ScalaPlugins:
         p = f"{prefix}/" if prefix else ""
         for scalac_plugin_path in self.classpath.filenames:
             yield f"-Xplugin:{p}{scalac_plugin_path}"
-        for name in self.names:
+        for name in sorted(self.names):
             yield f"-Xplugin-require:{name}"
 
 

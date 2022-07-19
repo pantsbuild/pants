@@ -242,7 +242,7 @@ class ClasspathEntry:
         dependencies: Iterable[ClasspathEntry] = (),
     ):
         self.digest = digest
-        self.filenames = tuple(filenames)
+        self.filenames = tuple(sorted(filenames))
         self.dependencies = FrozenOrderedSet(dependencies)
 
     @classmethod
