@@ -1099,14 +1099,22 @@ def test_single_source_file_path() -> None:
     assert TestSingleSourceField("f.ext", Address("project")).file_path == "project/f.ext"
 
 
-def test_single_source_field_bans_globs() -> None:
-    class TestSingleSourceField(SingleSourceField):
-        pass
+def test_sources_fields_ban_parent_dir_pattern() -> None:
+    with pytest.raises(InvalidFieldException):
+        SingleSourceField("../f.ext", Address("project"))
+    with pytest.raises(InvalidFieldException):
+        SingleSourceField("dir/../f.ext", Address("project"))
+    with pytest.raises(InvalidFieldException):
+        MultipleSourcesField(["../f.ext", "f.ext"], Address("project"))
+    with pytest.raises(InvalidFieldException):
+        MultipleSourcesField(["dir/../f.ext", "f.ext"], Address("project"))
 
+
+def test_single_source_field_bans_globs() -> None:
     with pytest.raises(InvalidFieldException):
-        TestSingleSourceField("*.ext", Address("project"))
+        SingleSourceField("*.ext", Address("project"))
     with pytest.raises(InvalidFieldException):
-        TestSingleSourceField("!f.ext", Address("project"))
+        SingleSourceField("!f.ext", Address("project"))
 
 
 def test_multiple_sources_field_ban_subdirs() -> None:
