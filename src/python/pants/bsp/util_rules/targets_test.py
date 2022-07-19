@@ -4,6 +4,7 @@ import textwrap
 
 import pytest
 
+from pants.backend.java import target_types
 from pants.backend.java.bsp import rules as java_bsp_rules
 from pants.backend.java.compile import javac
 from pants.backend.java.target_types import JavaSourceTarget
@@ -31,6 +32,7 @@ def rule_runner() -> RuleRunner:
             *jvm_tool.rules(),
             *jvm_util_rules.rules(),
             *jdk_rules.rules(),
+            *target_types.rules(),
             QueryRule(BSPBuildTargets, ()),
             QueryRule(Targets, [BuildTargetIdentifier]),
         ],

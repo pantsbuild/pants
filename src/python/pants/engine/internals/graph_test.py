@@ -39,6 +39,9 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    Field,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
@@ -87,6 +90,21 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
 
 class ResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
+    default = None
+
+
+_DEFAULT_RESOLVE = "default_test_resolve"
+
+
+class ResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
+    field_type = ResolveField
+
+
+@rule
+def resolve_field_default_factory(
+    request: ResolveFieldDefaultFactoryRequest,
+) -> FieldDefaultFactoryResult:
+    return FieldDefaultFactoryResult(lambda f: f.value or _DEFAULT_RESOLVE)
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -828,6 +846,8 @@ def generated_targets_rule_runner() -> RuleRunner:
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
+            UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
+            resolve_field_default_factory,
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -1110,12 +1130,11 @@ def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRun
             """\
             generated(
               name='t1',
-              resolve=parametrize('a', 'b'),
+              resolve=parametrize('default_test_resolve', 'b'),
               source='f1.ext',
             )
             generated(
               name='t2',
-              resolve='a',
               source='f2.ext',
               dependencies=[':t1'],
             )
@@ -1123,9 +1142,9 @@ def test_parametrize_partial_atom_to_atom(generated_targets_rule_runner: RuleRun
         ),
         ["f1.ext", "f2.ext"],
         expected_dependencies={
-            "demo:t1@resolve=a": set(),
+            "demo:t1@resolve=default_test_resolve": set(),
             "demo:t1@resolve=b": set(),
-            "demo:t2": {"demo:t1@resolve=a"},
+            "demo:t2": {"demo:t1@resolve=default_test_resolve"},
         },
     )
 
@@ -1212,6 +1231,50 @@ def test_parametrize_partial_generator_to_generated(
             "demo:t2@resolve=b": {
                 "demo/f2.ext:t2@resolve=b",
             },
+        },
+    )
+
+
+def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
+    class ParentField(Field):
+        alias = "parent"
+        help = "foo"
+
+    class ChildField(ParentField):
+        alias = "child"
+        help = "foo"
+
+    class ParentTarget(Target):
+        alias = "parent_tgt"
+        help = "foo"
+        core_fields = (ParentField, Dependencies)
+
+    class ChildTarget(Target):
+        alias = "child_tgt"
+        help = "foo"
+        core_fields = (ChildField, Dependencies)
+
+    rule_runner = RuleRunner(
+        rules=generated_targets_rule_runner.rules,
+        target_types=[ParentTarget, ChildTarget],
+        objects={"parametrize": Parametrize},
+    )
+    build_content = dedent(
+        """\
+        child_tgt(name="child", child=parametrize("a", "b"))
+        parent_tgt(name="parent", parent=parametrize("a", "b"), dependencies=[":child"])
+        """
+    )
+    assert_generated(
+        rule_runner,
+        Address("demo", target_name="child"),
+        build_content,
+        [],
+        expected_dependencies={
+            "demo:child@child=a": set(),
+            "demo:child@child=b": set(),
+            "demo:parent@parent=a": {"demo:child@child=a"},
+            "demo:parent@parent=b": {"demo:child@child=b"},
         },
     )
 
