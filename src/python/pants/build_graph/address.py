@@ -433,10 +433,7 @@ class Address(EngineAwareParameter):
         else:
             target = f"{parent_prefix}{self.target_name}"
         if self.parameters:
-            key_value_strs = ",".join(
-                f"{sanitize(k)}={sanitize(v)}" for k, v in self.parameters.items()
-            )
-            params = f"@@{key_value_strs}"
+            params = f"@{sanitize(self.parameters_repr)}"
         else:
             params = ""
         generated = f"@{sanitize(self.generated_name)}" if self.generated_name else ""
