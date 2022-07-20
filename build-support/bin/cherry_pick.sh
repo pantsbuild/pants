@@ -36,7 +36,7 @@ fi
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
-CATEGORY_LABEL=$(gh pr view 16239 --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
+CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
 exit 2
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.$MILESTONE.XXXXXX")
 PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
