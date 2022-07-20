@@ -1235,6 +1235,55 @@ def test_parametrize_partial_generator_to_generated(
     )
 
 
+def test_parametrize_partial_exclude(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext', 'f2.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f3.ext'],
+              dependencies=[
+                './f1.ext:t1',
+                './f2.ext:t1',
+                '!./f2.ext:t1',
+              ],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext", "f3.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f2.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t1@resolve=b": set(),
+            "demo/f3.ext:t2@resolve=a": {"demo/f1.ext:t1@resolve=a"},
+            "demo/f3.ext:t2@resolve=b": {"demo/f1.ext:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+                "demo/f2.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+                "demo/f2.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f3.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f3.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
 def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     class ParentField(Field):
         alias = "parent"
