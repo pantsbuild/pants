@@ -77,7 +77,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
             if self.address.generated_name
             else self.address.target_name
         )
-        params_sanitized = self.address.parameters_repr.replace(".","_")
+        params_sanitized = self.address.parameters_repr.replace(".", "_")
         file_prefix = f"{target_name_part}{params_sanitized}"
 
         if file_ending is None:
