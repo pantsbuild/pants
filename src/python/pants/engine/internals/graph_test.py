@@ -1756,7 +1756,7 @@ def dependencies_rule_runner() -> RuleRunner:
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
-        target_types=[SmalltalkLibraryGenerator, MockTarget],
+        target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
     )
 
 
@@ -2000,6 +2000,35 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
         expected=[
             Address("src/smalltalk", relative_file_path="f1.st"),
             Address("src/smalltalk", relative_file_path="f2.st"),
+        ],
+    )
+
+
+def test_depends_on_atom_via_14419(dependencies_rule_runner: RuleRunner) -> None:
+    """See #14419."""
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/f1.st": "",
+            "src/smalltalk/f2.st": "",
+            "src/smalltalk/BUILD": dedent(
+                """\
+                smalltalk_library(source='f1.st')
+                smalltalk_library(
+                    name='t2',
+                    source='f2.st',
+                    dependencies=['./f1.st'],
+                )
+                """
+            ),
+        }
+    )
+    # Due to the accommodation for #14419, the file address `./f1.st` resolves to the atom target
+    # with the default name.
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        Address("src/smalltalk", target_name="t2"),
+        expected=[
+            Address("src/smalltalk"),
         ],
     )
 

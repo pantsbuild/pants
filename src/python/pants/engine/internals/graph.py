@@ -338,13 +338,7 @@ async def resolve_target(
             base_address, description_of_origin=request.description_of_origin
         ),
     )
-    if address.is_generated_target:
-        # TODO: This is an accommodation to allow using file/generator Addresses for
-        # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
-        original_target = parametrizations.get(base_address)
-        if original_target and not target_types_to_generate_requests.is_generator(original_target):
-            return WrappedTarget(original_target)
-    target = parametrizations.get(address)
+    target = parametrizations.get(address, target_types_to_generate_requests)
     if target is None:
         raise ResolveError(
             softwrap(
@@ -1125,7 +1119,9 @@ async def resolve_dependencies(
         )
 
         explicitly_provided_includes = [
-            parametrizations.get_subset(address, tgt, field_defaults).address
+            parametrizations.get_subset(
+                address, tgt, field_defaults, target_types_to_generate_requests
+            ).address
             for address, parametrizations in zip(
                 explicitly_provided_includes, explicit_dependency_parametrizations
             )
