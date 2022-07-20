@@ -196,5 +196,4 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     rendered_pod_file = _read_file_from_digest(
         rule_runner, digest=rendered_output.snapshot.digest, filename="mychart/templates/pod.yaml"
     )
-    print(rendered_pod_file)
     assert rendered_pod_file == expected_rendered_pod
