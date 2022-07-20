@@ -1400,6 +1400,55 @@ def test_parametrize_partial_generator_to_generated(
     )
 
 
+def test_parametrize_partial_exclude(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext', 'f2.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f3.ext'],
+              dependencies=[
+                './f1.ext:t1',
+                './f2.ext:t1',
+                '!./f2.ext:t1',
+              ],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext", "f3.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f2.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t1@resolve=b": set(),
+            "demo/f3.ext:t2@resolve=a": {"demo/f1.ext:t1@resolve=a"},
+            "demo/f3.ext:t2@resolve=b": {"demo/f1.ext:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+                "demo/f2.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+                "demo/f2.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f3.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f3.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
 def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     class ParentField(Field):
         alias = "parent"
@@ -2131,7 +2180,7 @@ def dependencies_rule_runner() -> RuleRunner:
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
-        target_types=[SmalltalkLibraryGenerator, MockTarget],
+        target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
     )
 
 
@@ -2262,6 +2311,7 @@ def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
                 """\
                 smalltalk_libraries(name='target', sources=['*.st'])
                 target(name='provided')
+                target(name='injected2')
                 """
             ),
         }
@@ -2392,6 +2442,35 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
         expected=[
             Address("src/smalltalk", relative_file_path="f1.st"),
             Address("src/smalltalk", relative_file_path="f2.st"),
+        ],
+    )
+
+
+def test_depends_on_atom_via_14419(dependencies_rule_runner: RuleRunner) -> None:
+    """See #14419."""
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/f1.st": "",
+            "src/smalltalk/f2.st": "",
+            "src/smalltalk/BUILD": dedent(
+                """\
+                smalltalk_library(source='f1.st')
+                smalltalk_library(
+                    name='t2',
+                    source='f2.st',
+                    dependencies=['./f1.st'],
+                )
+                """
+            ),
+        }
+    )
+    # Due to the accommodation for #14419, the file address `./f1.st` resolves to the atom target
+    # with the default name.
+    assert_dependencies_resolved(
+        dependencies_rule_runner,
+        Address("src/smalltalk", target_name="t2"),
+        expected=[
+            Address("src/smalltalk"),
         ],
     )
 

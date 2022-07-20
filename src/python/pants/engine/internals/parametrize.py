@@ -10,7 +10,7 @@ from typing import Any, Iterator, cast
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.target import Field, FieldDefaults, Target
+from pants.engine.target import Field, FieldDefaults, Target, TargetTypesToGenerateTargetsRequests
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list
@@ -169,12 +169,27 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
 
         raise self._bare_address_error(address)
 
-    def get(self, address: Address) -> Target | None:
+    def get(
+        self,
+        address: Address,
+        target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests | None = None,
+    ) -> Target | None:
         """Find the Target with an exact Address match, if any."""
         for parametrization in self:
             instance = parametrization.get(address)
             if instance is not None:
                 return instance
+
+        # TODO: This is an accommodation to allow using file/generator Addresses for
+        # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
+        if target_types_to_generate_requests and address.is_generated_target:
+            base_address = address.maybe_convert_to_target_generator()
+            original_target = self.get(base_address, target_types_to_generate_requests)
+            if original_target and not target_types_to_generate_requests.is_generator(
+                original_target
+            ):
+                return original_target
+
         return None
 
     def get_all_superset_targets(self, address: Address) -> Iterator[Address]:
@@ -201,11 +216,15 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
                     yield parametrized_tgt.address
 
     def get_subset(
-        self, address: Address, consumer: Target, field_defaults: FieldDefaults
+        self,
+        address: Address,
+        consumer: Target,
+        field_defaults: FieldDefaults,
+        target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     ) -> Target:
         """Find the Target with the given Address, or with fields matching the given consumer."""
         # Check for exact matches.
-        instance = self.get(address)
+        instance = self.get(address, target_types_to_generate_requests)
         if instance is not None:
             return instance
 
