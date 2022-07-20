@@ -8,6 +8,7 @@ from pants.backend.python.goals.run_helper import (
     _create_python_source_run_request,
 )
 from pants.backend.python.subsystems.debugpy import DebugPy
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexEntryPointField,
     PythonRunGoalUseSandboxField,
@@ -32,13 +33,17 @@ class PythonSourceFieldSet(RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_source_run_request(
-    field_set: PythonSourceFieldSet, pex_env: PexEnvironment
+    field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python: PythonSetup
 ) -> RunRequest:
+    run_goal_use_sandbox = field_set.run_goal_use_sandbox.value
+    if run_goal_use_sandbox is None:
+        run_goal_use_sandbox = python.default_run_goal_use_sandbox
+
     return await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         pex_env=pex_env,
-        run_in_sandbox=field_set.run_goal_use_sandbox.value,
+        run_in_sandbox=run_goal_use_sandbox,
         # Setting --venv is kosher because the PEX we create is just for the thirdparty deps.
         additional_pex_args=["--venv"],
     )
