@@ -112,7 +112,7 @@ class GolangSubsystem(Subsystem):
             """
             The path relative to an ASDF install directory to use to find the `bin` directory within an installed
             Go distribution. The default value for this option works for the `go-sdk` ASDF plugin. Other ASDF
-            plugins that install Go may have a different relative path to use. 
+            plugins that install Go may have a different relative path to use.
             """
         ),
         advanced=True,
