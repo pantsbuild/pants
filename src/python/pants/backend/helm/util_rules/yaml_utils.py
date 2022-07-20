@@ -14,7 +14,6 @@ from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
 
-@dataclass(unsafe_hash=True)
 @frozen_after_init
 class YamlPath:
     """Simple implementation of YAML paths using `/` syntax and being the single slash the path to
@@ -24,6 +23,9 @@ class YamlPath:
     _absolute: bool
 
     def __init__(self, elements: Iterable[str], *, absolute: bool) -> None:
+        if len(elements) == 0 and not absolute:
+            raise ValueError("Relative YAML paths with no elements are not allowed.")
+
         self._elements = tuple(elements)
         self._absolute = absolute
 
@@ -214,6 +216,9 @@ class FrozenYamlIndex(Generic[T]):
         the received function.
 
         The items that map to `None` in the given function are not included in the result.
+
+        This is a combination of the `map` and `filter` higher-order functions into one so
+        both operations are performed in a single pass.
         """
 
         mutable_index: MutableYamlIndex[R] = MutableYamlIndex()

@@ -98,8 +98,8 @@ name: example
 version: 0.1.0
 ```
 ```yaml src/chart/values.yaml
-# Undefined image entry
-image:
+# Default image in case this chart is used by other tools after being published
+image: example.com/registry/my-app:latest
 ```
 ```yaml src/chart/templates/pod.yaml
 ---
@@ -116,7 +116,7 @@ spec:
       image: {{ .Values.image }}
 ```
 ```text src/deployment/BUILD
-# Uses the target address for the first-party docker image as the `image` entry for the chart.
+# Overrides the `image` value for the chart using the target address for the first-party docker image.
 helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 ```
 
@@ -129,9 +129,10 @@ src/docker
 
 This should work any kind of Kubernetes resource that will result in Docker image being deployed into Kubernetes, like `Deployment`, `StatefulSet`, `ReplicaSet`, `CronJob`, etc. Please get in touch with us in case you find Pants was not capable to infer dependencies in any of your `helm_deployment` targets by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:getting-help).
 
-> 📘 Why using Pants' target addresses in the charts?
+> 📘 Docker image references VS Pants' target addresses
 > 
-> You can still use typical Docker registry addresses in your Helm charts and deployments if you want to use off-the-shelf images published with other means. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
+> You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with other tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to in accessible Docker registries. We recommend that those resources that will be deploying first-party Docker images to follow what is shown in the previous example, allowing to override the value of the image address in the chart.
+> Besides, your deployments can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
 
 Value override files
 --------------------
