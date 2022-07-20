@@ -9,7 +9,7 @@ from typing import Iterable
 
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
-from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentTarget
+from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentTarget, HelmDeploymentTimeoutField
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DeployHelmDeploymentFieldSet(HelmDeploymentFieldSet, DeployFieldSet):
-    pass
+    
+    timeout: HelmDeploymentTimeoutField
 
 
 _VALID_PASSTHROUGH_FLAGS = [
@@ -52,8 +53,6 @@ _VALID_PASSTHROUGH_OPTS = [
     "--kube-as-user",
     "--kube-ca-file",
     "--kube-token",
-    "--set",
-    "--set-string",
 ]
 
 

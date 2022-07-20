@@ -120,6 +120,11 @@ spec:
 helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 ```
 
+> 📘 Docker image references VS Pants' target addresses
+> 
+> You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with other tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to in accessible Docker registries. We recommend that those resources that will be deploying first-party Docker images to follow what is shown in the previous example, allowing to override the value of the image address in the chart.
+> Besides, your deployments can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
+
 With this setup we should be able to run `./pants dependencies src/deployment` and Pants should give the following output:
 
 ```text
@@ -129,10 +134,10 @@ src/docker
 
 This should work any kind of Kubernetes resource that will result in Docker image being deployed into Kubernetes, like `Deployment`, `StatefulSet`, `ReplicaSet`, `CronJob`, etc. Please get in touch with us in case you find Pants was not capable to infer dependencies in any of your `helm_deployment` targets by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:getting-help).
 
-> 📘 Docker image references VS Pants' target addresses
+> 📘 How the Docker image reference is calculated during deployment?
 > 
-> You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with other tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to in accessible Docker registries. We recommend that those resources that will be deploying first-party Docker images to follow what is shown in the previous example, allowing to override the value of the image address in the chart.
-> Besides, your deployments can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
+> Pants' will rely on the behaviour of the `docker_image` target when it comes down to generate the final image reference. Since a given image may have more than one valid image reference, **Pants will try to use the first one that is not tagged as `latest`**, falling back into `latest` if none could be found.
+> It's good practice to publish your Docker images using tags other than `latest` and Pants preferred behaviour is to choose those are this guarantees that the _version_ of the Docker image being deployed is the expected one.
 
 Value override files
 --------------------
@@ -141,7 +146,30 @@ As seen in the initial examples of the usage of the `helm_deployment` target, it
 
 When using deployments that may have more than one YAML file as the source of configuration values, it is recommended use the `override` word in those filenames that are meant to override values coming from other more common or general sources.
 
-This approach is an accepted good practice in the community and Pants' makes use of it to ensure that the list of value file sources is in the right order every single time.
+Besides, you may be interested in organizing your deployment source files using a nested folder structure as the following:
+
+```
+src/deployment/config_maps.yaml
+src/deployment/services.yaml
+src/deployment/dev/services.yaml
+src/deployment/uat/services.yaml
+```
+
+```text src/deployment/BUILD
+helm_deployment(name="dev", dependencies=["//src/chart"], sources=["*.yaml", "dev/*.yaml"])
+
+helm_deployment(name="uat", dependencies=["//src/chart"], sources=["*.yaml", "uat/*.yaml"])
+```
+
+In this case, files that are in nested folders will also act as value override files.
+
+We believe that this approach gives enough flexibility to organise your deployment sources as you better prefer while providing an intuitive way to Pants' users to ensure that the list of value file sources is in the right order every single time.
+
+In addition to value files, you can also use inline values in your `helm_deployment` targets by means of the `values` field. All inlines values that are set this way will override any entry that may come from value files, whether the source file was an override file or not. The relationship between the three scopes can be imagined as follows:
+
+```
+Value files < Value override files < Inline values
+```
 
 Deploying
 ---------
@@ -156,3 +184,14 @@ Continuing with the example in the previous section, we can deploy it into Kuber
 The `experimental-deploy` goal also supports default Helm pass-through arguments that allow to change the deployment behaviour to be either atomic or a dry-run or even what is the Kubernetes config file and target context to be used in the deployment.
 
 Please note that the list of valid pass-through arguments has been limited to those that not alter the reproducibility of the deployment (i.e. `--create-namespace` is not a valid pass-through argument). Those arguments will have equivalente fields in the `helm_deployment` target.
+
+For example, to make an atomic deployment into a non-default Kubernetes context you can use a command like the following one:
+
+```
+./pants experimental-deploy src/deployments:prod -- --kube-context my-custom-kube-context --atomic
+```
+
+> 📘 How does Pants authenticate with the Kubernetes cluster?
+>
+> Short answer is: it doesn't. 
+> Pants will invoke Helm under the hood with the appropriate arguments to only perform the deployment. Any authentication steps that may be needed to perform the given deployment have to be done before invoking the `experimental-deploy` goal. If you are planning to run the deployment procedure from your CI/CD pipelines, ensure that all necessary preliminary steps are done before the one that triggers the deployment.

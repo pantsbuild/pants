@@ -49,7 +49,9 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 dependencies=["//src/chart", "//src/docker/myimage"],
                 sources=["*.yaml", "subdir/*.yml"],
                 values={
-                    "key": "foo"
+                    "key": "foo",
+                    "amount": "300",
+                    "long_string": "This is a long string",
                 },
                 timeout=150,
               )
@@ -105,7 +107,11 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--values",
         "values.yaml,subdir/values.yml,override-values.yaml,subdir/override-values.yml",
         "--set",
-        'key="foo"',
+        "key=foo",
+        "--set",
+        "amount=300",
+        "--set",
+        'long_string="This is a long string"',
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--install",

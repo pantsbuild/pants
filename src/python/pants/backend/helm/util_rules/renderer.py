@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 from pathlib import PurePath
+import re
 from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
@@ -231,6 +232,12 @@ async def setup_render_helm_deployment_process(
 
     release_name = request.field_set.release_name.value or request.field_set.address.target_name
     inline_values = request.field_set.values.value
+
+    def maybe_escape_string_value(value: str) -> str:
+        if re.match("\\w+", value):
+            return f'"{value}"'
+        return value
+
     process = HelmProcess(
         argv=[
             request.cmd.value,
@@ -249,18 +256,18 @@ async def setup_render_helm_deployment_process(
             *(("--create-namespace",) if request.field_set.create_namespace.value else ()),
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
-            *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
-            *chain.from_iterable(
-                (("--set", f'{key}="{value}"') for key, value in inline_values.items())
-                if inline_values
-                else ()
-            ),
+            *(("--output-dir", request.output_directory) if request.output_directory else ()),
             *(
                 ("--post-renderer", os.path.join(".", request.post_renderer.exe))
                 if request.post_renderer
                 else ()
+            )
+            *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
+            *chain.from_iterable(
+                (("--set", f"{key}={maybe_escape_string_value(value)}") for key, value in inline_values.items())
+                if inline_values
+                else ()
             ),
-            *(("--output-dir", request.output_directory) if request.output_directory else ()),
             *request.extra_argv,
         ],
         extra_env=env,

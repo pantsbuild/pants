@@ -464,7 +464,6 @@ class HelmDeploymentFieldSet(FieldSet):
     no_hooks: HelmDeploymentNoHooksField
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
-    timeout: HelmDeploymentTimeoutField
 
 
 class AllHelmDeploymentTargets(Targets):
