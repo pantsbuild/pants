@@ -362,9 +362,7 @@ def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_allow_files_dependency(
-    rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
-) -> None:
+def test_allow_files_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -373,8 +371,8 @@ def test_allow_files_dependency(
                 files(name="files", sources=["File.txt"])
                 """
             ),
-            "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.scala": dedent(
                 """\
                 package org.pantsbuild.example
