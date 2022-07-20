@@ -3,16 +3,15 @@
 
 import os
 from contextlib import contextmanager
-from pathlib import Path, PurePath
 from typing import Iterable, List, Sequence, TypeVar
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.core.subsystems.python_bootstrap import (
-    PythonBootstrap,
-    get_asdf_data_dir,
-    get_pyenv_root,
-)
+from pants.core.subsystems.python_bootstrap import PythonBootstrap, get_pyenv_root
+from pants.core.util_rules import asdf
+from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
 from pants.engine.environment import Environment
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
@@ -59,47 +58,6 @@ def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[
     return [sequence[i] for i in indices]
 
 
-@contextmanager
-def fake_asdf_root(
-    fake_versions: List[str], fake_home_versions: List[int], fake_local_versions: List[int]
-):
-    with temporary_dir() as home_dir, temporary_dir() as asdf_dir:
-
-        fake_dirs: List[Path] = []
-        fake_version_dirs: List[str] = []
-
-        fake_home_dir = Path(home_dir)
-        fake_tool_versions = fake_home_dir / ".tool-versions"
-        fake_home_versions_str = " ".join(materialize_indices(fake_versions, fake_home_versions))
-        fake_tool_versions.write_text(f"nodejs lts\njava 8\npython {fake_home_versions_str}\n")
-
-        fake_asdf_dir = Path(asdf_dir)
-        fake_asdf_plugin_dir = fake_asdf_dir / "plugins" / "python"
-        fake_asdf_installs_dir = fake_asdf_dir / "installs" / "python"
-
-        fake_dirs.extend(
-            [fake_home_dir, fake_asdf_dir, fake_asdf_plugin_dir, fake_asdf_installs_dir]
-        )
-
-        for version in fake_versions:
-            fake_version_path = fake_asdf_installs_dir / version / "bin"
-            fake_version_dirs.append(f"{fake_version_path}")
-            fake_dirs.append(fake_version_path)
-
-        for fake_dir in fake_dirs:
-            fake_dir.mkdir(parents=True, exist_ok=True)
-
-        yield (
-            home_dir,
-            asdf_dir,
-            fake_version_dirs,
-            # fake_home_version_dirs
-            materialize_indices(fake_version_dirs, fake_home_versions),
-            # fake_local_version_dirs
-            materialize_indices(fake_version_dirs, fake_local_versions),
-        )
-
-
 def test_get_environment_paths() -> None:
     paths = PythonBootstrap.get_environment_paths(Environment({"PATH": "foo/bar:baz:/qux/quux"}))
     assert ["foo/bar", "baz", "/qux/quux"] == paths
@@ -138,60 +96,6 @@ def test_get_pyenv_paths() -> None:
     assert expected_local_paths == local_paths
 
 
-def test_get_asdf_dir() -> None:
-    home = PurePath("♡")
-    default_root = home / ".asdf"
-    explicit_root = home / "explicit"
-
-    assert explicit_root == get_asdf_data_dir(Environment({"ASDF_DATA_DIR": f"{explicit_root}"}))
-    assert default_root == get_asdf_data_dir(Environment({"HOME": f"{home}"}))
-    assert get_asdf_data_dir(Environment({})) is None
-
-
-def test_get_asdf_paths() -> None:
-    # 3.9.4 is intentionally "left out" so that it's only found if the "all installs" fallback is
-    # used
-    all_python_versions = ["2.7.14", "3.5.5", "3.7.10", "3.9.4", "3.9.5"]
-    asdf_home_versions = [0, 1, 2]
-    asdf_local_versions = [2, 1, 4]
-    asdf_local_versions_str = " ".join(
-        materialize_indices(all_python_versions, asdf_local_versions)
-    )
-    RuleRunner().write_files(
-        {
-            ".tool-versions": (
-                "nodejs 16.0.1\n"
-                "java current\n"
-                f"python {asdf_local_versions_str}\n"
-                "rust 1.52.0\n"
-            )
-        }
-    )
-    with fake_asdf_root(all_python_versions, asdf_home_versions, asdf_local_versions) as (
-        home_dir,
-        asdf_dir,
-        expected_asdf_paths,
-        expected_asdf_home_paths,
-        expected_asdf_local_paths,
-    ):
-        # Check the "all installed" fallback
-        all_paths = PythonBootstrap.get_asdf_paths(Environment({"ASDF_DATA_DIR": asdf_dir}))
-
-        home_paths = PythonBootstrap.get_asdf_paths(
-            Environment({"HOME": home_dir, "ASDF_DATA_DIR": asdf_dir})
-        )
-        local_paths = PythonBootstrap.get_asdf_paths(
-            Environment({"HOME": home_dir, "ASDF_DATA_DIR": asdf_dir}), asdf_local=True
-        )
-
-        # The order the filesystem returns the "installed" folders is arbitrary
-        assert set(expected_asdf_paths) == set(all_paths)
-
-        # These have a fixed order defined by the `.tool-versions` file
-        assert expected_asdf_home_paths == home_paths
-        assert expected_asdf_local_paths == local_paths
-
-
 def test_expand_interpreter_search_paths() -> None:
     local_pyenv_version = "3.5.5"
     all_python_versions = ["2.7.14", local_pyenv_version, "3.7.10", "3.9.4", "3.9.5"]
@@ -200,7 +104,13 @@ def test_expand_interpreter_search_paths() -> None:
     asdf_local_versions_str = " ".join(
         materialize_indices(all_python_versions, asdf_local_versions)
     )
-    RuleRunner().write_files(
+    rule_runner = RuleRunner(
+        rules=[
+            *asdf.rules(),
+            QueryRule(AsdfToolPathsResult, (AsdfToolPathsRequest,)),
+        ]
+    )
+    rule_runner.write_files(
         {
             ".python-version": f"{local_pyenv_version}\n",
             ".tool-versions": (
@@ -235,17 +145,23 @@ def test_expand_interpreter_search_paths() -> None:
                 "<PYENV_LOCAL>",
                 "/qux",
             ]
-            env = Environment(
+            asdf_paths_result = get_asdf_paths(
+                rule_runner,
                 {
                     "HOME": home_dir,
                     "PATH": "/env/path1:/env/path2",
                     "PYENV_ROOT": pyenv_root,
                     "ASDF_DATA_DIR": asdf_dir,
-                }
+                },
+                standard=True,
+                local=True,
+                extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
             )
             expanded_paths = PythonBootstrap._expand_interpreter_search_paths(
                 paths,
-                env,
+                env=asdf_paths_result.env,
+                asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
+                asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
             )
 
     expected = [
