@@ -112,15 +112,14 @@ async def _resolve_asdf_tool_paths(
         # The definition of a tool-versions file can be found here:
         # https://asdf-vm.com/#/core-configuration?id=tool-versions
         tool_versions_lines = tool_versions_file.read_text().splitlines()
-        print(f"tool_versions_lines = {tool_versions_lines}")
-        last_line = None
+        last_line_fields = None
         for line in tool_versions_lines:
-            # Find the last line for this tool.
-            if line.lower().startswith(tool_name):
-                last_line = line
-        if last_line:
-            _, _, versions = last_line.partition(tool_name)
-            for v in re.split(r"\s+", versions.strip()):
+            fields = re.split(r"\s+", line.strip())
+            if not fields or fields[0] != tool_name:
+                continue
+            last_line_fields = fields
+        if last_line_fields:
+            for v in last_line_fields[1:]:
                 if ":" in v:
                     key, _, value = v.partition(":")
                     if key.lower() == "path":
