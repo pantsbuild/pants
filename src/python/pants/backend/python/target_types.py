@@ -144,11 +144,12 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
-class PythonRunGoalUseSandboxField(BoolField):
+class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
-    default = True
     help = softwrap(
         """
+        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
 

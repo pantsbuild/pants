@@ -180,6 +180,15 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    default_run_goal_use_sandbox = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            The default value used for the `run_goal_use_sandbox` field of Python targets. See the
+            relevant field for more details.
+            """
+        ),
+    )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
         "--resolves-to-interpreter-constraints",
         help=softwrap(
