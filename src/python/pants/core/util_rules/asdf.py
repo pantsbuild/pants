@@ -12,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,10 @@ async def _resolve_asdf_tool_paths(
         return tuple(asdf_paths)
 
 
-@rule
+# TODO: This rule is marked uncacheable because it directly accsses the filesystem to examine ASDF configuration.
+# See https://github.com/pantsbuild/pants/issues/10842 for potential future support for capturing from absolute
+# paths that could allow this rule to be cached.
+@_uncacheable_rule
 async def resolve_asdf_tool_paths(
     request: AsdfToolPathsRequest, build_root: BuildRoot
 ) -> AsdfToolPathsResult:
