@@ -9,10 +9,10 @@ pub struct TimeoutLayer {
 }
 
 impl TimeoutLayer {
-    /// Create a timeout from a duration
-    pub fn new(timeout: Duration) -> Self {
-        TimeoutLayer { timeout }
-    }
+  /// Create a timeout from a duration
+  pub fn new(timeout: Duration) -> Self {
+    TimeoutLayer { timeout }
+  }
 }
 
 impl<S> Layer<S> for TimeoutLayer {

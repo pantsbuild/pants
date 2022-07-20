@@ -56,7 +56,7 @@ where
         }
 
         Poll::Ready(Err(Elapsed(()).into()))
-      },
+      }
     }
   }
 }
