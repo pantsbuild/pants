@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, Type, cast
+from typing import Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -33,7 +33,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -338,13 +338,7 @@ async def resolve_target(
             base_address, description_of_origin=request.description_of_origin
         ),
     )
-    if address.is_generated_target:
-        # TODO: This is an accommodation to allow using file/generator Addresses for
-        # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
-        original_target = parametrizations.get(base_address)
-        if original_target and not target_types_to_generate_requests.is_generator(original_target):
-            return WrappedTarget(original_target)
-    target = parametrizations.get(address)
+    target = parametrizations.get(address, target_types_to_generate_requests)
     if target is None:
         raise ResolveError(
             softwrap(
@@ -1055,6 +1049,35 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
+@rule_helper
+async def _fill_parameters(
+    field_alias: str,
+    consumer_tgt: Target,
+    addresses: Iterable[Address],
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    field_defaults: FieldDefaults,
+) -> tuple[Address, ...]:
+    assert not isinstance(addresses, Iterator)
+
+    parametrizations = await MultiGet(
+        Get(
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                address.maybe_convert_to_target_generator(),
+                description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
+            ),
+        )
+        for address in addresses
+    )
+
+    return tuple(
+        parametrizations.get_subset(
+            address, consumer_tgt, field_defaults, target_types_to_generate_requests
+        ).address
+        for address, parametrizations in zip(addresses, parametrizations)
+    )
+
+
 @rule(desc="Resolve direct dependencies")
 async def resolve_dependencies(
     request: DependenciesRequest,
@@ -1111,25 +1134,24 @@ async def resolve_dependencies(
     # parameters. If so, fill them in.
     explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
     if explicitly_provided_includes:
-        explicit_dependency_parametrizations = await MultiGet(
-            Get(
-                _TargetParametrizations,
-                _TargetParametrizationsRequest(
-                    address.maybe_convert_to_target_generator(),
-                    description_of_origin=(
-                        f"the `{request.field.alias}` field of the target {tgt.address}"
-                    ),
-                ),
-            )
-            for address in explicitly_provided_includes
+        explicitly_provided_includes = await _fill_parameters(
+            request.field.alias,
+            tgt,
+            explicitly_provided_includes,
+            target_types_to_generate_requests,
+            field_defaults,
         )
-
-        explicitly_provided_includes = [
-            parametrizations.get_subset(address, tgt, field_defaults).address
-            for address, parametrizations in zip(
-                explicitly_provided_includes, explicit_dependency_parametrizations
+    explicitly_provided_ignores: FrozenOrderedSet[Address] = explicitly_provided.ignores
+    if explicitly_provided_ignores:
+        explicitly_provided_ignores = FrozenOrderedSet(
+            await _fill_parameters(
+                request.field.alias,
+                tgt,
+                tuple(explicitly_provided_ignores),
+                target_types_to_generate_requests,
+                field_defaults,
             )
-        ]
+        )
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
@@ -1162,7 +1184,7 @@ async def resolve_dependencies(
             for addr in special_cased_field.to_unparsed_address_inputs().values
         )
 
-    excluded = explicitly_provided.ignores.union(
+    excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)
     )
     result = Addresses(
