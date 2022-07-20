@@ -181,6 +181,7 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     default_run_goal_use_sandbox = BoolOption(
+        "--default-run-goal-use-sandbox",
         default=True,
         help=softwrap(
             """
