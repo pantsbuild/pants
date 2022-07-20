@@ -580,6 +580,16 @@ class PexIncludeRequirementsField(BoolField):
     )
 
 
+class PexIncludeSourcesField(BoolField):
+    alias = "include_sources"
+    default = True
+    help = softwrap(
+        """
+        Whether to include your first party sources the binary uses in the packaged PEX file.
+        """
+    )
+
+
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
@@ -608,6 +618,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexLayoutField,
     PexExecutionModeField,
     PexIncludeRequirementsField,
+    PexIncludeSourcesField,
     PexIncludeToolsField,
     RestartableField,
 )
