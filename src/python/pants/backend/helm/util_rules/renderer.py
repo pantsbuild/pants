@@ -36,7 +36,12 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.process import ProcessResult
+from pants.engine.process import (
+    InteractiveProcess,
+    InteractiveProcessRequest,
+    Process,
+    ProcessResult,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -338,6 +343,14 @@ async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
         )
 
     return RenderedFiles(address=renderer.address, chart=renderer.chart, snapshot=output_snapshot)
+
+
+@rule
+async def helm_renderer_as_interactive_process(
+    renderer: HelmDeploymentRenderer,
+) -> InteractiveProcess:
+    process = await Get(Process, HelmProcess, renderer.process)
+    return await Get(InteractiveProcess, InteractiveProcessRequest(process))
 
 
 def rules():

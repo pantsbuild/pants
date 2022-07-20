@@ -7,9 +7,11 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
 from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
     HelmDeploymentTimeoutField,
@@ -21,10 +23,10 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
 )
-from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeployProcesses, DeploySubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessRequest, Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import DependenciesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -84,14 +86,22 @@ class InvalidDeploymentArgs(Exception):
 async def run_helm_deploy(
     field_set: DeployHelmDeploymentFieldSet,
     deploy: DeploySubsystem,
-) -> DeployProcesses:
+) -> DeployProcess:
     valid_args, invalid_args = _cleanup_passthrough_args(deploy.args)
     if invalid_args:
         raise InvalidDeploymentArgs(invalid_args)
 
-    post_renderer = await Get(
-        HelmPostRendererRunnable, HelmDeploymentPostRendererRequest(field_set)
+    target_dependencies, post_renderer = await MultiGet(
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(HelmPostRendererRunnable, HelmDeploymentPostRendererRequest(field_set)),
     )
+
+    publish_targets = [
+        tgt
+        for tgt in target_dependencies
+        if HelmChartFieldSet.is_applicable(tgt) or DockerFieldSet.is_applicable(tgt)
+    ]
+
     renderer = await Get(
         HelmDeploymentRenderer,
         HelmDeploymentRendererRequest(
@@ -107,11 +117,10 @@ async def run_helm_deploy(
         ),
     )
 
-    process = await Get(Process, HelmProcess, renderer.process)
-    interactive_process = await Get(InteractiveProcess, InteractiveProcessRequest(process))
+    process = await Get(InteractiveProcess, HelmDeploymentRenderer, renderer)
 
-    return DeployProcesses(
-        [DeployProcess(name=field_set.address.spec, process=interactive_process)]
+    return DeployProcess(
+        name=field_set.address.spec, publish_dependencies=tuple(publish_targets), process=process
     )
 
 

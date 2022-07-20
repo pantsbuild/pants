@@ -13,7 +13,7 @@ from pants.backend.helm.goals.deploy import rules as helm_deploy_rules
 from pants.backend.helm.target_types import HelmChartTarget, HelmDeploymentTarget
 from pants.backend.helm.testutil import HELM_CHART_FILE
 from pants.backend.helm.util_rules.tool import HelmBinary
-from pants.core.goals.deploy import DeployProcesses
+from pants.core.goals.deploy import DeployProcess
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -26,7 +26,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *helm_deploy_rules(),
             QueryRule(HelmBinary, ()),
-            QueryRule(DeployProcesses, (DeployHelmDeploymentFieldSet,)),
+            QueryRule(DeployProcess, (DeployHelmDeploymentFieldSet,)),
         ],
     )
     return rule_runner
@@ -88,11 +88,10 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
     field_set = DeployHelmDeploymentFieldSet.create(target)
 
     helm = rule_runner.request(HelmBinary, [])
-    deploy_processes = rule_runner.request(DeployProcesses, [field_set])
+    deploy_process = rule_runner.request(DeployProcess, [field_set])
 
-    assert len(deploy_processes) == 1
-    assert deploy_processes[0].process
-    assert deploy_processes[0].process.process.argv == (
+    assert deploy_process.process
+    assert deploy_process.process.process.argv == (
         helm.path,
         "upgrade",
         "foo",
@@ -156,4 +155,4 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
     with pytest.raises(
         ExecutionError, match="The following command line arguments are not valid: --namespace foo."
     ):
-        rule_runner.request(DeployProcesses, [field_set])
+        rule_runner.request(DeployProcess, [field_set])
