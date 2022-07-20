@@ -6,12 +6,12 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 from pathlib import PurePath
-import re
 from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
@@ -234,7 +234,7 @@ async def setup_render_helm_deployment_process(
     inline_values = request.field_set.values.value
 
     def maybe_escape_string_value(value: str) -> str:
-        if re.match("\\w+", value):
+        if re.findall("\\s+", value):
             return f'"{value}"'
         return value
 
@@ -261,10 +261,13 @@ async def setup_render_helm_deployment_process(
                 ("--post-renderer", os.path.join(".", request.post_renderer.exe))
                 if request.post_renderer
                 else ()
-            )
+            ),
             *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
             *chain.from_iterable(
-                (("--set", f"{key}={maybe_escape_string_value(value)}") for key, value in inline_values.items())
+                (
+                    ("--set", f"{key}={maybe_escape_string_value(value)}")
+                    for key, value in inline_values.items()
+                )
                 if inline_values
                 else ()
             ),

@@ -14,6 +14,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
 
+@dataclass(unsafe_hash=True)
 @frozen_after_init
 class YamlPath:
     """Simple implementation of YAML paths using `/` syntax and being the single slash the path to
@@ -23,11 +24,11 @@ class YamlPath:
     _absolute: bool
 
     def __init__(self, elements: Iterable[str], *, absolute: bool) -> None:
-        if len(elements) == 0 and not absolute:
-            raise ValueError("Relative YAML paths with no elements are not allowed.")
-
         self._elements = tuple(elements)
         self._absolute = absolute
+
+        if len(self._elements) == 0 and not self._absolute:
+            raise ValueError("Relative YAML paths with no elements are not allowed.")
 
     @classmethod
     def parse(cls, path: str) -> YamlPath:
