@@ -41,6 +41,7 @@ from pants.backend.scala.dependency_inference.rules import rules as scala_dep_in
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
+from pants.core.target_types import FilesGeneratorTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
@@ -157,6 +158,7 @@ def rule_runner() -> RuleRunner:
             ProtobufSourceTarget,
             ProtobufSourcesGeneratorTarget,
             ScalaSourcesGeneratorTarget,
+            FilesGeneratorTarget,
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -357,3 +359,34 @@ def test_compile_mixed_cycle(rule_runner: RuleRunner) -> None:
     lib_address = Address(spec_path="lib")
     assert len(expect_single_expanded_coarsened_target(rule_runner, main_address).members) == 2
     rule_runner.request(Classpath, [Addresses([main_address, lib_address])])
+
+
+@maybe_skip_jdk_test
+def test_allow_files_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(name='main', dependencies=[":files"])
+                files(name="files", sources=["File.txt"])
+                """
+            ),
+            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "Example.scala": dedent(
+                """\
+                package org.pantsbuild.example
+
+                object Main {
+                    def main(args: Array[String]): Unit = {
+                        println("Hello World")
+                    }
+                }
+                """
+            ),
+            "File.txt": "HELLO WORLD",
+        }
+    )
+
+    main_address = Address(spec_path="", target_name="main")
+    rule_runner.request(Classpath, [Addresses([main_address])])
