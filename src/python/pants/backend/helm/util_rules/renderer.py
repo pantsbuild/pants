@@ -298,6 +298,8 @@ _HELM_OUTPUT_FILE_MARKER = "# Source: "
 async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
+        if len(sanitised_lines) == 0:
+            return FileContent(file_name, b"")
         if sanitised_lines[len(sanitised_lines) - 1] == _YAML_FILE_SEPARATOR:
             sanitised_lines = sanitised_lines[:-1]
         if sanitised_lines[0] != _YAML_FILE_SEPARATOR:
