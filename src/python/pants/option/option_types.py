@@ -789,7 +789,7 @@ class ArgsListOption(ShellStrListOption):
         # This should be set when callers can alternatively use "--" followed by the arguments,
         # instead of having to provide "--[scope]-args='--arg1 --arg2'".
         passthrough: bool | None = None,
-        default: _MaybeDynamicT[list[str]] = [],
+        default: _MaybeDynamicT[list[_ListMemberT]] = [],
     ):
         if extra_help:
             extra_help = "\n\n" + extra_help
