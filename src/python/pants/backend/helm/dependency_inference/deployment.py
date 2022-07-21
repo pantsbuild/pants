@@ -20,7 +20,7 @@ from pants.backend.helm.util_rules.manifest import ImageRef, KubeManifests, Pars
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
-    RenderedFiles,
+    RenderedHelmDeployment,
 )
 from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
@@ -48,7 +48,7 @@ class HelmDeploymentReport:
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
 async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymentReport:
     rendered_deployment = await Get(
-        RenderedFiles,
+        RenderedHelmDeployment,
         HelmDeploymentRendererRequest(
             cmd=HelmDeploymentRendererCmd.TEMPLATE,
             field_set=field_set,

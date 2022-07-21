@@ -11,7 +11,6 @@ from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
 from pants.backend.helm.target_types import (
-    HelmChartFieldSet,
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
     HelmDeploymentTimeoutField,
@@ -19,7 +18,6 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
-    HelmDeploymentRenderer,
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
 )
@@ -96,14 +94,10 @@ async def run_helm_deploy(
         Get(HelmPostRendererRunnable, HelmDeploymentPostRendererRequest(field_set)),
     )
 
-    publish_targets = [
-        tgt
-        for tgt in target_dependencies
-        if HelmChartFieldSet.is_applicable(tgt) or DockerFieldSet.is_applicable(tgt)
-    ]
+    publish_targets = [tgt for tgt in target_dependencies if DockerFieldSet.is_applicable(tgt)]
 
     renderer = await Get(
-        HelmDeploymentRenderer,
+        InteractiveProcess,
         HelmDeploymentRendererRequest(
             cmd=HelmDeploymentRendererCmd.UPGRADE,
             field_set=field_set,
@@ -113,14 +107,12 @@ async def run_helm_deploy(
                 *valid_args,
             ],
             post_renderer=post_renderer,
-            description=f"Deploying release {field_set.address}.",
+            description=f"Deploying {field_set.address}",
         ),
     )
 
-    process = await Get(InteractiveProcess, HelmDeploymentRenderer, renderer)
-
     return DeployProcess(
-        name=field_set.address.spec, publish_dependencies=tuple(publish_targets), process=process
+        name=field_set.address.spec, publish_dependencies=tuple(publish_targets), process=renderer
     )
 
 

@@ -24,7 +24,7 @@ from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRender
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
-    RenderedFiles,
+    RenderedHelmDeployment,
 )
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -42,7 +42,7 @@ def rule_runner() -> RuleRunner:
             *infer_deployment.rules(),
             *post_renderer.rules(),
             QueryRule(HelmPostRendererRunnable, (HelmDeploymentPostRendererRequest,)),
-            QueryRule(RenderedFiles, (HelmDeploymentRendererRequest,)),
+            QueryRule(RenderedHelmDeployment, (HelmDeploymentRendererRequest,)),
             QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
@@ -181,7 +181,7 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     assert config_file == expected_config_file
 
     rendered_output = rule_runner.request(
-        RenderedFiles,
+        RenderedHelmDeployment,
         [
             HelmDeploymentRendererRequest(
                 field_set=field_set,

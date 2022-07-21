@@ -28,6 +28,7 @@ from pants.engine.target import (
     Targets,
     TriBoolField,
     generate_file_based_overrides_field_help_message,
+    ValidNumbers,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
@@ -429,6 +430,7 @@ class HelmDeploymentTimeoutField(IntField):
     alias = "timeout"
     required = False
     help = "Timeout in seconds when running a Helm deployment."
+    valid_numbers = ValidNumbers.positive_only
 
 
 class HelmDeploymentTarget(Target):

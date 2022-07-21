@@ -91,7 +91,7 @@ class HelmDeploymentRendererRequest(EngineAwareParameter):
             "address": self.field_set.address,
             "description": self.description,
             "extra_argv": self.extra_argv,
-            "post_renderer": True if self.post_renderer else False,
+            "post_renderer": self.post_renderer,
         }
 
 
@@ -124,15 +124,16 @@ class HelmDeploymentRenderer(EngineAwareParameter, EngineAwareReturnType):
 
     def metadata(self) -> dict[str, Any] | None:
         return {
+            "address": self.address,
             "chart": self.chart.address,
-            "helm_argv": self.process.argv,
+            "process": self.process,
             "post_renderer": self.post_renderer,
             "output_directory": self.output_directory,
         }
 
 
 @dataclass(frozen=True)
-class RenderedFiles(EngineAwareReturnType):
+class RenderedHelmDeployment(EngineAwareReturnType):
     address: Address
     chart: HelmChart
     snapshot: Snapshot
@@ -295,7 +296,7 @@ _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
 @rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
-async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
+async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedHelmDeployment:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
         if len(sanitised_lines) == 0:
@@ -344,7 +345,9 @@ async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
             Snapshot, RemovePrefix(result.output_digest, renderer.output_directory)
         )
 
-    return RenderedFiles(address=renderer.address, chart=renderer.chart, snapshot=output_snapshot)
+    return RenderedHelmDeployment(
+        address=renderer.address, chart=renderer.chart, snapshot=output_snapshot
+    )
 
 
 @rule

@@ -17,7 +17,7 @@ from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
-    RenderedFiles,
+    RenderedHelmDeployment,
 )
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *renderer.rules(),
-            QueryRule(RenderedFiles, (HelmDeploymentRendererRequest,)),
+            QueryRule(RenderedHelmDeployment, (HelmDeploymentRendererRequest,)),
         ],
     )
     source_root_patterns = ("src/*",)
@@ -126,7 +126,7 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         description="Test template rendering",
     )
 
-    rendered = rule_runner.request(RenderedFiles, [render_request])
+    rendered = rule_runner.request(RenderedHelmDeployment, [render_request])
 
     assert rendered.snapshot.files
     assert "mychart/templates/configmap.yaml" in rendered.snapshot.files
