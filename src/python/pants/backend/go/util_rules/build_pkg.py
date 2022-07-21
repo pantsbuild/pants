@@ -7,7 +7,6 @@ import hashlib
 import os.path
 from dataclasses import dataclass
 
-from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
@@ -15,6 +14,7 @@ from pants.backend.go.util_rules.assembly import (
     FallibleAssemblyPreCompilation,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType

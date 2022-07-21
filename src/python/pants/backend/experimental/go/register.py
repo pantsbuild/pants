@@ -6,7 +6,6 @@ from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.goals import check, package_binary, run_binary, tailor, test
 from pants.backend.go.lint.gofmt import skip_field as gofmt_skip_field
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
-from pants.backend.go.subsystems import golang
 from pants.backend.go.target_types import (
     GoBinaryTarget,
     GoModTarget,
@@ -18,7 +17,9 @@ from pants.backend.go.util_rules import (
     build_pkg,
     build_pkg_target,
     first_party_pkg,
+    go_bootstrap,
     go_mod,
+    goroot,
     import_analysis,
     link,
     pkg_analyzer,
@@ -39,7 +40,8 @@ def rules():
         *build_pkg_target.rules(),
         *check.rules(),
         *third_party_pkg.rules(),
-        *golang.rules(),
+        *go_bootstrap.rules(),
+        *goroot.rules(),
         *import_analysis.rules(),
         *go_mod.rules(),
         *first_party_pkg.rules(),
