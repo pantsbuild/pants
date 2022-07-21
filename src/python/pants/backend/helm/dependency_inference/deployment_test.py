@@ -10,7 +10,6 @@ import pytest
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.dependency_inference.deployment import (
-    AnalyseHelmDeploymentRequest,
     FirstPartyHelmDeploymentMappings,
     HelmDeploymentDependenciesInferenceFieldSet,
     HelmDeploymentReport,
@@ -54,7 +53,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *tool.rules(),
             QueryRule(FirstPartyHelmDeploymentMappings, ()),
-            QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
+            QueryRule(HelmDeploymentReport, (HelmDeploymentFieldSet,)),
             QueryRule(InferredDependencies, (InferHelmDeploymentDependenciesRequest,)),
         ],
     )
@@ -97,9 +96,7 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = HelmDeploymentFieldSet.create(target)
 
-    dependencies_report = rule_runner.request(
-        HelmDeploymentReport, [AnalyseHelmDeploymentRequest(field_set)]
-    )
+    dependencies_report = rule_runner.request(HelmDeploymentReport, [field_set])
 
     expected_container_refs = [
         ImageRef(registry=None, repository="busybox", tag="1.28"),

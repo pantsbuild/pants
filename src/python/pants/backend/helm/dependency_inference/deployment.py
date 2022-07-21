@@ -36,12 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class AnalyseHelmDeploymentRequest:
-    field_set: HelmDeploymentFieldSet
-
-
-@dataclass(frozen=True)
 class HelmDeploymentReport:
+    address: Address
     image_refs: FrozenYamlIndex[ImageRef]
 
     @property
@@ -50,22 +46,22 @@ class HelmDeploymentReport:
 
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
-async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
+async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymentReport:
     output_dir = "__output"
 
     rendered_deployment = await Get(
         RenderedFiles,
         HelmDeploymentRendererRequest(
             cmd=HelmDeploymentRendererCmd.TEMPLATE,
-            field_set=request.field_set,
-            description=f"Rendering Helm deployment {request.field_set.address}",
+            field_set=field_set,
+            description=f"Rendering Helm deployment {field_set.address}",
             output_directory=output_dir,
         ),
     )
 
     manifests = await Get(
         KubeManifests,
-        ParseKubeManifests(rendered_deployment.snapshot.digest, request.field_set.address.spec),
+        ParseKubeManifests(rendered_deployment.snapshot.digest, field_set.address.spec),
     )
 
     # Build YAML index of `ImageRef`s for future processing during depedendecy inference or post-rendering.
@@ -79,7 +75,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
                 item=container.image,
             )
 
-    return HelmDeploymentReport(image_refs=image_refs_index.frozen())
+    return HelmDeploymentReport(address=field_set.address, image_refs=image_refs_index.frozen())
 
 
 @dataclass(frozen=True)
@@ -98,8 +94,7 @@ async def first_party_helm_deployment_mappings(
 ) -> FirstPartyHelmDeploymentMappings:
     field_sets = [HelmDeploymentFieldSet.create(tgt) for tgt in deployment_targets]
     all_deployments_info = await MultiGet(
-        Get(HelmDeploymentReport, AnalyseHelmDeploymentRequest(field_set))
-        for field_set in field_sets
+        Get(HelmDeploymentReport, HelmDeploymentFieldSet, field_set) for field_set in field_sets
     )
 
     docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
