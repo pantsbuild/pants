@@ -78,7 +78,7 @@ async def assemble_resources_jar(
     output_files = [output_filename]
 
     # #16231: Valid JAR files need the directories of each resource file as well as the files
-    # themselves. This fetches each parent directory
+    # themselves.
 
     paths = {Path(filename) for filename in source_files.snapshot.files}
     directories = {parent for path in paths for parent in path.parents}
