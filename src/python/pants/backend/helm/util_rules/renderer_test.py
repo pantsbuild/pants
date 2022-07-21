@@ -120,29 +120,20 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         """
     )
 
-    render_requests = [
-        HelmDeploymentRendererRequest(
-            cmd=HelmDeploymentRendererCmd.TEMPLATE,
-            field_set=field_set,
-            description="Rendering using output_directory",
-            output_directory="__out",
-        ),
-        HelmDeploymentRendererRequest(
-            cmd=HelmDeploymentRendererCmd.TEMPLATE,
-            field_set=field_set,
-            description="Rendering using stdout",
-        ),
-    ]
+    render_request = HelmDeploymentRendererRequest(
+        cmd=HelmDeploymentRendererCmd.TEMPLATE,
+        field_set=field_set,
+        description="Test template rendering",
+    )
 
-    for request in render_requests:
-        rendered = rule_runner.request(RenderedFiles, [request])
+    rendered = rule_runner.request(RenderedFiles, [render_request])
 
-        assert rendered.snapshot.files
-        assert "mychart/templates/configmap.yaml" in rendered.snapshot.files
+    assert rendered.snapshot.files
+    assert "mychart/templates/configmap.yaml" in rendered.snapshot.files
 
-        template_output = _read_file_from_digest(
-            rule_runner,
-            digest=rendered.snapshot.digest,
-            filename="mychart/templates/configmap.yaml",
-        )
-        assert template_output == expected_config_map_file
+    template_output = _read_file_from_digest(
+        rule_runner,
+        digest=rendered.snapshot.digest,
+        filename="mychart/templates/configmap.yaml",
+    )
+    assert template_output == expected_config_map_file

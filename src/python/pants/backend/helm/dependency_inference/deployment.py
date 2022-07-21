@@ -47,15 +47,12 @@ class HelmDeploymentReport:
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
 async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymentReport:
-    output_dir = "__output"
-
     rendered_deployment = await Get(
         RenderedFiles,
         HelmDeploymentRendererRequest(
             cmd=HelmDeploymentRendererCmd.TEMPLATE,
             field_set=field_set,
             description=f"Rendering Helm deployment {field_set.address}",
-            output_directory=output_dir,
         ),
     )
 

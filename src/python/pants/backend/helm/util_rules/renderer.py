@@ -16,7 +16,7 @@ from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
-from pants.backend.helm.target_types import HelmDeploymentFieldSet
+from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentSourcesField
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -66,7 +66,6 @@ class HelmDeploymentRendererRequest(EngineAwareParameter):
     description: str = dataclasses.field(compare=False)
     extra_argv: tuple[str, ...]
     post_renderer: HelmPostRendererRunnable | None
-    output_directory: str | None
 
     def __init__(
         self,
@@ -76,26 +75,12 @@ class HelmDeploymentRendererRequest(EngineAwareParameter):
         description: str,
         extra_argv: Iterable[str] | None = None,
         post_renderer: HelmPostRendererRunnable | None = None,
-        output_directory: str | None = None,
     ) -> None:
         self.field_set = field_set
         self.cmd = cmd
         self.description = description
         self.extra_argv = tuple(extra_argv or ())
         self.post_renderer = post_renderer
-        self.output_directory = output_directory
-
-        if self.post_renderer and self.output_directory:
-            raise ValueError(
-                softwrap(
-                    """
-                    Both `post_renderer` and `output_directory` have been set but only one of them
-                    is allowed at the same time.
-
-                    Remove either of them to be able to create a valid instance of a `HelmDeploymentRenderer`.
-                    """
-                )
-            )
 
     def debug_hint(self) -> str | None:
         return self.field_set.address.spec
@@ -103,9 +88,9 @@ class HelmDeploymentRendererRequest(EngineAwareParameter):
     def metadata(self) -> dict[str, Any] | None:
         return {
             "cmd": self.cmd.value,
+            "address": self.field_set.address,
             "description": self.description,
             "extra_argv": self.extra_argv,
-            "output_directory": self.output_directory,
             "post_renderer": True if self.post_renderer else False,
         }
 
@@ -202,14 +187,25 @@ async def setup_render_helm_deployment_process(
 ) -> HelmDeploymentRenderer:
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
-        Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
+        Get(
+            StrippedSourceFiles,
+            SourceFilesRequest(
+                sources_fields=[request.field_set.sources],
+                for_sources_types=[HelmDeploymentSourcesField],
+                enable_codegen=True,
+            ),
+        ),
     )
 
     logger.debug(f"Using Helm chart {chart.address} in deployment {request.field_set.address}.")
 
+    output_dir = None
     output_digest = EMPTY_DIGEST
-    if request.output_directory:
-        output_digest = await Get(Digest, CreateDigest([Directory(request.output_directory)]))
+    output_directories = None
+    if not request.post_renderer:
+        output_dir = "__out"
+        output_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
+        output_directories = [output_dir]
 
     # Ordering the value file names needs to be consistent so overrides are respected.
     sorted_value_files = _sort_value_file_names_for_evaluation(value_files.snapshot.files)
@@ -233,7 +229,6 @@ async def setup_render_helm_deployment_process(
         append_only_caches = request.post_renderer.append_only_caches
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
-    output_directories = [request.output_directory] if request.output_directory else None
 
     release_name = request.field_set.release_name.value or request.field_set.address.target_name
     inline_values = request.field_set.values.value
@@ -261,7 +256,7 @@ async def setup_render_helm_deployment_process(
             *(("--create-namespace",) if request.field_set.create_namespace.value else ()),
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
-            *(("--output-dir", request.output_directory) if request.output_directory else ()),
+            *(("--output-dir", output_dir) if output_dir else ()),
             *(
                 ("--post-renderer", os.path.join(".", request.post_renderer.exe))
                 if request.post_renderer
@@ -290,20 +285,25 @@ async def setup_render_helm_deployment_process(
         address=request.field_set.address,
         chart=chart,
         process=process,
-        output_directory=request.output_directory,
+        output_directory=output_dir,
         post_renderer=True if request.post_renderer else False,
     )
 
 
+_YAML_FILE_SEPARATOR = "---"
 _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
 @rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
 async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
-        content = "\n".join(lines) + "\n"
-        if not content.startswith("---"):
-            content = "---\n" + content
+        sanitised_lines = list(lines)
+        if sanitised_lines[len(sanitised_lines) - 1] == _YAML_FILE_SEPARATOR:
+            sanitised_lines = sanitised_lines[:-1]
+        if sanitised_lines[0] != _YAML_FILE_SEPARATOR:
+            sanitised_lines = [_YAML_FILE_SEPARATOR, *sanitised_lines]
+
+        content = "\n".join(sanitised_lines) + "\n"
         return FileContent(file_name, content.encode("utf-8"))
 
     def parse_renderer_output(result: ProcessResult) -> list[FileContent]:

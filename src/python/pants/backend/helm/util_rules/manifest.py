@@ -176,10 +176,11 @@ class KubeManifest:
         cls, filename: PurePath, d: dict[str, Any], *, document_index: int = 0
     ) -> KubeManifest:
         std_kind: StandardKind | None = None
+        kind_value = d["kind"]
         try:
-            std_kind = StandardKind(d["kind"])
+            std_kind = StandardKind(kind_value)
         except ValueError:
-            custom_kind = CustomResourceKind(d["kind"])
+            custom_kind = CustomResourceKind(kind_value)
 
         spec = None
         if std_kind:
