@@ -3,6 +3,7 @@
 
 import itertools
 import logging
+from pathlib import Path
 from itertools import chain
 
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
@@ -76,6 +77,13 @@ async def assemble_resources_jar(
     output_filename = f"{request.component.representative.address.path_safe_spec}.resources.jar"
     output_files = [output_filename]
 
+    # #16231: Valid JAR files need the directories of each resource file as well as the files
+    # themselves. This fetches each parent directory
+
+    paths = {Path(filename) for filename in source_files.snapshot.files}
+    directories = {parent for path in paths for parent in path.parents}
+    input_files = {str(path) for path in chain(paths, directories)}
+    
     resources_jar_input_digest = source_files.snapshot.digest
     resources_jar_result = await Get(
         ProcessResult,
@@ -83,7 +91,7 @@ async def assemble_resources_jar(
             argv=[
                 zip.path,
                 output_filename,
-                *source_files.snapshot.files,
+                *input_files,
             ],
             description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
