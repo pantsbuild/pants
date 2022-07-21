@@ -3,8 +3,8 @@
 
 import itertools
 import logging
-from pathlib import Path
 from itertools import chain
+from pathlib import Path
 
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
 from pants.core.util_rules import stripped_source_files
@@ -83,7 +83,7 @@ async def assemble_resources_jar(
     paths = {Path(filename) for filename in source_files.snapshot.files}
     directories = {parent for path in paths for parent in path.parents}
     input_files = {str(path) for path in chain(paths, directories)}
-    
+
     resources_jar_input_digest = source_files.snapshot.digest
     resources_jar_result = await Get(
         ProcessResult,
