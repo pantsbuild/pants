@@ -33,7 +33,13 @@ class Autoflake(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="--target-version=py37 --quiet")
+    args = ArgsListOption(
+        example="--remove-all-unused-imports --target-version=py37 --quiet",
+        # This argument was previously hardcoded. Moved it a default argument
+        # to allow it to be overridden while maintaining the existing api.
+        # See: https://github.com/pantsbuild/pants/issues/16193
+        default=["--remove-all-unused-imports"],
+    )
     export = ExportToolOption()
 
 
