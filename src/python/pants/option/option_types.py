@@ -216,7 +216,7 @@ class _ListOptionBase(
         cls,
         flag_name: str | None = None,
         *,
-        default: _MaybeDynamicT[list[_ListMemberT]] = [],
+        default: _MaybeDynamicT[list[_ListMemberT]] | None = [],
         help: _HelpT,
         # Additional bells/whistles
         register_if: _RegisterIfFuncT | None = None,
@@ -789,6 +789,7 @@ class ArgsListOption(ShellStrListOption):
         # This should be set when callers can alternatively use "--" followed by the arguments,
         # instead of having to provide "--[scope]-args='--arg1 --arg2'".
         passthrough: bool | None = None,
+        default: _MaybeDynamicT[list[_ListMemberT]] | None = None,
     ):
         if extra_help:
             extra_help = "\n\n" + extra_help
@@ -802,6 +803,7 @@ class ArgsListOption(ShellStrListOption):
                     """
                 )
             ),
+            default=default,  # type: ignore[arg-type]
         )
         if passthrough is not None:
             instance._extra_kwargs["passthrough"] = passthrough
