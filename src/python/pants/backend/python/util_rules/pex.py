@@ -949,6 +949,7 @@ class VenvPexProcess:
     execution_slot_variable: str | None
     concurrency_available: int
     cache_scope: ProcessCacheScope
+    append_only_caches: FrozenDict[str, str]
 
     def __init__(
         self,
@@ -966,6 +967,7 @@ class VenvPexProcess:
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+        append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
         self.venv_pex = venv_pex
         self.argv = tuple(argv)
@@ -980,6 +982,7 @@ class VenvPexProcess:
         self.execution_slot_variable = execution_slot_variable
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
+        self.append_only_caches = FrozenDict(append_only_caches or {})
 
 
 @rule
@@ -998,6 +1001,12 @@ async def setup_venv_pex_process(
         if request.input_digest
         else venv_pex.digest
     )
+    append_only_caches: FrozenDict[str, str] = FrozenDict(
+        **pex_environment.in_sandbox(
+            working_directory=request.working_directory
+        ).append_only_caches,
+        **request.append_only_caches,
+    )
     return Process(
         argv=argv,
         description=request.description,
@@ -1007,9 +1016,7 @@ async def setup_venv_pex_process(
         env=request.extra_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=pex_environment.in_sandbox(
-            working_directory=request.working_directory
-        ).append_only_caches,
+        append_only_caches=append_only_caches,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

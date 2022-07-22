@@ -24,6 +24,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection
@@ -72,6 +73,7 @@ class MyPyRequest(CheckRequest):
 def generate_argv(
     mypy: MyPy,
     *,
+    cache_dir: str,
     venv_python: str,
     file_list_path: str,
     python_version: Optional[str],
@@ -81,6 +83,9 @@ def generate_argv(
         args.append(f"--config-file={mypy.config}")
     if python_version:
         args.append(f"--python-version={python_version}")
+    # @TODO: appeared in 0.700, is that OK?
+    args.append("--skip-cache-mtime-check")
+    args.extend(("--cache-dir", cache_dir))
     args.append(f"@{file_list_path}")
     return tuple(args)
 
@@ -109,6 +114,7 @@ async def mypy_typecheck_partition(
     partition: MyPyPartition,
     config_file: MyPyConfigFile,
     first_party_plugins: MyPyFirstPartyPlugins,
+    build_root: BuildRoot,
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> CheckResult:
@@ -223,6 +229,7 @@ async def mypy_typecheck_partition(
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
     }
+    cache_dir = f".cache/mypy_cache/{hex(abs(hash(build_root.path)))[2:]}"
 
     result = await Get(
         FallibleProcessResult,
@@ -231,6 +238,7 @@ async def mypy_typecheck_partition(
             argv=generate_argv(
                 mypy,
                 venv_python=requirements_venv_pex.python.argv0,
+                cache_dir=cache_dir,
                 file_list_path=file_list_path,
                 python_version=config_file.python_version_to_autoset(
                     partition.interpreter_constraints, python_setup.interpreter_versions_universe
@@ -241,6 +249,7 @@ async def mypy_typecheck_partition(
             output_directories=(REPORT_DIR,),
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
+            append_only_caches={"mypy_cache": cache_dir},
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
