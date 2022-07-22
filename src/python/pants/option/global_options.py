@@ -1320,8 +1320,6 @@ class BootstrapOptions:
     remote_auth_plugin = StrOption(
         default=None,
         advanced=True,
-        removal_version="2.15.0.dev1",
-        removal_hint="Remote auth plugin function is now specified via a backend entrypoint.",
         help=softwrap(
             """
             Path to a plugin to dynamically configure remote caching and execution options.
