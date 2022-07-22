@@ -11,7 +11,7 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.helm.dependency_inference import deployment as infer_deployment
 from pants.backend.helm.subsystems.post_renderer import (
     HELM_POST_RENDERER_CFG_FILENAME,
-    HelmPostRendererRunnable,
+    HelmPostRenderer,
 )
 from pants.backend.helm.target_types import (
     HelmChartTarget,
@@ -22,9 +22,9 @@ from pants.backend.helm.testutil import HELM_CHART_FILE, HELM_TEMPLATE_HELPERS_F
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
-    HelmDeploymentRendererCmd,
-    HelmDeploymentRendererRequest,
-    RenderedHelmDeployment,
+    HelmDeploymentCmd,
+    HelmDeploymentRequest,
+    RenderedHelmFiles,
 )
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -41,8 +41,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *infer_deployment.rules(),
             *post_renderer.rules(),
-            QueryRule(HelmPostRendererRunnable, (HelmDeploymentPostRendererRequest,)),
-            QueryRule(RenderedHelmDeployment, (HelmDeploymentRendererRequest,)),
+            QueryRule(HelmPostRenderer, (HelmDeploymentPostRendererRequest,)),
+            QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
             QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
@@ -171,7 +171,7 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     field_set = HelmDeploymentFieldSet.create(tgt)
 
     post_renderer = rule_runner.request(
-        HelmPostRendererRunnable,
+        HelmPostRenderer,
         [HelmDeploymentPostRendererRequest(field_set)],
     )
 
@@ -181,11 +181,11 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     assert config_file == expected_config_file
 
     rendered_output = rule_runner.request(
-        RenderedHelmDeployment,
+        RenderedHelmFiles,
         [
-            HelmDeploymentRendererRequest(
+            HelmDeploymentRequest(
                 field_set=field_set,
-                cmd=HelmDeploymentRendererCmd.TEMPLATE,
+                cmd=HelmDeploymentCmd.RENDER,
                 description="Test post-renderer output",
                 post_renderer=post_renderer,
             )

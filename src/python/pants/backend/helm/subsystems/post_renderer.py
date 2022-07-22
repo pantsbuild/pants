@@ -9,6 +9,7 @@ import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
+from typing import Any
 
 import yaml
 
@@ -38,7 +39,7 @@ _HELM_POSTRENDERER_SOURCE = "post_renderer_main.py"
 _HELM_POSTRENDERER_PACKAGE = "pants.backend.helm.subsystems"
 
 
-class HelmPostRenderer(PythonToolRequirementsBase):
+class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-post-renderer"
     help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
@@ -59,12 +60,14 @@ class HelmPostRenderer(PythonToolRequirementsBase):
 
 
 class HelmPostRendererLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = HelmPostRenderer.options_scope
+    resolve_name = HelmPostRendererSubsystem.options_scope
 
 
 @rule
 def setup_postrenderer_lockfile_request(
-    _: HelmPostRendererLockfileSentinel, post_renderer: HelmPostRenderer, python_setup: PythonSetup
+    _: HelmPostRendererLockfileSentinel,
+    post_renderer: HelmPostRendererSubsystem,
+    python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     return GeneratePythonLockfile.from_tool(
         post_renderer, use_pex=python_setup.generate_lockfiles_with_pex
@@ -80,8 +83,8 @@ class HelmPostRendererTool:
 
 
 @rule(desc="Setup Helm post renderer binaries", level=LogLevel.DEBUG)
-async def setup_internal_post_renderer(
-    post_renderer: HelmPostRenderer,
+async def setup_post_renderer_tool(
+    post_renderer: HelmPostRendererSubsystem,
 ) -> HelmPostRendererTool:
     post_renderer_sources = pkgutil.get_data(_HELM_POSTRENDERER_PACKAGE, _HELM_POSTRENDERER_SOURCE)
     if not post_renderer_sources:
@@ -118,7 +121,7 @@ class SetupHelmPostRenderer(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class HelmPostRendererRunnable(EngineAwareReturnType):
+class HelmPostRenderer(EngineAwareReturnType):
     exe: str
     digest: Digest
     immutable_input_digests: FrozenDict[str, Digest]
@@ -132,13 +135,16 @@ class HelmPostRendererRunnable(EngineAwareReturnType):
     def message(self) -> str | None:
         return f"runnable {self.exe} for {self.description_of_origin} is ready."
 
+    def metadata(self) -> dict[str, Any] | None:
+        return {"exe": self.exe, "env": self.env, "append_only_caches": self.append_only_caches}
+
 
 @rule(desc="Configure Helm post-renderer", level=LogLevel.DEBUG)
 async def setup_post_renderer_launcher(
     request: SetupHelmPostRenderer,
     post_renderer_tool: HelmPostRendererTool,
     cat_binary: CatBinary,
-) -> HelmPostRendererRunnable:
+) -> HelmPostRenderer:
     # Build post-renderer configuration file and create a digest containing it.
     post_renderer_config = yaml.safe_dump(
         request.replacements.to_json_dict(), explicit_start=True, sort_keys=True
@@ -196,7 +202,7 @@ async def setup_post_renderer_launcher(
     launcher_digest = await Get(
         Digest, MergeDigests([wrapper_digest, post_renderer_process.input_digest])
     )
-    return HelmPostRendererRunnable(
+    return HelmPostRenderer(
         exe=_HELM_POST_RENDERER_WRAPPER_SCRIPT,
         digest=launcher_digest,
         env=post_renderer_process.env,

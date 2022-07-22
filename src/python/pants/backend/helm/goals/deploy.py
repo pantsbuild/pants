@@ -9,7 +9,7 @@ from typing import Iterable
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.helm.dependency_inference import deployment
-from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
+from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
 from pants.backend.helm.target_types import (
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
@@ -17,10 +17,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import post_renderer
 from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
-from pants.backend.helm.util_rules.renderer import (
-    HelmDeploymentRendererCmd,
-    HelmDeploymentRendererRequest,
-)
+from pants.backend.helm.util_rules.renderer import HelmDeploymentCmd, HelmDeploymentRequest
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeploySubsystem
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -91,15 +88,15 @@ async def run_helm_deploy(
 
     target_dependencies, post_renderer = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(HelmPostRendererRunnable, HelmDeploymentPostRendererRequest(field_set)),
+        Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set)),
     )
 
     publish_targets = [tgt for tgt in target_dependencies if DockerFieldSet.is_applicable(tgt)]
 
     renderer = await Get(
         InteractiveProcess,
-        HelmDeploymentRendererRequest(
-            cmd=HelmDeploymentRendererCmd.UPGRADE,
+        HelmDeploymentRequest(
+            cmd=HelmDeploymentCmd.UPGRADE,
             field_set=field_set,
             extra_argv=[
                 "--install",

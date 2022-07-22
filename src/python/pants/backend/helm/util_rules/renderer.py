@@ -15,7 +15,7 @@ from pathlib import PurePath
 from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
+from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentSourcesField
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
@@ -50,31 +50,31 @@ from pants.util.strutil import pluralize, softwrap
 logger = logging.getLogger(__name__)
 
 
-class HelmDeploymentRendererCmd(Enum):
+class HelmDeploymentCmd(Enum):
     """Supported Helm rendering commands, for use when creating a `HelmDeploymentRenderer`."""
 
     UPGRADE = "upgrade"
-    TEMPLATE = "template"
+    RENDER = "template"
 
 
 @dataclass(unsafe_hash=True)
 @frozen_after_init
-class HelmDeploymentRendererRequest(EngineAwareParameter):
+class HelmDeploymentRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
-    cmd: HelmDeploymentRendererCmd
+    cmd: HelmDeploymentCmd
     description: str = dataclasses.field(compare=False)
     extra_argv: tuple[str, ...]
-    post_renderer: HelmPostRendererRunnable | None
+    post_renderer: HelmPostRenderer | None
 
     def __init__(
         self,
         field_set: HelmDeploymentFieldSet,
         *,
-        cmd: HelmDeploymentRendererCmd,
+        cmd: HelmDeploymentCmd,
         description: str,
         extra_argv: Iterable[str] | None = None,
-        post_renderer: HelmPostRendererRunnable | None = None,
+        post_renderer: HelmPostRenderer | None = None,
     ) -> None:
         self.field_set = field_set
         self.cmd = cmd
@@ -96,12 +96,17 @@ class HelmDeploymentRendererRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class HelmDeploymentRenderer(EngineAwareParameter, EngineAwareReturnType):
-    address: Address
+class HelmRendererProcess(EngineAwareParameter, EngineAwareReturnType):
     chart: HelmChart
     process: HelmProcess
-    post_renderer: bool
+    address: Address
     output_directory: str | None
+
+    @property
+    def uses_post_renderer(self) -> bool:
+        if self.output_directory:
+            return False
+        return True
 
     def debug_hint(self) -> str | None:
         return self.address.spec
@@ -113,7 +118,7 @@ class HelmDeploymentRenderer(EngineAwareParameter, EngineAwareReturnType):
         msg = softwrap(
             f"""
             Built renderer for {self.address} using chart {self.chart.address}
-            with{'out' if not self.post_renderer else ''} a post-renderer stage
+            with{'out' if not self.output_directory else ''} a post-renderer stage
             """
         )
         if self.output_directory:
@@ -125,15 +130,14 @@ class HelmDeploymentRenderer(EngineAwareParameter, EngineAwareReturnType):
     def metadata(self) -> dict[str, Any] | None:
         return {
             "address": self.address,
-            "chart": self.chart.address,
+            "chart": self.chart,
             "process": self.process,
-            "post_renderer": self.post_renderer,
             "output_directory": self.output_directory,
         }
 
 
 @dataclass(frozen=True)
-class RenderedHelmDeployment(EngineAwareReturnType):
+class RenderedHelmFiles(EngineAwareReturnType):
     address: Address
     chart: HelmChart
     snapshot: Snapshot
@@ -153,7 +157,7 @@ class RenderedHelmDeployment(EngineAwareReturnType):
         return {"content": self.snapshot}
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"deployment": self.address, "chart": self.chart.address}
+        return {"address": self.address, "chart": self.chart}
 
 
 def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]:
@@ -184,8 +188,8 @@ def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]
 
 @rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
 async def setup_render_helm_deployment_process(
-    request: HelmDeploymentRendererRequest,
-) -> HelmDeploymentRenderer:
+    request: HelmDeploymentRequest,
+) -> HelmRendererProcess:
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(
@@ -282,12 +286,11 @@ async def setup_render_helm_deployment_process(
         output_directories=output_directories,
     )
 
-    return HelmDeploymentRenderer(
-        address=request.field_set.address,
+    return HelmRendererProcess(
         chart=chart,
         process=process,
+        address=request.field_set.address,
         output_directory=output_dir,
-        post_renderer=True if request.post_renderer else False,
     )
 
 
@@ -296,7 +299,7 @@ _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
 @rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
-async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedHelmDeployment:
+async def run_renderer(renderer: HelmRendererProcess) -> RenderedHelmFiles:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
         if len(sanitised_lines) == 0:
@@ -328,31 +331,29 @@ async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedHelmDeployme
 
         return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
 
-    logger.debug(f"Running Helm renderer process for deployment {renderer.address}")
+    logger.debug(f"Running Helm renderer process for {renderer.address}")
     result = await Get(ProcessResult, HelmProcess, renderer.process)
 
     output_snapshot = EMPTY_SNAPSHOT
     if not renderer.output_directory:
-        logger.debug(
-            f"Parsing Helm renderer files from the process' output of deployment {renderer.address}."
-        )
+        logger.debug(f"Parsing Helm renderer files from the process' output of {renderer.address}.")
         output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
     else:
         logger.debug(
-            f"Obtaining Helm renderer files from the process' output directory of deployment {renderer.address}."
+            f"Obtaining Helm renderer files from the process' output directory of {renderer.address}."
         )
         output_snapshot = await Get(
             Snapshot, RemovePrefix(result.output_digest, renderer.output_directory)
         )
 
-    return RenderedHelmDeployment(
+    return RenderedHelmFiles(
         address=renderer.address, chart=renderer.chart, snapshot=output_snapshot
     )
 
 
 @rule
 async def helm_renderer_as_interactive_process(
-    renderer: HelmDeploymentRenderer,
+    renderer: HelmRendererProcess,
 ) -> InteractiveProcess:
     process = await Get(Process, HelmProcess, renderer.process)
     return await Get(InteractiveProcess, InteractiveProcessRequest(process))

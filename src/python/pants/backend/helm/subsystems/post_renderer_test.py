@@ -9,10 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.post_renderer import (
-    HelmPostRendererRunnable,
-    SetupHelmPostRenderer,
-)
+from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.util_rules.yaml_utils import MutableYamlIndex, YamlPath
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -25,7 +22,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *post_renderer.rules(),
-            QueryRule(HelmPostRendererRunnable, (SetupHelmPostRenderer,)),
+            QueryRule(HelmPostRenderer, (SetupHelmPostRenderer,)),
             QueryRule(ProcessResult, (Process,)),
         ]
     )
@@ -54,7 +51,7 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
     )
 
     post_renderer_setup = rule_runner.request(
-        HelmPostRendererRunnable,
+        HelmPostRenderer,
         [
             SetupHelmPostRenderer(
                 replacements.frozen(), description_of_origin="test_post_renderer_is_runnable"

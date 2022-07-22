@@ -22,10 +22,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDeploymentMappings
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.post_renderer import (
-    HelmPostRendererRunnable,
-    SetupHelmPostRenderer,
-)
+from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
@@ -50,7 +47,7 @@ async def prepare_post_renderer_for_helm_deployment(
     request: HelmDeploymentPostRendererRequest,
     mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
-) -> HelmPostRendererRunnable:
+) -> HelmPostRenderer:
     docker_addresses = mappings.deployment_to_docker_addresses[request.field_set.address]
     logger.debug(
         softwrap(
@@ -115,7 +112,7 @@ async def prepare_post_renderer_for_helm_deployment(
     )
 
     return await Get(
-        HelmPostRendererRunnable,
+        HelmPostRenderer,
         SetupHelmPostRenderer(replacements, description_of_origin=request.field_set.address.spec),
     )
 

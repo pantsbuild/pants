@@ -15,9 +15,9 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.testutil import HELM_CHART_FILE, HELM_TEMPLATE_HELPERS_FILE
 from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.renderer import (
-    HelmDeploymentRendererCmd,
-    HelmDeploymentRendererRequest,
-    RenderedHelmDeployment,
+    HelmDeploymentCmd,
+    HelmDeploymentRequest,
+    RenderedHelmFiles,
 )
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *renderer.rules(),
-            QueryRule(RenderedHelmDeployment, (HelmDeploymentRendererRequest,)),
+            QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
         ],
     )
     source_root_patterns = ("src/*",)
@@ -120,13 +120,13 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         """
     )
 
-    render_request = HelmDeploymentRendererRequest(
-        cmd=HelmDeploymentRendererCmd.TEMPLATE,
+    render_request = HelmDeploymentRequest(
+        cmd=HelmDeploymentCmd.RENDER,
         field_set=field_set,
         description="Test template rendering",
     )
 
-    rendered = rule_runner.request(RenderedHelmDeployment, [render_request])
+    rendered = rule_runner.request(RenderedHelmFiles, [render_request])
 
     assert rendered.snapshot.files
     assert "mychart/templates/configmap.yaml" in rendered.snapshot.files
