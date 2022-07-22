@@ -1,5 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
@@ -55,6 +58,8 @@ class RunRequest:
     # be substituted with the (absolute) chroot path.
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    immutable_input_digests: Mapping[str, Digest] | None = None
+    append_only_caches: Mapping[str, str] | None = None
 
     def __init__(
         self,
@@ -62,10 +67,14 @@ class RunRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
+        self.immutable_input_digests = immutable_input_digests
+        self.append_only_caches = append_only_caches
 
 
 class RunDebugAdapterRequest(RunRequest):
@@ -183,6 +192,8 @@ async def run(
             run_in_workspace=True,
             restartable=restartable,
             cleanup=cleanup,
+            immutable_input_digests=request.immutable_input_digests,
+            append_only_caches=request.append_only_caches,
         ),
     )
 
