@@ -91,7 +91,7 @@ async def assemble_resources_jar(
             argv=[
                 zip.path,
                 output_filename,
-                *input_files,
+                *sorted(input_files),
             ],
             description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
