@@ -57,7 +57,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.62.1-*
 
           ~/.rustup/update-hashes
 
@@ -202,7 +202,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.62.1-*
 
           ~/.rustup/update-hashes
 
@@ -422,7 +422,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.62.1-*
 
           ~/.rustup/update-hashes
 
@@ -561,7 +561,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.62.1-*
 
           ~/.rustup/update-hashes
 

@@ -27,6 +27,7 @@ from pants.jvm import classpath, jdk_rules
 from pants.jvm.package import war
 from pants.jvm.package.war import PackageWarFileFieldSet
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget, JvmWarTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -55,6 +56,7 @@ def rule_runner():
             *war.rules(),
             *jvm_tool.rules(),
             *classpath.rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *jdk_rules.rules(),
             *java_dep_inf_rules(),

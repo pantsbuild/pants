@@ -31,6 +31,7 @@ from pants.engine.target import GeneratedSources, HydratedSources, HydrateSource
 from pants.jvm import classpath, jdk_rules, testutil, util_rules
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.resolve import coursier_fetch, coursier_setup
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -73,6 +74,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *stripped_source_files.rules(),
             *artifact_mapper.rules(),
+            *strip_jar.rules(),
             *javac_rules(),
             *java_dep_inf_rules(),
             *testutil.rules(),

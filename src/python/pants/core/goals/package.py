@@ -72,11 +72,14 @@ class OutputPathField(StringField, AsyncFieldMixin):
     def value_or_default(self, *, file_ending: str | None) -> str:
         if self.value:
             return self.value
-        file_prefix = (
+        target_name_part = (
             self.address.generated_name.replace(".", "_")
             if self.address.generated_name
             else self.address.target_name
         )
+        params_sanitized = self.address.parameters_repr.replace(".", "_")
+        file_prefix = f"{target_name_part}{params_sanitized}"
+
         if file_ending is None:
             file_name = file_prefix
         else:

@@ -22,6 +22,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.package import deploy_jar
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
+from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
 from pants.jvm.test import junit
 
@@ -50,6 +51,7 @@ def rules():
         *repl.rules(),
         *classpath.rules(),
         *junit.rules(),
+        *strip_jar.rules(),
         *deploy_jar.rules(),
         *lockfile.rules(),
         *coursier_fetch.rules(),

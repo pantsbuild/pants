@@ -150,11 +150,12 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
-class PythonRunGoalUseSandboxField(BoolField):
+class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
-    default = True
     help = softwrap(
         """
+        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
 
@@ -586,6 +587,16 @@ class PexIncludeRequirementsField(BoolField):
     )
 
 
+class PexIncludeSourcesField(BoolField):
+    alias = "include_sources"
+    default = True
+    help = softwrap(
+        """
+        Whether to include your first party sources the binary uses in the packaged PEX file.
+        """
+    )
+
+
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
@@ -614,6 +625,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexLayoutField,
     PexExecutionModeField,
     PexIncludeRequirementsField,
+    PexIncludeSourcesField,
     PexIncludeToolsField,
     RestartableField,
 )

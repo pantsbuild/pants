@@ -34,6 +34,22 @@ class DebugPy(PythonToolBase):
 
     args = ArgsListOption(example="--log-to-stderr")
 
+    @property
+    def all_requirements(self) -> tuple[str, ...]:
+        """All the raw requirement strings to install the tool.
+
+        This may not include transitive dependencies: these are top-level requirements.
+        """
+        # NB: Locking with importlib_metadata is only necessary while debugpy supports Py 3.7, as
+        # `importlib.metadata` was added in Py 3.8 and would allow us to resolve the console_script
+        # using just the stdlib.
+        #
+        # Lastly, importlib_metadata, has so-far maintained a backwards-compatible API for
+        # `entry_points`, so we lock using the lowest version but can be reasonably confident our
+        # code will still work if executed in an environment with a user requirement on a newer
+        # importlib_metadata.
+        return (self.version, "importlib_metadata==1.4.0", *self.extra_requirements)
+
     @staticmethod
     def _get_main_spec_args(main: MainSpecification) -> tuple[str, ...]:
         if isinstance(main, EntryPoint):
@@ -42,13 +58,13 @@ class DebugPy(PythonToolBase):
             return ("-m", main.module)
 
         assert isinstance(main, ConsoleScript)
-        # NB: This is only necessary while debugpy supports Py 3.7, as `importlib.metadata` was
-        # added in Py 3.8 and would allow us to resolve the console_script using just the stdlib.
         return (
             "-c",
             (
-                "from pex.third_party.pkg_resources import working_set;"
-                + f"(next(working_set.iter_entry_points('console_scripts', '{main.name}')).resolve())()"
+                "import importlib_metadata;"
+                + "eps = importlib_metadata.entry_points()['console_scripts'];"
+                + f"ep = next(ep for ep in eps if ep.name == '{main.name}');"
+                + "ep.load()()"
             ),
         )
 

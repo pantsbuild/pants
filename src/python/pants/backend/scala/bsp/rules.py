@@ -33,8 +33,6 @@ from pants.bsp.util_rules.targets import (
     BSPCompileResult,
     BSPDependencyModulesRequest,
     BSPDependencyModulesResult,
-    BSPResolveFieldFactoryRequest,
-    BSPResolveFieldFactoryResult,
     BSPResourcesRequest,
     BSPResourcesResult,
 )
@@ -86,14 +84,13 @@ class ScalaMetadataFieldSet(FieldSet):
     jdk: JvmJdkField
 
 
-class ScalaBSPResolveFieldFactoryRequest(BSPResolveFieldFactoryRequest):
-    resolve_prefix = "jvm"
-
-
 class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
     can_merge_metadata_from = ("java",)
     field_set_type = ScalaMetadataFieldSet
+
+    resolve_prefix = "jvm"
+    resolve_field = JvmResolveField
 
 
 @dataclass(frozen=True)
@@ -175,16 +172,6 @@ async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
     return await Get(
         Snapshot,
         AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"),
-    )
-
-
-@rule
-def bsp_resolve_field_factory(
-    request: ScalaBSPResolveFieldFactoryRequest,
-    jvm: JvmSubsystem,
-) -> BSPResolveFieldFactoryResult:
-    return BSPResolveFieldFactoryResult(
-        lambda target: target.get(JvmResolveField).normalized_value(jvm)
     )
 
 
@@ -540,7 +527,6 @@ def rules():
         *jvm_resources_rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
-        UnionRule(BSPResolveFieldFactoryRequest, ScalaBSPResolveFieldFactoryRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
         UnionRule(BSPHandlerMapping, ScalaMainClassesHandlerMapping),
         UnionRule(BSPHandlerMapping, ScalaTestClassesHandlerMapping),

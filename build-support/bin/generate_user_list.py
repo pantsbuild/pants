@@ -103,6 +103,11 @@ _orgs = (
         "https://files.readme.io/43d674d-toolchain_logo_small.png",
     ),
     Org("Valon", "https://valon.com/", "https://files.readme.io/df5216a-valon-small.png"),
+    Org(
+        "Vicara Solutions",
+        "https://vicarasolutions.com/",
+        "https://files.readme.io/1748a22-vicara-solutions.png",
+    ),
 )
 
 

@@ -6,13 +6,13 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.target import Target
+from pants.engine.target import Field, FieldDefaults, Target, TargetTypesToGenerateTargetsRequests
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, softwrap
@@ -193,12 +193,27 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
 
         raise self._bare_address_error(address)
 
-    def get(self, address: Address) -> Target | None:
+    def get(
+        self,
+        address: Address,
+        target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests | None = None,
+    ) -> Target | None:
         """Find the Target with an exact Address match, if any."""
         for parametrization in self:
             instance = parametrization.get(address)
             if instance is not None:
                 return instance
+
+        # TODO: This is an accommodation to allow using file/generator Addresses for
+        # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
+        if target_types_to_generate_requests and address.is_generated_target:
+            base_address = address.maybe_convert_to_target_generator()
+            original_target = self.get(base_address, target_types_to_generate_requests)
+            if original_target and not target_types_to_generate_requests.is_generator(
+                original_target
+            ):
+                return original_target
+
         return None
 
     def get_all_superset_targets(self, address: Address) -> Iterator[Address]:
@@ -224,26 +239,30 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
                 if address.is_parametrized_subset_of(parametrized_tgt.address):
                     yield parametrized_tgt.address
 
-    def get_subset(self, address: Address, consumer: Target) -> Target:
+    def get_subset(
+        self,
+        address: Address,
+        consumer: Target,
+        field_defaults: FieldDefaults,
+        target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    ) -> Target:
         """Find the Target with the given Address, or with fields matching the given consumer."""
         # Check for exact matches.
-        instance = self.get(address)
+        instance = self.get(address, target_types_to_generate_requests)
         if instance is not None:
             return instance
 
         def remaining_fields_match(candidate: Target) -> bool:
-            """Returns true if all Fields absent from the candidate's Address match the consumer.
-
-            TODO: This does not account for the computed default values of Fields:
-              see https://github.com/pantsbuild/pants/issues/16175
-            """
-
+            """Returns true if all Fields absent from the candidate's Address match the consumer."""
             unspecified_param_field_names = {
                 key for key in candidate.address.parameters.keys() if key not in address.parameters
             }
-
             return all(
-                consumer.has_field(field_type) and consumer[field_type].value == field.value
+                _concrete_fields_are_equivalent(
+                    field_defaults,
+                    consumer=consumer,
+                    candidate_field=field,
+                )
                 for field_type, field in candidate.field_values.items()
                 if field_type.alias in unspecified_param_field_names
             )
@@ -300,3 +319,34 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             f"Target `{address}` can be addressed as:\n"
             f"{bullet_list(str(t.address) for t in self.all)}"
         )
+
+
+def _concrete_fields_are_equivalent(
+    field_defaults: FieldDefaults, *, consumer: Target, candidate_field: Field
+) -> bool:
+    candidate_field_type = type(candidate_field)
+    candidate_field_value = field_defaults.value_or_default(candidate_field)
+
+    if consumer.has_field(candidate_field_type):
+        return cast(
+            bool,
+            field_defaults.value_or_default(consumer[candidate_field_type])
+            == candidate_field_value,
+        )
+    # Else, see if the consumer has a field that is a superclass of `candidate_field_value`, to
+    # handle https://github.com/pantsbuild/pants/issues/16190. This is only safe because we are
+    # confident that both `candidate_field_type` and the fields from `consumer` are _concrete_,
+    # meaning they are not abstract templates like `StringField`.
+    superclass = next(
+        (
+            consumer_field
+            for consumer_field in consumer.field_types
+            if isinstance(candidate_field, consumer_field)
+        ),
+        None,
+    )
+    if superclass is None:
+        return False
+    return cast(
+        bool, field_defaults.value_or_default(consumer[superclass]) == candidate_field_value
+    )

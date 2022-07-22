@@ -7,8 +7,9 @@ import textwrap
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from pants.backend.go.subsystems import golang
-from pants.backend.go.subsystems.golang import GolangSubsystem, GoRoot
+from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.util_rules import goroot
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
@@ -147,4 +148,4 @@ async def compute_go_tool_id(request: GoSdkToolIDRequest) -> GoSdkToolIDResult:
 
 
 def rules():
-    return (*collect_rules(), *golang.rules())
+    return (*collect_rules(), *goroot.rules())
