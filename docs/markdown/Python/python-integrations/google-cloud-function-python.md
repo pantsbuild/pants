@@ -88,4 +88,4 @@ Step 4: Upload to Google Cloud
 
 You can use any of the various Google Cloud methods to upload your zip file, such as the Google Cloud console or the [Google Cloud CLI](https://cloud.google.com/functions/docs/deploying/filesystem#deploy_using_the_gcloud_tool).
 
-You must specify the handler as `main.handler`.
+You must specify the handler as `handler`.
