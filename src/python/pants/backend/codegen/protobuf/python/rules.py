@@ -107,13 +107,11 @@ async def generate_python_from_protobuf(
         )
 
         if request.protocol_target.get(ProtobufGrpcToggleField).value:
-            mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
+            mypy_pex_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
-            if any(
-                dist_info.project_name == "mypy-protobuf" and dist_info.version.major >= 2
-                for dist_info in mypy_info
-            ):
+            mypy_protobuf_info = mypy_pex_info.find("mypy-protobuf")
+            if mypy_protobuf_info and mypy_protobuf_info.version.major >= 2:
                 # TODO: Use `pex_path` once VenvPex stores a Pex field.
                 mypy_pex = await Get(
                     VenvPex,

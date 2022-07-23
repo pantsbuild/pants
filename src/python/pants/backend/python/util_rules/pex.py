@@ -11,7 +11,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, Iterator, Mapping
+from typing import Iterable, Iterator, Mapping, TypeVar
 
 import packaging.specifiers
 import packaging.version
@@ -1037,9 +1037,21 @@ class PexDistributionInfo:
     requires_dists: tuple[Requirement, ...]
 
 
+DefaultT = TypeVar("DefaultT")
+
+
 class PexResolveInfo(Collection[PexDistributionInfo]):
     """Information about all distributions resolved in a PEX file, as reported by `PEX_TOOLS=1
     repository info -v`."""
+
+    def find(
+        self, name: str, default: DefaultT | None = None
+    ) -> PexDistributionInfo | DefaultT | None:
+        """Returns the PexDistributionInfo with the given name, first one wins."""
+        try:
+            return next(info for info in self if info.project_name == name)
+        except StopIteration:
+            return default
 
 
 def parse_repository_info(repository_info: str) -> PexResolveInfo:
