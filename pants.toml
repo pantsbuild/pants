@@ -68,8 +68,9 @@ unmatched_build_file_globs = "error"
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
-# TODO: See https://github.com/pantsbuild/pants/issues/16096.
-remote_cache_eager_fetch = true
+# TODO: May cause tests which experience missing digests to hang.
+# See https://github.com/pantsbuild/pants/issues/16096.
+remote_cache_eager_fetch = false
 
 [anonymous-telemetry]
 enabled = true
