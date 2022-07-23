@@ -74,11 +74,9 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     # Isort 5+ changes how config files are handled. Determine which semantics we should use.
     is_isort5 = False
     if isort.config:
-        isort_info = await Get(PexResolveInfo, VenvPex, isort_pex)
-        is_isort5 = any(
-            dist_info.project_name == "isort" and dist_info.version.major >= 5
-            for dist_info in isort_info
-        )
+        isort_pex_info = await Get(PexResolveInfo, VenvPex, isort_pex)
+        isort_info = isort_pex_info.find("isort")
+        is_isort5 = isort_info is not None and isort_info.version.major >= 5
 
     input_digest = await Get(
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))

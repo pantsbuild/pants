@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Iterable, Optional, Tuple
+
+import packaging
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField
@@ -17,19 +20,26 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 )
 from pants.backend.python.util_rules import partition, pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    PexResolveInfo,
+    VenvPex,
+    VenvPexProcess,
+)
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -69,9 +79,12 @@ class MyPyRequest(CheckRequest):
     name = MyPy.options_scope
 
 
-def generate_argv(
+@rule_helper
+async def _generate_argv(
     mypy: MyPy,
     *,
+    pex: VenvPex,
+    cache_dir: str,
     venv_python: str,
     file_list_path: str,
     python_version: Optional[str],
@@ -81,6 +94,16 @@ def generate_argv(
         args.append(f"--config-file={mypy.config}")
     if python_version:
         args.append(f"--python-version={python_version}")
+
+    mypy_pex_info = await Get(PexResolveInfo, VenvPex, pex)
+    mypy_info = mypy_pex_info.find("mypy")
+    assert mypy_info is not None
+    if mypy_info.version > packaging.version.Version("0.700"):
+        args.append("--skip-cache-mtime-check")
+        args.extend(("--cache-dir", cache_dir))
+    else:
+        # Don't bother caching
+        args.append("--cache-dir=/dev/null")
     args.append(f"@{file_list_path}")
     return tuple(args)
 
@@ -109,6 +132,7 @@ async def mypy_typecheck_partition(
     partition: MyPyPartition,
     config_file: MyPyConfigFile,
     first_party_plugins: MyPyFirstPartyPlugins,
+    build_root: BuildRoot,
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> CheckResult:
@@ -224,13 +248,17 @@ async def mypy_typecheck_partition(
         "MYPYPATH": ":".join(all_used_source_roots),
     }
 
+    cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
+
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
             mypy_pex,
-            argv=generate_argv(
+            argv=await _generate_argv(
                 mypy,
+                pex=mypy_pex,
                 venv_python=requirements_venv_pex.python.argv0,
+                cache_dir=cache_dir,
                 file_list_path=file_list_path,
                 python_version=config_file.python_version_to_autoset(
                     partition.interpreter_constraints, python_setup.interpreter_versions_universe
@@ -241,6 +269,7 @@ async def mypy_typecheck_partition(
             output_directories=(REPORT_DIR,),
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
+            append_only_caches={"mypy_cache": cache_dir},
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
