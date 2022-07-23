@@ -751,6 +751,8 @@ impl Context {
         if let Some(new_level) = maybe_new_level {
           workunit.increment_counter(Metric::BacktrackAttempts, 1);
           let description = &root.process.description;
+          // TODO: This message should likely be at `info`, or eventually, debug.
+          //   see https://github.com/pantsbuild/pants/issues/15867
           log::warn!(
             "Making attempt {new_level} to backtrack and retry `{description}`, due to \
               missing digest {digest:?}."
