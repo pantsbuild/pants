@@ -357,12 +357,6 @@ class DynamicRemoteOptions:
         remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
         auth_plugin_result: AuthPluginResult | None = None
-        if ":" not in bootstrap_options.remote_auth_plugin:
-            raise OptionsError(
-                "Invalid value for `[GLOBAL].remote_auth_plugin`: "
-                f"{bootstrap_options.remote_auth_plugin}. Please use the format "
-                "`path.to.module:my_func`."
-            )
         if not remote_auth_plugin_func_from_entry_point:
             remote_auth_plugin_func = cls._get_auth_plugin_from_option(
                 bootstrap_options.remote_auth_plugin
