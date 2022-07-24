@@ -95,7 +95,10 @@ def test_infer_python_imports(caplog) -> None:
     def run_dep_inference(
         address: Address, *, enable_string_imports: bool = False
     ) -> InferredDependencies:
-        args = ["--source-root-patterns=src/python"]
+        args = [
+            "--source-root-patterns=src/python",
+            "--python-infer-unowned-dependency-behavior=ignore",
+        ]
         if enable_string_imports:
             args.append("--python-infer-string-imports")
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
