@@ -17,7 +17,21 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 
-CC_FILE_EXTENSIONS = (".c", ".h", ".cc", ".cpp", ".hpp")
+# Using the extensions referenced in C++ Core Guidelines FAQ
+# https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
+# https://isocpp.org/wiki/faq/coding-standards#src-file-ext
+CC_HEADER_FILE_EXTENSIONS = (
+    ".h",
+    ".hh",
+    ".hpp",
+)
+CC_SOURCE_FILE_EXTENSIONS = (
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cxx",
+)
+CC_FILE_EXTENSIONS = CC_HEADER_FILE_EXTENSIONS + CC_SOURCE_FILE_EXTENSIONS
 
 
 class CCDependenciesField(Dependencies):

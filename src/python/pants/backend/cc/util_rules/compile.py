@@ -50,47 +50,49 @@ async def compile_cc_source(
     toolchain: CCToolchain, request: CompileCCSourceRequest
 ) -> FallibleCompiledCCObject:
 
-    target_source_file = await Get(
-        SourceFiles, SourceFilesRequest([request.target.get(SourcesField)])
-    )
-
-    deps = await Get(
+    # Try to determine what this file needs in its digest to compile correctly (i.e. which header files)
+    inferred_dependencies = await Get(
         InferredDependencies,
         InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(request.target)),
     )
 
+    # Convert inferred dependency addresses into targets
     wrapped_targets = await MultiGet(
         Get(
             WrappedTarget,
-            WrappedTargetRequest(dep, description_of_origin="<build_pkg_target.py>"),
+            WrappedTargetRequest(address, description_of_origin="<cc/util_rules/compile.py>"),
         )
-        for dep in deps.include
+        for address in inferred_dependencies.include
     )
 
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest([dep.target.get(SourcesField) for dep in wrapped_targets])
+    target_source_file = await Get(
+        SourceFiles, SourceFilesRequest([request.target.get(SourcesField)])
     )
-    logger.warning(f"SourceFIles:  {source_files}")
+    inferred_source_files = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            [wrapped_target.target.get(SourcesField) for wrapped_target in wrapped_targets]
+        ),
+    )
 
     input_digest = await Get(
         Digest,
-        MergeDigests((target_source_file.snapshot.digest, source_files.snapshot.digest)),
+        MergeDigests((target_source_file.snapshot.digest, inferred_source_files.snapshot.digest)),
     )
 
-    argv = (toolchain.c, "-c", *target_source_file.files, *source_files.files)
-    logger.error(f"argv:  {argv}")
-
-    compiled_object_name = f"{request.target.address}.o"
+    target_file = target_source_file.files[0]
+    compiled_object_name = f"{target_file}.o"
+    argv = (toolchain.c, "-c", target_file)
     compile_result = await Get(
         FallibleProcessResult,
         Process(
             argv=argv,
             input_digest=input_digest,
-            description=f"Compile CC source file: {request.target.address}",
+            description=f"Compile CC source file: {target_file}",
             output_files=(compiled_object_name,),
         ),
     )
-    # logger.error(request.source.value)
+
     return FallibleCompiledCCObject(compiled_object_name, compile_result)
 
 

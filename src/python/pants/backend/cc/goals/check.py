@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import logging
+from pathlib import PurePath
 from typing import Iterable
 
-from pants.backend.cc.target_types import CCFieldSet
+from pants.backend.cc.target_types import CC_SOURCE_FILE_EXTENSIONS, CCFieldSet
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
@@ -22,27 +23,36 @@ class CCCheckRequest(CheckRequest):
     name = "cc-compile"
 
 
+def _source_file_extension(field_set: CCFieldSet) -> str:
+    path = PurePath(field_set.sources.value)
+    return path.suffix
+
+
 @rule(desc="Check CC compilation", level=LogLevel.DEBUG)
 async def check_cc(request: CCCheckRequest) -> CheckResults:
     logger.warning(f"FieldSets: {request.field_sets}")
 
+    # Filter out header files from Check processes
+    source_file_field_sets = [
+        field_set
+        for field_set in request.field_sets
+        if _source_file_extension(field_set) in CC_SOURCE_FILE_EXTENSIONS
+    ]
+
+    # TODO: Should this be a target?
     wrapped_targets = await MultiGet(
         Get(
             WrappedTarget,
             WrappedTargetRequest(field_set.address, description_of_origin="<build_pkg_target.py>"),
         )
-        for field_set in request.field_sets
+        for field_set in source_file_field_sets
     )
-    # build_requests = await MultiGet(
-    #     Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(field_set.address))
-    #     for field_set in request.field_sets
-    # )
 
+    # TODO: Should we pass targets? Or field sets? Or single source files?
     compile_results = await MultiGet(
         Get(FallibleCompiledCCObject, CompileCCSourceRequest(wrapped_target.target))
         for wrapped_target in wrapped_targets
     )
-    logger.info(compile_results)
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
     exit_code = next(
