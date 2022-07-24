@@ -151,7 +151,7 @@ async def package_python_google_cloud_function(
         ProcessResult,
         VenvPexProcess(
             lambdex_pex,
-            argv=("build", "-M", "main.py", "-e", handler.val, output_filename),
+            argv=("build", "-M", "main.py", "-H", "handler", "-e", handler.val, output_filename),
             input_digest=pex_result.digest,
             output_files=(output_filename,),
             description=f"Setting up handler in {output_filename}",
@@ -162,9 +162,15 @@ async def package_python_google_cloud_function(
     if field_set.runtime.value:
         extra_log_data.append(("Runtime", field_set.runtime.value))
     extra_log_data.extend(("Complete platform", path) for path in complete_platforms)
-    # The GCP-facing handler function is always main.handler, which is the
-    # wrapper injected by lambdex that manages invocation of the actual handler.
-    extra_log_data.append(("Handler", "main.handler"))
+    # The GCP-facing handler function is always `main.handler` (We pass `-M main.py -H handler` to
+    # Lambdex to ensure this), which is the wrapper injected by Lambdex that manages invocation of
+    # the actual user-supplied handler function. This arrangement works well since GCF assumes the
+    # handler function is housed in `main.py` in the root of the zip (you can re-direct this by
+    # setting a `GOOGLE_FUNCTION_SOURCE` Google Cloud build environment variable; e.g.:
+    # `gcloud functions deploy {--build-env-vars-file,--set-build-env-vars}`, but it's non-trivial
+    # to do this right or with intended effect) and the handler name you configure GCF with is just
+    # the unqualified function name, which we log here.
+    extra_log_data.append(("Handler", "handler"))
 
     first_column_width = 4 + max(len(header) for header, _ in extra_log_data)
     artifact = BuiltPackageArtifact(
