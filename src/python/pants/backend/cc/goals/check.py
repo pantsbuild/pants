@@ -9,9 +9,8 @@ from typing import Iterable
 from pants.backend.cc.target_types import CCFieldSet
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -27,11 +26,6 @@ class CCCheckRequest(CheckRequest):
 async def check_cc(request: CCCheckRequest) -> CheckResults:
     logger.warning(f"FieldSets: {request.field_sets}")
 
-    logger.warning(f"FieldSet Sources: {[field_set.sources for field_set in request.field_sets]}")
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
-    )
-    logger.warning([list(ct.closure()) for ct in coarsened_targets])
     wrapped_targets = await MultiGet(
         Get(
             WrappedTarget,
@@ -39,11 +33,14 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         )
         for field_set in request.field_sets
     )
-    logger.warning(wrapped_targets)
+    # build_requests = await MultiGet(
+    #     Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(field_set.address))
+    #     for field_set in request.field_sets
+    # )
 
     compile_results = await MultiGet(
-        Get(FallibleCompiledCCObject, CompileCCSourceRequest(field_set.sources))
-        for field_set in request.field_sets
+        Get(FallibleCompiledCCObject, CompileCCSourceRequest(wrapped_target.target))
+        for wrapped_target in wrapped_targets
     )
     logger.info(compile_results)
 
