@@ -74,7 +74,7 @@ For example:
 $ ./pants package project/google_cloud_function_example.py
 Wrote code bundle to dist/project.zip
   Runtime: python3.8
-  Handler: main.handler
+  Handler: handler
 ```
 
 > 🚧 Running from macOS and failing to build?
