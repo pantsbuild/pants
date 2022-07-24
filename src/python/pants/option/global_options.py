@@ -308,7 +308,7 @@ class DynamicRemoteOptions:
             )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
-        if bootstrap_options.remote_auth_plugin or remote_auth_plugin_func:
+        if bootstrap_options.remote_auth_plugin or remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
                 bootstrap_options,
                 full_options=full_options,
