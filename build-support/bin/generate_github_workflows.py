@@ -482,6 +482,7 @@ class Helper:
             "name": "Upload pants.log",
             "uses": "actions/upload-artifact@v3",
             "if": "always()",
+            "continue-on-error": True,
             "with": {
                 "name": f"pants-log-{name.replace('/', '_')}-{self.platform_name()}",
                 "path": ".pants.d/pants.log",
