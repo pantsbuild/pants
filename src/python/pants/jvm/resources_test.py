@@ -65,6 +65,9 @@ def test_resources(rule_runner: RuleRunner) -> None:
             "BUILD": "resources(name='root', sources=['**/*.txt'])",
             "one.txt": "",
             "two.txt": "",
+            "three/four.txt": "",
+            "three/five.txt": "",
+            "three/six/seven/eight.txt": "",
             "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
         }
     )
