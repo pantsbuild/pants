@@ -233,7 +233,7 @@ class DynamicRemoteOptions:
             raise OptionsError(
                 "Invalid value for `--remote-auth-plugin`: "
                 f"{remote_auth_plugin_option_value}. Please use the format "
-                f"`path.to.module:my_func`."
+                "`path.to.module:my_func`."
             )
         auth_plugin_path, auth_plugin_func = remote_auth_plugin_option_value.split(":")
         auth_plugin_module = importlib.import_module(auth_plugin_path)
