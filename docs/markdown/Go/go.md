@@ -4,7 +4,7 @@ slug: "go"
 excerpt: "Pants's support for Golang."
 hidden: false
 createdAt: "2021-10-08T18:16:00.142Z"
-updatedAt: "2022-05-03T23:52:25.735Z"
+updatedAt: "2022-07-25T23:52:25.735Z"
 ---
 > 🚧 Go support is beta stage
 > 
@@ -33,15 +33,14 @@ updatedAt: "2022-05-03T23:52:25.735Z"
 Initial setup
 -------------
 
-First, activate the Go backend and set the expected Go version in `pants.toml`:
+First, activate the Go backend in `pants.toml`:
 
 ```toml pants.toml
 [GLOBAL]
 backend_packages = ["pants.backend.experimental.go"]
-
-[golang]
-expected_version = "1.17"
 ```
+
+You may want to set the option `[golang].minimum_expected_version` to a value like `"1.17"`. Pants will use this to find a Go distribution that is the same version or newer. You still set your projects' Go version with `go.mod` with the `go` directive; this option is only used for Pants to discover a compatible Go distribution. 
 
 You can also set `[golang].go_search_paths` to influence where Pants looks for Go, e.g. `["/usr/bin"]`. It defaults to your `PATH`.
 
