@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 from dataclasses import dataclass
 from hashlib import sha256
+from textwrap import dedent
 from typing import Iterable, Optional, Tuple
 
 import packaging
@@ -36,9 +38,10 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinary
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -89,7 +92,7 @@ async def _generate_argv(
     file_list_path: str,
     python_version: Optional[str],
 ) -> Tuple[str, ...]:
-    args = [f"--python-executable={venv_python}", *mypy.args]
+    args = [pex.pex.argv0, f"--python-executable={venv_python}", *mypy.args]
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     if python_version:
@@ -99,7 +102,11 @@ async def _generate_argv(
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
     if mypy_info.version > packaging.version.Version("0.700"):
+        # Skip mtime checks because we don't propogate mtime when materialzing the sandbox, so the
+        # mtime checks will always fail otherwise.
         args.append("--skip-cache-mtime-check")
+        # See "__run_wrapper.sh" below for explanation
+        args.append("--sqlite-cache")  # Added in v 0.660
         args.extend(("--cache-dir", cache_dir))
     else:
         # Don't bother caching
@@ -135,6 +142,9 @@ async def mypy_typecheck_partition(
     build_root: BuildRoot,
     mypy: MyPy,
     python_setup: PythonSetup,
+    mkdir: MkdirBinary,
+    cp: CpBinary,
+    mv: MvBinary,
 ) -> CheckResult:
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
@@ -227,6 +237,58 @@ async def mypy_typecheck_partition(
         requirements_venv_pex_request, file_list_digest_request
     )
 
+    py_version = config_file.python_version_to_autoset(
+        partition.interpreter_constraints, python_setup.interpreter_versions_universe
+    )
+    named_cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
+    run_cache_dir = ".tmp_cache/mypy_cache"
+    argv = await _generate_argv(
+        mypy,
+        pex=mypy_pex,
+        venv_python=requirements_venv_pex.python.argv0,
+        cache_dir=run_cache_dir,
+        file_list_path=file_list_path,
+        python_version=config_file.python_version_to_autoset(
+            partition.interpreter_constraints, python_setup.interpreter_versions_universe
+        ),
+    )
+
+    script_runner_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    "__run_wrapper.sh",
+                    dedent(
+                        f"""\
+                            # We want to leverage the MyPy cache for fast incremental runs of MyPy.
+                            # Pants exposes "append_only_caches" we can leverage, but with the caveat
+                            # that it requires either only appending files, or multiprocess-safe access.
+                            #
+                            # MyPy guaruntees neither, but there's workarounds!
+                            #
+                            # By default, MyPy uses 2 cache files persource file, which introduces a
+                            # whole slew of race conditions. To workaround this we enable MyPy's SQLite cache,
+                            # which enables us to run MyPy on a temporary copy of the cache, then mv
+                            # the modified cache back to the real location. This is multiprocess-safe
+                            # as mv on the same filesystem is an atomic "rename", and any processes
+                            # copying the "old" file will still have valid file descriptors for the
+                            # "old" file.
+
+                            {mkdir.path} -p {run_cache_dir}/{py_version} 2>&1 > /dev/null
+                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
+                            {' '.join(argv)}
+                            EXIT_CODE=$?
+                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
+                            exit $EXIT_CODE
+                        """
+                    ).encode(),
+                    is_executable=True,
+                )
+            ]
+        ),
+    )
+
     merged_input_files = await Get(
         Digest,
         MergeDigests(
@@ -236,6 +298,7 @@ async def mypy_typecheck_partition(
                 closure_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
                 config_file.digest,
+                script_runner_digest,
             ]
         ),
     )
@@ -248,30 +311,20 @@ async def mypy_typecheck_partition(
         "MYPYPATH": ":".join(all_used_source_roots),
     }
 
-    cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
-
-    result = await Get(
-        FallibleProcessResult,
+    process = await Get(
+        Process,
         VenvPexProcess(
             mypy_pex,
-            argv=await _generate_argv(
-                mypy,
-                pex=mypy_pex,
-                venv_python=requirements_venv_pex.python.argv0,
-                cache_dir=cache_dir,
-                file_list_path=file_list_path,
-                python_version=config_file.python_version_to_autoset(
-                    partition.interpreter_constraints, python_setup.interpreter_versions_universe
-                ),
-            ),
             input_digest=merged_input_files,
             extra_env=env,
             output_directories=(REPORT_DIR,),
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
-            append_only_caches={"mypy_cache": cache_dir},
+            append_only_caches={"mypy_cache": named_cache_dir},
         ),
     )
+    process = dataclasses.replace(process, argv=("__run_wrapper.sh",))
+    result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
         result,
