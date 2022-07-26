@@ -290,6 +290,12 @@ def _pip_args(extra_pip_args: list[str]) -> tuple[str, ...]:
     return (*extra_pip_args, "--quiet", "--no-cache-dir")
 
 
+def runproc(raw_cmd_args: Iterable[str], **kwargs) -> Any:
+    cmd_args = [str(arg) for arg in raw_cmd_args]
+    sys.stderr.write(f"Running: {' '.join(cmd_args)}\n")
+    return subprocess.run(cmd_args, **kwargs)
+
+
 def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[str]) -> None:
     def run_venv_pants(args: list[str]) -> str:
         # When we do (dry-run) testing, we need to run the packaged pants. It doesn't have internal
@@ -297,7 +303,7 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
         # packages, we override the `--python-path` to include them (and to implicitly exclude
         # `src/python`).
         return (
-            subprocess.run(
+            runproc(
                 [
                     venv_bin_dir / "pants",
                     "--no-remote-cache-read",
@@ -317,7 +323,7 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
             .strip()
         )
 
-    subprocess.run(
+    runproc(
         [
             venv_bin_dir / "pip",
             "install",
@@ -352,7 +358,7 @@ def install_exercising_namespace_packages(
         tempdir = Path(td)
         wheel_dir = tempdir / "wheels"
         pip = venv_bin_dir / "pip"
-        subprocess.run(
+        runproc(
             [
                 pip,
                 "wheel",
@@ -366,7 +372,7 @@ def install_exercising_namespace_packages(
         sys_path_entries = []
         for index, wheel in enumerate(wheel_dir.iterdir()):
             sys_path_entry = tempdir / f"entry_{index}"
-            subprocess.run(
+            runproc(
                 [
                     pip,
                     "install",
@@ -389,7 +395,7 @@ def validate_testutil_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list
     with install_exercising_namespace_packages(
         venv_bin_dir, f"pantsbuild.pants.testutil=={version}", extra_pip_args=extra_pip_args
     ) as pythonpath:
-        subprocess.run(
+        runproc(
             [
                 venv_bin_dir / "python",
                 "-c",
@@ -435,7 +441,7 @@ PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 class _Constants:
     def __init__(self) -> None:
         self._head_sha = (
-            subprocess.run(
+            runproc(
                 ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
             )
             .stdout.decode()
@@ -494,7 +500,7 @@ def get_pypi_config(section: str, option: str) -> str:
 
 def get_git_branch() -> str:
     return (
-        subprocess.run(
+        runproc(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"], stdout=subprocess.PIPE, check=True
         )
         .stdout.decode()
@@ -504,7 +510,7 @@ def get_git_branch() -> str:
 
 def get_pgp_key_id() -> str:
     return (
-        subprocess.run(
+        runproc(
             ["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE, check=False
         )
         .stdout.decode()
@@ -514,7 +520,7 @@ def get_pgp_key_id() -> str:
 
 def get_pgp_program_name() -> str:
     configured_name = (
-        subprocess.run(
+        runproc(
             ["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE, check=False
         )
         .stdout.decode()
@@ -541,7 +547,7 @@ def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
 def create_venv(venv_dir: Path) -> Path:
     venv.create(venv_dir, with_pip=True, clear=True, symlinks=True)
     bin_dir = venv_dir / "bin"
-    subprocess.run(
+    runproc(
         [bin_dir / "pip", "install", "--quiet", "--disable-pip-version-check", "--upgrade", "pip"],
         check=True,
     )
@@ -557,7 +563,7 @@ def create_tmp_venv() -> Iterator[Path]:
     """
     with TemporaryDirectory() as tempdir:
         bin_dir = create_venv(Path(tempdir))
-        subprocess.run([(bin_dir / "pip"), "install", "--quiet", "wheel"], check=True)
+        runproc([(bin_dir / "pip"), "install", "--quiet", "wheel"], check=True)
         yield bin_dir
 
 
@@ -566,7 +572,7 @@ def create_twine_venv() -> None:
     if CONSTANTS.twine_venv_dir.exists():
         shutil.rmtree(CONSTANTS.twine_venv_dir)
     bin_dir = create_venv(CONSTANTS.twine_venv_dir)
-    subprocess.run([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
+    runproc([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
 
 
 @contextmanager
@@ -638,7 +644,7 @@ def build_pants_wheels() -> None:
 
     with set_pants_version(CONSTANTS.pants_unstable_version):
         try:
-            subprocess.run(args, check=True)
+            runproc(args, check=True)
         except subprocess.CalledProcessError as e:
             failed_packages = ",".join(package.name for package in PACKAGES)
             failed_targets = " ".join(package.target for package in PACKAGES)
@@ -679,7 +685,7 @@ def build_pants_wheels() -> None:
 
     banner(f"Validating Pants wheels for {CONSTANTS.python_version}.")
     create_twine_venv()
-    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", dest / "*.whl"], check=True)
+    runproc([CONSTANTS.twine_venv_dir / "bin/twine", "check", dest / "*.whl"], check=True)
     green(f"Validated Pants wheels for {CONSTANTS.python_version}.")
 
 
@@ -689,7 +695,7 @@ def build_3rdparty_wheels() -> None:
     pkg_tgts = [pkg.target for pkg in PACKAGES]
     with create_tmp_venv() as bin_dir:
         deps = (
-            subprocess.run(
+            runproc(
                 [
                     "./pants",
                     "--concurrent",
@@ -705,7 +711,7 @@ def build_3rdparty_wheels() -> None:
             .splitlines()
         )
         python_requirements = (
-            subprocess.run(
+            runproc(
                 [
                     "./pants",
                     "--concurrent",
@@ -732,7 +738,7 @@ def build_3rdparty_wheels() -> None:
         reqs = itertools.chain.from_iterable(
             obj["requirements"]
             for obj in json.loads(
-                subprocess.run(
+                runproc(
                     [
                         "./pants",
                         "--concurrent",
@@ -744,7 +750,7 @@ def build_3rdparty_wheels() -> None:
                 ).stdout
             )
         )
-        subprocess.run(
+        runproc(
             [bin_dir / "pip", "wheel", f"--wheel-dir={dest}", *reqs],
             check=True,
         )
@@ -759,9 +765,9 @@ def build_fs_util() -> None:
     release_mode = os.environ.get("MODE", "") != "debug"
     if release_mode:
         command.append("--release")
-    subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
+    runproc(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
     current_os = (
-        subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
+        runproc(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
         .stdout.decode()
         .strip()
     )
@@ -833,7 +839,7 @@ def build_pex(fetch: bool) -> None:
 
     dest = Path("dist") / pex_name
     with download_pex_bin() as pex_bin:
-        subprocess.run(
+        runproc(
             [
                 sys.executable,
                 str(pex_bin),
@@ -871,7 +877,7 @@ def build_pex(fetch: bool) -> None:
         # We also need to filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
         env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
         env.update(DISABLED_BACKENDS_CONFIG)
-        subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
+        runproc([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
 
@@ -916,7 +922,7 @@ def publish_apple_silicon() -> None:
     dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
     if dest_dir.exists():
         shutil.rmtree(dest_dir)
-    subprocess.run(
+    runproc(
         [
             "./pants",
             "--concurrent",
@@ -941,7 +947,7 @@ def publish_apple_silicon() -> None:
         )
 
     create_twine_venv()
-    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
+    runproc([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
     upload_wheels_via_twine()
     banner("Successfully released Apple Silicon wheel to PyPI")
 
@@ -949,7 +955,7 @@ def publish_apple_silicon() -> None:
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
     git_status = (
-        subprocess.run(["git", "status", "--porcelain"], stdout=subprocess.PIPE, check=True)
+        runproc(["git", "status", "--porcelain"], stdout=subprocess.PIPE, check=True)
         .stdout.decode()
         .strip()
     )
@@ -981,7 +987,7 @@ def check_pgp() -> None:
     if not key:
         die("You must set up a PGP key. See https://www.pantsbuild.org/docs/release-process.")
     print("Found the following key for release signing:\n")
-    subprocess.run([get_pgp_program_name(), "-k", key], check=True)
+    runproc([get_pgp_program_name(), "-k", key], check=True)
     key_confirmation = input("\nIs this the correct key? [Y/n]: ")
     if key_confirmation and key_confirmation.lower() != "y":
         die(
@@ -1035,7 +1041,7 @@ def reversion_prebuilt_wheels() -> None:
 
 def tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
-    subprocess.run(
+    runproc(
         [
             "git",
             "tag",
@@ -1047,13 +1053,13 @@ def tag_release() -> None:
         ],
         check=True,
     )
-    subprocess.run(
+    runproc(
         ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
     )
 
 
 def upload_wheels_via_twine() -> None:
-    subprocess.run(
+    runproc(
         [
             str(CONSTANTS.twine_venv_dir / "bin/twine"),
             "upload",

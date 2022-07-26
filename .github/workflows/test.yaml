@@ -343,7 +343,9 @@ jobs:
     - env: {}
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+      run: 'set -x
+
+        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
         ./build-support/bin/release.sh build-local-pex
 
@@ -587,7 +589,9 @@ jobs:
         ARCHFLAGS: -arch x86_64
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+      run: 'set -x
+
+        [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
         ./build-support/bin/release.sh build-local-pex
 

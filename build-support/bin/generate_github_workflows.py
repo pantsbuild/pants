@@ -456,6 +456,7 @@ class Helper:
                     # it cleans out `dist/deploy`, which the build-wheels runs populate for
                     # later attention by deploy_to_s3.py.
                     """\
+                    set -x
                     [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
                     ./build-support/bin/release.sh build-local-pex
                     ./build-support/bin/release.sh build-wheels
