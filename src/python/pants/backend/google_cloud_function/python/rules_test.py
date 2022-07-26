@@ -103,7 +103,7 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
         {
             "pex_exe/BUILD": dedent(
                 """\
-                python_requirement(name="req", requirements=["pex==2.1.66"])
+                python_requirement(name="req", requirements=["pex==2.1.99"])
                 pex_binary(dependencies=[":req"], script="pex")
                 """
             ),
@@ -162,7 +162,7 @@ def test_create_hello_world_lambda(
         expected_extra_log_lines=(
             "              Runtime: python37",
             "    Complete platform: src/python/foo/bar/platform.json",
-            "              Handler: main.handler",
+            "              Handler: handler",
         ),
         extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
@@ -225,7 +225,7 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python37",
-            "    Handler: main.handler",
+            "    Handler: handler",
         ),
     )
     assert caplog.records
