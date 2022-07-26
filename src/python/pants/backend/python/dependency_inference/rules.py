@@ -180,7 +180,7 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     unowned_dependency_behavior = EnumOption(
-        default=UnownedDependencyUsage.DoNothing,
+        default=UnownedDependencyUsage.LogWarning,
         help=softwrap(
             """
             How to handle imports that don't have an inferrable owner.
