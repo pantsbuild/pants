@@ -101,7 +101,7 @@ async def _generate_argv(
     mypy_pex_info = await Get(PexResolveInfo, VenvPex, pex)
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
-    if mypy_info.version > packaging.version.Version("0.700"):
+    if mypy_info.version > packaging.version.Version("0.700") and python_version is not None:
         # Skip mtime checks because we don't propogate mtime when materialzing the sandbox, so the
         # mtime checks will always fail otherwise.
         args.append("--skip-cache-mtime-check")
@@ -248,9 +248,7 @@ async def mypy_typecheck_partition(
         venv_python=requirements_venv_pex.python.argv0,
         cache_dir=run_cache_dir,
         file_list_path=file_list_path,
-        python_version=config_file.python_version_to_autoset(
-            partition.interpreter_constraints, python_setup.interpreter_versions_universe
-        ),
+        python_version=py_version,
     )
 
     script_runner_digest = await Get(
@@ -258,7 +256,7 @@ async def mypy_typecheck_partition(
         CreateDigest(
             [
                 FileContent(
-                    "__run_wrapper.sh",
+                    "__mypy_runner.sh",
                     dedent(
                         f"""\
                             # We want to leverage the MyPy cache for fast incremental runs of MyPy.
@@ -323,7 +321,7 @@ async def mypy_typecheck_partition(
             append_only_caches={"mypy_cache": named_cache_dir},
         ),
     )
-    process = dataclasses.replace(process, argv=("__run_wrapper.sh",))
+    process = dataclasses.replace(process, argv=("__mypy_runner.sh",))
     result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
