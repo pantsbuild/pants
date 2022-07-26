@@ -136,7 +136,10 @@ class PantsDaemonCore:
         # they need to be re-evaluated every run. We only reinitialize the scheduler if changes
         # were made, though.
         dynamic_remote_options, auth_plugin_result = DynamicRemoteOptions.from_options(
-            options, env, self._prior_auth_plugin_result
+            options,
+            env,
+            self._prior_auth_plugin_result,
+            remote_auth_plugin_func=build_config.remote_auth_plugin_func,
         )
         remote_options_changed = (
             self._prior_dynamic_remote_options is not None
