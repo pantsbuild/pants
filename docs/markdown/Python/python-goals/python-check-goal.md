@@ -253,8 +253,11 @@ Known limitations
 ### Performance is sometimes slower than normal
 
 Pants 2.14 added support for leveraging MyPy's cache, making subsequent runs of MyPy extremely performant.
-The support, however, requires features that were added to MyPy in version `0.700`. If you're using a version
-of MyPy older than `0.700`, consider upgrading to unlock super-speedy subsequent runs of MyPy.
+The support, however, requires features that were added to MyPy in version `0.700`, and requires that
+`python_version` isn't set in MyPy's config or in `[mypy].args`.
+
+If you're using a version of MyPy older than `0.700`, consider upgrading to unlock super-speedy subsequent runs of MyPy.
+Additionally consider not providing `python_version` in your config or args.
 
 
 Tip: only run over changed files and their dependees
