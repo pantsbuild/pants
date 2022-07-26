@@ -272,6 +272,11 @@ async def mypy_typecheck_partition(
                             # as mv on the same filesystem is an atomic "rename", and any processes
                             # copying the "old" file will still have valid file descriptors for the
                             # "old" file.
+                            #
+                            # (MyPy uses the cache as a drop-in replacement for the dual-files solution,
+                            # and therefore uses two DB rows per source file and issues a different
+                            # query for each row. Therefore SQLite's own safety still doesn't protect
+                            # us from race-conditions between the two queries).
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} 2>&1 > /dev/null
                             {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
