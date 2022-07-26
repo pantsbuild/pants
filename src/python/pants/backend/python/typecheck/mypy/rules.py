@@ -263,7 +263,7 @@ async def mypy_typecheck_partition(
                             # Pants exposes "append_only_caches" we can leverage, but with the caveat
                             # that it requires either only appending files, or multiprocess-safe access.
                             #
-                            # MyPy guaruntees neither, but there's workarounds!
+                            # MyPy guarantees neither, but there's workarounds!
                             #
                             # By default, MyPy uses 2 cache files per source file, which introduces a
                             # whole slew of race conditions. We can mimize the race conditions by
