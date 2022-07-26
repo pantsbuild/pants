@@ -393,7 +393,7 @@ class DynamicRemoteOptions:
         plugin_name = (
             auth_plugin_result.plugin_name
             or bootstrap_options.remote_auth_plugin
-            or remote_auth_plugin_func.__name__
+            or f"{remote_auth_plugin_func.__module__}.{remote_auth_plugin_func.__name__}"
         )
         if not auth_plugin_result.is_available:
             # NB: This is debug because we expect plugins to log more informative messages.
