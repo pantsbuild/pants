@@ -183,8 +183,8 @@ Sharding the input targets
 
 The `test` goal natively supports sharding input targets into multiple shards. Use the option `--test-shard=k/N`, where k is a non-negative integer less than N. For example, you can split up your CI into three shards with `--shard=0/3`, `--shard=1/3`, and `--shard=2/3`.
 
-For other goals, you can leverage shell piping to partition the input targets into multiple shards. For example, to split your `lint` run into 10 shards, and select shard 0:
+For other goals, you can leverage shell piping to partition the input targets into multiple shards. For example, to split your `package` run into 5 shards, and select shard 0:
 
 ```bash
-./pants list :: | awk 'NR % 10 == 0' | xargs ./pants lint
+./pants list :: | awk 'NR % 5 == 0' | xargs ./pants package
 ```
