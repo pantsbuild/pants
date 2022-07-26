@@ -140,7 +140,7 @@ async def paths(
         spec_paths.append(spec_path)
 
     with paths_subsystem.output(console) as write_stdout:
-        write_stdout(json.dumps(spec_paths, indent=2))
+        write_stdout(json.dumps(spec_paths, indent=2) + "\n")
 
     return PathsGoal(exit_code=0)
 
