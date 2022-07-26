@@ -265,18 +265,31 @@ async def mypy_typecheck_partition(
                             #
                             # MyPy guaruntees neither, but there's workarounds!
                             #
-                            # By default, MyPy uses 2 cache files persource file, which introduces a
-                            # whole slew of race conditions. To workaround this we enable MyPy's SQLite cache,
-                            # which enables us to run MyPy on a temporary copy of the cache, then mv
-                            # the modified cache back to the real location. This is multiprocess-safe
-                            # as mv on the same filesystem is an atomic "rename", and any processes
-                            # copying the "old" file will still have valid file descriptors for the
-                            # "old" file.
+                            # By default, MyPy uses 2 cache files per source file, which introduces a
+                            # whole slew of race conditions. We can mimize the race conditions by
+                            # using MyPy's SQLite cache. MyPy still has race conditions when using the
+                            # db, as it issues at least 2 single-row queries per source file at different
+                            # points in time (therefore SQLite's own safety guarantees don't apply).
                             #
-                            # (MyPy uses the cache as a drop-in replacement for the dual-files solution,
-                            # and therefore uses two DB rows per source file and issues a different
-                            # query for each row. Therefore SQLite's own safety still doesn't protect
-                            # us from race-conditions between the two queries).
+                            # To workaround this we make a copy of the db from the append_only_cache,
+                            # run MyPy on it, then move the updated cache back to the append_only_cache.
+                            # This is multiprocess-safe as mv on the same filesystem is an atomic "rename",
+                            # and any processes copying the "old" file will still have valid file
+                            # descriptors for the "old" file.
+                            #
+                            # There is a chance of multiple processes thrashing on the cache, leaving
+                            # it in a state that doesn't reflect reality at the current point in time,
+                            # and forcing other processes to do potentially done work. This strategy
+                            # still provides a net benefit because the cache is generally _mostly_
+                            # valid (it includes entries for the standard library, and 3rdparty deps,
+                            # among 1stparty sources), and even in the worst case
+                            # (every single file has changed) the overhead of missing the cache each
+                            # query should be small when compared to the work being done of typechecking.
+                            #
+                            # Lastly, we expect that since this is run through Pants which attempts
+                            # to partition MyPy runs by python version (which the DB is independent
+                            # for different versions) and uses a one-process-at-a-time daemon by default,
+                            # multuple MyPy processes operating on a single db cache should be rare.
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} 2>&1 > /dev/null
                             {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
