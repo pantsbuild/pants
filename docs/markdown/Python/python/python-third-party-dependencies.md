@@ -128,7 +128,7 @@ python_requirement(
 )
 ```
 
-Note that Pants does not consume your `poetry.lock` file. Instead, see the below section on lockfiles.
+Note that Pants does not consume your `poetry.lock` file. Instead, see the [section on lockfiles](#lockfiles) below.
 
 How dependencies are chosen
 ---------------------------
