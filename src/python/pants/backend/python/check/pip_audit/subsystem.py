@@ -89,7 +89,7 @@ class PipAuditExportSentinel(ExportPythonToolSentinel):
 
 
 @rule(
-    desc="Determine pip-audit interpreter constraints (for lockfile generation)",
+    desc="Determine pip-audit interpreter constraints (for export)",
     level=LogLevel.DEBUG,
 )
 async def pip_audit_export(
