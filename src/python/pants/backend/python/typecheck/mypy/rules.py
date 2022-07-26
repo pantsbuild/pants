@@ -266,7 +266,7 @@ async def mypy_typecheck_partition(
                             # MyPy guarantees neither, but there's workarounds!
                             #
                             # By default, MyPy uses 2 cache files per source file, which introduces a
-                            # whole slew of race conditions. We can mimize the race conditions by
+                            # whole slew of race conditions. We can minimize the race conditions by
                             # using MyPy's SQLite cache. MyPy still has race conditions when using the
                             # db, as it issues at least 2 single-row queries per source file at different
                             # points in time (therefore SQLite's own safety guarantees don't apply).
