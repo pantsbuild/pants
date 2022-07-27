@@ -9,8 +9,10 @@ from pants.backend.terraform import style, tool
 from pants.backend.terraform.lint.tffmt import tffmt
 from pants.backend.terraform.lint.tffmt.tffmt import TffmtRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
+from pants.backend.terraform.tool import TerraformTool
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import external_tool, source_files
+from pants.core.util_rules.external_tool import ExternalToolVersion
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
@@ -21,13 +23,13 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 RuleRunnerOptions = NewType("RuleRunnerOptions", List[str])
 
 
-tf_versions = ["1.0.7", "1.2.3"]
+available_tf_versions = [
+    ExternalToolVersion.decode(v).version for v in TerraformTool.default_known_versions
+]
+
+tf_versions = [TerraformTool.default_version, available_tf_versions[0]]
 # uncomment to run against *all* terraform versions
-# from pants.backend.terraform.tool import TerraformTool
-# from pants.core.util_rules.external_tool import ExternalToolVersion
-# tf_versions = list(
-#     {ExternalToolVersion.decode(v).version for v in TerraformTool.default_known_versions}
-# )
+# tf_versions = list(set(available_tf_versions))
 
 
 @pytest.fixture(params=tf_versions)
