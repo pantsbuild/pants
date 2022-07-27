@@ -1677,6 +1677,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
     )
+    experimental_coalesced_process_batching = BoolOption(
+        "--experimental-coalesced-process-batching",
+        default=False,
+        help="@TODO: Help goes here!",
+    )
 
     use_deprecated_pex_binary_run_semantics = BoolOption(
         default=False,
@@ -1945,6 +1950,13 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+@dataclass(frozen=True)
+class ExperimentalCoalescedProcessBatchingOption:
+    """A wrapper around the global option `experimental_coalesced_process_batching`."""
+
+    val: bool
 
 
 @dataclass(frozen=True)

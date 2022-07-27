@@ -53,6 +53,7 @@ from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
+    CoalescedProcessBatch,
     Process,
     ProcessResultMetadata,
 )
@@ -157,6 +158,7 @@ class Scheduler:
             download_file=DownloadFile,
             platform=Platform,
             process=Process,
+            coalesced_process_batch=CoalescedProcessBatch,
             process_result=FallibleProcessResult,
             process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,

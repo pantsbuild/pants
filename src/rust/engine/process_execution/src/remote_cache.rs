@@ -23,8 +23,8 @@ use workunit_store::{
 
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
@@ -429,6 +429,15 @@ enum CacheErrorType {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    _context: Context,
+    _workunit: &mut RunningWorkunit,
+    _req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    panic!("Unimplemented");
+  }
+
   async fn run(
     &self,
     context: Context,

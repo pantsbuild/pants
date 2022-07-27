@@ -10,6 +10,7 @@ from pants.option.global_options import (
     GlobalOptions,
     NamedCachesDirOption,
     ProcessCleanupOption,
+    ExperimentalCoalescedProcessBatchingOption,
     UseDeprecatedPexBinaryRunSemanticsOption,
 )
 from pants.option.options import Options
@@ -66,6 +67,15 @@ def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessClea
 @rule
 def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCachesDirOption:
     return NamedCachesDirOption(global_options.named_caches_dir)
+
+
+@rule
+def extract_experimental_coalesced_process_batch(
+    global_options: GlobalOptions,
+) -> ExperimentalCoalescedProcessBatchingOption:
+    return ExperimentalCoalescedProcessBatchingOption(
+        global_options.experimental_coalesced_process_batching
+    )
 
 
 @rule
