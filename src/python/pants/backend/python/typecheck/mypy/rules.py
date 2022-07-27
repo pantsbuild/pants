@@ -47,7 +47,7 @@ from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, shell_quote
 
 
 @dataclass(frozen=True)
@@ -293,7 +293,7 @@ async def mypy_typecheck_partition(
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} 2>&1 > /dev/null
                             {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
-                            {' '.join(argv)}
+                            {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
                             {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
                             exit $EXIT_CODE
