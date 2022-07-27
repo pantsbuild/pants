@@ -19,7 +19,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.100",
+//     "pex==2.1.101",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -783,13 +783,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0b96e0d3071165b2170591726343d3af36254152f1cad86657c9af41ac1204b2",
-              "url": "https://files.pythonhosted.org/packages/3a/7a/3f00ca003568d4650005e3f074dd14fa75b65accbbfb55bebbe3dd3f095b/pex-2.1.100-py2.py3-none-any.whl"
+              "hash": "fa501a025417bd35d07ece39482502501ba3bc2a94be476db33a5452be0da32f",
+              "url": "https://files.pythonhosted.org/packages/77/11/696975448606b1b29ebc877aae43035537cb1ddc2e6a8f85a2ee448ce2e2/pex-2.1.101-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0846283f9e70fd9abb448d6ef2c6d8f6f8ea0e34fd8d22330eea1120c9b195f6",
-              "url": "https://files.pythonhosted.org/packages/75/40/aa3dc196b77f33a9954f1527334dd2dc928201898840d8089ec586bc0364/pex-2.1.100.tar.gz"
+              "hash": "d966f2ac9fbf32c6941a798fa8035f74546a056168ac3ef35fca72131e60e1a9",
+              "url": "https://files.pythonhosted.org/packages/70/ff/5eaeef82710ed8f43bede93e31f1801357e3f06407c99f9a24d72d35cd60/pex-2.1.101.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -797,7 +797,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.100"
+          "version": "2.1.101"
         },
         {
           "artifacts": [
@@ -1829,13 +1829,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8298d6d56d39be0e3bc13c1c97d133f9b45d797169a0e11cdd0e0489d786f7ec",
-              "url": "https://files.pythonhosted.org/packages/68/47/93d3d28e97c7577f563903907912f4b3804054e4877a5ba6651f7182c53b/urllib3-1.26.10-py2.py3-none-any.whl"
+              "hash": "c33ccba33c819596124764c23a97d25f32b28433ba0dedeb77d873a38722c9bc",
+              "url": "https://files.pythonhosted.org/packages/d1/cb/4783c8f1a90f89e260dbf72ebbcf25931f3a28f8f80e2e90f8a589941b19/urllib3-1.26.11-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "879ba4d1e89654d9769ce13121e0f94310ea32e8d2f8cf587b77c08bbcdb30d6",
-              "url": "https://files.pythonhosted.org/packages/25/36/f056e5f1389004cf886bb7a8514077f24224238a7534497c014a6b9ac770/urllib3-1.26.10.tar.gz"
+              "hash": "ea6e8fb210b19d950fab93b60c9009226c63a28808bc8386e05301e25883ac0a",
+              "url": "https://files.pythonhosted.org/packages/6d/d5/e8258b334c9eb8eb78e31be92ea0d5da83ddd9385dc967dd92737604d239/urllib3-1.26.11.tar.gz"
             }
           ],
           "project_name": "urllib3",
@@ -1851,7 +1851,7 @@
             "pyOpenSSL>=0.14; extra == \"secure\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<4,>=2.7",
-          "version": "1.26.10"
+          "version": "1.26.11"
         },
         {
           "artifacts": [
@@ -2187,7 +2187,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.100",
+  "pex_version": "2.1.101",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -2200,7 +2200,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.100",
+    "pex==2.1.101",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
