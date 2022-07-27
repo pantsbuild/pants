@@ -1,4 +1,5 @@
-# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+#!/usr/bin/env python3
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Fetch versions of Terraform and format them for use in known_versions."""
 
@@ -123,6 +124,19 @@ class VersionHashes:
         return {x.filename: x.sha256sum for x in self.sha256sums}
 
 
+def parse_sha256sums_file(file_text: str) -> List[VersionHash]:
+    """Parse Terraform's sha256sums file."""
+    return [
+        VersionHash(**x)
+        for x in csv.DictReader(
+            StringIO(file_text),
+            delimiter=" ",
+            skipinitialspace=True,
+            fieldnames=["sha256sum", "filename"],
+        )
+    ]
+
+
 def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
     """Parse and verify GPG signatures of SHA256SUMs."""
 
@@ -130,15 +144,7 @@ def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
         return next(filter(lambda s: s.link.endswith(what), links))
 
     sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link)
-    sha256sums = [
-        VersionHash(**x)
-        for x in csv.DictReader(
-            StringIO(sha256sums_raw.text),
-            delimiter=" ",
-            skipinitialspace=True,
-            fieldnames=["sha256sum", "filename"],
-        )
-    ]
+    sha256sums = parse_sha256sums_file(sha256sums_raw.text)
 
     signature_link = link_ends_with("SHA256SUMS.sig")
     signature = requests.get(signature_link.link).content
@@ -161,7 +167,7 @@ def get_file_size(url) -> int:
 
 
 def parse_download_url(url: str) -> Tuple[str, str]:
-    """Get the platform from the url."""
+    """Get the version and platform from the url."""
     filename = Path(urlparse(url).path).stem
     _, version, platform_name, platform_arch = filename.split("_")
     return version, platform_name + "_" + platform_arch
