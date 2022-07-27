@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, TypeVar
 from urllib.parse import urljoin, urlparse
 
 import gnupg
@@ -23,7 +23,10 @@ from pants.core.util_rules.external_tool import ExternalToolVersion
 logging.basicConfig(level=logging.INFO)
 
 
-def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, List]:
+T = TypeVar("T")
+
+
+def partition(predicate: Callable[[Any], bool], items: Iterable[T]) -> Tuple[List[T], List[T]]:
     """Split an Iterable into two lists based on a predicate.
 
     >>> l = [0,1,2,3,4,5,6]
@@ -96,8 +99,9 @@ def get_tf_links(page: BeautifulSoup) -> Links:
 
 @dataclass(frozen=True)
 class TFVersionInfo:
-    signature_links: Links
     platform_links: Links
+    sha256sums_link: Link
+    signature_link: Link
 
 
 def get_info_for_version(url) -> TFVersionInfo:
@@ -105,7 +109,15 @@ def get_info_for_version(url) -> TFVersionInfo:
     logging.info(f"getting info for version at {url}")
     all_links = get_tf_links(get_tf_page(url))
     signature_links, platform_links = partition(lambda i: "SHA" in i.link, all_links)
-    return TFVersionInfo(signature_links, platform_links)
+
+    def link_ends_with(what: str) -> Link:
+        return next(filter(lambda s: s.link.endswith(what), signature_links))
+
+    return TFVersionInfo(
+        platform_links,
+        sha256sums_link=link_ends_with("SHA256SUMS"),
+        signature_link=link_ends_with("SHA256SUMS.sig"),
+    )
 
 
 @dataclass(frozen=True)
@@ -137,24 +149,20 @@ def parse_sha256sums_file(file_text: str) -> List[VersionHash]:
     ]
 
 
-def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
+def parse_signatures(links: TFVersionInfo, verifier: GPGVerifier) -> VersionHashes:
     """Parse and verify GPG signatures of SHA256SUMs."""
 
-    def link_ends_with(what: str) -> Link:
-        return next(filter(lambda s: s.link.endswith(what), links))
-
-    sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link)
+    sha256sums_raw = requests.get(links.sha256sums_link.link)
     sha256sums = parse_sha256sums_file(sha256sums_raw.text)
 
-    signature_link = link_ends_with("SHA256SUMS.sig")
-    signature = requests.get(signature_link.link).content
+    signature = requests.get(links.signature_link.link).content
 
     vr = verifier.validate_signature(signature, sha256sums_raw.content)
     if not vr.valid:
-        logging.error(f"signature is not valid for {signature_link.text}")
+        logging.error(f"signature is not valid for {links.signature_link.text}")
         raise RuntimeError("signature is not valid")
     else:
-        logging.info(f"signature is valid for {signature_link.text}")
+        logging.info(f"signature is valid for {links.signature_link.text}")
 
     return VersionHashes(sha256sums, signature)
 
@@ -193,7 +201,7 @@ def fetch_platforms_for_version(
         logging.info(f"discarding unsupported prerelease slug={version_slug}")
         return None
 
-    signatures_info = parse_signatures(version_infos.signature_links, verifier)
+    signatures_info = parse_signatures(version_infos, verifier)
     sha256sums = signatures_info.by_file()
 
     out = []
