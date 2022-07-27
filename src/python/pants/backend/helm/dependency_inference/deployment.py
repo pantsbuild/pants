@@ -114,10 +114,11 @@ async def first_party_helm_deployment_mappings(
     )
 
 
+@dataclass(frozen=True)
 class HelmDeploymentDependenciesInferenceFieldSet(FieldSet):
     required_fields = (HelmDeploymentDependenciesField,)
 
-    dependencies = HelmDeploymentDependenciesField
+    dependencies: HelmDeploymentDependenciesField
 
 
 class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
