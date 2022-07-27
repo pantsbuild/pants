@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.openapi.dependency_inference import OpenApiDependencies, ParseOpenApiSources
+from pants.backend.openapi.subsystems.openapi import OpenApiSubsystem
 from pants.backend.openapi.target_types import (
     OPENAPI_FILE_EXTENSIONS,
-    OpenApiDefinitionGeneratorTarget,
+    OpenApiDocumentGeneratorTarget,
     OpenApiSourceGeneratorTarget,
 )
 from pants.core.goals.tailor import (
@@ -37,7 +38,11 @@ class PutativeOpenApiTargetsRequest(PutativeTargetsRequest):
 async def find_putative_targets(
     req: PutativeOpenApiTargetsRequest,
     all_owned_sources: AllOwnedSources,
+    openapi_subsystem: OpenApiSubsystem,
 ) -> PutativeTargets:
+    if not openapi_subsystem.tailor_targets:
+        return PutativeTargets()
+
     all_openapi_files = await Get(
         Paths, PathGlobs, req.path_globs(*(f"**/openapi{ext}" for ext in OPENAPI_FILE_EXTENSIONS))
     )
@@ -57,17 +62,17 @@ async def find_putative_targets(
         targets.update(result.dependencies.keys())
         paths = tuple(v for v in itertools.chain(*result.dependencies.values()) if v not in targets)
 
-    unowned_openapi_definitions = set(all_openapi_files.files) - set(all_owned_sources)
+    unowned_openapi_documents = set(all_openapi_files.files) - set(all_owned_sources)
     unowned_openapi_sources = targets - set(all_owned_sources)
     classified_unowned_openapi_files = {
-        OpenApiDefinitionGeneratorTarget: unowned_openapi_definitions,
+        OpenApiDocumentGeneratorTarget: unowned_openapi_documents,
         OpenApiSourceGeneratorTarget: unowned_openapi_sources,
     }
 
     putative_targets = []
     for tgt_type, filepaths in classified_unowned_openapi_files.items():
         for dirname, filenames in group_by_dir(filepaths).items():
-            name = "definition" if tgt_type == OpenApiDefinitionGeneratorTarget else None
+            name = "openapi" if tgt_type == OpenApiDocumentGeneratorTarget else None
             putative_targets.append(
                 PutativeTarget.for_target_type(
                     tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)

@@ -12,7 +12,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
 )
 
-OPENAPI_FILE_EXTENSIONS = (".json", ".yaml")
+OPENAPI_FILE_EXTENSIONS = (".json", ".yaml", ".yml")
 
 
 class OpenApiField(SingleSourceField):
@@ -24,42 +24,42 @@ class OpenApiGeneratorField(MultipleSourcesField):
 
 
 # -----------------------------------------------------------------------------------------------
-# `openapi_definition` and `openapi_definitions` targets
+# `openapi_document` and `openapi_documents` targets
 # -----------------------------------------------------------------------------------------------
 
 
-class OpenApiDefinitionField(OpenApiField):
+class OpenApiDocumentField(OpenApiField):
     pass
 
 
-class OpenApiDefinitionDependenciesField(Dependencies):
+class OpenApiDocumentDependenciesField(Dependencies):
     pass
 
 
-class OpenApiDefinitionTarget(Target):
-    alias = "openapi_definition"
+class OpenApiDocumentTarget(Target):
+    alias = "openapi_document"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        OpenApiDefinitionDependenciesField,
-        OpenApiDefinitionField,
+        OpenApiDocumentDependenciesField,
+        OpenApiDocumentField,
     )
-    help = "A single OpenAPI definition file."
+    help = "A single OpenAPI document file."
 
 
-class OpenApiDefinitionGeneratorField(OpenApiGeneratorField):
+class OpenApiDocumentGeneratorField(OpenApiGeneratorField):
     default = tuple(f"openapi{ext}" for ext in OPENAPI_FILE_EXTENSIONS)
 
 
-class OpenApiDefinitionGeneratorTarget(TargetFilesGenerator):
-    alias = "openapi_definitions"
+class OpenApiDocumentGeneratorTarget(TargetFilesGenerator):
+    alias = "openapi_documents"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        OpenApiDefinitionGeneratorField,
+        OpenApiDocumentGeneratorField,
     )
-    generated_target_cls = OpenApiDefinitionTarget
+    generated_target_cls = OpenApiDocumentTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (OpenApiDefinitionDependenciesField,)
-    help = "Generate an `openapi_definition` target for each file in the `sources` field."
+    moved_fields = (OpenApiDocumentDependenciesField,)
+    help = "Generate an `openapi_document` target for each file in the `sources` field."
 
 
 # -----------------------------------------------------------------------------------------------

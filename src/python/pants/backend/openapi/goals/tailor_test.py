@@ -7,7 +7,7 @@ from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.goals import tailor
 from pants.backend.openapi.goals.tailor import PutativeOpenApiTargetsRequest
 from pants.backend.openapi.target_types import (
-    OpenApiDefinitionGeneratorTarget,
+    OpenApiDocumentGeneratorTarget,
     OpenApiSourceGeneratorTarget,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
@@ -23,14 +23,14 @@ def rule_runner() -> RuleRunner:
             *tailor.rules(),
             QueryRule(PutativeTargets, (PutativeOpenApiTargetsRequest, AllOwnedSources)),
         ],
-        target_types=[OpenApiDefinitionGeneratorTarget, OpenApiSourceGeneratorTarget],
+        target_types=[OpenApiDocumentGeneratorTarget, OpenApiSourceGeneratorTarget],
     )
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/owned/BUILD": "openapi_definitions()\n",
+            "src/owned/BUILD": "openapi_documents()\n",
             "src/owned/openapi.json": '{"$ref": "foobar.json"}',
             "src/owned/foobar.json": "{}",
             "src/unowned/foobar.json": "{}",
@@ -50,9 +50,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    OpenApiDefinitionGeneratorTarget,
+                    OpenApiDocumentGeneratorTarget,
                     "src/unowned",
-                    "definition",
+                    "openapi",
                     ["openapi.json", "openapi.yaml"],
                 ),
                 PutativeTarget.for_target_type(
@@ -77,3 +77,22 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         )
         == putative_targets
     )
+
+
+def test_find_putative_targets_when_disabled(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/unowned/openapi.json": "{}",
+        }
+    )
+
+    rule_runner.set_options(["--no-openapi-tailor-targets"])
+
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeOpenApiTargetsRequest(("src/unowned",)),
+            AllOwnedSources(),
+        ],
+    )
+    assert PutativeTargets() == putative_targets

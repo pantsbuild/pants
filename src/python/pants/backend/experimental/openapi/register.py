@@ -8,8 +8,8 @@ from typing import Iterable
 from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.goals import tailor
 from pants.backend.openapi.target_types import (
-    OpenApiDefinitionGeneratorTarget,
-    OpenApiDefinitionTarget,
+    OpenApiDocumentGeneratorTarget,
+    OpenApiDocumentTarget,
     OpenApiSourceGeneratorTarget,
     OpenApiSourceTarget,
 )
@@ -27,8 +27,8 @@ def rules() -> Iterable[Rule | UnionRule]:
 
 def target_types() -> Iterable[type[Target]]:
     return (
-        OpenApiDefinitionTarget,
-        OpenApiDefinitionGeneratorTarget,
+        OpenApiDocumentTarget,
+        OpenApiDocumentGeneratorTarget,
         OpenApiSourceTarget,
         OpenApiSourceGeneratorTarget,
     )

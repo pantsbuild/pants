@@ -6,13 +6,13 @@ import pytest
 
 from pants.backend.openapi import dependency_inference
 from pants.backend.openapi.dependency_inference import (
-    InferOpenApiDefinitionDependenciesRequest,
+    InferOpenApiDocumentDependenciesRequest,
     InferOpenApiSourceDependenciesRequest,
-    OpenApiDefinitionDependenciesInferenceFieldSet,
+    OpenApiDocumentDependenciesInferenceFieldSet,
     OpenApiSourceDependenciesInferenceFieldSet,
 )
 from pants.backend.openapi.target_types import (
-    OpenApiDefinitionGeneratorTarget,
+    OpenApiDocumentGeneratorTarget,
     OpenApiSourceGeneratorTarget,
 )
 from pants.build_graph.address import Address
@@ -32,11 +32,11 @@ from pants.util.ordered_set import FrozenOrderedSet
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[OpenApiDefinitionGeneratorTarget, OpenApiSourceGeneratorTarget],
+        target_types=[OpenApiDocumentGeneratorTarget, OpenApiSourceGeneratorTarget],
         rules=[
             *external_tool.rules(),
             *dependency_inference.rules(),
-            UnionRule(InferDependenciesRequest, InferOpenApiDefinitionDependenciesRequest),
+            UnionRule(InferDependenciesRequest, InferOpenApiDocumentDependenciesRequest),
             UnionRule(InferDependenciesRequest, InferOpenApiSourceDependenciesRequest),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
         ],
@@ -47,10 +47,10 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_definition_dependency_inference(rule_runner: RuleRunner) -> None:
+def test_document_dependency_inference(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/openapi/foo/BUILD": 'openapi_sources()\nopenapi_definitions(name="openapi")\n',
+            "src/openapi/foo/BUILD": 'openapi_sources()\nopenapi_documents(name="openapi")\n',
             "src/openapi/foo/openapi.json": "{}",
         }
     )
@@ -61,8 +61,8 @@ def test_definition_dependency_inference(rule_runner: RuleRunner) -> None:
     inferred_deps = rule_runner.request(
         InferredDependencies,
         [
-            InferOpenApiDefinitionDependenciesRequest(
-                OpenApiDefinitionDependenciesInferenceFieldSet.create(target)
+            InferOpenApiDocumentDependenciesRequest(
+                OpenApiDocumentDependenciesInferenceFieldSet.create(target)
             )
         ],
     )
@@ -86,7 +86,7 @@ def test_source_dependency_inference(rule_runner: RuleRunner) -> None:
                     "$ref": "bar/models.json"
                 },
                 "bar": {
-                    "$ref": "../bar/models.yaml"
+                    "$ref": "../bar/models.yml"
                 }
             }
             """
@@ -94,9 +94,9 @@ def test_source_dependency_inference(rule_runner: RuleRunner) -> None:
             "src/openapi/foo/bar/BUILD": "openapi_sources()\n",
             "src/openapi/foo/bar/models.json": "{}",
             "src/openapi/bar/subdir/BUILD": "openapi_sources()\n",
-            "src/openapi/bar/subdir/models.yaml": "$ref: ../models.yaml\n",
+            "src/openapi/bar/subdir/models.yaml": "$ref: ../models.yml\n",
             "src/openapi/bar/BUILD": "openapi_sources()\n",
-            "src/openapi/bar/models.yaml": "{}",
+            "src/openapi/bar/models.yml": "{}",
         }
     )
 
@@ -112,7 +112,7 @@ def test_source_dependency_inference(rule_runner: RuleRunner) -> None:
     assert inferred_deps == InferredDependencies(
         FrozenOrderedSet(
             [
-                Address("src/openapi/bar", relative_file_path="models.yaml"),
+                Address("src/openapi/bar", relative_file_path="models.yml"),
                 Address("src/openapi/foo/bar", relative_file_path="models.json"),
             ]
         ),
@@ -121,6 +121,83 @@ def test_source_dependency_inference(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(
         Address("src/openapi/bar/subdir", relative_file_path="models.yaml")
     )
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferOpenApiSourceDependenciesRequest(
+                OpenApiSourceDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert inferred_deps == InferredDependencies(
+        FrozenOrderedSet(
+            [
+                Address("src/openapi/bar", relative_file_path="models.yml"),
+            ]
+        ),
+    )
+
+
+def test_document_explicit_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/openapi/foo/BUILD": textwrap.dedent(
+                """\
+            openapi_documents(
+                dependencies=['!src/openapi/foo/openapi.json', 'src/openapi/bar/models.yaml'],
+            )
+            """
+            ),
+            "src/openapi/foo/openapi.json": "{}",
+            "src/openapi/bar/BUILD": "openapi_sources()\n",
+            "src/openapi/bar/models.yaml": "{}",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/openapi/foo", relative_file_path="openapi.json"))
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferOpenApiDocumentDependenciesRequest(
+                OpenApiDocumentDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert inferred_deps == InferredDependencies(
+        FrozenOrderedSet(
+            [
+                Address("src/openapi/bar", relative_file_path="models.yaml"),
+            ]
+        ),
+    )
+
+
+def test_source_explicit_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/openapi/foo/BUILD": textwrap.dedent(
+                """\
+            openapi_sources(
+                dependencies=['!src/openapi/bar/models.json', 'src/openapi/bar/models.yaml'],
+            )
+            """
+            ),
+            "src/openapi/foo/openapi.json": textwrap.dedent(
+                """\
+            {
+                "foo": {
+                    "$ref": "../bar/models.json"
+                }
+            }
+            """
+            ),
+            "src/openapi/bar/BUILD": "openapi_sources()\n",
+            "src/openapi/bar/models.json": "{}",
+            "src/openapi/bar/models.yaml": "{}",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/openapi/foo", relative_file_path="openapi.json"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
         [
