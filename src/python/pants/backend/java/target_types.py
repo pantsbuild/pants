@@ -82,8 +82,9 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "junit_tests"
     core_fields = (*COMMON_TARGET_FIELDS, JavaTestsGeneratorSourcesField, JunitTestTimeoutField)
     generated_target_cls = JunitTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, JunitTestTimeoutField)
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        JunitTestTimeoutField,
         JvmDependenciesField,
         JvmJdkField,
         JvmProvidesTypesField,
