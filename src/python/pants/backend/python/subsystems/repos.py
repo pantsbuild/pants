@@ -29,7 +29,6 @@ class PythonRepos(Subsystem):
             corresponds to the `--find-links` option.
             """
         ),
-        advanced=True,
     )
     indexes = StrListOption(
         default=[pypi_index],
@@ -40,7 +39,6 @@ class PythonRepos(Subsystem):
             should be compliant with PEP 503.
             """
         ),
-        advanced=True,
     )
 
     @property
