@@ -98,13 +98,13 @@ def get_tf_links(page: BeautifulSoup) -> Links:
 
 
 @dataclass(frozen=True)
-class TFVersionInfo:
+class TFVersionLinks:
     platform_links: Links
     sha256sums_link: Link
     signature_link: Link
 
 
-def get_info_for_version(url) -> TFVersionInfo:
+def get_info_for_version(url) -> TFVersionLinks:
     """Get list of binaries and signatures for a version of Terraform."""
     logging.info(f"getting info for version at {url}")
     all_links = get_tf_links(get_tf_page(url))
@@ -113,7 +113,7 @@ def get_info_for_version(url) -> TFVersionInfo:
     def link_ends_with(what: str) -> Link:
         return next(filter(lambda s: s.link.endswith(what), signature_links))
 
-    return TFVersionInfo(
+    return TFVersionLinks(
         platform_links,
         sha256sums_link=link_ends_with("SHA256SUMS"),
         signature_link=link_ends_with("SHA256SUMS.sig"),
@@ -149,7 +149,7 @@ def parse_sha256sums_file(file_text: str) -> List[VersionHash]:
     ]
 
 
-def parse_signatures(links: TFVersionInfo, verifier: GPGVerifier) -> VersionHashes:
+def parse_signatures(links: TFVersionLinks, verifier: GPGVerifier) -> VersionHashes:
     """Parse and verify GPG signatures of SHA256SUMs."""
 
     sha256sums_raw = requests.get(links.sha256sums_link.link)
@@ -190,23 +190,23 @@ def fetch_platforms_for_version(
     verifier: GPGVerifier,
     inverse_platform_mapping: Dict[str, str],
     version_slug: str,
-    version_infos: TFVersionInfo,
+    version_links: TFVersionLinks,
 ) -> Optional[List[ExternalToolVersion]]:
     """Fetch platform binary information for a particular Terraform version."""
     logging.info(
-        f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
+        f"processiong version {version_slug} with {len(version_links.platform_links)} binaries"
     )
 
     if is_prerelease(version_slug):
         logging.info(f"discarding unsupported prerelease slug={version_slug}")
         return None
 
-    signatures_info = parse_signatures(version_infos, verifier)
+    signatures_info = parse_signatures(version_links, verifier)
     sha256sums = signatures_info.by_file()
 
     out = []
 
-    for platform_link in version_infos.platform_links:
+    for platform_link in version_links.platform_links:
         version, platform = parse_download_url(platform_link.link)
 
         if platform not in inverse_platform_mapping:
