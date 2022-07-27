@@ -3,6 +3,8 @@ title: "Kotlin"
 slug: "kotlin"
 excerpt: "Kotlin support for Pants."
 hidden: false
+createdAt: "2022-07-26T02:02:59.962Z"
+updatedAt: "2022-07-26T02:02:59.962Z"
 ---
 
 > 🚧 Kotlin support is alpha stage
@@ -45,14 +47,14 @@ backend_packages = [
 
 ## Choosing JDK and Kotlin versions
 
-Pants supports choosing the JDK and Kotlin versions per target in your repository, but to reduce the amount of
-boilerplate required, most users set repository-wide defaults in `pants.toml`, and then only override them when
-necessary for particular targets.
+Pants supports choosing the JDK and Kotlin versions per target in your repository. To reduce the amount of
+boilerplate required, however, most users set repository-wide defaults in `pants.toml`, and then only override
+them when necessary for particular targets.
 
 ### JDK
 
 JDKs used by Pants are automatically fetched using [Coursier](https://get-coursier.io/), and are chosen using
-the [`[jvm].jdk` setting](doc:reference-jvm#section-jdk) to set a repository-wide default.
+the [`[jvm].jdk` option](doc:reference-jvm#section-jdk) to set a repository-wide default.
 
 To override the default on a particular target, you can use the [`jdk=` field](doc:reference-kotlin_source#codejdkcode).
 It can be useful to use the [`parametrize` builtin](doc:targets#parametrizing-targets) with the `jdk=` field,
@@ -68,9 +70,9 @@ resolve, which is configured by the [`[jvm].default_resolve` option](reference-j
 Each resolve must contain the following jars for the Kotlin runtime with the version matching the version specified
 for the resolve in the `[kotlin].version_for_resolve` option:
 
-- org.jetbrains.kotlin:kotlin-stdlib
-- org.jetbrains.kotlin:kotlin-reflect
-- org.jetbrains.kotlin:kotlin-script-runtime
+- `org.jetbrains.kotlin:kotlin-stdlib`
+- `org.jetbrains.kotlin:kotlin-reflect`
+- `org.jetbrains.kotlin:kotlin-script-runtime`
 
 To use multiple Kotlin versions in a repository, you would define multiple resolves, and then adjust
 the [`resolve` field](doc:reference-kotlin_junit_test#coderesolvecode) of any targets which should be used with the
@@ -79,7 +81,7 @@ non-`default_resolve` resolve.
 To cross-build a set of Kotlin targets for multiple Kotlin versions, you can use the
 [`parametrize` builtin](doc:targets#parametrizing-targets) with the `resolve=` field of the target and its dependencies.
 
-> 🚧 `jvm_artifact` targets for the Kotlin runtime are explicitly required.
+> 🚧 `jvm_artifact` targets for the Kotlin runtime must be explicitly defined.
 >
 > The Kotlin backend currently requires that a `jvm_artifact` target for each Kotlin runtime jars be present in any
 > resolve used for Kotlin. If any of the required `jvm_artifact` targets are missing, Pants will error. Pants will
@@ -186,7 +188,7 @@ To run tests, use `./pants test`:
 # Run a single test file
 ❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibTest.kt
 
-# Test all files in a directory
+# Test all files in and under a directory
 ❯ ./pants test tests/jvm::
 
 # Test the whole repository
