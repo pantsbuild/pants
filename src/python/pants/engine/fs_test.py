@@ -366,6 +366,19 @@ def test_path_globs_symlink_dead_nested(rule_runner: RuleRunner) -> None:
     assert_path_globs(rule_runner, ["subdir/dead"], expected_files=[], expected_dirs=[])
 
 
+def test_path_globs_symlink_loop(rule_runner: RuleRunner) -> None:
+    # Matching a recursive glob against a link which points to its parent directory would cause
+    # infinite recursion, so we eagerly error instead.
+    setup_fs_test_tar(rule_runner)
+    link = os.path.join(rule_runner.build_root, "subdir/link.ln")
+    dest = os.path.join(rule_runner.build_root, "subdir")
+    relative_symlink(dest, link)
+
+    exc_reg = r".*Maximum link depth exceeded"
+    with pytest.raises(Exception, match=exc_reg):
+        assert_path_globs(rule_runner, ["**"], expected_files=[], expected_dirs=[])
+
+
 def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
