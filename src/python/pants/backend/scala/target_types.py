@@ -152,6 +152,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         ScalatestTestsSourcesOverridesField,
+        ScalatestTestTimeoutField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = (*COMMON_TARGET_FIELDS, ScalatestTestTimeoutField)
