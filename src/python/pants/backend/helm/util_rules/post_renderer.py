@@ -24,6 +24,7 @@ from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDep
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
+from pants.backend.helm.util_rules.manifest import ImageRef
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -48,13 +49,15 @@ async def prepare_post_renderer_for_helm_deployment(
     mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
 ) -> HelmPostRenderer:
-    docker_addresses = mappings.deployment_to_docker_addresses[request.field_set.address]
+    docker_addr_index = mappings.deployment_to_docker_addresses[request.field_set.address]
+    docker_addresses = [addr for _, addr in docker_addr_index.values()]
+
     logger.debug(
         softwrap(
             f"""
             Resolving Docker image references for targets:
 
-            {bullet_list([addr.spec for addr in docker_addresses.values()])}
+            {bullet_list([addr.spec for addr in docker_addresses])}
             """
         )
     )
@@ -66,10 +69,10 @@ async def prepare_post_renderer_for_helm_deployment(
                 build_upstream_images=False,
             ),
         )
-        for addr in docker_addresses.values()
+        for addr in docker_addresses
     )
 
-    docker_targets = await Get(Targets, Addresses(docker_addresses.values()))
+    docker_targets = await Get(Targets, Addresses(docker_addresses))
     field_sets = [DockerFieldSet.create(tgt) for tgt in docker_targets]
 
     def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
@@ -104,12 +107,14 @@ async def prepare_post_renderer_for_helm_deployment(
 
     docker_addr_ref_mapping = {
         addr: resolve_docker_image_ref(addr, ctx)
-        for addr, ctx in zip(docker_addresses.values(), docker_contexts)
+        for addr, ctx in zip(docker_addresses, docker_contexts)
     }
 
-    replacements = docker_addresses.transform_values(
-        lambda addr: docker_addr_ref_mapping[addr] if addr in docker_addr_ref_mapping else None
-    )
+    def find_replacement(value: tuple[ImageRef, Address]) -> str | None:
+        _, addr = value
+        return docker_addr_ref_mapping.get(addr)
+
+    replacements = docker_addr_index.transform_values(find_replacement)
 
     return await Get(
         HelmPostRenderer,

@@ -25,12 +25,18 @@ from pants.backend.helm.util_rules.renderer import (
 from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
+from pants.engine.target import (
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    FieldSet,
+    InferDependenciesRequest,
+    InferredDependencies,
+)
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import pluralize
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +83,9 @@ async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymen
 
 @dataclass(frozen=True)
 class FirstPartyHelmDeploymentMappings:
-    deployment_to_docker_addresses: FrozenDict[Address, FrozenYamlIndex[Address]]
+    deployment_to_docker_addresses: FrozenDict[Address, FrozenYamlIndex[tuple[ImageRef, Address]]]
 
-    def referenced_by(self, address: Address) -> list[Address]:
+    def referenced_by(self, address: Address) -> list[tuple[ImageRef, Address]]:
         if address not in self.deployment_to_docker_addresses:
             return []
         return list(self.deployment_to_docker_addresses[address].values())
@@ -96,17 +102,15 @@ async def first_party_helm_deployment_mappings(
 
     docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
 
-    def image_refs_to_addresses(info: HelmDeploymentReport) -> FrozenYamlIndex[Address]:
-        """Maps and filters the `ImageRef`s that are in fact `docker_image` addresses and returns a
-        YAML index of those addresses."""
-
-        return info.image_refs.transform_values(
-            lambda image_ref: docker_target_addresses.get(str(image_ref), None)
-        )
+    def lookup_docker_addreses(image_ref: ImageRef) -> tuple[ImageRef, Address] | None:
+        addr = docker_target_addresses.get(str(image_ref), None)
+        if addr:
+            return image_ref, addr
+        return None
 
     # Builds a mapping between `helm_deployment` addresses and a YAML index of `docker_image` addresses.
     address_mapping = {
-        fs.address: image_refs_to_addresses(info)
+        fs.address: info.image_refs.transform_values(lookup_docker_addreses)
         for fs, info in zip(field_sets, all_deployments_info)
     }
     return FirstPartyHelmDeploymentMappings(
@@ -129,13 +133,35 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest, mapping: FirstPartyHelmDeploymentMappings
 ) -> InferredDependencies:
-    docker_images = mapping.referenced_by(request.field_set.address)
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    )
+    candidate_docker_addresses = mapping.referenced_by(request.field_set.address)
+
+    dependencies: OrderedSet[Address] = OrderedSet()
+
+    # We disambiguate just to help
+    for imager_ref, candidate_address in candidate_docker_addresses:
+        matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
+        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+            matches,
+            request.field_set.address,
+            context=softwrap(
+                f"The Helm deployment {request.field_set.address} declares "
+                f"{imager_ref} as Docker image reference"
+            ),
+            import_reference="manifest",
+        )
+
+        maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
+        if maybe_disambiguated:
+            dependencies.add(maybe_disambiguated)
 
     logging.debug(
-        f"Found {pluralize(len(docker_images), 'dependency')} for target {request.field_set.address}"
+        f"Found {pluralize(len(dependencies), 'dependency')} for target {request.field_set.address}"
     )
 
-    return InferredDependencies(docker_images)
+    return InferredDependencies(dependencies)
 
 
 def rules():
