@@ -55,6 +55,7 @@ DEFAULT_MODULE_MAPPING = {
     "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "djangorestframework": ("rest_framework",),
+    "django-csp": ["csp"],
     "enum34": ("enum",),
     "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
@@ -111,6 +112,7 @@ DEFAULT_MODULE_MAPPING = {
     "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "streamlit-aggrid": ("st_aggrid",),
+    "opensearch-py": ["opensearchpy"],
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
