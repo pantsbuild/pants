@@ -154,7 +154,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test Rust (macOS)
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -420,7 +420,7 @@ jobs:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Test Python (macOS)
     needs: bootstrap_pants_macos
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3

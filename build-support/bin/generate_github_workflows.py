@@ -45,7 +45,7 @@ PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
 
 LINUX_VERSION = "ubuntu-20.04"
-MACOS_VERSION = "macos-10.15"
+MACOS_VERSION = "macos-11"
 
 DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
 DONT_SKIP_WHEELS = (
