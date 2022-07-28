@@ -437,6 +437,30 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.15.0.dev0",
+        removal_hint=(
+            "Use `[python].tailor_ignore_empty_init_files`, which checks that the `__init__.py`"
+            "file is both solitary and also empty."
+        ),
+    )
+    tailor_ignore_empty_init_files = BoolOption(
+        "--tailor-ignore-empty-init-files",
+        default=True,
+        help=softwrap(
+            """
+            If true, don't add `python_sources` targets for `__init__.py` files that are both empty
+            and where there are no other Python files in the directory.
+
+            Empty and solitary `__init__.py` files usually exist as import scaffolding rather than
+            true library code, so it can be noisy to add BUILD files.
+
+            Even if this option is set to true, Pants will still ensure the empty `__init__.py`
+            files are included in the sandbox when running processes.
+
+            If you set to false, you may also want to set `[python-infer].init_files = "always"`.
+            """
+        ),
+        advanced=True,
     )
     tailor_requirements_targets = BoolOption(
         "--tailor-requirements-targets",
