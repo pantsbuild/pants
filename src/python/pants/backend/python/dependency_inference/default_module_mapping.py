@@ -83,7 +83,9 @@ DEFAULT_MODULE_MAPPING = {
     "opentelemetry-api": ("opentelemetry",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
-    "opentelemetry-instrumentation-aiohttp-client": ("opentelemetry.instrumentation.aiohttp_client",),
+    "opentelemetry-instrumentation-aiohttp-client": (
+        "opentelemetry.instrumentation.aiohttp_client",
+    ),
     "opentelemetry-instrumentation-grpc": ("opentelemetry.instrumentation.grpc",),
     "opentelemetry-instrumentation-pymongo": ("opentelemetry.instrumentation.pymongo",),
     "opentelemetry-instrumentation-requests": ("opentelemetry.instrumentation.requests",),
