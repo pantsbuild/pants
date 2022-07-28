@@ -200,9 +200,11 @@ class MyPy(PythonToolBase):
                     ({doc_url('python-interpreter-compatibility')}). Instead, it will
                     use what you set.
 
-                    (Automatically setting the option allows Pants to partition your targets by their
-                    constraints, so that, for example, you can run MyPy on Python 2-only code and
-                    Python 3-only code at the same time. This feature may no longer work.)
+                    (Allowing Pants to automatically set the option allows Pants to partition your
+                    targets by their constraints, so that, for example, you can run MyPy on
+                    Python 2-only code and Python 3-only code at the same time. It also allows Pants
+                    to leverage MyPy's cache, making subsequent runs of MyPy very fast.
+                    In the future, this feature may no longer work.)
                     """
                 )
             )
