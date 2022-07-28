@@ -33,7 +33,7 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
-    MACOS10_X86_64 = "macOS10-x86_64"
+    MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
@@ -333,8 +333,8 @@ class Helper:
         return str(self.platform.value)
 
     def runs_on(self) -> list[str]:
-        if self.platform == Platform.MACOS10_X86_64:
-            return ["macos-10.15"]
+        if self.platform == Platform.MACOS11_X86_64:
+            return ["macos-11"]
         if self.platform == Platform.MACOS11_ARM64:
             return ["self-hosted", "macOS11", "ARM64"]
         if self.platform == Platform.LINUX_X86_64:
@@ -343,7 +343,7 @@ class Helper:
 
     def platform_env(self):
         ret = {}
-        if self.platform == Platform.MACOS10_X86_64:
+        if self.platform == Platform.MACOS11_X86_64:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -593,7 +593,7 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
 
 
 def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
-    helper = Helper(Platform.MACOS10_X86_64)
+    helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
         "bootstrap_pants_macos_x86_64": {
             "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",

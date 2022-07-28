@@ -4,7 +4,7 @@ slug: "rules-api-goal-rules"
 excerpt: "How to create new goals."
 hidden: false
 createdAt: "2020-05-07T22:38:43.975Z"
-updatedAt: "2022-04-07T14:45:07.539Z"
+updatedAt: "2022-07-25T14:45:07.539Z"
 ---
 For many [plugin tasks](doc:common-plugin-tasks), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 
@@ -162,13 +162,13 @@ See [Rules and the Target API](doc:rules-api-and-target-api)  for detailed infor
 > 
 > ```python
 > @goal_rule
-> def publish(distribution: PythonDistribution, console: Console) -> Publish:
+> def publish(distribution: PythonDistributionTarget, console: Console) -> Publish:
 >    ...
 > ```
 > 
 > This will not work because the engine has no path in the rule graph to resolve a `PythonDistribution` type given the initial input types to the rule graph (the "roots").
 > 
-> Instead, request `Targets`, which will give you all of the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `AddressSpecs + FilesystemSpecs` -> `Specs` -> `Addresses` -> `Targets`.
+> Instead, request `Targets`, which will give you all of the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
 > 
 > From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api).
 > 
@@ -185,17 +185,19 @@ See [Rules and the Target API](doc:rules-api-and-target-api)  for detailed infor
 
 ### Only care about source files?
 
-If you only care about files, and you don't need any metadata from BUILD files, then you can request `SpecsSnapshot` instead of `Targets`.
+If you only care about files, and you don't need any metadata from BUILD files, then you can request `SpecsPaths` instead of `Targets`.
 
 ```python
-from pants.engine.fs import SpecsSnapshot
+from pants.engine.fs import SpecsPaths
 ...
 
 @goal_rule
-async def hello_world(console: Console, specs_snapshot: SpecsSnapshot) -> HelloWorld:
-    for f in specs_snapshot.snapshot.files:
+async def hello_world(console: Console, specs_paths: SpecsPaths) -> HelloWorld:
+    for f in specs_paths.files:
         console.print_stdout(f)
     return HelloWorld(exit_code=0)
 ```
 
-When users use address arguments like `::`, you will get all the sources belonging to the matched targets. When users use file arguments like `'**'`, you will get all matching files, even if the file doesn't have any owning target.
+`SpecsPaths.files` will list all files matched by the specs, e.g. `::` will match every file in the project (regardless of if targets own the files).
+
+To convert `SpecsPaths` into a [`Digest`](doc:rules-api-file-system), use `await Get(Digest, PathGlobs(globs=specs_paths.files))`.

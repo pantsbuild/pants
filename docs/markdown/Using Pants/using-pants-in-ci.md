@@ -4,7 +4,7 @@ slug: "using-pants-in-ci"
 excerpt: "Suggestions for how to use Pants to speed up your CI (continuous integration)."
 hidden: false
 createdAt: "2021-05-24T23:02:54.908Z"
-updatedAt: "2022-02-08T23:50:56.628Z"
+updatedAt: "2022-07-25T23:50:56.628Z"
 ---
 > 📘 Examples
 > 
@@ -71,6 +71,8 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 
 Recommended commands
 --------------------
+
+With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching).)
 
 ### Approach #1: only run over changed files
 
@@ -144,7 +146,7 @@ Alternatively, you can simply run over all your code. Pants's caching means that
 
 However, when the cache gets too big, it should be nuked (see "Directories to cache"), so your CI may end up doing more work than Approach #1.
 
-This approach works particularly well if you are using remote caching.
+This approach works particularly well if you are using [remote caching](doc:remote-caching).
 
 Configuring Pants for CI: `pants.ci.toml` (optional)
 ----------------------------------------------------
