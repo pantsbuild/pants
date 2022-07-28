@@ -291,11 +291,12 @@ async def mypy_typecheck_partition(
                             # for different versions) and uses a one-process-at-a-time daemon by default,
                             # multuple MyPy processes operating on a single db cache should be rare.
 
-                            {mkdir.path} -p {run_cache_dir}/{py_version} 2>&1 > /dev/null
-                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
+                            {mkdir.path} -p {run_cache_dir}/{py_version} > /dev/null 2>&1 || true
+                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
-                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db 2>&1 > /dev/null || true
+                            {mkdir.path} -p {named_cache_dir}/{py_version} > /dev/null 2>&1 || true
+                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             exit $EXIT_CODE
                         """
                     ).encode(),
