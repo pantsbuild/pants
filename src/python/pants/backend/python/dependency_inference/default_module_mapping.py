@@ -55,7 +55,7 @@ DEFAULT_MODULE_MAPPING = {
     "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "djangorestframework": ("rest_framework",),
-    "django-csp": ("csp"),
+    "django-csp": ("csp",),
     "enum34": ("enum",),
     "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
