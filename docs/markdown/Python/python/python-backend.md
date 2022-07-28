@@ -53,22 +53,6 @@ Created project/BUILD:
   - Add python_tests target tests
 ```
 
-> 📘 Have content in your `__init__.py` files?
->
-> Pants automatically uses all relevant `__init__.py` files, even if dependency inference does not include the files and you don't add it to the `dependencies` fields of your targets.
->
-> This works if you have empty `__init__.py` files, like most Python projects do; but if you have actual code in your `__init__.py` files, you should turn on both of these options in your `pants.toml`:
->
-> ```toml
-> [python]
-> tailor_ignore_solitary_init_files = false
->
-> [python-infer]
-> inits = true
-> ```
->
-> This option will cause Pants to infer "proper" dependencies on any ancestor `__init__.py` file. If you run `./pants dependencies project/util/foo.py`, you should see `project/__init__.py` and `project/util/__init__.py` show up. This will ensure that any of the `dependencies` of your `__init__.py` files are included.
-
 > 🚧 macOS users: you may need to change interpreter search paths
 >
 > By default, Pants will look at both your `$PATH` and—if you use Pyenv—your `$(pyenv root)/versions` folder when discovering Python interpreters. Your `$PATH` likely includes the system Pythons at `/usr/bin/python` and `/usr/bin/python3`, which are known to have many issues like failing to install some dependencies.
