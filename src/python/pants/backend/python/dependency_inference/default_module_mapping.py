@@ -131,7 +131,7 @@ DEFAULT_MODULE_MAPPING = {
     "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "streamlit-aggrid": ("st_aggrid",),
-    "opensearch-py": ("opensearchpy"),
+    "opensearch-py": ("opensearchpy",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
