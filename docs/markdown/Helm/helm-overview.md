@@ -3,7 +3,7 @@ title: "Helm Overview"
 slug: "helm-overview"
 hidden: false
 createdAt: "2022-05-13T16:06:59.247Z"
-updatedAt: "2022-05-17T15:00:11.338Z"
+updatedAt: "2022-07-25T15:00:11.338Z"
 ---
 > 🚧 Helm support is in alpha stage
 > 
@@ -104,6 +104,8 @@ helm_chart(lint_strict=True)
 ```
 
 Likewise, in a similar way you could enable strict linting globally and then choose to disable it in a per-target basis. Run `./pants help helm` or `./pants help helm_chart` for more information.
+
+You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
 ### Package
 
