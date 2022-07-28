@@ -142,6 +142,13 @@ Pants Build 2 Tour: <https://www.youtube.com/playlist?list=PLwPRXwjURiOzXjgqydxZ
 Posts & Articles
 ----------------
 
+### Dev.to
+
+July 25, 2022
+"Better CI/CD caching with new-gen build systems"
+<https://dev.to/benjyw/better-cicd-caching-with-new-gen-build-systems-3aem> 
+How the cache solutions offered by CI providers work, why they are often of limited benefit, and how Pants supports a much more effective caching paradigm. 
+
 ### Suresh Joshi
 
 April 4, 2022  
