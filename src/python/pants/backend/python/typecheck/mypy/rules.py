@@ -295,6 +295,7 @@ async def mypy_typecheck_partition(
                             {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
+                            {mkdir.path} -p {named_cache_dir}/{py_version} > /dev/null 2>&1 || true
                             {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             exit $EXIT_CODE
                         """
