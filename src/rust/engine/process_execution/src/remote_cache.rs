@@ -99,7 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
-      Some(read_timeout),
+      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
