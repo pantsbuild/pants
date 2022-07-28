@@ -45,6 +45,35 @@ backend_packages = [
 ]
 ```
 
+## Setting up targets
+
+Run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will
+create `kotlin_sources` targets in every directory containing library code, as well as `kotlin_junit_tests` targets
+for filenames that look like tests.
+
+```
+❯ ./pants tailor ::
+Created src/jvm/org/pantsbuild/example/app/BUILD:
+  - Add kotlin_sources target app
+Created src/jvm/org/pantsbuild/example/json/BUILD:
+  - Add kotlin_sources target json
+Created src/jvm/org/pantsbuild/example/lib/BUILD:
+  - Add java_sources target lib
+```
+
+You can run `./pants list ::` to see all targets in your project:
+
+```
+❯ ./pants list ::
+...
+src/jvm/org/pantsbuild/example/app:app
+src/jvm/org/pantsbuild/example/app/ExampleApp.kt
+src/jvm/org/pantsbuild/example/json:json
+src/jvm/org/pantsbuild/example/json/JsonExample.kt
+src/jvm/org/pantsbuild/example/lib:lib
+src/jvm/org/pantsbuild/example/lib/ExampleLib.java
+```
+
 ## Choosing JDK and Kotlin versions
 
 Pants supports choosing the JDK and Kotlin versions per target in your repository. To reduce the amount of
