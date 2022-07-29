@@ -14,8 +14,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
 )
+from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
-from pants.backend.python.util_rules import pex
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -41,7 +41,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
@@ -65,9 +64,7 @@ class ProtobufJavaGrpcPlugin:
 
 
 @rule
-async def resolve_protobuf_java_grpc_plugin(
-    platform: Platform,
-) -> ProtobufJavaGrpcPlugin:
+async def resolve_protobuf_java_grpc_plugin() -> ProtobufJavaGrpcPlugin:
     lockfile_request = await Get(GenerateJvmLockfileFromTool, GrpcJavaToolLockfileSentinel())
     classpath = await Get(
         ToolClasspath,
@@ -82,7 +79,7 @@ async def resolve_protobuf_java_grpc_plugin(
         Platform.macos_x86_64: "exe_osx-x86_64",
         Platform.linux_arm64: "exe_linux-aarch_64",
         Platform.linux_x86_64: "exe_linux-x86_64",
-    }[platform]
+    }[Platform.current]
 
     classpath_entries = await Get(DigestEntries, Digest, classpath.digest)
     candidate_plugin_entries = []
@@ -213,7 +210,6 @@ async def generate_grpc_java_lockfile_request(
 def rules():
     return [
         *collect_rules(),
-        *pex.rules(),
         *dependency_inference.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, GrpcJavaToolLockfileSentinel),
@@ -221,6 +217,7 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
-        # Rules to avoid rule graph errors.
-        *artifact_mapper.rules(),
+        # Bring in the Java backend (since this backend compiles Jave code) to avoid rule graph errors.
+        # TODO: Figure out whether a subset of rules can be brought in to still avoid rule graph errors.
+        *java_backend_rules(),
     ]
