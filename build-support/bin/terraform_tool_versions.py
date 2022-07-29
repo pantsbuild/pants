@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""Fetch versions of Terraform and format them for use in known_versions."""
+"""Fetch versions of Terraform and format them for use in known_versions.
+
+The main version page lists the available versions in descending order.
+It includes stable releases but also various levels of pre-release.
+
+Each version links to a version-specific page.
+This page includes links to download the binary, sha256sum file, and a signature of the sha256sum file.
+"""
 
 import csv
 import itertools
@@ -175,7 +182,10 @@ def get_file_size(url) -> int:
 
 
 def parse_download_url(url: str) -> Tuple[str, str]:
-    """Get the version and platform from the url."""
+    """Get the version and platform from the url.
+
+    The url is of the form "https://releases.hashicorp.com/terraform/{expected_platform}/terraform_{expected_version}_{expected_platform}.zip"
+    """
     filename = Path(urlparse(url).path).stem
     _, version, platform_name, platform_arch = filename.split("_")
     return version, platform_name + "_" + platform_arch
