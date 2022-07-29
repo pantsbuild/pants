@@ -78,7 +78,7 @@ The `helm_deployment` target has many additional fields including the target kub
 Dependencies with `docker_image` targets
 ----------------------------------------
 
-A Helm deployment will in most cases deploy one or more Docker images into Kubernetes. Furthermore, it's quite likely there is going to be at list some first party Docker images among those. Pants is capable of analysing the Helm chart being used in a deployment and detect those first-party Docker images if the chart being used, uses Pants' target addresses to those Docker images.
+A Helm deployment will in most cases deploy one or more Docker images into Kubernetes. Furthermore, it's quite likely there is going to be at least a few first party Docker images among those. Pants is capable of analysing the Helm chart being used in a deployment to detect those required first-party Docker images using Pants' target addresses to those Docker images.
 
 To illustrate this, let's imagine the following scenario: Let's say we have a first-party Docker image that we want to deploy into Kubernetes as a `Pod` resource kind. For achieving this we define the following workspace:
 
