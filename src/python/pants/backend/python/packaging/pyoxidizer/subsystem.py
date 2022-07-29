@@ -23,6 +23,6 @@ class PyOxidizer(PythonToolBase):
     default_main = ConsoleScript("pyoxidizer")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.8,<4"]
+    default_interpreter_constraints = ["CPython==3.9.*"]
 
     args = ArgsListOption(example="--release")

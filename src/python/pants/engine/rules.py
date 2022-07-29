@@ -23,6 +23,7 @@ from typing import (
     get_type_hints,
 )
 
+
 from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
@@ -41,6 +42,10 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 PANTS_RULES_MODULE_KEY = "__pants_rules__"
+
+from os import environ
+if environ.get("EX"):
+    raise Exception()
 
 
 # NB: This violates Python naming conventions of using snake_case for functions. This is because
@@ -383,12 +388,19 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
+
+    open("logfile.txt", "w").write("hello")
+
     if not namespaces:
         currentframe = inspect.currentframe()
-        assert isinstance(currentframe, FrameType)
+        if not isinstance(currentframe, FrameType):
+            raise Exception(f"{currentframe=}")
+        #assert isinstance(currentframe, FrameType)
         caller_frame = currentframe.f_back
         caller_module = inspect.getmodule(caller_frame)
-        assert isinstance(caller_module, ModuleType)
+        if not isinstance(caller_module, ModuleType):
+            raise Exception(f"{currentframe=} {caller_frame=} {caller_module=}")
+        #assert isinstance(caller_module, ModuleType)
         namespaces = (caller_module,)
 
     def iter_rules():

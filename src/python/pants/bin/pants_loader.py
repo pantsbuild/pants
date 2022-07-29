@@ -17,7 +17,6 @@ from pants.bin.pants_env_vars import (
 )
 from pants.bin.pants_runner import PantsRunner
 
-
 class PantsLoader:
     """Initial entrypoint for pants.
 
@@ -86,6 +85,9 @@ class PantsLoader:
     def run_default_entrypoint() -> None:
         start_time = time.time()
         try:
+            # Patch for PyOxidizer
+            if not sys.argv[0]:
+                sys.argv[0] = "PLACEHOLDER_BINARY"
             runner = PantsRunner(args=sys.argv, env=os.environ)
             exit_code = runner.run(start_time)
         except KeyboardInterrupt as e:
