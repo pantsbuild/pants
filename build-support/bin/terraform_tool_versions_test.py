@@ -122,4 +122,4 @@ def test_parse_sha256sums_file():
     ids=["standard_release", "rc", "beta", "alpha"],
 )
 def test_is_prerelease(version, expected):
-    assert is_prerelease(version) == expected
+    assert is_prerelease("terraform_" + version) == expected

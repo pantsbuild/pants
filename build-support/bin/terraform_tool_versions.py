@@ -13,6 +13,7 @@ This page includes links to download the binary, sha256sum file, and a signature
 import csv
 import itertools
 import logging
+import re
 import tempfile
 from dataclasses import dataclass
 from io import StringIO
@@ -193,7 +194,9 @@ def parse_download_url(url: str) -> Tuple[str, str]:
 
 def is_prerelease(version_slug: str) -> bool:
     """Determine if a Terraform version is a prerelease version (alpha, beta, or rc)"""
-    return any((x in version_slug for x in {"alpha", "beta", "rc"}))
+    stable_version_regex = r"^terraform_\d+\.\d+\.\d+$"
+
+    return re.search(stable_version_regex, version_slug) is None
 
 
 def fetch_platforms_for_version(
