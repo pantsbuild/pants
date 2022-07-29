@@ -78,15 +78,9 @@ pex_binary(
 )
 
 
-python_distribution(
-    name="pants_bin",
-    dependencies=[":pants_loader"],
-    provides=python_artifact(name="pantsbuild.pants.oxidized", description="test oxidized pants build"),
-)
-
 pyoxidizer_binary(
     name="pants_oxidized_experimental",
-    dependencies=[":pants_bin"],
+    dependencies=["src/python/pants:pants-packaged"],
     entry_point="pants.bin.pants_loader",
 )
 
