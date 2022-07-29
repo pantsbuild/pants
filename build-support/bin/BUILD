@@ -18,3 +18,8 @@ python_tests(
     name="py_tests",
     overrides={"reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]}},
 )
+
+pex_binary(
+    name="terraform_tool_versions",
+    entry_point="terraform_tool_versions.py",
+)

@@ -4,6 +4,8 @@
 python_requirements(
     module_mapping={
         "strawberry-graphql": ["strawberry"],
+        "beautifulsoup4": ["bs4"],
+        "python-gnupg": ["gnupg"],
     },
     overrides={
         "humbug": {"dependencies": ["#setuptools"]},

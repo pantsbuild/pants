@@ -48,3 +48,6 @@ fastapi==0.78.0
 starlette==0.19.1
 strawberry-graphql[fastapi]==0.114.0
 uvicorn[standard]==0.17.6
+
+beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
+python-gnupg==0.4.9 # For validating signatures
