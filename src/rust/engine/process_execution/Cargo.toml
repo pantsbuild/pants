@@ -6,8 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
-async-trait = "=0.1.42"
+async-trait = "0.1"
 async-lock = "2.5"
 walkdir = "2"
 protos = { path = "../protos" }
