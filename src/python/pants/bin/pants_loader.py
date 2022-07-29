@@ -9,6 +9,7 @@ import time
 import warnings
 from textwrap import dedent
 
+from pants import ox
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
@@ -89,6 +90,7 @@ class PantsLoader:
             # Patch for PyOxidizer
             if not sys.argv[0]:
                 sys.argv[0] = "PLACEHOLDER_BINARY"
+                ox.is_oxidized = True
             runner = PantsRunner(args=sys.argv, env=os.environ)
             exit_code = runner.run(start_time)
         except KeyboardInterrupt as e:
