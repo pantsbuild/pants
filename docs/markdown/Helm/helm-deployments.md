@@ -132,7 +132,7 @@ src/chart
 src/docker
 ```
 
-This should work any kind of Kubernetes resource that will result in Docker image being deployed into Kubernetes, like `Deployment`, `StatefulSet`, `ReplicaSet`, `CronJob`, etc. Please get in touch with us in case you find Pants was not capable to infer dependencies in any of your `helm_deployment` targets by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:getting-help).
+This should work with any kind of Kubernetes resource that leads to Docker image being deployed into Kubernetes, such as `Deployment`, `StatefulSet`, `ReplicaSet`, `CronJob`, etc. Please get in touch with us in case you find Pants was not capable to infer dependencies in any of your `helm_deployment` targets by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:getting-help).
 
 > 📘 How the Docker image reference is calculated during deployment?
 > 
