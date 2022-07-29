@@ -123,7 +123,7 @@ helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 > 📘 Docker image references VS Pants' target addresses
 > 
 > You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to images in accessible Docker registries. As shown in the example, we recommend that you make the image address value configurable, especially for charts that deploy first-party Docker images.
-> Besides, your deployments can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
+> Your chart resources can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
 
 With this setup we should be able to run `./pants dependencies src/deployment` and Pants should give the following output:
 
