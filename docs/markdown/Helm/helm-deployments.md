@@ -73,7 +73,7 @@ There are quite a few things to notice in the previous example:
 > 
 > Don't forget to configure your source roots such that each of the shown files in the previous example sit at their respective source root level.
 
-The `helm_deployment` target has many additional fields that cover from configuring the target namespace to even provide with inline overriding values. Please run `./pants help helm_deployment` to see all the posibilities.
+The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `./pants help helm_deployment` to see all the posibilities.
 
 Dependencies with `docker_image` targets
 ----------------------------------------
