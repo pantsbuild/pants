@@ -50,13 +50,12 @@ class HelpFormatter(MaybeColor):
                 lines.extend([*self.format_option(ohi), ""])
 
         add_option(oshi.basic)
-        if self._show_advanced or (
-            not oshi.basic and oshi.advanced
-        ):  # show advanced options if there are no basic ones.
+        show_advanced = self._show_advanced or (not oshi.basic and oshi.advanced)
+        if show_advanced:  # show advanced options if there are no basic ones.
             add_option(oshi.advanced, category="advanced")
         if self._show_deprecated and oshi.deprecated:
             add_option(oshi.deprecated, category="deprecated")
-        if oshi.advanced and not self._show_advanced:
+        if not show_advanced and oshi.advanced:
             lines.append(
                 self.maybe_green(
                     f"Advanced options available. You can list them by running "
