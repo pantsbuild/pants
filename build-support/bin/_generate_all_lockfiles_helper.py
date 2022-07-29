@@ -127,7 +127,9 @@ AllTools = (
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
     DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
-    DefaultTool.jvm(JavaProtobufGrpcSubsystem, backend="pants.backend.experimental.codegen.protobuf.java"),
+    DefaultTool.jvm(
+        JavaProtobufGrpcSubsystem, backend="pants.backend.experimental.codegen.protobuf.java"
+    ),
     DefaultTool.jvm(ScalafmtSubsystem),
     DefaultTool.jvm(Scalatest),
     DefaultTool.jvm(
