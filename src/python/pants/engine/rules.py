@@ -23,7 +23,6 @@ from typing import (
     get_type_hints,
 )
 
-
 from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
@@ -389,18 +388,14 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
         currentframe = inspect.currentframe()
         if not isinstance(currentframe, FrameType):
             raise Exception(f"{currentframe=}")
-        #assert isinstance(currentframe, FrameType)
         caller_frame = currentframe.f_back
-        caller_module = inspect.getmodule(caller_frame)
-        if not isinstance(caller_module, ModuleType):
-            raise Exception(f"{currentframe=} {caller_frame=} {caller_module=}")
-        #assert isinstance(caller_module, ModuleType)
-        namespaces = (caller_module,)
+        global_items = caller_frame.f_globals
+        namespaces = (global_items,)
 
     def iter_rules():
         for namespace in namespaces:
             mapping = namespace.__dict__ if isinstance(namespace, ModuleType) else namespace
-            for name, item in mapping.items():
+            for item in mapping.values():
                 if not callable(item):
                     continue
                 rule = getattr(item, "rule", None)
