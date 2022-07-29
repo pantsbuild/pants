@@ -17,6 +17,7 @@ from pants.bin.pants_env_vars import (
 )
 from pants.bin.pants_runner import PantsRunner
 
+
 class PantsLoader:
     """Initial entrypoint for pants.
 

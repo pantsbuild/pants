@@ -32,8 +32,10 @@ from pants.util.strutil import strip_v2_chroot_path
 logger = logging.getLogger(__name__)
 
 from os import environ
+
 if environ.get("EX"):
     raise Exception()
+
 
 @dataclass(frozen=True)
 class CheckResult:
