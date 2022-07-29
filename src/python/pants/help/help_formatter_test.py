@@ -13,7 +13,7 @@ from pants.option.parser import OptionValueHistory, Parser
 from pants.option.ranked_value import Rank, RankedValue
 
 
-class OptionHelpFormatterTest:
+class TestOptionHelpFormatter:
     @staticmethod
     def _format_for_single_option(**kwargs):
         ohi = OptionHelpInfo(
@@ -55,16 +55,28 @@ class OptionHelpFormatterTest:
         )
         assert default_line.lstrip() == "default: kiwi"
 
-    @staticmethod
-    def _format_for_global_scope(
-        show_advanced: bool, show_deprecated: bool, args: list[str], kwargs
-    ) -> list[str]:
-        parser = Parser(
+    @classmethod
+    def _get_parser(cls) -> Parser:
+        return Parser(
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
         )
+
+    @classmethod
+    def _format_for_global_scope(
+        cls, show_advanced: bool, show_deprecated: bool, args: list[str], kwargs
+    ) -> list[str]:
+        parser = cls._get_parser()
         parser.register(*args, **kwargs)
+        return cls._format_for_global_scope_with_parser(
+            parser, show_advanced=show_advanced, show_deprecated=show_deprecated
+        )
+
+    @classmethod
+    def _format_for_global_scope_with_parser(
+        cls, parser: Parser, show_advanced: bool, show_deprecated: bool
+    ) -> list[str]:
         # Force a parse to generate the derivation history.
         parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [], False))
         oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "help.test")
@@ -73,13 +85,15 @@ class OptionHelpFormatterTest:
         ).format_options(oshi)
 
     def test_suppress_advanced(self) -> None:
-        args = ["--foo"]
-        kwargs = {"advanced": True}
-        lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 18
+        parser = self._get_parser()
+        parser.register("--foo", advanced=True)
+        # must have a non advanced option to be able to supress showing advanced options.
+        parser.register("--jerry", advanced=False)
+        lines = self._format_for_global_scope_with_parser(parser, False, False)
+        assert len(lines) == 15
         assert not any("--foo" in line for line in lines)
-        lines = self._format_for_global_scope(True, False, args, kwargs)
-        assert len(lines) == 18
+        lines = self._format_for_global_scope_with_parser(parser, True, False)
+        assert len(lines) == 24
 
     def test_suppress_deprecated(self) -> None:
         args = ["--foo"]
