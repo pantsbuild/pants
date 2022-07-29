@@ -353,6 +353,16 @@ async def prepare_coursier_resolve_info(
         for (req, _), path in zip(jars, jar_file_paths)
     ]
 
+    # Coursier only fetches non-jar artifact types ("packaging" in Pants parlance) if passed an `-A` option
+    # explicitly requesting that the non-jar artifact(s) be fetched. This is an addition to passing the coordinate
+    # with the desired type (packaging) value.
+    extra_types: set[str] = set()
+    for no_jar in no_jars:
+        if no_jar.coordinate.packaging != "jar":
+            extra_types.add(no_jar.coordinate.packaging)
+    if extra_types:
+        extra_args.extend(["-A", ",".join(sorted(["jar", "bundle", *extra_types]))])
+
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
     digest = await Get(

@@ -577,6 +577,44 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_fetch_one_coord_with_non_jar_packaging(rule_runner: RuleRunner) -> None:
+    """This test demonstrates that fetch_one_coord is able to download non-jar artifacts such as
+    protoc plugin binaries that are distribured via Maven Central."""
+    coordinate = Coordinate(
+        group="io.grpc",
+        artifact="protoc-gen-grpc-java",
+        version="1.48.0",
+        packaging="exe",
+        classifier="linux-x86_64",
+    )
+    resolved_lockfile = rule_runner.request(
+        CoursierResolvedLockfile,
+        [ArtifactRequirements.from_coordinates([coordinate])],
+    )
+
+    entries = [
+        e
+        for e in resolved_lockfile.entries
+        if e.coord
+        == Coordinate(
+            group="io.grpc",
+            artifact="protoc-gen-grpc-java",
+            version="1.48.0",
+            packaging="exe",
+            classifier="linux-x86_64",
+            strict=True,
+        )
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+
+    classpath_entry = rule_runner.request(ClasspathEntry, [entry])
+    assert classpath_entry.filenames == (
+        "io.grpc_protoc-gen-grpc-java_exe_linux-x86_64_1.48.0.exe",
+    )
+
+
+@maybe_skip_jdk_test
 def test_user_repo_order_is_respected(rule_runner: RuleRunner) -> None:
     """Tests that the repo resolution order issue found in #14577 is avoided."""
 
