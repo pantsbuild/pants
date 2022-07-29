@@ -174,7 +174,7 @@ Value files < Value override files < Inline values
 Deploying
 ---------
 
-Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `./pants experimental-deploy src/deployment`. This will go trigger the following steps:
+Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `./pants experimental-deploy src/deployment`. This will trigger the following steps:
 
 1. Analyse the dependencies of the given deployment.
 2. Build and publish any first-party Docker image and Helm charts that are part of those dependencies.
