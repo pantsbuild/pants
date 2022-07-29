@@ -183,7 +183,7 @@ Continuing with the example in the previous section, we can deploy it into Kuber
 
 The `experimental-deploy` goal also supports default Helm pass-through arguments that allow to change the deployment behaviour to be either atomic or a dry-run or even what is the Kubernetes config file and target context to be used in the deployment.
 
-Please note that the list of valid pass-through arguments has been limited to those that not alter the reproducibility of the deployment (i.e. `--create-namespace` is not a valid pass-through argument). Those arguments will have equivalente fields in the `helm_deployment` target.
+Please note that the list of valid pass-through arguments has been limited to those that do not alter the reproducibility of the deployment (i.e. `--create-namespace` is not a valid pass-through argument). Those arguments will have equivalent fields in the `helm_deployment` target.
 
 For example, to make an atomic deployment into a non-default Kubernetes context you can use a command like the following one:
 
