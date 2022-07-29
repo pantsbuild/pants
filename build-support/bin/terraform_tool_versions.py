@@ -18,7 +18,7 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, TypeVar
+from typing import Dict, Generator, List, Optional, Tuple, TypeVar
 from urllib.parse import urljoin, urlparse
 
 import gnupg
@@ -32,22 +32,6 @@ logging.basicConfig(level=logging.INFO)
 
 
 T = TypeVar("T")
-
-
-def partition(predicate: Callable[[Any], bool], items: Iterable[T]) -> Tuple[List[T], List[T]]:
-    """Split an Iterable into two lists based on a predicate.
-
-    >>> l = [0,1,2,3,4,5,6]
-    >>> partition(lambda i: i % 2 == 0, l)
-    ([0, 2, 4, 6], [1, 3, 5])
-    """
-    where_true, where_false = [], []
-    for item in items:
-        if predicate(item):
-            where_true.append(item)
-        else:
-            where_false.append(item)
-    return where_true, where_false
 
 
 class GPGVerifier:
@@ -114,10 +98,10 @@ class TFVersionLinks:
 
 def get_info_for_version(version_page_links: Links) -> TFVersionLinks:
     """Get list of binaries and signatures for a version of Terraform."""
-    signature_links, binary_links = partition(lambda i: "SHA" in i.link, version_page_links)
+    binary_links = list(filter(lambda i: "SHA" not in i.link, version_page_links))
 
     def link_ends_with(what: str) -> Link:
-        return next(filter(lambda s: s.link.endswith(what), signature_links))
+        return next(filter(lambda s: s.link.endswith(what), version_page_links))
 
     return TFVersionLinks(
         binary_links,

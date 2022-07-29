@@ -11,15 +11,7 @@ from terraform_tool_versions import (
     is_prerelease,
     parse_download_url,
     parse_sha256sums_file,
-    partition,
 )
-
-
-def test_partition():
-    items = list(range(7))
-    even, odd = partition(lambda i: i % 2 == 0, items)
-    assert even == [0, 2, 4, 6]
-    assert odd == [1, 3, 5]
 
 
 def test_parse_download_url():
