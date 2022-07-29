@@ -107,22 +107,20 @@ def get_tf_links(page: BeautifulSoup) -> Links:
 
 @dataclass(frozen=True)
 class TFVersionLinks:
-    platform_links: Links
+    binary_links: Links
     sha256sums_link: Link
     signature_link: Link
 
 
-def get_info_for_version(url) -> TFVersionLinks:
+def get_info_for_version(version_page_links: Links) -> TFVersionLinks:
     """Get list of binaries and signatures for a version of Terraform."""
-    logging.info(f"getting info for version at {url}")
-    all_links = get_tf_links(get_tf_page(url))
-    signature_links, platform_links = partition(lambda i: "SHA" in i.link, all_links)
+    signature_links, binary_links = partition(lambda i: "SHA" in i.link, version_page_links)
 
     def link_ends_with(what: str) -> Link:
         return next(filter(lambda s: s.link.endswith(what), signature_links))
 
     return TFVersionLinks(
-        platform_links,
+        binary_links,
         sha256sums_link=link_ends_with("SHA256SUMS"),
         signature_link=link_ends_with("SHA256SUMS.sig"),
     )
@@ -207,7 +205,7 @@ def fetch_platforms_for_version(
 ) -> Optional[List[ExternalToolVersion]]:
     """Fetch platform binary information for a particular Terraform version."""
     logging.info(
-        f"processiong version {version_slug} with {len(version_links.platform_links)} binaries"
+        f"processiong version {version_slug} with {len(version_links.binary_links)} binaries"
     )
 
     if is_prerelease(version_slug):
@@ -219,7 +217,7 @@ def fetch_platforms_for_version(
 
     out = []
 
-    for platform_link in version_links.platform_links:
+    for platform_link in version_links.binary_links:
         version, platform = parse_download_url(platform_link.link)
 
         if platform not in inverse_platform_mapping:
@@ -253,7 +251,8 @@ def fetch_versions(
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
     platform_version_links = (
-        (x.text, get_info_for_version(urljoin(url, x.link))) for x in version_links
+        (x.text, get_info_for_version(get_tf_links(get_tf_page(urljoin(url, x.link)))))
+        for x in version_links
     )
 
     inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}

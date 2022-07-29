@@ -5,7 +5,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import pytest
 from terraform_tool_versions import (
+    Link,
     VersionHash,
+    get_info_for_version,
     is_prerelease,
     parse_download_url,
     parse_sha256sums_file,
@@ -28,6 +30,42 @@ def test_parse_download_url():
     version, platform = parse_download_url(url)
     assert version == expected_version
     assert platform == expected_platform
+
+
+def test_get_info_for_version():
+    sha256sums_link = Link(
+        "terraform_1.2.6_SHA256SUMS",
+        "https://releases.hashicorp.com/terraform/1.2.6/terraform_1.2.6_SHA256SUMS",
+    )
+    keyed_signature_link = Link(
+        "terraform_1.2.6_SHA256SUMS.72D7468F.sig",
+        "https://releases.hashicorp.com/terraform/1.2.6/terraform_1.2.6_SHA256SUMS.72D7468F.sig",
+    )
+    signature_link = Link(
+        "terraform_1.2.6_SHA256SUMS.sig",
+        "https://releases.hashicorp.com/terraform/1.2.6/terraform_1.2.6_SHA256SUMS.sig",
+    )
+
+    links = [
+        sha256sums_link,
+        keyed_signature_link,
+        signature_link,
+        Link(
+            "terraform_1.2.6_darwin_amd64.zip",
+            "https://releases.hashicorp.com/terraform/1.2.6/terraform_1.2.6_darwin_amd64.zip",
+        ),
+        Link(
+            "terraform_1.2.6_darwin_arm64.zip",
+            "https://releases.hashicorp.com/terraform/1.2.6/terraform_1.2.6_darwin_arm64.zip",
+        ),
+    ]
+
+    result = get_info_for_version(links)
+
+    assert result.signature_link == signature_link
+    assert result.sha256sums_link == sha256sums_link
+    assert len(result.binary_links) == 2
+    assert keyed_signature_link not in result.binary_links
 
 
 sha256sums_file = """\
