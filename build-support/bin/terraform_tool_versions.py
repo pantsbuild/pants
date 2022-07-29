@@ -98,10 +98,10 @@ class TFVersionLinks:
 
 def get_info_for_version(version_page_links: Links) -> TFVersionLinks:
     """Get list of binaries and signatures for a version of Terraform."""
-    binary_links = list(filter(lambda i: "SHA" not in i.link, version_page_links))
+    binary_links = [vpl for vpl in version_page_links if "SHA" not in vpl.link]
 
     def link_ends_with(what: str) -> Link:
-        return next(filter(lambda s: s.link.endswith(what), version_page_links))
+        return next(s for s in version_page_links if s.link.endswith(what))
 
     return TFVersionLinks(
         binary_links,
