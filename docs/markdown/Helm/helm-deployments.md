@@ -137,7 +137,7 @@ This should work with any kind of Kubernetes resource that leads to Docker image
 > 📘 How the Docker image reference is calculated during deployment?
 > 
 > Pants' will rely on the behaviour of the `docker_image` target when it comes down to generate the final image reference. Since a given image may have more than one valid image reference, **Pants will try to use the first one that is not tagged as `latest`**, falling back to `latest` if none could be found.
-> It's good practice to publish your Docker images using tags other than `latest` and Pants preferred behaviour is to choose those are this guarantees that the _version_ of the Docker image being deployed is the expected one.
+> It's good practice to publish your Docker images using tags other than `latest` and Pants preferred behaviour is to choose those as this guarantees that the _version_ of the Docker image being deployed is the expected one.
 
 Value override files
 --------------------
