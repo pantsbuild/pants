@@ -386,9 +386,10 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     if not namespaces:
         currentframe = inspect.currentframe()
-        if not isinstance(currentframe, FrameType):
-            raise Exception(f"{currentframe=}")
+        assert isinstance(currentframe, FrameType)
         caller_frame = currentframe.f_back
+        assert isinstance(caller_frame, FrameType)
+
         global_items = caller_frame.f_globals
         namespaces = (global_items,)
 

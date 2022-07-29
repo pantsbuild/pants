@@ -33,7 +33,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.20.0",
+  "toolchain.pants.plugin==0.21.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -67,8 +67,6 @@ build_ignore.add = [
 unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
-remote_store_address = "grpcs://cache.toolchain.com:443"
-remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 # TODO: May cause tests which experience missing digests to hang.
 # See https://github.com/pantsbuild/pants/issues/16096.
 remote_cache_eager_fetch = false

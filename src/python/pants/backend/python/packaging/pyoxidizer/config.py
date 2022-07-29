@@ -17,7 +17,7 @@ def make_exe():
     policy.resources_location_fallback = "filesystem-relative:lib"
 
     python_config = dist.make_python_interpreter_config()
-    
+
     $RUN_MODULE
 
     exe = dist.to_python_executable(

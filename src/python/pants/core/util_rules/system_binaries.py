@@ -326,6 +326,14 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class CpBinary(BinaryPath):
+    pass
+
+
+class MvBinary(BinaryPath):
+    pass
+
+
 class ChmodBinary(BinaryPath):
     pass
 
@@ -685,6 +693,22 @@ async def find_mkdir() -> MkdirBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
+async def find_cp() -> CpBinary:
+    request = BinaryPathRequest(binary_name="cp", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="copy files")
+    return CpBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `mv` binary", level=LogLevel.DEBUG)
+async def find_mv() -> MvBinary:
+    request = BinaryPathRequest(binary_name="mv", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="move files")
+    return MvBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)

@@ -52,6 +52,12 @@ def test_default_module_mapping_is_normalized() -> None:
         ), "Please update `DEFAULT_TYPE_STUB_MODULE_MAPPING` to use canonical project names"
 
 
+def test_default_module_mapping_uses_tuples() -> None:
+    for modules in DEFAULT_MODULE_MAPPING.values():
+        assert isinstance(modules, tuple)
+        assert len(modules) > 0
+
+
 @pytest.mark.parametrize(
     "stripped_path,expected",
     [
