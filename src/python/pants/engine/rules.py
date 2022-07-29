@@ -43,10 +43,6 @@ from pants.util.strutil import softwrap
 
 PANTS_RULES_MODULE_KEY = "__pants_rules__"
 
-from os import environ
-if environ.get("EX"):
-    raise Exception()
-
 
 # NB: This violates Python naming conventions of using snake_case for functions. This is because
 # SubsystemRule behaves very similarly to UnionRule and RootRule, and we want to use the same
@@ -388,8 +384,6 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
-
-    open("logfile.txt", "w").write("hello")
 
     if not namespaces:
         currentframe = inspect.currentframe()
