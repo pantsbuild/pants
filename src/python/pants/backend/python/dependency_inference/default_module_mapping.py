@@ -55,7 +55,7 @@ DEFAULT_MODULE_MAPPING = {
     "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "djangorestframework": ("rest_framework",),
-    "django-csp": ["csp"],
+    "django-csp": ("csp",),
     "enum34": ("enum",),
     "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
@@ -90,6 +90,12 @@ DEFAULT_MODULE_MAPPING = {
     "opentelemetry-instrumentation-grpc": ("opentelemetry.instrumentation.grpc",),
     "opentelemetry-instrumentation-pymongo": ("opentelemetry.instrumentation.pymongo",),
     "opentelemetry-instrumentation-requests": ("opentelemetry.instrumentation.requests",),
+    "opentelemetry-instrumentation-botocore": ("opentelemetry.instrumentation.botocore",),
+    "opentelemetry-instrumentation-django": ("opentelemetry.instrumentation.django",),
+    "opentelemetry-instrumentation-httpx": ("opentelemetry.instrumentation.httpx",),
+    "opentelemetry-instrumentation-elasticsearch": ("opentelemetry.instrumentation.elasticsearch",),
+    "opentelemetry-instrumentation-psycopg2": ("opentelemetry.instrumentation.psycopg2",),
+    "opentelemetry-instrumentation-jinja2": ("opentelemetry.instrumentation.jinja2",),
     "opentelemetry-sdk": ("opentelemetry.sdk",),
     "opentelemetry-test-utils": ("opentelemetry.test",),
     "paho-mqtt": ("paho",),
@@ -125,7 +131,7 @@ DEFAULT_MODULE_MAPPING = {
     "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "streamlit-aggrid": ("st_aggrid",),
-    "opensearch-py": ["opensearchpy"],
+    "opensearch-py": ("opensearchpy",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
