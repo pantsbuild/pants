@@ -595,7 +595,7 @@ pub struct InvalidatableGraph(Graph<NodeKey>);
 
 impl Invalidatable for InvalidatableGraph {
   fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize {
-    let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(move |node| {
+    let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(false, move |node| {
       if let Some(fs_subject) = node.fs_subject() {
         paths.contains(fs_subject)
       } else {
@@ -611,7 +611,7 @@ impl Invalidatable for InvalidatableGraph {
 
   fn invalidate_all(&self, caller: &str) -> usize {
     let InvalidationResult { cleared, dirtied } =
-      self.invalidate_from_roots(|node| node.fs_subject().is_some());
+      self.invalidate_from_roots(false, |node| node.fs_subject().is_some());
     info!(
       "{} invalidation: cleared {} and dirtied {} nodes for all paths",
       caller, cleared, dirtied
@@ -766,7 +766,7 @@ impl Context {
     self
       .core
       .graph
-      .invalidate_from_roots(move |node| match node {
+      .invalidate_from_roots(true, move |node| match node {
         NodeKey::ExecuteProcess(p) => roots.contains(p),
         _ => false,
       });
