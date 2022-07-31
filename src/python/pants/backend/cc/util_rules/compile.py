@@ -65,9 +65,11 @@ async def compile_cc_source(
         for address in inferred_dependencies.include
     )
 
+    # Gather all required source files and dependencies
     target_source_file = await Get(
         SourceFiles, SourceFilesRequest([request.target.get(SourcesField)])
     )
+
     inferred_source_files = await Get(
         SourceFiles,
         SourceFilesRequest(
@@ -80,6 +82,7 @@ async def compile_cc_source(
         MergeDigests((target_source_file.snapshot.digest, inferred_source_files.snapshot.digest)),
     )
 
+    # Run compilation
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
     argv = (toolchain.c, "-c", target_file)
