@@ -1,3 +1,14 @@
+"""
+Helper to rapidly incorporate Linters into pants.
+TODO:
+- does help work
+- lockfiles
+- export
+- config files
+- ? mutliple uses of the same tool (eg `radon cc`, `radon mi`)
+-
+"""
+
 from dataclasses import dataclass
 from typing import Callable, Iterable, Optional, Tuple, Type
 
@@ -19,6 +30,9 @@ from pants.util.strutil import pluralize
 
 class MetalintTool(PythonToolBase):
     args: ArgsListOption
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.7"]
 
 
 @dataclass(frozen=True)
@@ -130,9 +144,6 @@ def rules():
         default_version = "radon==5.1.0"
         default_main = ConsoleScript("radon")
 
-        register_interpreter_constraints = True
-        default_interpreter_constraints = ["CPython>=3.7"]
-
         args = ArgsListOption(example="--no-assert")
 
     def radon_cc_args(tool: MetalintTool, files: Tuple[str, ...]):
@@ -152,9 +163,6 @@ def rules():
 
         default_version = "vulture==2.5"
         default_main = ConsoleScript("vulture")
-
-        register_interpreter_constraints = True
-        default_interpreter_constraints = ["CPython>=3.7"]
 
         args = ArgsListOption(example="--min-confidence 95")
 
