@@ -171,20 +171,12 @@ async def _sort_value_file_names_for_evaluation(
         result = list(value_files_snapshot.files)
         result.sort()
     else:
-
-        def source_globs(value: str) -> PathGlobs:
-            return PathGlobs(
-                [value],
-                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-                conjunction=GlobExpansionConjunction.all_match,
-            )
-
-        # Break the list of filenames in subsets that follow the order given in the `sources_spec` globs
-        sources_globs_subsets = [source_globs(value) for value in sources_field.globs]
-        sources_subsets: list[set[str]] = []
-        for globs in sources_globs_subsets:
-            subset_snapshot = await Get(Snapshot, DigestSubset(value_files_snapshot.digest, globs))
-            sources_subsets.append(set(subset_snapshot.files))
+        # Break the list of filenames in subsets that follow the order given in the `sources` field
+        subset_snapshots = await MultiGet(
+            Get(Snapshot, DigestSubset(value_files_snapshot.digest, PathGlobs([glob_pattern])))
+            for glob_pattern in sources_field.globs
+        )
+        sources_subsets = [set(snapshot.files) for snapshot in subset_snapshots]
 
         def minimise_and_sort_subset(input_subset: set[str]) -> list[str]:
             result: set[str] = input_subset
