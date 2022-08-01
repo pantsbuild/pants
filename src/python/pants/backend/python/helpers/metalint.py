@@ -32,14 +32,14 @@ class Metalint:
         ]
 
 
-def mk(linter_name, metalint_argv):
+def mk(linter_name, binary_name, metalint_argv):
     class MetalintTool(PythonToolBase):
         options_scope = linter_name
         name = linter_name
         help = """ """
 
         default_version = "radon==5.1.0"
-        default_main = ConsoleScript(linter_name)
+        default_main = ConsoleScript(binary_name)
 
         register_interpreter_constraints = True
         default_interpreter_constraints = ["CPython>=3.7"]
@@ -114,6 +114,10 @@ def rules():
         "--no-assert",
         "-n",
     ]
-    radon = mk("radoncc", radon_cc)
+    radoncc = mk("radoncc", "radon", radon_cc)
+    radon_mi = [
+        "mi", "-m", "-s",
+    ]
+    radonmi = mk("radonmi", "radon", radon_mi)
 
-    return radon.rules()
+    return [*radoncc.rules(), *radonmi.rules()]
