@@ -1,9 +1,6 @@
 """
 Helper to rapidly incorporate Linters into pants.
 TODO:
-- does help work
-- lockfiles
-- export
 - config files
 - ? mutliple uses of the same tool (eg `radon cc`, `radon mi`)
 -
@@ -13,12 +10,18 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, Optional, Tuple, Type
 
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import (
     ExportToolOption,
     PythonToolBase,
 )
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
+    GenerateToolLockfileSentinel,
+)
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -40,6 +43,17 @@ class MetalintTool(PythonToolBase):
 
     export = ExportToolOption()
 
+    register_lockfile = True
+    default_lockfile_resource = ("", "")
+    default_lockfile_url = "hihello"
+
+    @property
+    def lockfile(self) -> str:
+        shim_lockfile = f"{self.options_scope}.lock"
+        if not self._lockfile or self._lockfile == DEFAULT_TOOL_LOCKFILE:
+            return shim_lockfile
+        return self._lockfile
+
 
 @functools.lru_cache  # functools.cache is python 3.8, and doesn't have a maxsize
 def make_export_rules(python_tool: Type[PythonToolBase]):
@@ -58,6 +72,24 @@ def make_export_rules(python_tool: Type[PythonToolBase]):
     return MetalintExportSentinel, metalint_export
 
 
+@functools.lru_cache
+def make_lockfile_rules(python_tool: Type[PythonToolBase]):
+    class MetalintGenerateToolLockfileSentinel(GenerateToolLockfileSentinel):
+        resolve_name = python_tool.options_scope
+
+    @rule(level=LogLevel.DEBUG)
+    def metalint_lockfile(
+        _: MetalintGenerateToolLockfileSentinel,
+        tool: python_tool,
+        python_setup: PythonSetup,
+    ) -> GeneratePythonLockfile:
+        return GeneratePythonLockfile.from_tool(
+            tool, use_pex=python_setup.generate_lockfiles_with_pex
+        )
+
+    return MetalintGenerateToolLockfileSentinel, metalint_lockfile
+
+
 @dataclass(frozen=True)
 class Metalint:
     tool: Type[PythonToolBase]
@@ -65,6 +97,8 @@ class Metalint:
     lint_req: Type[LintTargetsRequest]
     export_sentinel: Type[ExportPythonToolSentinel]
     export_rule: Callable
+    lockfile_sentinel: Type[GenerateToolLockfileSentinel]
+    lockfile_rule: Callable
     run_rule: Callable
 
     def rules(self):
@@ -73,6 +107,8 @@ class Metalint:
             UnionRule(LintTargetsRequest, self.lint_req),
             self.export_rule,
             UnionRule(ExportPythonToolSentinel, self.export_sentinel),
+            self.lockfile_rule,
+            UnionRule(GenerateToolLockfileSentinel, self.lockfile_sentinel),
             self.run_rule,
         ]
 
@@ -97,7 +133,6 @@ def make_linter(
     MetalintFieldSet: Optional[Type[FieldSet]] = None,
     MetalintRequest: Optional[Type[LintTargetsRequest]] = None,
 ):
-
     if not MetalintFieldSet:
 
         @dataclass(frozen=True)
@@ -114,6 +149,10 @@ def make_linter(
             name = linter_name
 
     MetalintExportSentinel, metalint_export = make_export_rules(python_tool)
+
+    MetalintGenerateToolLockfileSentinel, metalint_lockfile = make_lockfile_rules(
+        python_tool
+    )
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
@@ -167,6 +206,8 @@ def make_linter(
         MetalintRequest,
         MetalintExportSentinel,
         metalint_export,
+        MetalintGenerateToolLockfileSentinel,
+        metalint_lockfile,
         run_metalint,
     )
 
