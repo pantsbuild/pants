@@ -47,7 +47,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 skip_crds=True,
                 no_hooks=True,
                 dependencies=["//src/chart", "//src/docker/myimage"],
-                sources=["common.yaml", "*.yaml", "*-override.yaml", "subdir/*.yaml",  "subdir/*-override.yaml", "subdir/last.yaml"],
+                sources=["common.yaml", "*.yaml", "*-override.yaml", "subdir/*.yaml", "subdir/*-override.yaml", "subdir/last.yaml"],
                 values={
                     "key": "foo",
                     "amount": "300",
@@ -110,7 +110,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--values",
-        "common.yaml,bar.yaml,foo.yaml,bar-override.yaml,subdir/bar.yml,subdir/foo.yaml,subdir/foo-override.yaml,subdir/last.yml",
+        "common.yaml,bar.yaml,foo.yaml,bar-override.yaml,subdir/bar.yaml,subdir/foo.yaml,subdir/foo-override.yaml,subdir/last.yaml",
         "--set",
         "key=foo",
         "--set",

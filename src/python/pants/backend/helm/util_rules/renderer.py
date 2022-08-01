@@ -29,11 +29,9 @@ from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
-    DigestEntries,
     DigestSubset,
     Directory,
     FileContent,
-    FileEntry,
     GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
@@ -41,12 +39,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.process import (
-    InteractiveProcess,
-    InteractiveProcessRequest,
-    Process,
-    ProcessResult,
-)
+from pants.engine.process import InteractiveProcess, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -167,46 +160,59 @@ class RenderedHelmFiles(EngineAwareReturnType):
 
 @rule_helper
 async def _sort_value_file_names_for_evaluation(
-    address: Address, *, sources_value: Iterable[str] | None, snapshot: Snapshot
+    address: Address, *, sources_field: HelmDeploymentSourcesField, value_files_snapshot: Snapshot
 ) -> list[str]:
-    """Sorts the list of given `filenames` alphabetically but giving precedence to the order in
-    which they have been given in the `sources` field."""
+    """Sorts the list of files in `value_files_snapshot` alphabetically but grouping them in the
+    order in which they have been given in the `sources_field` field glob patterns."""
 
-    if sources_value is None:
-        result = list(snapshot.files)
+    result: list[str] = []
+
+    if not sources_field.value:
+        result = list(value_files_snapshot.files)
         result.sort()
-        return result
+    else:
 
-    sources_spec_iter: Iterable[str] = sources_value
+        def source_globs(value: str) -> PathGlobs:
+            return PathGlobs(
+                [value],
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                conjunction=GlobExpansionConjunction.all_match,
+            )
 
-    def source_globs(value: str) -> PathGlobs:
-        return PathGlobs(
-            [value, *[f"!{excluded}" for excluded in sources_spec_iter if excluded != value]],
-            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-            conjunction=GlobExpansionConjunction.all_match,
+        # Break the list of filenames in subsets that follow the order given in the `sources_spec` globs
+        sources_globs_subsets = [source_globs(value) for value in sources_field.globs]
+        sources_subsets: list[set[str]] = []
+        for globs in sources_globs_subsets:
+            subset_snapshot = await Get(Snapshot, DigestSubset(value_files_snapshot.digest, globs))
+            sources_subsets.append(set(subset_snapshot.files))
+
+        def minimise_and_sort_subset(input_subset: set[str]) -> list[str]:
+            result: set[str] = input_subset
+            for subset in sources_subsets:
+                if subset == input_subset:
+                    continue
+
+                if result.issuperset(subset):
+                    result = result.difference(subset)
+
+            result_as_list = list(result)
+            result_as_list.sort()
+            return result_as_list
+
+        result = list(
+            chain.from_iterable([minimise_and_sort_subset(subset) for subset in sources_subsets])
         )
-
-    # Break the list of filenames in subsets that follow the order given in the `sources_spec` globs
-    sources_globs_subsets = [source_globs(value) for value in sources_spec_iter]
-    result_list: list[str] = []
-    for globs in sources_globs_subsets:
-        subset_snapshot = await Get(Snapshot, DigestSubset(snapshot.digest, globs))
-
-        subset_files = list(subset_snapshot.files)
-        subset_files.sort()
-
-        result_list.extend(subset_files)
 
     logger.debug(
         softwrap(
             f"""Value files for {address} would be evaluated using the following order:
 
-            {', '.join(result_list)}
+            {', '.join(result)}
             """
         )
     )
 
-    return result_list
+    return result
 
 
 @rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
@@ -235,11 +241,11 @@ async def setup_render_helm_deployment_process(
         output_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
         output_directories = [output_dir]
 
-    # Ordering the value file names needs to be consistent so overrides are respected.
+    # Sort the list of file names following a consistent ordering
     sorted_value_files = await _sort_value_file_names_for_evaluation(
         request.field_set.address,
-        sources_value=request.field_set.sources.value,
-        snapshot=value_files.snapshot,
+        sources_field=request.field_set.sources,
+        value_files_snapshot=value_files.snapshot,
     )
 
     # Digests to be used as an input into the renderer process.

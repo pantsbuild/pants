@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
@@ -17,6 +18,7 @@ from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
+    HelmRendererProcess,
     RenderedHelmFiles,
 )
 from pants.core.util_rules import external_tool, stripped_source_files
@@ -35,6 +37,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *renderer.rules(),
+            QueryRule(HelmRendererProcess, (HelmDeploymentRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
         ],
     )
@@ -52,13 +55,12 @@ def _read_file_from_digest(rule_runner: RuleRunner, *, digest: Digest, filename:
     return config_file_contents[0].content.decode("utf-8")
 
 
-def test_renders_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/mychart/BUILD": "helm_chart()",
-            "src/mychart/Chart.yaml": HELM_CHART_FILE,
-            "src/mychart/values.yaml": dedent(
-                """\
+def _common_workspace_files() -> dict[str | PurePath, str | bytes]:
+    return {
+        "src/mychart/BUILD": "helm_chart()",
+        "src/mychart/Chart.yaml": HELM_CHART_FILE,
+        "src/mychart/values.yaml": dedent(
+            """\
                 config_maps:
                   - name: foo
                     data:
@@ -67,10 +69,10 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
                     data:
                       bar_key: bar_value
                 """
-            ),
-            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/mychart/templates/configmap.yaml": dedent(
-                """\
+        ),
+        "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+        "src/mychart/templates/configmap.yaml": dedent(
+            """\
                 {{- $root := . -}}
                 {{- $allConfigMaps := .Values.config_maps -}}
                 {{- range $configMap := $allConfigMaps }}
@@ -87,7 +89,60 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
                 {{- end }}
                 {{- end }}
                 """
-            ),
+        ),
+    }
+
+
+def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **_common_workspace_files(),
+            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
+            "src/deployment/b.yaml": "",
+            "src/deployment/a.yaml": "",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    render_request = HelmDeploymentRequest(
+        cmd=HelmDeploymentCmd.RENDER,
+        field_set=field_set,
+        description="Test sort files using default sources",
+    )
+
+    render_process = rule_runner.request(HelmRendererProcess, [render_request])
+    assert "a.yaml,b.yaml" in render_process.process.argv
+
+
+def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **_common_workspace_files(),
+            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'], sources=['b.yaml', '*.yaml'])",
+            "src/deployment/b.yaml": "",
+            "src/deployment/a.yaml": "",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    render_request = HelmDeploymentRequest(
+        cmd=HelmDeploymentCmd.RENDER,
+        field_set=field_set,
+        description="Test sort files using default sources",
+    )
+
+    render_process = rule_runner.request(HelmRendererProcess, [render_request])
+    assert "b.yaml,a.yaml" in render_process.process.argv
+
+
+def test_renders_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **_common_workspace_files(),
             "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
         }
     )
