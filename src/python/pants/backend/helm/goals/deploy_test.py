@@ -47,7 +47,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 skip_crds=True,
                 no_hooks=True,
                 dependencies=["//src/chart", "//src/docker/myimage"],
-                sources=["*.yaml", "subdir/*.yml"],
+                sources=["common.yaml", "*.yaml", "*-override.yaml", "subdir/*.yaml",  "subdir/*-override.yaml", "subdir/last.yaml"],
                 values={
                     "key": "foo",
                     "amount": "300",
@@ -57,10 +57,14 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
               )
               """
             ),
-            "src/deployment/values.yaml": "",
-            "src/deployment/override-values.yaml": "",
-            "src/deployment/subdir/values.yml": "",
-            "src/deployment/subdir/override-values.yml": "",
+            "src/deployment/common.yaml": "",
+            "src/deployment/bar-override.yaml": "",
+            "src/deployment/foo.yaml": "",
+            "src/deployment/bar.yaml": "",
+            "src/deployment/subdir/foo.yaml": "",
+            "src/deployment/subdir/foo-override.yaml": "",
+            "src/deployment/subdir/bar.yaml": "",
+            "src/deployment/subdir/last.yaml": "",
             "src/docker/myimage/BUILD": dedent(
                 """\
                 docker_image(registries=["https://wwww.example.com"], repository="myimage")
@@ -106,7 +110,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--values",
-        "values.yaml,subdir/values.yml,override-values.yaml,subdir/override-values.yml",
+        "common.yaml,bar.yaml,foo.yaml,bar-override.yaml,subdir/bar.yml,subdir/foo.yaml,subdir/foo-override.yaml,subdir/last.yml",
         "--set",
         "key=foo",
         "--set",

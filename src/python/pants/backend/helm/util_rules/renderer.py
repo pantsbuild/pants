@@ -11,7 +11,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from pathlib import PurePath
 from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
@@ -20,6 +19,7 @@ from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeployme
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
@@ -29,9 +29,14 @@ from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
+    DigestEntries,
+    DigestSubset,
     Directory,
     FileContent,
+    FileEntry,
+    GlobExpansionConjunction,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
@@ -42,7 +47,7 @@ from pants.engine.process import (
     Process,
     ProcessResult,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize, softwrap
@@ -160,30 +165,48 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return {"address": self.address, "chart": self.chart}
 
 
-def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]:
-    """Breaks the list of files into two main buckets: overrides and non-overrides, and then sorts
-    each of the buckets using a path-based criteria.
+@rule_helper
+async def _sort_value_file_names_for_evaluation(
+    address: Address, *, sources_value: Iterable[str] | None, snapshot: Snapshot
+) -> list[str]:
+    """Sorts the list of given `filenames` alphabetically but giving precedence to the order in
+    which they have been given in the `sources` field."""
 
-    The final list will be composed by the non-overrides bucket followed by the overrides one.
-    """
+    if sources_value is None:
+        result = list(snapshot.files)
+        result.sort()
+        return result
 
-    non_overrides = []
-    overrides = []
-    paths = [PurePath(filename) for filename in filenames]
-    for p in paths:
-        if "override" in p.name.lower():
-            overrides.append(p)
-        else:
-            non_overrides.append(p)
+    sources_spec_iter: Iterable[str] = sources_value
 
-    def by_path_length(p: PurePath) -> int:
-        if not p.parents:
-            return 0
-        return len(p.parents)
+    def source_globs(value: str) -> PathGlobs:
+        return PathGlobs(
+            [value, *[f"!{excluded}" for excluded in sources_spec_iter if excluded != value]],
+            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+            conjunction=GlobExpansionConjunction.all_match,
+        )
 
-    non_overrides.sort(key=by_path_length)
-    overrides.sort(key=by_path_length)
-    return [str(path) for path in [*non_overrides, *overrides]]
+    # Break the list of filenames in subsets that follow the order given in the `sources_spec` globs
+    sources_globs_subsets = [source_globs(value) for value in sources_spec_iter]
+    result_list: list[str] = []
+    for globs in sources_globs_subsets:
+        subset_snapshot = await Get(Snapshot, DigestSubset(snapshot.digest, globs))
+
+        subset_files = list(subset_snapshot.files)
+        subset_files.sort()
+
+        result_list.extend(subset_files)
+
+    logger.debug(
+        softwrap(
+            f"""Value files for {address} would be evaluated using the following order:
+
+            {', '.join(result_list)}
+            """
+        )
+    )
+
+    return result_list
 
 
 @rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
@@ -213,7 +236,11 @@ async def setup_render_helm_deployment_process(
         output_directories = [output_dir]
 
     # Ordering the value file names needs to be consistent so overrides are respected.
-    sorted_value_files = _sort_value_file_names_for_evaluation(value_files.snapshot.files)
+    sorted_value_files = await _sort_value_file_names_for_evaluation(
+        request.field_set.address,
+        sources_value=request.field_set.sources.value,
+        snapshot=value_files.snapshot,
+    )
 
     # Digests to be used as an input into the renderer process.
     input_digests = [
@@ -356,7 +383,7 @@ async def helm_renderer_as_interactive_process(
     renderer: HelmRendererProcess,
 ) -> InteractiveProcess:
     process = await Get(Process, HelmProcess, renderer.process)
-    return await Get(InteractiveProcess, InteractiveProcessRequest(process))
+    return InteractiveProcess.from_process(process)
 
 
 def rules():
