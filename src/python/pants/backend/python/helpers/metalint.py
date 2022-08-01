@@ -35,6 +35,16 @@ class Metalint:
 ArgvMaker = Callable[[PythonToolBase, Tuple[str, ...]], Iterable[str]]
 
 
+def no_argv(tool: PythonToolBase, files: Tuple[str, ...]):
+    """Helper for tools that just run without any args"""
+    return []
+
+
+def files_argv(tool: PythonToolBase, files: Tuple[str, ...]):
+    """Helper for tools that just take a list of files to run against"""
+    return files
+
+
 def make_linter(python_tool: Type[PythonToolBase], linter_name, argv_maker: ArgvMaker):
     @dataclass(frozen=True)
     class MetalintFieldSet(FieldSet):
@@ -133,9 +143,6 @@ def rules():
 
         args = ArgsListOption(example="")
 
-    def vulture_args(tool: PythonToolBase, files: Tuple[str, ...]):
-        return files
-
-    vulture = make_linter(VultureTool, "vulture", vulture_args)
+    vulture = make_linter(VultureTool, "vulture", files_argv)
 
     return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
