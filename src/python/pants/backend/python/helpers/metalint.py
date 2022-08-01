@@ -32,14 +32,14 @@ class Metalint:
         ]
 
 
-def mk(metalint_argv):
+def mk(linter_name, metalint_argv):
     class MetalintTool(PythonToolBase):
-        options_scope = "metalint"
-        name = "Metalint"
+        options_scope = linter_name
+        name = linter_name
         help = """ """
 
         default_version = "radon==5.1.0"
-        default_main = ConsoleScript("radon")
+        default_main = ConsoleScript(linter_name)
 
         register_interpreter_constraints = True
         default_interpreter_constraints = ["CPython>=3.7"]
@@ -55,7 +55,7 @@ def mk(metalint_argv):
 
     class MetalintRequest(LintTargetsRequest):
         field_set_type = MetalintFieldSet
-        name = "radon"
+        name = linter_name
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
@@ -64,7 +64,7 @@ def mk(metalint_argv):
         metalint_pex = Get(
             Pex,
             PexRequest(
-                output_filename="radon.pex",
+                output_filename=f"{linter_name}.pex",
                 internal_only=True,
                 requirements=metalint.pex_requirements(),
                 interpreter_constraints=metalint.interpreter_constraints,
@@ -96,7 +96,7 @@ def mk(metalint_argv):
                 downloaded_metalint,
                 argv=argv,
                 input_digest=input_digest,
-                description=f"Run Radon on {pluralize(len(request.field_sets), 'file')}.",
+                description=f"Run {linter_name} on {pluralize(len(request.field_sets), 'file')}.",
                 level=LogLevel.DEBUG,
             ),
         )
@@ -107,13 +107,13 @@ def mk(metalint_argv):
 
 
 def rules():
-    radon_argv = [
+    radon_cc = [
         "cc",
         "-s",
         "--total-average",
         "--no-assert",
         "-n",
     ]
-    radon = mk(radon_argv)
+    radon = mk("radoncc", radon_cc)
 
     return radon.rules()
