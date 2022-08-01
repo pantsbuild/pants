@@ -4,13 +4,18 @@
 from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
 from pants.backend.cc.goals import check, tailor
 from pants.backend.cc.subsystems import toolchain
-from pants.backend.cc.target_types import CCSourcesGeneratorTarget, CCSourceTarget
+from pants.backend.cc.target_types import (
+    CCBinaryTarget,
+    CCLibraryTarget,
+    CCSourcesGeneratorTarget,
+    CCSourceTarget,
+)
 from pants.backend.cc.target_types import rules as target_type_rules
 from pants.backend.cc.util_rules import compile
 
 
 def target_types():
-    return [CCSourceTarget, CCSourcesGeneratorTarget]
+    return [CCSourceTarget, CCSourcesGeneratorTarget, CCLibraryTarget, CCBinaryTarget]
 
 
 def rules():

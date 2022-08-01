@@ -30,7 +30,7 @@ def _source_file_extension(field_set: CCFieldSet) -> str:
 
 @rule(desc="Check CC compilation", level=LogLevel.DEBUG)
 async def check_cc(request: CCCheckRequest) -> CheckResults:
-    logger.warning(f"FieldSets: {request.field_sets}")
+    logger.error(request.field_sets)
 
     # Filter out header files from Check processes
     source_file_field_sets = [

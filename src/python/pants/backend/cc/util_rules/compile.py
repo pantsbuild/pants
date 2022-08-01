@@ -55,6 +55,7 @@ async def compile_cc_source(
         InferredDependencies,
         InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(request.target)),
     )
+    logger.warning(inferred_dependencies)
 
     # Convert inferred dependency addresses into targets
     wrapped_targets = await MultiGet(

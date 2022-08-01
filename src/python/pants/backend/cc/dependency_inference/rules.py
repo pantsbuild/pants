@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -35,6 +36,8 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 INCLUDE_REGEX = re.compile(r"^\s*#\s*include\s+((\".*\")|(<.*>))")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,7 @@ def parse_includes(content: str) -> frozenset[CCIncludeDirective]:
     for line in content.splitlines():
         m = INCLUDE_REGEX.match(line)
         if m:
+            logger.error(line)
             if m.group(2):
                 includes.add(CCIncludeDirective(m.group(2)[1:-1], False))
             elif m.group(3):
@@ -152,12 +156,17 @@ async def infer_cc_source_dependencies(
         )
         if maybe_relative_address:
             result.add(maybe_relative_address)
+            logger.warning(f"Maybe: {maybe_relative_address}")
             continue
 
         # Otherwise try source roots.
         if cc_infer.include_from_source_roots:
+            logger.warning(f"source_roots: {include.path}")
+            logger.error(cc_files_mapping)
             unambiguous = cc_files_mapping.mapping.get(include.path)
             ambiguous = cc_files_mapping.ambiguous_files.get(include.path)
+            logger.warning(f"Unambiguous {unambiguous}")
+            logger.warning(f"Ambiguous: {ambiguous}")
             if unambiguous:
                 result.add(unambiguous)
             elif ambiguous:
@@ -176,6 +185,7 @@ async def infer_cc_source_dependencies(
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
 
+    logger.warning(f"Results: {result}")
     return InferredDependencies(sorted(result))
 
 

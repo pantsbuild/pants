@@ -12,10 +12,12 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
+    StringSequenceField,
     Target,
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.util.strutil import softwrap
 
 # Using the extensions referenced in C++ Core Guidelines FAQ
 # https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
@@ -92,6 +94,76 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (Dependencies,)
     help = "Generate a `cc_source` target for each file in the `sources` field."
+
+
+# -----------------------------------------------------------------------------------------------
+# `cc_library` and `cc_binary` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class CCCompileOptionsField(StringSequenceField):
+    alias = "compile_options"
+    help = softwrap(
+        """
+        TODO
+        """
+    )
+
+
+class CCDefinesField(StringSequenceField):
+    alias = "defines"
+    help = softwrap(
+        """
+        TODO
+        """
+    )
+
+
+class CCHeadersField(StringSequenceField):
+    alias = "headers"
+    help = softwrap(
+        """
+        TODO
+        Public headers which are exported by this target, and can be imported by others.
+        """
+    )
+
+
+class CCBinaryFieldSet(FieldSet):
+    required_fields = (CCDependenciesField,)
+
+    dependencies: CCDependenciesField
+
+
+class CCLibraryTarget(Target):
+    alias = "cc_library"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CCCompileOptionsField,
+        CCDefinesField,
+        CCDependenciesField,
+        CCHeadersField,
+    )
+    help = softwrap(
+        """
+        TODO
+        """
+    )
+
+
+class CCBinaryTarget(Target):
+    alias = "cc_binary"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CCCompileOptionsField,
+        CCDefinesField,
+        CCDependenciesField,
+    )
+    help = softwrap(
+        """
+        TODO
+        """
+    )
 
 
 def rules():

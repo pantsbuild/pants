@@ -17,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, StrListOption
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class CCSubsystem(Subsystem):
+    # TODO: Consider splitting this into a C and C++ subsystem if it gets unwieldy
     options_scope = "cc"
     name = "cc"
     help = """TODO"""
@@ -69,7 +70,43 @@ class CCSubsystem(Subsystem):
         ),
     )
 
-    args = ArgsListOption(example="-target x86_64-apple-macosx12.0")
+    c_defines = StrListOption(
+        default=[""],
+        help=softwrap(
+            """
+            TODO
+            """
+        ),
+    )
+
+    c_compile_options = StrListOption(
+        default=["--std=c11"],
+        help=softwrap(
+            """
+            TODO
+            Will be prefixed by -D at command line
+            """
+        ),
+    )
+
+    cpp_compile_options = StrListOption(
+        default=["-std=c++11"],
+        help=softwrap(
+            """
+            TODO
+            """
+        ),
+    )
+
+    cpp_defines = StrListOption(
+        default=[""],
+        help=softwrap(
+            """
+            TODO
+            Will be prefixed by -D at command line
+            """
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -79,6 +116,7 @@ class CCToolchain:
     c: str
     cpp: str
     # ld: str
+    # ar: str
 
 
 @rule_helper
@@ -92,8 +130,7 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
                 test=BinaryPathTest(args=["-v"]),
             ),
         )
-        # TODO:
-        logger.error(binary_paths)
+
         if not binary_paths or not binary_paths.first_path:
             continue
         return binary_paths.first_path.path
