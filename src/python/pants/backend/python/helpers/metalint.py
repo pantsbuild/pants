@@ -32,7 +32,7 @@ class Metalint:
         ]
 
 
-def mk(linter_name, binary_name, version_spec, metalint_argv):
+def make_linter(linter_name, binary_name, version_spec, metalint_argv):
     class MetalintTool(PythonToolBase):
         options_scope = linter_name
         name = linter_name
@@ -59,7 +59,7 @@ def mk(linter_name, binary_name, version_spec, metalint_argv):
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
-            request: MetalintRequest, metalint: MetalintTool
+        request: MetalintRequest, metalint: MetalintTool
     ) -> LintResults:
         metalint_pex = Get(
             Pex,
@@ -107,18 +107,13 @@ def mk(linter_name, binary_name, version_spec, metalint_argv):
 
 
 def rules():
-    radon_cc = [
-        "cc",
-        "-s",
-        "--total-average",
-        "--no-assert",
-        "-n",
-    ]
-    radoncc = mk("radoncc", "radon", "radon==5.1.0", radon_cc)
-    radon_mi = [
-        "mi", "-m", "-s",
-    ]
-    radonmi = mk("radonmi", "radon", "radon==5.1.0", radon_mi)
-    vulture = mk("vulture", "vulture", "vulture==2.5", [])
+    radoncc = make_linter(
+        "radoncc",
+        "radon",
+        "radon==5.1.0",
+        ["cc", "-s", "--total-average", "--no-assert", "-n"],
+    )
+    radonmi = make_linter("radonmi", "radon", "radon==5.1.0", ["mi", "-m", "-s"])
+    vulture = make_linter("vulture", "vulture", "vulture==2.5", [])
 
     return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
