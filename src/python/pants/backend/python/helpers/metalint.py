@@ -32,20 +32,7 @@ class Metalint:
         ]
 
 
-def make_linter(linter_name, binary_name, version_spec, metalint_argv):
-    class MetalintTool(PythonToolBase):
-        options_scope = linter_name
-        name = linter_name
-        help = """ """
-
-        default_version = version_spec
-        default_main = ConsoleScript(binary_name)
-
-        register_interpreter_constraints = True
-        default_interpreter_constraints = ["CPython>=3.7"]
-
-        args = ArgsListOption(example="")
-
+def make_linter(python_tool: Type[PythonToolBase], linter_name, metalint_argv):
     @dataclass(frozen=True)
     class MetalintFieldSet(FieldSet):
         required_fields = (PythonSourceField,)
@@ -59,7 +46,7 @@ def make_linter(linter_name, binary_name, version_spec, metalint_argv):
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
-        request: MetalintRequest, metalint: MetalintTool
+        request: MetalintRequest, metalint: python_tool
     ) -> LintResults:
         metalint_pex = Get(
             Pex,
@@ -103,17 +90,43 @@ def make_linter(linter_name, binary_name, version_spec, metalint_argv):
         result = LintResult.from_fallible_process_result(process_result)
         return LintResults([result], linter_name=request.name)
 
-    return Metalint(MetalintTool, MetalintFieldSet, MetalintRequest, run_metalint)
+    return Metalint(python_tool, MetalintFieldSet, MetalintRequest, run_metalint)
 
 
 def rules():
+    class RadonTool(PythonToolBase):
+        options_scope = "radon"
+        name = "radon"
+        help = """Radon is a Python tool which computes various code metrics."""
+
+        default_version = "radon==5.1.0"
+        default_main = ConsoleScript("radon")
+
+        register_interpreter_constraints = True
+        default_interpreter_constraints = ["CPython>=3.7"]
+
+        args = ArgsListOption(example="")
+
     radoncc = make_linter(
+        RadonTool,
         "radoncc",
-        "radon",
-        "radon==5.1.0",
         ["cc", "-s", "--total-average", "--no-assert", "-n"],
     )
-    radonmi = make_linter("radonmi", "radon", "radon==5.1.0", ["mi", "-m", "-s"])
-    vulture = make_linter("vulture", "vulture", "vulture==2.5", [])
+    radonmi = make_linter(RadonTool, "radonmi", ["mi", "-m", "-s"])
+
+    class VultureTool(PythonToolBase):
+        options_scope = "vulture"
+        name = "Vulture"
+        help = """Vulture finds unused code in Python programs"""
+
+        default_version = "vulture==2.5"
+        default_main = ConsoleScript("vulture")
+
+        register_interpreter_constraints = True
+        default_interpreter_constraints = ["CPython>=3.7"]
+
+        args = ArgsListOption(example="")
+
+    vulture = make_linter(VultureTool, "vulture", [])
 
     return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
