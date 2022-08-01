@@ -119,5 +119,6 @@ def rules():
         "mi", "-m", "-s",
     ]
     radonmi = mk("radonmi", "radon", "radon==5.1.0", radon_mi)
+    vulture = mk("vulture", "vulture", "vulture==2.5", [])
 
-    return [*radoncc.rules(), *radonmi.rules()]
+    return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
