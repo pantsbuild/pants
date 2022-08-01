@@ -2,8 +2,6 @@
 Helper to rapidly incorporate Linters into pants.
 TODO:
 - config files
-- ? mutliple uses of the same tool (eg `radon cc`, `radon mi`)
--
 """
 import functools
 from dataclasses import dataclass
@@ -30,7 +28,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Dependencies, FieldSet
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption
+from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -46,6 +44,8 @@ class MetalintTool(PythonToolBase):
     register_lockfile = True
     default_lockfile_resource = ("", "")
     default_lockfile_url = "hihello"
+
+    skip = SkipOption("lint")
 
     @property
     def lockfile(self) -> str:
@@ -158,6 +158,9 @@ def make_linter(
     async def run_metalint(
         request: MetalintRequest, metalint: python_tool
     ) -> LintResults:
+        if metalint.skip:
+            return LintResults([], linter_name=request.name)
+
         metalint_pex = Get(
             Pex,
             PexRequest(
