@@ -32,7 +32,7 @@ class Metalint:
         ]
 
 
-def mk():
+def mk(metalint_argv):
     class MetalintTool(PythonToolBase):
         options_scope = "metalint"
         name = "Metalint"
@@ -89,19 +89,12 @@ def mk():
             ),
         )
 
-        radon_argv = [
-            "cc",
-            "-s",
-            "--total-average",
-            "--no-assert",
-            "-n",
-            *sources.snapshot.files,
-        ]
+        argv = [*metalint_argv, *sources.snapshot.files]
         process_result = await Get(
             FallibleProcessResult,
             PexProcess(
                 downloaded_metalint,
-                argv=radon_argv,
+                argv=argv,
                 input_digest=input_digest,
                 description=f"Run Radon on {pluralize(len(request.field_sets), 'file')}.",
                 level=LogLevel.DEBUG,
@@ -114,6 +107,13 @@ def mk():
 
 
 def rules():
-    radon = mk()
+    radon_argv = [
+        "cc",
+        "-s",
+        "--total-average",
+        "--no-assert",
+        "-n",
+    ]
+    radon = mk(radon_argv)
 
     return radon.rules()
