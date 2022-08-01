@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Iterable, Tuple, Type
+from typing import Callable, Iterable, Optional, Tuple, Type
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
@@ -49,17 +49,28 @@ def files_argv(tool: MetalintTool, files: Tuple[str, ...]):
     return files
 
 
-def make_linter(python_tool: Type[MetalintTool], linter_name, argv_maker: ArgvMaker):
-    @dataclass(frozen=True)
-    class MetalintFieldSet(FieldSet):
-        required_fields = (PythonSourceField,)
+def make_linter(
+    python_tool: Type[MetalintTool],
+    linter_name,
+    argv_maker: ArgvMaker,
+    MetalintFieldSet: Optional[Type[FieldSet]] = None,
+    MetalintRequest: Optional[Type[LintTargetsRequest]] = None,
+):
 
-        sources: PythonSourceField
-        dependencies: Dependencies
+    if not MetalintFieldSet:
 
-    class MetalintRequest(LintTargetsRequest):
-        field_set_type = MetalintFieldSet
-        name = linter_name
+        @dataclass(frozen=True)
+        class MetalintFieldSet(FieldSet):
+            required_fields = (PythonSourceField,)
+
+            sources: PythonSourceField
+            dependencies: Dependencies
+
+    if not MetalintRequest:
+
+        class MetalintRequest(LintTargetsRequest):
+            field_set_type = MetalintFieldSet
+            name = linter_name
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
