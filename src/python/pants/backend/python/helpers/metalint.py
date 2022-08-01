@@ -24,6 +24,13 @@ class Metalint:
     lint_req: Type[LintTargetsRequest]
     run_rule: Callable
 
+    def rules(self):
+        return [
+            SubsystemRule(self.tool),
+            UnionRule(LintTargetsRequest, self.lint_req),
+            self.run_rule,
+        ]
+
 
 def mk():
     class MetalintTool(PythonToolBase):
@@ -52,7 +59,7 @@ def mk():
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
-        request: MetalintRequest, metalint: MetalintTool
+            request: MetalintRequest, metalint: MetalintTool
     ) -> LintResults:
         metalint_pex = Get(
             Pex,
@@ -109,8 +116,4 @@ def mk():
 def rules():
     radon = mk()
 
-    return [
-        SubsystemRule(radon.tool),
-        UnionRule(LintTargetsRequest, radon.lint_req),
-        radon.run_rule,
-    ]
+    return radon.rules()
