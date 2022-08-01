@@ -1,7 +1,7 @@
 """
 Helper to rapidly incorporate Linters into pants.
 TODO:
-- config files
+- parse output ?
 """
 import functools
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ from pants.core.goals.generate_lockfiles import (
     GenerateToolLockfileSentinel,
 )
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -28,9 +29,9 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Dependencies, FieldSet
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
 
 
 class MetalintTool(PythonToolBase):
@@ -42,10 +43,36 @@ class MetalintTool(PythonToolBase):
     export = ExportToolOption()
 
     register_lockfile = True
-    default_lockfile_resource = ("", "")
-    default_lockfile_url = "hihello"
+    default_lockfile_resource = ("", "")  # shim
+    default_lockfile_url = "hihello"  # shim
 
     skip = SkipOption("lint")
+
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to a config file for {cls.options_scope}
+            """
+        ),
+    )
+
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during
+            runs (`.pylintrc`, `pylintrc`, `pyproject.toml`, and `setup.cfg`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
+        ),
+    )
 
     @property
     def lockfile(self) -> str:
@@ -53,6 +80,14 @@ class MetalintTool(PythonToolBase):
         if not self._lockfile or self._lockfile == DEFAULT_TOOL_LOCKFILE:
             return shim_lockfile
         return self._lockfile
+
+    def config_request(self) -> ConfigFilesRequest:
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
+            discovery=self.config_discovery,
+            check_content={"pyproject.toml": b"[tool.vulture"},
+        )
 
 
 @functools.lru_cache  # functools.cache is python 3.8, and doesn't have a maxsize
@@ -177,7 +212,15 @@ def make_linter(
             SourceFilesRequest(field_set.sources for field_set in request.field_sets),
         )
 
-        downloaded_metalint, sources = await MultiGet(metalint_pex, sources_request)
+        config_files_get = Get(
+            ConfigFiles,
+            ConfigFilesRequest,
+            metalint.config_request(),
+        )
+
+        downloaded_metalint, sources, config_files = await MultiGet(
+            metalint_pex, sources_request, config_files_get
+        )
 
         input_digest = await Get(
             Digest,
@@ -185,6 +228,7 @@ def make_linter(
                 (
                     downloaded_metalint.digest,
                     sources.snapshot.digest,
+                    config_files.snapshot.digest,
                 )
             ),
         )
@@ -225,6 +269,16 @@ def rules():
         default_main = ConsoleScript("radon")
 
         args = ArgsListOption(example="--no-assert")
+
+        def config_request(self) -> ConfigFilesRequest:
+            """https://radon.readthedocs.io/en/latest/commandline.html#radon-configuration-files"""
+            return ConfigFilesRequest(
+                specified=self.config,
+                specified_option_name=f"[{self.options_scope}].config",
+                discovery=self.config_discovery,
+                check_existence=["radon.cfg"],
+                check_content={"setup.cfg": b"[radon]"},
+            )
 
     def radon_cc_args(tool: MetalintTool, files: Tuple[str, ...]):
         return ["cc"] + ["-s", "--total-average", "--no-assert", "-nb"] + list(files)
