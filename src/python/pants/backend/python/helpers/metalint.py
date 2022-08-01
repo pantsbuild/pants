@@ -8,13 +8,17 @@ from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, collect_rules, rule
+from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import Dependencies, FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
+
+
+class MetalintTool(PythonToolBase):
+    args: ArgsListOption
 
 
 @dataclass(frozen=True)
@@ -32,20 +36,20 @@ class Metalint:
         ]
 
 
-ArgvMaker = Callable[[PythonToolBase, Tuple[str, ...]], Iterable[str]]
+ArgvMaker = Callable[[MetalintTool, Tuple[str, ...]], Iterable[str]]
 
 
-def no_argv(tool: PythonToolBase, files: Tuple[str, ...]):
+def no_argv(tool: MetalintTool, files: Tuple[str, ...]):
     """Helper for tools that just run without any args"""
     return []
 
 
-def files_argv(tool: PythonToolBase, files: Tuple[str, ...]):
+def files_argv(tool: MetalintTool, files: Tuple[str, ...]):
     """Helper for tools that just take a list of files to run against"""
     return files
 
 
-def make_linter(python_tool: Type[PythonToolBase], linter_name, argv_maker: ArgvMaker):
+def make_linter(python_tool: Type[MetalintTool], linter_name, argv_maker: ArgvMaker):
     @dataclass(frozen=True)
     class MetalintFieldSet(FieldSet):
         required_fields = (PythonSourceField,)
@@ -107,7 +111,7 @@ def make_linter(python_tool: Type[PythonToolBase], linter_name, argv_maker: Argv
 
 
 def rules():
-    class RadonTool(PythonToolBase):
+    class RadonTool(MetalintTool):
         options_scope = "radon"
         name = "radon"
         help = """Radon is a Python tool which computes various code metrics."""
@@ -118,19 +122,19 @@ def rules():
         register_interpreter_constraints = True
         default_interpreter_constraints = ["CPython>=3.7"]
 
-        args = ArgsListOption(example="")
+        args = ArgsListOption(example="--no-assert")
 
-    def radon_cc_args(tool: PythonToolBase, files: Tuple[str, ...]):
-        return ["cc", "-s", "--total-average", "--no-assert", "-n", *files]
+    def radon_cc_args(tool: MetalintTool, files: Tuple[str, ...]):
+        return ["cc"] + ["-s", "--total-average", "--no-assert", "-nb"] + list(files)
 
     radoncc = make_linter(RadonTool, "radoncc", radon_cc_args)
 
-    def radon_mi_args(tool: PythonToolBase, files: Tuple[str, ...]):
-        return ["mi", "-m", "-s", *files]
+    def radon_mi_args(tool: MetalintTool, files: Tuple[str, ...]):
+        return ["mi"] + ["-m", "-s"] + list(files)
 
     radonmi = make_linter(RadonTool, "radonmi", radon_mi_args)
 
-    class VultureTool(PythonToolBase):
+    class VultureTool(MetalintTool):
         options_scope = "vulture"
         name = "Vulture"
         help = """Vulture finds unused code in Python programs"""
@@ -141,8 +145,11 @@ def rules():
         register_interpreter_constraints = True
         default_interpreter_constraints = ["CPython>=3.7"]
 
-        args = ArgsListOption(example="")
+        args = ArgsListOption(example="--min-confidence 95")
 
-    vulture = make_linter(VultureTool, "vulture", files_argv)
+    def vulture_args(tool: VultureTool, files: Tuple[str, ...]):
+        return tool.args + files
+
+    vulture = make_linter(VultureTool, "vulture", vulture_args)
 
     return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
