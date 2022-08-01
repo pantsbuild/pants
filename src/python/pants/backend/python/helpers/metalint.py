@@ -8,12 +8,15 @@ TODO:
 - ? mutliple uses of the same tool (eg `radon cc`, `radon mi`)
 -
 """
-
+import functools
 from dataclasses import dataclass
 from typing import Callable, Iterable, Optional, Tuple, Type
 
-from pants.backend.python.goals.export import ExportPythonToolSentinel, ExportPythonTool
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase, ExportToolOption
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    PythonToolBase,
+)
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
@@ -36,6 +39,23 @@ class MetalintTool(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.7"]
 
     export = ExportToolOption()
+
+
+@functools.lru_cache  # functools.cache is python 3.8, and doesn't have a maxsize
+def make_export_rules(python_tool: Type[PythonToolBase]):
+    class MetalintExportSentinel(ExportPythonToolSentinel):
+        ...
+
+    @rule(level=LogLevel.DEBUG)
+    def metalint_export(
+        _: MetalintExportSentinel, tool: python_tool
+    ) -> ExportPythonTool:
+        return ExportPythonTool(
+            resolve_name=tool.options_scope,
+            pex_request=tool.to_pex_request(),
+        )
+
+    return MetalintExportSentinel, metalint_export
 
 
 @dataclass(frozen=True)
@@ -93,18 +113,7 @@ def make_linter(
             field_set_type = MetalintFieldSet
             name = linter_name
 
-    class MetalintExportSentinel(ExportPythonToolSentinel):
-        ...
-
-    @rule(level=LogLevel.DEBUG)
-    def metalint_export(
-            _: MetalintExportSentinel, tool: python_tool
-    ) -> ExportPythonTool:
-        return ExportPythonTool(
-            resolve_name=tool.options_scope,
-            pex_request=tool.to_pex_request(),
-        )
-
+    MetalintExportSentinel, metalint_export = make_export_rules(python_tool)
 
     @rule(level=LogLevel.DEBUG)
     async def run_metalint(
@@ -152,7 +161,14 @@ def make_linter(
         result = LintResult.from_fallible_process_result(process_result)
         return LintResults([result], linter_name=request.name)
 
-    return Metalint(python_tool, MetalintFieldSet, MetalintRequest, MetalintExportSentinel, metalint_export, run_metalint,)
+    return Metalint(
+        python_tool,
+        MetalintFieldSet,
+        MetalintRequest,
+        MetalintExportSentinel,
+        metalint_export,
+        run_metalint,
+    )
 
 
 def rules():
@@ -193,6 +209,6 @@ def rules():
 
     return [
         *radoncc.rules(),
-        # *radonmi.rules(),
+        *radonmi.rules(),
         *vulture.rules(),
     ]
