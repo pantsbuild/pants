@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Type
+from typing import Callable, Iterable, Tuple, Type
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
@@ -32,7 +32,10 @@ class Metalint:
         ]
 
 
-def make_linter(python_tool: Type[PythonToolBase], linter_name, metalint_argv):
+ArgvMaker = Callable[[PythonToolBase, Tuple[str, ...]], Iterable[str]]
+
+
+def make_linter(python_tool: Type[PythonToolBase], linter_name, argv_maker: ArgvMaker):
     @dataclass(frozen=True)
     class MetalintFieldSet(FieldSet):
         required_fields = (PythonSourceField,)
@@ -76,7 +79,7 @@ def make_linter(python_tool: Type[PythonToolBase], linter_name, metalint_argv):
             ),
         )
 
-        argv = [*metalint_argv, *sources.snapshot.files]
+        argv = argv_maker(metalint, sources.snapshot.files)
         process_result = await Get(
             FallibleProcessResult,
             PexProcess(
@@ -107,12 +110,15 @@ def rules():
 
         args = ArgsListOption(example="")
 
-    radoncc = make_linter(
-        RadonTool,
-        "radoncc",
-        ["cc", "-s", "--total-average", "--no-assert", "-n"],
-    )
-    radonmi = make_linter(RadonTool, "radonmi", ["mi", "-m", "-s"])
+    def radon_cc_args(tool: PythonToolBase, files: Tuple[str, ...]):
+        return ["cc", "-s", "--total-average", "--no-assert", "-n", *files]
+
+    radoncc = make_linter(RadonTool, "radoncc", radon_cc_args)
+
+    def radon_mi_args(tool: PythonToolBase, files: Tuple[str, ...]):
+        return ["mi", "-m", "-s", *files]
+
+    radonmi = make_linter(RadonTool, "radonmi", radon_mi_args)
 
     class VultureTool(PythonToolBase):
         options_scope = "vulture"
@@ -127,6 +133,9 @@ def rules():
 
         args = ArgsListOption(example="")
 
-    vulture = make_linter(VultureTool, "vulture", [])
+    def vulture_args(tool: PythonToolBase, files: Tuple[str, ...]):
+        return files
+
+    vulture = make_linter(VultureTool, "vulture", vulture_args)
 
     return [*radoncc.rules(), *radonmi.rules(), *vulture.rules()]
