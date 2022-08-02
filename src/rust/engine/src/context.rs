@@ -763,13 +763,20 @@ impl Context {
       .collect::<HashSet<_>>();
 
     // Invalidate the matched roots.
-    self
-      .core
-      .graph
-      .invalidate_from_roots(move |node| match node {
-        NodeKey::ExecuteProcess(p) => roots.contains(p),
-        _ => false,
-      });
+    let InvalidationResult { cleared, dirtied } =
+      self
+        .core
+        .graph
+        .invalidate_from_roots(move |node| match node {
+          NodeKey::ExecuteProcess(p) => roots.contains(p),
+          _ => false,
+        });
+    log::info!(
+      "Backtracking: cleared {} and dirtied {} nodes for {:?}",
+      cleared,
+      dirtied,
+      digest
+    );
 
     // We invalidated a Node, and the caller (at some level above us in the stack) should retry.
     // Complete this node with the Invalidated state.
