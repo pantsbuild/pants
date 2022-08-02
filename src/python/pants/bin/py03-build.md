@@ -10,4 +10,4 @@ Run `codesign -s py03-test /Users/chrisjrn/src/pants/dist/src.python.pants.bin/p
 
 Run `./pants --no-pantsd --no-remote-cache-write package --pyoxidizer-args="--system-rust --target-triple=aarch64-apple-darwin" src/python/pants/bin:pants_oxidized_experimental`
 
-Run `_PANTS_VERSION_OVERRIDE="2.14.0.dev" dist/src.python.pants.bin/pants_oxidized_experimental/aarch64-apple-darwin/debug/install/pants_oxidized_experimental --no-pantsd`
+Run `dist/src.python.pants.bin/pants_oxidized_experimental/aarch64-apple-darwin/debug/install/pants_oxidized_experimental --no-pantsd`
