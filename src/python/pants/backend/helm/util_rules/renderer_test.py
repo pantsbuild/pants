@@ -18,13 +18,13 @@ from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
-    HelmRendererProcess,
     RenderedHelmFiles,
 )
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest
+from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *renderer.rules(),
-            QueryRule(HelmRendererProcess, (HelmDeploymentRequest,)),
+            QueryRule(InteractiveProcess, (HelmDeploymentRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
         ],
     )
@@ -107,12 +107,12 @@ def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
     field_set = HelmDeploymentFieldSet.create(tgt)
 
     render_request = HelmDeploymentRequest(
-        cmd=HelmDeploymentCmd.RENDER,
+        cmd=HelmDeploymentCmd.UPGRADE,
         field_set=field_set,
         description="Test sort files using default sources",
     )
 
-    render_process = rule_runner.request(HelmRendererProcess, [render_request])
+    render_process = rule_runner.request(InteractiveProcess, [render_request])
     assert "a.yaml,b.yaml" in render_process.process.argv
 
 
@@ -130,12 +130,12 @@ def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
     field_set = HelmDeploymentFieldSet.create(tgt)
 
     render_request = HelmDeploymentRequest(
-        cmd=HelmDeploymentCmd.RENDER,
+        cmd=HelmDeploymentCmd.UPGRADE,
         field_set=field_set,
         description="Test sort files using default sources",
     )
 
-    render_process = rule_runner.request(HelmRendererProcess, [render_request])
+    render_process = rule_runner.request(InteractiveProcess, [render_request])
     assert "b.yaml,a.yaml" in render_process.process.argv
 
 

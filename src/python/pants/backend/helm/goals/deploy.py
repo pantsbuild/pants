@@ -93,7 +93,7 @@ async def run_helm_deploy(
 
     publish_targets = [tgt for tgt in target_dependencies if DockerFieldSet.is_applicable(tgt)]
 
-    renderer = await Get(
+    interactive_process = await Get(
         InteractiveProcess,
         HelmDeploymentRequest(
             cmd=HelmDeploymentCmd.UPGRADE,
@@ -109,7 +109,9 @@ async def run_helm_deploy(
     )
 
     return DeployProcess(
-        name=field_set.address.spec, publish_dependencies=tuple(publish_targets), process=renderer
+        name=field_set.address.spec,
+        publish_dependencies=tuple(publish_targets),
+        process=interactive_process,
     )
 
 

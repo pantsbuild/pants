@@ -92,11 +92,24 @@ class HelmDeploymentRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class HelmRendererProcess(EngineAwareParameter, EngineAwareReturnType):
+class _HelmDeploymentAction(EngineAwareParameter, EngineAwareReturnType):
+    """Intermediate representation of a `HelmProcess` that will produce a fully rendered set of
+    manifests from a given chart.
+
+    The encapsulated `process` will correspond to the `cmd` that was originally requested.
+
+    This is meant only to be used internally by this module
+    """
+
     chart: HelmChart
+    cmd: HelmDeploymentCmd
     process: HelmProcess
     address: Address
     output_directory: str | None
+
+    @property
+    def is_side_effect(self) -> bool:
+        return self.cmd != HelmDeploymentCmd.RENDER
 
     @property
     def uses_post_renderer(self) -> bool:
@@ -208,7 +221,7 @@ async def _sort_value_file_names_for_evaluation(
 @rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
 async def setup_render_helm_deployment_process(
     request: HelmDeploymentRequest,
-) -> HelmRendererProcess:
+) -> _HelmDeploymentAction:
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(
@@ -309,7 +322,8 @@ async def setup_render_helm_deployment_process(
         output_directories=output_directories,
     )
 
-    return HelmRendererProcess(
+    return _HelmDeploymentAction(
+        cmd=request.cmd,
         chart=chart,
         process=process,
         address=request.field_set.address,
@@ -322,7 +336,7 @@ _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
 @rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
-async def run_renderer(renderer: HelmRendererProcess) -> RenderedHelmFiles:
+async def run_renderer(renderer: _HelmDeploymentAction) -> RenderedHelmFiles:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
         if len(sanitised_lines) == 0:
@@ -375,10 +389,10 @@ async def run_renderer(renderer: HelmRendererProcess) -> RenderedHelmFiles:
 
 
 @rule
-async def helm_renderer_as_interactive_process(
-    renderer: HelmRendererProcess,
-) -> InteractiveProcess:
-    process = await Get(Process, HelmProcess, renderer.process)
+async def materialize_deployment_action(action: _HelmDeploymentAction) -> InteractiveProcess:
+    assert action.is_side_effect
+
+    process = await Get(Process, HelmProcess, action.process)
     return InteractiveProcess.from_process(process)
 
 
