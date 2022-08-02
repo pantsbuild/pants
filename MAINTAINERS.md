@@ -26,6 +26,7 @@ Emeritus
 
 * Andy Reitz
 * Chris Heisterkamp
+* Chris Livingston
 * David Taylor
 * David Turner
 * Dorothy Ordogh
