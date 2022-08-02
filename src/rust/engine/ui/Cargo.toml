@@ -11,7 +11,7 @@ path = "src/console_ui.rs"
 console = "0.15.1"
 futures = "0.3"
 indexmap = "1.9"
-indicatif = "0.16.2"
+indicatif = "0.17"
 logging = { path = "../logging" }
 parking_lot = "0.12"
 # TODO: See https://github.com/Byron/prodash/pull/9.

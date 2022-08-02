@@ -25,7 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{self, BoxFuture, FutureExt};
 use indexmap::IndexSet;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
 use parking_lot::Mutex;
@@ -34,7 +34,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -71,12 +70,12 @@ impl ConsoleUI {
   ///
   /// The number of times per-second that `Self::render` should be called.
   ///
-  pub fn render_rate_hz() -> u64 {
+  pub fn render_rate_hz() -> u8 {
     10
   }
 
   pub fn render_interval() -> Duration {
-    Duration::from_millis(1000 / Self::render_rate_hz())
+    Duration::from_millis(1000 / (Self::render_rate_hz() as u64))
   }
 
   pub async fn with_console_ui_disabled<T>(&mut self, f: impl Future<Output = T>) -> T {
@@ -142,9 +141,9 @@ impl ConsoleUI {
 }
 
 struct IndicatifInstance {
-  // NB: The indeces correspond to indeces in
   tasks_to_display: IndexSet<SpanId>,
-  multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
+  // NB: Kept for Drop.
+  _multi_progress: MultiProgress,
   bars: Vec<ProgressBar>,
 }
 
@@ -246,6 +245,7 @@ impl Instance {
     } else {
       // We take exclusive access to stdio by registering a callback that is used to render stderr
       // while we're holding access. See the method doc.
+      // TODO: `MultiProgress` now supports `println` directly.
       let stderr_dest_bar: Arc<Mutex<Option<WeakProgressBar>>> = Arc::new(Mutex::new(None));
       // We acquire the lock before taking exclusive access, and don't release it until after
       // initialization. That way, the exclusive callback can always assume that the destination
@@ -279,20 +279,17 @@ impl Instance {
       let multi_progress = MultiProgress::with_draw_target(draw_target);
       let bars = (0..cmp::min(local_parallelism, terminal_height.into()))
         .map(|_n| {
-          let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
+          let style = ProgressStyle::default_bar()
+            .template("{spinner} {wide_msg}")
+            .expect("Valid template.");
           multi_progress.add(ProgressBar::new(terminal_width.into()).with_style(style))
         })
         .collect::<Vec<_>>();
       *stderr_dest_bar_guard = Some(bars[0].downgrade());
 
-      // Spawn a task to drive the multi progress.
-      let multi_progress_task = executor
-        .spawn_blocking(move || multi_progress.join())
-        .boxed();
-
       Ok(Instance::Indicatif(IndicatifInstance {
         tasks_to_display: IndexSet::new(),
-        multi_progress_task,
+        _multi_progress: multi_progress,
         bars,
       }))
     };
@@ -396,14 +393,8 @@ impl Instance {
       Instance::Indicatif(indicatif) => {
         // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
         // direct access to the Console.
-        indicatif
-          .multi_progress_task
-          .map(|res| {
-            // If teardown fails, we can't know whether any error messages will even reach the client, so
-            // there isn't much point in trying to recover gracefully.
-            res.unwrap_or_else(|e| panic!("Failed to render UI: {}", e))
-          })
-          .boxed()
+        std::mem::drop(indicatif);
+        future::ready(()).boxed()
       }
       Instance::Prodash(mut prodash) => {
         // Drop all tasks to clear the Tree. The call to shutdown will render a final "Tick" with the
