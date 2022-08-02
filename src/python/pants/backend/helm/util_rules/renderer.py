@@ -336,7 +336,9 @@ _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
 @rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
-async def run_renderer(renderer: _HelmDeploymentAction) -> RenderedHelmFiles:
+async def run_renderer(action: _HelmDeploymentAction) -> RenderedHelmFiles:
+    assert not action.is_side_effect
+
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
         if len(sanitised_lines) == 0:
@@ -368,23 +370,23 @@ async def run_renderer(renderer: _HelmDeploymentAction) -> RenderedHelmFiles:
 
         return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
 
-    logger.debug(f"Running Helm renderer process for {renderer.address}")
-    result = await Get(ProcessResult, HelmProcess, renderer.process)
+    logger.debug(f"Running Helm renderer process for {action.address}")
+    result = await Get(ProcessResult, HelmProcess, action.process)
 
     output_snapshot = EMPTY_SNAPSHOT
-    if not renderer.output_directory:
-        logger.debug(f"Parsing Helm renderer files from the process' output of {renderer.address}.")
+    if not action.output_directory:
+        logger.debug(f"Parsing Helm renderer files from the process' output of {action.address}.")
         output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
     else:
         logger.debug(
-            f"Obtaining Helm renderer files from the process' output directory of {renderer.address}."
+            f"Obtaining Helm renderer files from the process' output directory of {action.address}."
         )
         output_snapshot = await Get(
-            Snapshot, RemovePrefix(result.output_digest, renderer.output_directory)
+            Snapshot, RemovePrefix(result.output_digest, action.output_directory)
         )
 
     return RenderedHelmFiles(
-        address=renderer.address, chart=renderer.chart, snapshot=output_snapshot
+        address=action.address, chart=action.chart, snapshot=output_snapshot
     )
 
 
