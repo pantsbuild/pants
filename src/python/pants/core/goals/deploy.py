@@ -1,4 +1,4 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -32,14 +32,48 @@ logger = logging.getLogger(__name__)
 @union
 @dataclass(frozen=True)
 class DeployFieldSet(FieldSet, metaclass=ABCMeta):
-    """The FieldSet type for the `deploy` goal."""
+    """The FieldSet type for the `deploy` goal.
+    
+    Union members may list any fields required to fulfill the instantiation of the
+    `DeployProcess` result of the deploy rule.
+    """
 
 
 @dataclass(frozen=True)
 class DeployProcess:
+    """A process that when executed will have the side effect of deploying a target.
+    
+    To provide with the ability to deploy a given target, create a custom `DeployFieldSet` for
+    that given target and implement a rule that returns `DeployProcess` for that custom field set:
+
+    Example:
+
+        @dataclass(frozen=True)
+        class MyDeploymentFieldSet(DeployFieldSet):
+            pass
+
+        @rule
+        async def my_deployment_process(field_set: MyDeploymentFieldSet) -> DeployProcess:
+            # Create the underlying process that executes the deployment
+            process = Process(...)
+            return DeployProcess(
+                name="my_deployment",
+                process=InteractiveProcess.from_process(process)
+            )
+
+        def rules():
+            return [
+                *collect_rules(),
+                UnionRule(DeployFieldSet, MyDeploymentFieldSet)
+            ]
+
+    Use the `publish_dependencies` field to provide with a list of targets that produce packages
+    which need to be externally published before the deployment process is executed.
+    """
+
     name: str
-    publish_dependencies: tuple[Target, ...]
     process: InteractiveProcess | None
+    publish_dependencies: tuple[Target, ...] = ()
     description: str | None = None
 
 
@@ -50,7 +84,7 @@ class DeploySubsystem(GoalSubsystem):
     required_union_implementation = (DeployFieldSet,)
 
     args = ArgsListOption(
-        example="--force",
+        example="",
         passthrough=True,
         extra_help="Arguments to pass to the underlying tool.",
     )
