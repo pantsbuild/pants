@@ -152,12 +152,14 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         ScalatestTestsSourcesOverridesField,
+        ScalatestTestTimeoutField,
     )
     generated_target_cls = ScalatestTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, ScalatestTestTimeoutField)
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
+        ScalatestTestTimeoutField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,

@@ -279,8 +279,8 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         HelmUnitTestTimeoutField,
     )
     generated_target_cls = HelmUnitTestTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestTimeoutField, HelmUnitTestStrictField)
-    moved_fields = (HelmUnitTestDependenciesField,)
+    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestStrictField)
+    moved_fields = (HelmUnitTestDependenciesField, HelmUnitTestTimeoutField)
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field."
 
 
