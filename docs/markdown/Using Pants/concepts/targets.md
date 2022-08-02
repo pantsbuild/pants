@@ -230,56 +230,41 @@ You can use the address for the target generator as an alias for all of its gene
 Field default values
 ====================
 
-As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And
-for specific cases it is easy to provide some other value to a specific target. The issue is if you
-want to apply a specific non-default value for a field on many targets. This can get unwieldy, error
-prone and hard to maintain. Enter `__defaults__`.
+You can use `__defaults__` to apply the same metadata to all targets in a subtree. This is
+intended to reduce boilerplate.
 
-Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the
-current subtree.
+`__defaults__` expects a dictionary of target types to a dictionary of field names and their
+values (similar to the `overrides` field for target generators). You can also use a tuple of
+target types to set the same default for multiple target types. For example:
 
-The defaults are provided as a dictionary mapping targets to the default field values. Multiple
-targets may share the same set of default field values, when grouped together in parenthesis (as a
-Python tuple).
-
-Use the `all` keyword argument to provide default field values that should apply to all targets.
-
-The `extend=True` keyword argument allows to add to any existing default field values set by a
-previous `__defaults__` call rather than replacing them.
-
-Default fields and values are validated against their target types, except when provided using the
-`all` keyword, in which case only values for fields applicable to each target are validated.
-
-This means, that it is legal to provide a default value for `all` targets, even if it is only a
-subset of targets that actually supports that particular field.
-
-Examples:
-
-```python src/example/BUILD
-    # Provide default `tags` to all targets in this subtree, and skip black, where applicable.
-    __defaults__(all=dict(tags=["example"], skip_black=True))
+```python src/py/vendored/BUILD
+__defaults__(
+  {
+      python_test: {"skip_tests": True},
+      (python_source, python_test): {"skip_black": True, "skip_isort": True},
+  }
+)
 ```
 
-Subdirectories may override defaults from a parent BUILD file:
+Defaults will apply to all matching targets in the current directory and subdirectories. Individual
+targets can still override the field's value by setting it explicitly, including via the
+`overrides` field when using target generators.
 
-```python src/example/override/BUILD
-    # For `files` and `resources` targets, we want to use some other defaults.
-    __defaults__({
-      (files, resources): dict(tags=["example", "overridden"], description="Our assets")
-    })
-```
+A `__defaults__` declaration in a subdirectory will win out over ancestor directories if they
+set conflicting values. # TODO: document `extend`
 
-Use the `extend=True` keyword to update defaults rather than replace them, for any given target.
+Use the `all` keyword argument to provide default field values that should apply to all
+possible targets. If a target type does not have a field from `all` registered, Pants will simply
+ignore it.
 
-```python src/example/extend/BUILD
-    # Add a default description to all types, in addition to the inherited default tags.
-    __defaults__(extend=True, all=dict(description="Add default description to the defaults."))
-```
-
-To reset any modified defaults, simply override with the empty dict:
-
-```python src/example/nodefaults/BUILD
-    __defaults__(all={})
+```python BUILD
+__defaults__(
+    all={
+        "tags": ["my-tag"],
+        # It's okay that some targets don't have this field.
+        "skip_black": True,
+    },
+)
 ```
 
 Parametrizing targets

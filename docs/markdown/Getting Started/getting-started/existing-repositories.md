@@ -31,6 +31,21 @@ First, run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-file
 
 Then, activate the [Linters and formatters](doc:python-linters-and-formatters) you'd like to use. Hook up the `fmt` and `lint` goals to your [CI](doc:using-pants-in-ci).
 
+If you're not ready to run a particular linter or formatter on certain parts of your project yet, you can combine [`__defaults__`](doc:targets#field-default-values) with the `skip_x` fields, e.g.:
+
+```python src/python/project/BUILD
+__defaults__(
+  {
+      # This default applies to all matching targets in this directory and subdirectories.
+      (python_source, python_test): {"skip_black": True, "skip_isort": True},
+  }
+)
+
+python_sources()
+
+python_tests(name="tests")
+```
+
 ### 3. Set up tests
 
 To get [tests](doc:python-test-goal) working, you will first need to set up [source roots](doc:source-roots) and [third-party dependencies](doc:python-third-party-dependencies).
@@ -57,11 +72,22 @@ python_tests(
 )
 ```
 
-`./pants test ::` will only run the relevant tests. You can combine this with [`./pants peek`](doc:project-introspection) to get a list of test files that should be run with your original test runner:
+`./pants test ::` will skip all tests marked `skip_tests=True`. You can combine this with
+[`./pants peek`](doc:project-introspection) to get a list of test files that should be run with
+your original test runners:
 
 ```
 ./pants --filter-target-type=python_test peek :: | \
   jq -r '.[] | select(.skip_tests== true) | .["sources"][]'
+```
+
+If you need to skip tests for an entire subtree, you can use
+[`__defaults__`](doc:targets#field-default-values) with `skip_tests=True`. Then, individual tests
+can opt-in to running with Pants by setting `skip_tests=False`.
+
+```python src/py/BUILD
+# All Python tests in this directory and subdirectories will default to being skipped.
+__defaults__({python_test: {"skip_tests": True}})
 ```
 
 You may want to [speed up your CI](doc:using-pants-in-ci) by having Pants only run tests for changed files.
