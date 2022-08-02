@@ -109,12 +109,13 @@ async def gather_coordinates_for_jvm_lockfile(
     for artifact_input in request.artifact_inputs:
         # Try parsing as a `Coordinate` first since otherwise `AddressInput.parse` will try to see if the
         # group name is a file on disk.
-        try:
-            maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
-            requirements.add(maybe_coord)
-            continue
-        except Exception:
-            pass
+        if 2 <= artifact_input.count(":"):
+            try:
+                maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
+                requirements.add(maybe_coord)
+                continue
+            except Exception:
+                pass
 
         try:
             address_input = AddressInput.parse(

@@ -361,6 +361,8 @@ async def prepare_coursier_resolve_info(
         if no_jar.coordinate.packaging != "jar":
             extra_types.add(no_jar.coordinate.packaging)
     if extra_types:
+        # Note: `-A` defaults to `jar,bundle` and any value set replaces (and does not supplement) those defaults,
+        # so the defaults must be included here for them to remain usable.
         extra_args.extend(["-A", ",".join(sorted(["jar", "bundle", *extra_types]))])
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)

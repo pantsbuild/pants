@@ -229,6 +229,10 @@ class ClasspathEntry:
 
     TODO: Move to `classpath.py`.
     TODO: Generalize via https://github.com/pantsbuild/pants/issues/13112.
+
+    Note: Non-jar artifacts (e.g., executables with "exe" packaging) may end up on the classpath if
+    they are dependencies.
+    TODO: Does there need to be a filtering mechanism to exclude non-jar artifacgs in the default case?
     """
 
     digest: Digest
