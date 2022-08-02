@@ -579,7 +579,7 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_fetch_one_coord_with_non_jar_packaging(rule_runner: RuleRunner) -> None:
     """This test demonstrates that fetch_one_coord is able to download non-jar artifacts such as
-    protoc plugin binaries that are distribured via Maven Central."""
+    protoc plugin binaries that are distributed via Maven Central."""
     coordinate = Coordinate(
         group="io.grpc",
         artifact="protoc-gen-grpc-java",
