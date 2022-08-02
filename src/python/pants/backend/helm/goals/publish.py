@@ -22,7 +22,7 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessRequest, Process
+from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -106,15 +106,10 @@ async def publish_helm_chart(
         for registry in registries_to_push
     )
 
-    interactive_processes = await MultiGet(
-        Get(InteractiveProcess, InteractiveProcessRequest(process)) for process in processes
-    )
-
-    refs_and_processes = zip(publish_refs, interactive_processes)
     return PublishProcesses(
         [
-            PublishPackages(names=(package_ref,), process=process)
-            for package_ref, process in refs_and_processes
+            PublishPackages(names=(package_ref,), process=InteractiveProcess.from_process(process))
+            for package_ref, process in zip(publish_refs, processes)
         ]
     )
 

@@ -19,7 +19,6 @@ from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeployme
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
@@ -32,7 +31,6 @@ from pants.engine.fs import (
     DigestSubset,
     Directory,
     FileContent,
-    GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
     RemovePrefix,

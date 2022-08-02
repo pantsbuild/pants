@@ -57,7 +57,7 @@ _VALID_PASSTHROUGH_OPTS = [
 ]
 
 
-class InvalidDeploymentArgs(Exception):
+class InvalidHelmDeploymentArgs(Exception):
     def __init__(self, args: Iterable[str]) -> None:
         super().__init__(
             softwrap(
@@ -84,7 +84,7 @@ async def run_helm_deploy(
 ) -> DeployProcess:
     valid_args, invalid_args = _cleanup_passthrough_args(deploy.args)
     if invalid_args:
-        raise InvalidDeploymentArgs(invalid_args)
+        raise InvalidHelmDeploymentArgs(invalid_args)
 
     target_dependencies, post_renderer = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
