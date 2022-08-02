@@ -156,12 +156,14 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         KotlinJunitTestsGeneratorSourcesField,
+        JunitTestTimeoutField,
     )
     generated_target_cls = KotlinJunitTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, JunitTestTimeoutField)
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         KotlinJunitTestDependenciesField,
         KotlincConsumedPluginIdsField,
+        JunitTestTimeoutField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
