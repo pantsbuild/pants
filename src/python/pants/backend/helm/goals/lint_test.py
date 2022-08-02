@@ -11,6 +11,7 @@ from pants.backend.helm.goals.lint import HelmLintFieldSet, HelmLintRequest
 from pants.backend.helm.goals.lint import rules as helm_lint_rules
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
@@ -41,6 +42,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *source_root_rules(),
             *sources.rules(),
+            *target_types_rules(),
             SubsystemRule(HelmSubsystem),
             QueryRule(LintResults, (HelmLintRequest,)),
         ],
