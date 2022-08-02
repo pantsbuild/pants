@@ -33,16 +33,16 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class DeployFieldSet(FieldSet, metaclass=ABCMeta):
     """The FieldSet type for the `deploy` goal.
-    
-    Union members may list any fields required to fulfill the instantiation of the
-    `DeployProcess` result of the deploy rule.
+
+    Union members may list any fields required to fulfill the instantiation of the `DeployProcess`
+    result of the deploy rule.
     """
 
 
 @dataclass(frozen=True)
 class DeployProcess:
     """A process that when executed will have the side effect of deploying a target.
-    
+
     To provide with the ability to deploy a given target, create a custom `DeployFieldSet` for
     that given target and implement a rule that returns `DeployProcess` for that custom field set:
 
