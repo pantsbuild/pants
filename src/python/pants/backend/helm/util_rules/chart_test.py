@@ -7,7 +7,12 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.target_types import HelmArtifactTarget, HelmChartTarget
+from pants.backend.helm.target_types import (
+    HelmArtifactTarget,
+    HelmChartTarget,
+    HelmDeploymentFieldSet,
+    HelmDeploymentTarget,
+)
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
@@ -35,10 +40,6 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, HelmArtifactTarget, HelmDeploymentTarget],
         rules=[
             *chart.rules(),
-            *sources.rules(),
-            *tool.rules(),
-            *process.rules(),
-            *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(HelmChart, (HelmChartRequest,)),
             QueryRule(HelmChartMetadata, (ParseHelmChartMetadataDigest,)),
@@ -302,7 +303,7 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
     assert chart.info.version == "1.0.0"
 
 
-def test_fail_when_no_chart_dependency_is_found(rule_runner: RuleRunner) -> None:
+def test_fail_when_no_chart_dependency_is_found_for_a_deployment(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": """helm_deployment(name="foo")"""})
 
     target = rule_runner.get_target(Address("", target_name="foo"))
@@ -313,7 +314,7 @@ def test_fail_when_no_chart_dependency_is_found(rule_runner: RuleRunner) -> None
         rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
 
 
-def test_fail_when_more_than_one_chart_is_found(rule_runner: RuleRunner) -> None:
+def test_fail_when_more_than_one_chart_is_found_for_a_deployment(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/foo/BUILD": "helm_chart()",
