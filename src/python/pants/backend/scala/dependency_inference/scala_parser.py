@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
@@ -39,6 +38,7 @@ from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ async def resolve_fallible_result_to_analysis(
 async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = pkgutil.get_data(
+    parser_source_content = read_resource(
         "pants.backend.scala.dependency_inference", "ScalaParser.scala"
     )
     if not parser_source_content:
