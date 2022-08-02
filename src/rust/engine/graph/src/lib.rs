@@ -199,7 +199,7 @@ impl<N: Node> InnerGraph<N> {
       } else {
         // Else, clear.
         let node = self.pg[candidate].node().clone();
-        self.invalidate_from_roots(true, |n| &node == n);
+        self.invalidate_from_roots(|n| &node == n);
       }
     }
   }
@@ -239,11 +239,7 @@ impl<N: Node> InnerGraph<N> {
   /// An "invalidation root" is a Node in the graph which can be invalidated for a reason other
   /// than having had its dependencies changed.
   ///
-  fn invalidate_from_roots<P: Fn(&N) -> bool>(
-    &mut self,
-    log_dirtied: bool,
-    predicate: P,
-  ) -> InvalidationResult {
+  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> InvalidationResult {
     // Collect all entries that will be cleared.
     let root_ids: HashSet<_, Fnv> = self
       .nodes
@@ -299,9 +295,6 @@ impl<N: Node> InnerGraph<N> {
     // preserved; if we can't, they are cleared in `Graph::clear_deps`.
     for id in &transitive_ids {
       if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
-        if log_dirtied {
-          log::info!("Dirtying {}", entry.node());
-        }
         entry.dirty(self);
       }
     }
@@ -746,13 +739,9 @@ impl<N: Node> Graph<N> {
     inner.clear()
   }
 
-  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(
-    &self,
-    log_dirtied: bool,
-    predicate: P,
-  ) -> InvalidationResult {
+  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
     let mut inner = self.inner.lock();
-    inner.invalidate_from_roots(log_dirtied, predicate)
+    inner.invalidate_from_roots(predicate)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
