@@ -180,7 +180,7 @@ class Scheduler:
             store_rpc_concurrency=execution_options.remote_store_rpc_concurrency,
             store_batch_api_size_limit=execution_options.remote_store_batch_api_size_limit,
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
-            cache_eager_fetch=execution_options.remote_cache_eager_fetch,
+            cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
             cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
             execution_extra_platform_properties=tuple(
