@@ -217,7 +217,7 @@ To add a timeout, set the `test_timeout` field to an integer value of seconds, l
 go_package(test_timeout=120)
 ```
 
-Similar as [with Python](doc:python-test-goal#timeouts), you can also set a default value and a maximum value in `pants.toml`:
+You can also set a default value and a maximum value in `pants.toml`:
 
 ```toml pants.toml
 [test]
