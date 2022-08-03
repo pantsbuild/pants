@@ -227,6 +227,7 @@ timeout_maximum = 600
 
 If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
+Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 Gofmt
 -----
 
