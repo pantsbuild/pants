@@ -194,13 +194,6 @@ class GoTestExtraEnvVarsField(StringSequenceField):
 
 class GoTestTimeoutField(TestTimeoutField):
     alias = "test_timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) when running this package's tests.
-
-        If this field is not set, the test will never time out.
-        """
-    )
     valid_numbers = ValidNumbers.positive_and_zero
 
 

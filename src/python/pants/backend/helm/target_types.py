@@ -217,7 +217,7 @@ class HelmUnitTestDependenciesField(Dependencies):
 
 
 class HelmUnitTestTimeoutField(TestTimeoutField):
-    help = "A timeout (in seconds) used by each Helm Unittest test file belonging to this target."
+    pass
 
 
 class HelmUnitTestSourceField(SingleSourceField):

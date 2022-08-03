@@ -113,13 +113,7 @@ class Shunit2TestDependenciesField(Dependencies):
 
 
 class Shunit2TestTimeoutField(TestTimeoutField):
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each test file belonging to this target.
-
-        If unset, the test will never time out.
-        """
-    )
+    pass
 
 
 class SkipShunit2TestsField(BoolField):

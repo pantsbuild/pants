@@ -179,8 +179,7 @@ You can also pass through arguments to the test runner with `--`, e.g.:
 ❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala -- -z hello
 ```
 
-Timeouts
---------
+### Timeouts
 
 Pants can cancel tests which take too long. This is useful to prevent tests from hanging indefinitely.
 
