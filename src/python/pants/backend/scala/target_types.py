@@ -223,12 +223,14 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         ScalaJunitTestsSourcesOverridesField,
+        JunitTestTimeoutField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
+        JunitTestTimeoutField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,

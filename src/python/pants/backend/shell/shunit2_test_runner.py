@@ -237,7 +237,7 @@ async def setup_shunit2_for_target(
         description=f"Run shunit2 for {request.field_set.address}.",
         level=LogLevel.DEBUG,
         env=env_dict,
-        timeout_seconds=request.field_set.timeout.value,
+        timeout_seconds=request.field_set.timeout.calculate_from_global_options(test_subsystem),
         cache_scope=cache_scope,
     )
     return TestSetup(process)
