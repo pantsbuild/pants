@@ -78,3 +78,5 @@ pex_binary(
 )
 
 python_tests(name="tests")
+
+resources(name="resources", sources=["VERSION"])
