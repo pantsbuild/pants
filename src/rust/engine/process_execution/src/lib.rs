@@ -755,6 +755,14 @@ impl From<ProcessResultSource> for &'static str {
   }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum CacheContentBehavior {
+  Fetch,
+  Validate,
+  Defer,
+}
+
 #[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,

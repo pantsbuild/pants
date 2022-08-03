@@ -23,8 +23,8 @@ use workunit_store::{
 
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
@@ -54,7 +54,7 @@ pub struct CommandRunner {
   platform: Platform,
   cache_read: bool,
   cache_write: bool,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
@@ -74,7 +74,7 @@ impl CommandRunner {
     cache_read: bool,
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
-    eager_fetch: bool,
+    cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
     read_timeout: Duration,
   ) -> Result<Self, String> {
@@ -106,7 +106,7 @@ impl CommandRunner {
       platform,
       cache_read,
       cache_write,
-      eager_fetch,
+      cache_content_behavior,
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
@@ -264,7 +264,7 @@ impl CommandRunner {
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
-        self.eager_fetch,
+        self.cache_content_behavior,
         self.read_timeout,
       )
       .await;
@@ -511,7 +511,7 @@ async fn check_action_cache(
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
@@ -555,28 +555,11 @@ async fn check_action_cache(
         .await
         .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
 
-        if eager_fetch {
-          // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
-          // retried.
-          let response = response.clone();
-          in_workunit!(
-            "eager_fetch_action_cache",
-            Level::Trace,
-            desc = Some("eagerly fetching after action cache hit".to_owned()),
-            |_workunit| async move {
-              future::try_join_all(vec![
-                store.ensure_local_has_file(response.stdout_digest).boxed(),
-                store.ensure_local_has_file(response.stderr_digest).boxed(),
-                store
-                  .ensure_local_has_recursive_directory(response.output_directory)
-                  .boxed(),
-              ])
-              .await
-            }
-          )
+        check_action_cache_content(&response, store, cache_content_behavior)
           .await
-          .map_err(|e| Status::unavailable(format!("Output content could not be loaded: {e}")))?;
-        }
+          .map_err(|e| {
+            Status::unavailable(format!("Output content could not be validated: {e}"))
+          })?;
         Ok(response)
       })
       .await;
@@ -606,4 +589,35 @@ async fn check_action_cache(
     }
   )
   .await
+}
+
+async fn check_action_cache_content(
+  response: &FallibleProcessResultWithPlatform,
+  store: Store,
+  cache_content_behavior: CacheContentBehavior,
+) -> Result<(), StoreError> {
+  match cache_content_behavior {
+    CacheContentBehavior::Fetch | CacheContentBehavior::Validate => {
+      // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
+      // retried.
+      let response = response.clone();
+      let _ = in_workunit!(
+        "eager_fetch_action_cache",
+        Level::Trace,
+        |_workunit| async move {
+          future::try_join_all(vec![
+            store.ensure_local_has_file(response.stdout_digest).boxed(),
+            store.ensure_local_has_file(response.stderr_digest).boxed(),
+            store
+              .ensure_local_has_recursive_directory(response.output_directory)
+              .boxed(),
+          ])
+          .await
+        }
+      )
+      .await?;
+    }
+    CacheContentBehavior::Defer => {}
+  }
+  Ok(())
 }

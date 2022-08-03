@@ -17,8 +17,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -34,7 +34,7 @@ pub struct CommandRunner {
   cache: PersistentCache,
   file_store: Store,
   cache_read: bool,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   metadata: ProcessMetadata,
 }
 
@@ -44,7 +44,7 @@ impl CommandRunner {
     cache: PersistentCache,
     file_store: Store,
     cache_read: bool,
-    eager_fetch: bool,
+    cache_content_behavior: CacheContentBehavior,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
@@ -52,7 +52,7 @@ impl CommandRunner {
       cache,
       file_store,
       cache_read,
-      eager_fetch,
+      cache_content_behavior,
       metadata,
     }
   }
@@ -205,10 +205,12 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    // If eager_fetch is enabled, ensure that all digests in the result are loadable, erroring
-    // if any are not. If eager_fetch is disabled, a Digest which is discovered to be missing later
-    // on during execution will cause backtracking.
-    if self.eager_fetch {
+    // Optionally validate that all digests in the result are loadable, erroring if any are not.
+    // If content loading is deferred, a Digest which is discovered to be missing later on during
+    // execution will cause backtracking.
+    if self.cache_content_behavior != CacheContentBehavior::Defer {
+      // TODO: Should only validate that the Digest exists either locally or remotely: not
+      // fetch/`ensure_local_has` it.
       let _ = future::try_join_all(vec![
         self
           .file_store
