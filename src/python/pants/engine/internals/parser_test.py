@@ -58,8 +58,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             "If you expect to see more symbols activated in the below list,"
             f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
-            f"All registered symbols: ['__defaults__', 'build_file_dir', 'caof', {fmt_extra_sym}"
-            "'obj', 'prelude', 'tgt']"
+            f"All registered symbols: ['build_file_dir', 'caof', {fmt_extra_sym}"
+            "'obj', 'prelude', 'set_defaults', 'tgt']"
         )
 
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]

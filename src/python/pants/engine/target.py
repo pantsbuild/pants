@@ -298,9 +298,9 @@ class FieldDefaults:
     which compute the true value of the field given a subsytem argument. Consumers need to
     be type aware, and `@rules` cannot have dynamic requirements.
 
-    Additionally, `__defaults__` should mean that computed default Field values should become
+    Additionally, `set_defaults()` should mean that computed default Field values should become
     more rare: i.e. `JvmResolveField` and `PythonResolveField` could potentially move to
-    hardcoded default values which users override with `__defaults__` if they'd like to change
+    hardcoded default values which users override with `set_defaults()` if they'd like to change
     the default resolve names.
 
     See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions

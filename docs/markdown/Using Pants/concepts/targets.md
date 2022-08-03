@@ -160,9 +160,9 @@ Field default values
 As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And
 for specific cases it is easy to provide some other value to a specific target. The issue is if you
 want to apply a specific non-default value for a field on many targets. This can get unwieldy, error
-prone and hard to maintain. Enter `__defaults__`.
+prone and hard to maintain. Enter `set_defaults`.
 
-Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the
+Default field values per target are set using the `set_defaults` BUILD file symbol, and apply to the
 current subtree.
 
 The defaults are provided as a dictionary mapping targets to the default field values. Multiple
@@ -172,7 +172,7 @@ Python tuple).
 Use the `all` keyword argument to provide default field values that should apply to all targets.
 
 The `extend=True` keyword argument allows to add to any existing default field values set by a
-previous `__defaults__` call rather than replacing them.
+previous `set_defaults` call rather than replacing them.
 
 Default fields and values are validated against their target types, except when provided using the
 `all` keyword, in which case only values for fields applicable to each target are validated.
@@ -184,14 +184,14 @@ Examples:
 
 ```python src/example/BUILD
     # Provide default `tags` to all targets in this subtree, and skip black, where applicable.
-    __defaults__(all=dict(tags=["example"], skip_black=True))
+    set_defaults(all=dict(tags=["example"], skip_black=True))
 ```
 
 Subdirectories may override defaults from a parent BUILD file:
 
 ```python src/example/override/BUILD
     # For `files` and `resources` targets, we want to use some other defaults.
-    __defaults__({
+    set_defaults({
       (files, resources): dict(tags=["example", "overridden"], description="Our assets")
     })
 ```
@@ -200,13 +200,13 @@ Use the `extend=True` keyword to update defaults rather than replace them, for a
 
 ```python src/example/extend/BUILD
     # Add a default description to all types, in addition to the inherited default tags.
-    __defaults__(extend=True, all=dict(description="Add default description to the defaults."))
+    set_defaults(extend=True, all=dict(description="Add default description to the defaults."))
 ```
 
 To reset any modified defaults, simply override with the empty dict:
 
 ```python src/example/nodefaults/BUILD
-    __defaults__(all={})
+    set_defaults(all={})
 ```
 
 Target generation

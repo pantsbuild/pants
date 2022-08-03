@@ -1,7 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 """The `BuildFileDefaultsParserState.set_defaults` is used by the pants.engine.internals.Parser,
-exposed as the `__defaults__` BUILD file symbol.
+exposed as the `set_defaults` BUILD file symbol.
 
 When parsing a BUILD (from the rule `pants.engine.internals.build_files.parse_address_family`) the
 defaults from the closest parent BUILD file is passed as input to the parser, and the new defaults
@@ -52,7 +53,7 @@ class BuildFileDefaultsParserState:
         union_membership: UnionMembership,
     ) -> BuildFileDefaultsParserState:
         return cls(
-            address=Address(path, generated_name="__defaults__"),
+            address=Address(path, generated_name="set_defaults"),
             defaults=dict(defaults),
             registered_target_types=registered_target_types,
             union_membership=union_membership,

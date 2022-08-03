@@ -64,7 +64,7 @@ class ParseState(threading.local):
     def defaults(self) -> BuildFileDefaultsParserState:
         if self._defaults is None:
             raise AssertionError(
-                "The BUILD file __defaults__ was accessed before being set. This indicates a "
+                "The BUILD file set_defaults was accessed before being set. This indicates a "
                 "programming error in Pants. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
@@ -128,7 +128,7 @@ class Parser:
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
-            "__defaults__": parse_state.set_defaults,
+            "set_defaults": parse_state.set_defaults,
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 

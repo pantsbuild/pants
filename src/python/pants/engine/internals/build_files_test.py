@@ -258,7 +258,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
         {
             "helloworld/dir/BUILD": dedent(
                 """\
-                __defaults__({mock_tgt: dict(resolve="mock")}, all=dict(tags=["24"]))
+                set_defaults({mock_tgt: dict(resolve="mock")}, all=dict(tags=["24"]))
                 mock_tgt(tags=["42"])
                 mock_tgt(name='t2')
                 """
@@ -292,10 +292,10 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
 def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
-            "BUILD": """__defaults__(all=dict(tags=["root"]))""",
+            "BUILD": """set_defaults(all=dict(tags=["root"]))""",
             "helloworld/dir/BUILD": dedent(
                 """\
-                __defaults__({mock_tgt: dict(resolve="mock")}, extend=True)
+                set_defaults({mock_tgt: dict(resolve="mock")}, extend=True)
                 mock_tgt()
                 """
             ),

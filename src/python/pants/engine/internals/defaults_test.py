@@ -145,7 +145,7 @@ Scenario = namedtuple(
                     ValueError,
                     match=(
                         r"Expected dictionary mapping targets to default field values for "
-                        r"//#__defaults__ but got: list\."
+                        r"//#set_defaults but got: list\."
                     ),
                 ),
             ),
@@ -157,7 +157,7 @@ Scenario = namedtuple(
                 expected_error=pytest.raises(
                     ValueError,
                     match=(
-                        r"Invalid default field values in //#__defaults__ for target type "
+                        r"Invalid default field values in //#set_defaults for target type "
                         r"test_type_1, must be an `dict` but was \(\) with type `tuple`\."
                     ),
                 ),
@@ -169,7 +169,7 @@ Scenario = namedtuple(
                 args=({"unknown_target": {}},),
                 expected_error=pytest.raises(
                     ValueError,
-                    match=r"Unrecognized target type unknown_target in //#__defaults__\.",
+                    match=r"Unrecognized target type unknown_target in //#set_defaults\.",
                 ),
             ),
             id="unknown target",
@@ -194,7 +194,7 @@ Scenario = namedtuple(
                 expected_error=pytest.raises(
                     InvalidFieldException,
                     match=(
-                        r"The 'tags' field in target src/proj/a#__defaults__ must be an "
+                        r"The 'tags' field in target src/proj/a#set_defaults must be an "
                         r"iterable of strings \(e\.g\. a list of strings\), but was "
                         r"`'foo-bar'` with type `str`\."
                     ),
