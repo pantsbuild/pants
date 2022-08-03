@@ -385,9 +385,7 @@ async def run_renderer(action: _HelmDeploymentAction) -> RenderedHelmFiles:
             Snapshot, RemovePrefix(result.output_digest, action.output_directory)
         )
 
-    return RenderedHelmFiles(
-        address=action.address, chart=action.chart, snapshot=output_snapshot
-    )
+    return RenderedHelmFiles(address=action.address, chart=action.chart, snapshot=output_snapshot)
 
 
 @rule

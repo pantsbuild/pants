@@ -83,7 +83,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_root_patterns)}",
-            f"--experimental-deploy-args={repr(deploy_args)}",
+            f"--helm-args={repr(deploy_args)}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -148,7 +148,7 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_root_patterns)}",
-            f"--experimental-deploy-args={repr(deploy_args)}",
+            f"--helm-args={repr(deploy_args)}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
