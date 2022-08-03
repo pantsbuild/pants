@@ -336,7 +336,15 @@ shunit2_tests(
 )
 ```
 
-Unlike [with Python](doc:python-test-goal#timeouts), you cannot yet set a default or maximum timeout value, nor temporarily disable all timeouts. Please [let us know](doc:getting-help) if you would like this feature.
+Similar as [with Python](doc:python-test-goal#timeouts), you can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
 ### Testing your packaging pipeline
 

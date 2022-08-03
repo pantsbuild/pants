@@ -179,6 +179,41 @@ You can also pass through arguments to the test runner with `--`, e.g.:
 ❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala -- -z hello
 ```
 
+Timeouts
+--------
+
+Pants can cancel tests which take too long. This is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds in any of the supported targets, like this:
+
+```python BUILD
+java_junit_test(name="java_test", source="Test.java", timeout=120)
+scala_junit_test(name="scala_junit_test", source="Test.scala", timeout=100)
+scalatest_test(name="scalatest_test", source="Spec.scala", timeout=80)
+```
+
+When you set timeout on any of the target generators (i.e. `java_junit_tests`, `scalatest_tests`, etc.), the same timeout will apply to every generated corresponding target.
+
+```python BUILD
+java_junit_tests(
+    name="tests",
+    overrides={
+        "MyClass1Test.java": {"timeout": 20},
+        ("MyClass2Test.java", "MyClass3Test.java"): {"timeout": 35},
+    },
+)
+```
+
+Similar as [with Python](doc:python-test-goal#timeouts), you can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
 Lint and Format
 ---------------
 

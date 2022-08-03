@@ -16,6 +16,7 @@ from pants.engine.target import (
     Dependencies,
     FieldSet,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -23,6 +24,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     TriBoolField,
+    generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
@@ -269,6 +271,18 @@ class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
     )
 
 
+class HelmUnitTestOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        HelmUnitTestTestTarget.alias,
+        """
+        overrides={
+            "configmap_test.yaml": {"timeout": 120},
+            ("deployment_test.yaml", "pod_test.yaml"): {"tags": ["slow_tests"]},
+        }
+        """,
+    )
+
+
 class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     alias = "helm_unittest_tests"
     core_fields = (
@@ -277,10 +291,15 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
         HelmUnitTestTimeoutField,
+        HelmUnitTestOverridesField,
     )
     generated_target_cls = HelmUnitTestTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestStrictField)
-    moved_fields = (HelmUnitTestDependenciesField, HelmUnitTestTimeoutField)
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        HelmUnitTestDependenciesField,
+        HelmUnitTestStrictField,
+        HelmUnitTestTimeoutField,
+    )
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field."
 
 

@@ -167,6 +167,38 @@ With the test files in places, you can now run `./pants test ::` and Pants will 
 ✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
 ```
 
+### Timeouts
+
+Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds, like this:
+
+```python BUILD
+helm_unittest_test(name="tests", source="env-configmap_test.yaml", timeout=120)
+```
+
+When you set `timeout` on the `helm_unittest_tests` target generator, the same timeout will apply to every generated `helm_unittest_test` target. Instead, you can use the `overrides` field:
+
+```python BUILD
+helm_unittest_tests(
+    name="tests",
+    overrides={
+        "env-configmap_test.yaml": {"timeout": 20},
+        ("deployment_test.yaml", "pod_test.yaml"): {"timeout": 35},
+    },
+)
+```
+
+Similar as [with Python](doc:python-test-goal#timeouts), you can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
 Publishing Helm charts
 ======================
 
