@@ -38,6 +38,7 @@ class AssemblyPreCompilationRequest:
     compilation_input: Digest
     s_files: tuple[str, ...]
     dir_path: str
+    import_path: str
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,13 @@ async def setup_assembly_pre_compilation(
     request: AssemblyPreCompilationRequest,
     goroot: GoRoot,
 ) -> FallibleAssemblyPreCompilation:
+    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
+    # See https://go.dev/doc/go1.19#assembler and
+    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rule_go).
+    maybe_package_path_args = (
+        ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
+    )
+
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
@@ -86,6 +94,7 @@ async def setup_assembly_pre_compilation(
                 "-gensymabis",
                 "-o",
                 "symabis",
+                *maybe_package_path_args,
                 "--",
                 *(f"./{request.dir_path}/{name}" for name in request.s_files),
             ),
@@ -116,6 +125,7 @@ async def setup_assembly_pre_compilation(
                     "asm",
                     "-I",
                     os.path.join(goroot.path, "pkg", "include"),
+                    *maybe_package_path_args,
                     "-o",
                     f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",
                     f"./{request.dir_path}/{s_file}",
