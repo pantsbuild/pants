@@ -78,18 +78,18 @@ _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"
 
 
 @dataclass(frozen=True)
-class HelmPostRendererTool:
+class _HelmPostRendererTool:
     pex: VenvPex
 
 
 @rule(desc="Setup Helm post renderer binaries", level=LogLevel.DEBUG)
 async def setup_post_renderer_tool(
     post_renderer: HelmPostRendererSubsystem,
-) -> HelmPostRendererTool:
+) -> _HelmPostRendererTool:
     post_renderer_sources = pkgutil.get_data(_HELM_POSTRENDERER_PACKAGE, _HELM_POSTRENDERER_SOURCE)
     if not post_renderer_sources:
         raise ValueError(
-            f"Unable to file sounce to {_HELM_POSTRENDERER_SOURCE!r} in {_HELM_POSTRENDERER_PACKAGE}"
+            f"Unable to find source to {_HELM_POSTRENDERER_SOURCE!r} in {_HELM_POSTRENDERER_PACKAGE}"
         )
 
     post_renderer_content = FileContent(
@@ -104,7 +104,7 @@ async def setup_post_renderer_tool(
             main=EntryPoint(PurePath(post_renderer_content.path).stem), sources=post_renderer_digest
         ),
     )
-    return HelmPostRendererTool(post_renderer_pex)
+    return _HelmPostRendererTool(post_renderer_pex)
 
 
 HELM_POST_RENDERER_CFG_FILENAME = "post_renderer.cfg.yaml"
@@ -142,7 +142,7 @@ class HelmPostRenderer(EngineAwareReturnType):
 @rule(desc="Configure Helm post-renderer", level=LogLevel.DEBUG)
 async def setup_post_renderer_launcher(
     request: SetupHelmPostRenderer,
-    post_renderer_tool: HelmPostRendererTool,
+    post_renderer_tool: _HelmPostRendererTool,
     cat_binary: CatBinary,
 ) -> HelmPostRenderer:
     # Build post-renderer configuration file and create a digest containing it.

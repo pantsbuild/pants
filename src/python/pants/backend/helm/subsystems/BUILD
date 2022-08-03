@@ -1,6 +1,15 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_sources(
+    sources=["*.py", "!*_test.py", "!post_renderer_main.py", "!k8s_parser_main.py"],
+    dependencies=[":post_renderer", ":k8s_parser"],
+)
+
+python_tests(name="tests")
+
+# Post-Renderer
+
 python_requirement(
     name="yamlpath",
     requirements=[
@@ -11,17 +20,30 @@ python_requirement(
 )
 
 python_sources(
-    sources=["*.py", "!*_test.py", "!post_renderer_main.py"],
-    dependencies=[":post_renderer"],
-)
-
-python_sources(
-    name="__post_renderer_mainr",
+    name="__post_renderer_main",
     sources=["post_renderer_main.py"],
     resolve="helm-post-renderer",
     skip_mypy=True,
 )
 
-python_tests(name="tests")
-
 resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_main.py"])
+
+# Kubernetes manifest parser
+
+python_requirement(
+    name="k8s",
+    requirements=[
+        "kubernetes>=24.2.0,<25.0",
+        "kubernetes_typed>=18.20.0,<19.0"
+    ],
+    resolve="helm-k8s-parser"
+)
+
+python_sources(
+    name="__k8s_parser_main",
+    sources=["k8s_parser_main.py"],
+    resolve="helm-k8s-parser",
+    # skip_mypy=True,
+)
+
+resources(name="k8s_parser", sources=["k8s_parser.lock", "k8s_parser_main.py"])
