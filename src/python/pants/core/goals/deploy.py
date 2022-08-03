@@ -25,7 +25,6 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
-from pants.option.option_types import ArgsListOption
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +82,6 @@ class DeploySubsystem(GoalSubsystem):
     help = "Perform a deployment process."
 
     required_union_implementation = (DeployFieldSet,)
-
-    args = ArgsListOption(
-        example="",
-        passthrough=True,
-        extra_help="Arguments to pass to the underlying tool.",
-    )
 
 
 @dataclass(frozen=True)
