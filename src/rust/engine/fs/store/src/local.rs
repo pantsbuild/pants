@@ -338,6 +338,20 @@ impl ByteStore {
       .await
   }
 
+  pub async fn exists(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
+    if digest == EMPTY_DIGEST {
+      // Avoid I/O for this case. This allows some client-provided operations (like merging
+      // snapshots) to work without needing to first store the empty snapshot.
+      return Ok(true);
+    }
+
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    }?;
+    dbs.exists(digest.hash).await
+  }
+
   ///
   /// Loads bytes from the underlying LMDB store using the given function. Because the database is
   /// blocking, this accepts a function that views a slice rather than returning a clone of the

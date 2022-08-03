@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::RemoteCacheWarningsBehavior;
+use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -289,7 +289,7 @@ impl PyRemotingOptions {
     store_rpc_concurrency: usize,
     store_batch_api_size_limit: usize,
     cache_warnings_behavior: String,
-    cache_eager_fetch: bool,
+    cache_content_behavior: String,
     cache_rpc_concurrency: usize,
     cache_read_timeout_millis: u64,
     execution_extra_platform_properties: Vec<(String, String)>,
@@ -312,7 +312,7 @@ impl PyRemotingOptions {
       store_batch_api_size_limit,
       cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior)
         .unwrap(),
-      cache_eager_fetch,
+      cache_content_behavior: CacheContentBehavior::from_str(&cache_content_behavior).unwrap(),
       cache_rpc_concurrency,
       cache_read_timeout: Duration::from_millis(cache_read_timeout_millis),
       execution_extra_platform_properties,

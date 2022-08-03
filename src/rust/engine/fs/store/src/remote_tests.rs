@@ -259,9 +259,7 @@ async fn list_missing_digests_none_missing() {
   let store = new_byte_store(&cas);
   assert_eq!(
     store
-      .list_missing_digests(
-        store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-      )
+      .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]),)
       .await,
     Ok(HashSet::new())
   );
@@ -281,7 +279,7 @@ async fn list_missing_digests_some_missing() {
 
   assert_eq!(
     store
-      .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()),)
+      .list_missing_digests(store.find_missing_blobs_request(vec![digest]))
       .await,
     Ok(digest_set)
   );
@@ -295,9 +293,7 @@ async fn list_missing_digests_error() {
   let store = new_byte_store(&cas);
 
   let error = store
-    .list_missing_digests(
-      store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-    )
+    .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]))
     .await
     .expect_err("Want error");
   assert!(
