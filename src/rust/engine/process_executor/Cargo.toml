@@ -16,7 +16,7 @@ grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
-prost = "0.9"
+prost = "0.11"
 shlex = "1.1.0"
 store = { path = "../fs/store" }
 structopt = "0.3.26"

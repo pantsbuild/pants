@@ -15,7 +15,7 @@ fs = { path = ".." }
 futures = "0.3"
 hashing = { path = "../../hashing" }
 parking_lot = "0.12"
-prost = "0.9"
+prost = "0.11"
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
