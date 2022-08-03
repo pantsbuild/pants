@@ -16,7 +16,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import ImportPathToPackages
+from pants.backend.go.target_type_rules import ImportPathToPackages, ImportPathToPackagesRequest
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import (
     assembly,
@@ -40,6 +40,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
 )
+from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
@@ -182,7 +183,6 @@ async def setup_full_package_build_request(
     request: _SetupGoProtobufPackageBuildRequest,
     protoc: Protoc,
     go_protoc_plugin: _SetupGoProtocPlugin,
-    package_mapping: ImportPathToPackages,
     go_protobuf_mapping: GoProtobufImportPathMapping,
     analyzer: PackageAnalyzerSetup,
     platform: Platform,
@@ -195,6 +195,12 @@ async def setup_full_package_build_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
+    )
+
+    # TODO: Assumes that all of the transitive targets are in the same module!
+    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(transitive_targets.roots[0].address))
+    package_mapping = await Get(
+        ImportPathToPackages, ImportPathToPackagesRequest(go_mod_addr.address)
     )
 
     all_sources = await Get(

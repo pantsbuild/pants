@@ -26,7 +26,12 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
 )
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.import_analysis import GoStdLibImports
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
@@ -34,13 +39,14 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
-from pants.base.specs import DirGlobSpec, RawSpecs
+from pants.base.specs import DirGlobSpec, RawSpecs, RecursiveGlobSpec
 from pants.build_graph.address import ResolveError
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
-from pants.engine.addresses import Address, AddressInput
+from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -75,20 +81,49 @@ def find_all_go_targets(tgts: AllTargets) -> AllGoTargets:
 
 
 @dataclass(frozen=True)
+class ImportPathToPackagesRequest(EngineAwareParameter):
+    go_mod_address: Address
+
+    def debug_hint(self) -> str | None:
+        return str(self.go_mod_address)
+
+
+@dataclass(frozen=True)
 class ImportPathToPackages:
     mapping: FrozenDict[str, tuple[Address, ...]]
 
 
-@rule(desc="Map all Go targets to their import paths", level=LogLevel.DEBUG)
-async def map_import_paths_to_packages(go_tgts: AllGoTargets) -> ImportPathToPackages:
+@rule(desc="Map Go targets owned by module to import paths", level=LogLevel.DEBUG)
+async def map_import_paths_to_packages(
+    request: ImportPathToPackagesRequest,
+) -> ImportPathToPackages:
+    candidate_target_addrs = await Get(
+        Addresses,
+        RawSpecs(
+            recursive_globs=(RecursiveGlobSpec(request.go_mod_address.spec_path),),
+            description_of_origin=f"the go_mod target `{request.go_mod_address}`",
+        ),
+    )
+    go_mod_addrs = await MultiGet(
+        Get(OwningGoMod, OwningGoModRequest(addr)) for addr in candidate_target_addrs
+    )
+    go_target_addrs = sorted(
+        {
+            tgt
+            for tgt, go_mod_addr in zip(candidate_target_addrs, go_mod_addrs)
+            if go_mod_addr.address == request.go_mod_address
+        }
+    )
+    go_targets = await Get(Targets, Addresses(go_target_addrs))
+
     mapping: dict[str, list[Address]] = defaultdict(list)
     first_party_addresses = []
     first_party_gets = []
-    for tgt in go_tgts:
+    for tgt in go_targets:
         if tgt.has_field(GoImportPathField):
             import_path = tgt[GoImportPathField].value
             mapping[import_path].append(tgt.address)
-        else:
+        elif tgt.has_field(GoPackageSourcesField):
             first_party_addresses.append(tgt.address)
             first_party_gets.append(
                 Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(tgt.address))
@@ -117,8 +152,12 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
-    package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
+    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
+    package_mapping = await Get(
+        ImportPathToPackages, ImportPathToPackagesRequest(go_mod_addr.address)
+    )
+
     addr = request.field_set.address
     maybe_pkg_analysis = await Get(
         FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr)
@@ -175,8 +214,12 @@ class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
 async def infer_go_third_party_package_dependencies(
     request: InferGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
-    package_mapping: ImportPathToPackages,
 ) -> InferredDependencies:
+    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
+    package_mapping = await Get(
+        ImportPathToPackages, ImportPathToPackagesRequest(go_mod_addr.address)
+    )
+
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
