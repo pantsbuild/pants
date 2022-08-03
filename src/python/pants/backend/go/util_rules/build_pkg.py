@@ -246,7 +246,12 @@ async def build_go_package(
     if request.s_file_names:
         assembly_setup = await Get(
             FallibleAssemblyPreCompilation,
-            AssemblyPreCompilationRequest(input_digest, request.s_file_names, request.dir_path),
+            AssemblyPreCompilationRequest(
+                compilation_input=input_digest,
+                s_files=request.s_file_names,
+                dir_path=request.dir_path,
+                import_path=request.import_path,
+            ),
         )
         if assembly_setup.result is None:
             return FallibleBuiltGoPackage(
