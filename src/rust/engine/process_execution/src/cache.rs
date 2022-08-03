@@ -204,9 +204,11 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    check_cache_content(&result, &self.file_store, self.cache_content_behavior).await?;
-
-    Ok(Some(result))
+    if check_cache_content(&result, &self.file_store, self.cache_content_behavior).await? {
+      Ok(Some(result))
+    } else {
+      Ok(None)
+    }
   }
 
   async fn store(

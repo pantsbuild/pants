@@ -224,10 +224,10 @@ async fn cache_read_skipped_on_action_cache_errors() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
-/// If the cache has any issues during reads from the store during eager_fetch, we should gracefully
+/// If the cache cannot find a digest during a read from the store during fetch, we should gracefully
 /// fallback to the local runner.
 #[tokio::test]
-async fn cache_read_skipped_on_store_errors() {
+async fn cache_read_skipped_on_missing_digest() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
@@ -243,7 +243,9 @@ async fn cache_read_skipped_on_store_errors() {
   );
 
   assert_eq!(
-    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    workunit_store
+      .get_metrics()
+      .get("remote_cache_requests_uncached"),
     None
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -253,8 +255,10 @@ async fn cache_read_skipped_on_store_errors() {
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
   assert_eq!(
-    workunit_store.get_metrics().get("remote_cache_read_errors"),
-    Some(&1)
+    workunit_store
+      .get_metrics()
+      .get("remote_cache_requests_uncached"),
+    Some(&1),
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }

@@ -888,7 +888,7 @@ impl Store {
     }
 
     // Filter out file digests that exist locally.
-    // TODO: Implement a local batch API.
+    // TODO: Implement a local batch API: see https://github.com/pantsbuild/pants/issues/16400.
     let local_file_exists = future::try_join_all(
       file_digests
         .iter()
