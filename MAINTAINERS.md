@@ -16,7 +16,6 @@ Active Maintainers
 * John Sirois
 * Joshua Cannon
 * Kris Wilson
-* Nora Howard
 * Stu Hood
 * Tom Dyas
 * Yi Cheng
@@ -37,6 +36,7 @@ Emeritus
 * Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen
+* Nora Howard
 * Peiyu Wang
 * Pierre Chevalier
 * Tejal Desai
