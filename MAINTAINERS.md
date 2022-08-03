@@ -24,6 +24,7 @@ Emeritus
 ========
 
 * Andy Reitz
+* Borja Lorente
 * Chris Heisterkamp
 * Chris Livingston
 * David Taylor
