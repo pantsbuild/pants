@@ -9,6 +9,7 @@ from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
     check,
+    deploy,
     export,
     fmt,
     generate_lockfiles,
@@ -52,6 +53,7 @@ def rules():
     return [
         # goals
         *check.rules(),
+        *deploy.rules(),
         *export.rules(),
         *fmt.rules(),
         *generate_lockfiles.rules(),
