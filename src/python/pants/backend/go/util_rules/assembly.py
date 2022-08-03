@@ -62,13 +62,6 @@ async def setup_assembly_pre_compilation(
     request: AssemblyPreCompilationRequest,
     goroot: GoRoot,
 ) -> FallibleAssemblyPreCompilation:
-    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
-    # See https://go.dev/doc/go1.19#assembler and
-    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
-    maybe_package_path_args = (
-        ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
-    )
-
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
@@ -94,7 +87,6 @@ async def setup_assembly_pre_compilation(
                 "-gensymabis",
                 "-o",
                 "symabis",
-                *maybe_package_path_args,
                 "--",
                 *(f"./{request.dir_path}/{name}" for name in request.s_files),
             ),
@@ -113,6 +105,13 @@ async def setup_assembly_pre_compilation(
     merged = await Get(
         Digest,
         MergeDigests([request.compilation_input, symabis_result.output_digest]),
+    )
+
+    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
+    # See https://go.dev/doc/go1.19#assembler and
+    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
+    maybe_package_path_args = (
+        ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
     )
 
     assembly_results = await MultiGet(
