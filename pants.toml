@@ -66,9 +66,9 @@ build_ignore.add = [
 unmatched_build_file_globs = "error"
 
 # TODO: May cause tests which experience missing digests to hang. If you experience an
-# issue, please change this to `validate` and then report an issue on:
+# issue, please change this to `fetch` and then report an issue on:
 #   https://github.com/pantsbuild/pants/issues/16096.
-cache_content_behavior = "defer"
+cache_content_behavior = "validate"
 
 [anonymous-telemetry]
 enabled = true
