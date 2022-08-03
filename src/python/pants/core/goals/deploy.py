@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
+from itertools import chain
 from typing import Iterable
 
 from pants.core.goals.package import PackageFieldSet
