@@ -195,7 +195,7 @@ Pants has two types of lockfiles:
 - User lockfiles, for your own code such as packaging binaries and running tests.
 - Tool lockfiles, to install tools that Pants runs like Pytest and Flake8.
 
-With both types of lockfiles, Pants can generate the lockfile for you with the `generate-lockfiles` goal.
+With both types of lockfiles, Pants can generate the lockfile for you with the `lock` goal.
 
 ### User lockfiles
 
@@ -216,10 +216,10 @@ enable_resolves = true
 python-default = "lockfile_path.txt" 
 ```
 
-Then, use `./pants generate-lockfiles` to generate the lockfile.
+Then, use `./pants lock` to generate the lockfile.
 
 ```
-❯ ./pants generate-lockfiles
+❯ ./pants lock
 19:00:39.26 [INFO] Completed: Generate lockfile for python-default
 19:00:39.29 [INFO] Wrote lockfile for the resolve `python-default` to 3rdparty/python/default.lock
 ```
@@ -295,7 +295,7 @@ poetry_requirements(
 )
 ```
 
-Then, run `./pants generate-lockfiles` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
+Then, run `./pants lock` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
 
 Finally, update your first-party targets like `python_source` / `python_sources`, `python_test` / `python_tests`, and `pex_binary` to set their `resolve` field. As before, the `resolve` field defaults to `[python].default_resolve`.
 
@@ -324,7 +324,7 @@ All transitive dependencies of a target must use the same resolve. Pants's depen
 
 ### Tool lockfiles
 
-Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `./pants generate-lockfiles`.
+Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `./pants lock`.
 
 ```toml
 [flake8]
@@ -337,14 +337,14 @@ lockfile = "3rdparty/pytest_lockfile.txt"
 ```
 
 ```
-❯  ./pants generate-lockfiles
+❯  ./pants lock
 19:00:39.26 [INFO] Completed: Generate lockfile for flake8
 19:00:39.27 [INFO] Completed: Generate lockfile for pytest
 19:00:39.29 [INFO] Wrote lockfile for the resolve `flake8` to 3rdparty/flake8_lockfile.txt
 19:00:39.30 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/pytest_lockfile.txt
 ```
 
-You can also run `./pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
+You can also run `./pants lock --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
 
 To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for that tool. Although we do not recommend this!
 
@@ -362,7 +362,7 @@ We generally recommend using the default of Pex, which has several benefits:
 4. Faster performance when installing lockfiles. With Pex, Pants will only install the subset of the lockfile needed for a task; with Poetry, Pants will first install the lockfile and then extract the relevant subset.
 5. Avoids an issue many users have with problematic environment markers for transitive requirements (see below).
 
-However, it is very plausible there are still issues with Pex lockfiles because the Python ecosystem is so vast. Please open [bug reports](docs:getting-help)! If `generate-lockfiles` fails—or the lockfile errors when installed during goals like `test` and `package`—you may need to temporarily use Poetry. 
+However, it is very plausible there are still issues with Pex lockfiles because the Python ecosystem is so vast. Please open [bug reports](docs:getting-help)! If `lock` fails—or the lockfile errors when installed during goals like `test` and `package`—you may need to temporarily use Poetry. 
 
 Alternatively, you can try to manually generate and manage lockfiles—change to the v2.10 version of these docs to see instructions.
 
@@ -373,15 +373,15 @@ Alternatively, you can try to manually generate and manage lockfiles—change to
 > To incrementally migrate, consider writing a script that dynamically sets the option `--python-lockfile-generator`, like this:
 > 
 > ```
-> ./pants --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
-> ./pants --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
+> ./pants --python-lockfile-generator=pex lock --resolve=black --resolve=isort
+> ./pants --python-lockfile-generator=poetry lock --resolve=python-default
 > ```
 > 
-> Tip: if you write a script, set `[generate-lockfiles].custom_command` to say how to run your script.
+> Tip: if you write a script, set `[lock].custom_command` to say how to run your script.
 
 #### Poetry issue with environment markers
 
-One of the issues with Poetry is that sometimes `generate-lockfiles` will work, but then it errors when being installed due to missing transitive dependencies. This is especially common with user lockfiles. For example:
+One of the issues with Poetry is that sometimes `lock` will work, but then it errors when being installed due to missing transitive dependencies. This is especially common with user lockfiles. For example:
 
 ```
 Failed to resolve requirements from PEX environment @ /home/pantsbuild/.cache/pants/named_caches/pex_root/unzipped_pexes/42735ba5593c0be585614e50072f765c6a45be15.
@@ -424,9 +424,9 @@ version = "pylint>=2.11.0,<2.12"
 extra_requirements.add = ["colorama"]
 ```
 
-Then, regenerate the lock with `generate-lockfiles`.
+Then, regenerate the lock with `lock`.
 
-You can also try manually removing the problematic environment markers, although you will need to remember to do this again whenever re-running `generate-lockfiles`.
+You can also try manually removing the problematic environment markers, although you will need to remember to do this again whenever re-running `lock`.
 
 Advanced usage
 --------------

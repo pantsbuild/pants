@@ -31,10 +31,10 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
-    GenerateLockfilesSubsystem,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    LockSubsystem,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
@@ -151,7 +151,7 @@ def maybe_warn_python_repos(
 async def generate_lockfile(
     req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
-    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    lock_subsystem: LockSubsystem,
     python_repos: PythonRepos,
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
@@ -270,8 +270,7 @@ async def generate_lockfile(
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
         regenerate_command=(
-            generate_lockfiles_subsystem.custom_command
-            or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
+            lock_subsystem.custom_command or f"{bin_name()} lock --resolve={req.resolve_name}"
         ),
         delimeter=header_delimiter,
     )

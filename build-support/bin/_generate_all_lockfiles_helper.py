@@ -193,7 +193,7 @@ def update_internal_lockfiles(specified: list[str] | None) -> None:
         # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
         # restore it here so that the lockfile gets generated properly.
         "--python-enable-resolves",
-        "generate-lockfiles",
+        "lock",
     ]
     if specified:
         args.append(f"--resolve={repr(specified)}")
@@ -206,7 +206,7 @@ def update_default_lockfiles(specified: list[str] | None) -> None:
         "--concurrent",
         f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
         *itertools.chain.from_iterable(tool.args for tool in AllTools),
-        "generate-lockfiles",
+        "lock",
     ]
     if specified:
         args.append(f"--resolve={repr(specified)}")

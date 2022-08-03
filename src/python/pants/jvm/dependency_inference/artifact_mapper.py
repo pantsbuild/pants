@@ -362,7 +362,7 @@ class ConflictingJvmArtifactVersionInResolveError(ValueError):
             f"of {subsystem} for this resolve{source}. "
             "Please remove the `jvm_artifact` target with JVM coordinate "
             f"{conflicting_coordinate.to_coord_str()}, then re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`"
+            f"`{bin_name()} lock --resolve={resolve_name}`"
         )
         super().__init__(msg)
 
@@ -382,7 +382,7 @@ class MissingRequiredJvmArtifactsInResolve(ValueError):
             "in this resolve, this resolve must contain `jvm_artifact` targets for each requirement of "
             f"{subsystem}.\n\n"
             "Please add the following `jvm_artifact` target(s) somewhere in the repository and re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            f"`{bin_name()} lock --resolve={resolve_name}`:\n"
         )
         for coordinate in coordinates:
             if isinstance(coordinate, Coordinate):

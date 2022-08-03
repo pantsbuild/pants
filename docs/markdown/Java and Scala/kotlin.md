@@ -143,7 +143,7 @@ jvm_artifact(
 ```
 
 Pants requires use of a lockfile for third-party dependencies. After adding or editing `jvm_artifact` targets, you
-will need to update affected lockfiles by running `./pants generate-lockfiles`. The default lockfile is located at
+will need to update affected lockfiles by running `./pants lock`. The default lockfile is located at
 `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the
 [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
 

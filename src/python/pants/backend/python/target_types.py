@@ -1183,7 +1183,7 @@ class PythonRequirementResolveField(PythonResolveField):
 
         If not defined, will default to `[python].default_resolve`.
 
-        When generating a lockfile for a particular resolve via the `generate-lockfiles` goal,
+        When generating a lockfile for a particular resolve via the `lock` goal,
         it will include all requirements that are declared with that resolve.
         First-party targets like `python_source` and `pex_binary` then declare which resolve
         they use via their `resolve` field; so, for your first-party code to use a

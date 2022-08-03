@@ -151,7 +151,7 @@ def test_generate_lockfile_without_python_backend() -> None:
         [
             "--backend-packages=pants.backend.experimental.terraform",
             "--terraform-hcl2-parser-lockfile=tf.lock",
-            "generate-lockfiles",
+            "lock",
             "--resolve=terraform-hcl2-parser",
         ]
     ).assert_success()

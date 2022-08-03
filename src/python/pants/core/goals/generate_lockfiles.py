@@ -256,7 +256,7 @@ def determine_resolves_to_generate(
                 ),
                 *resolve_names_to_sentinels.keys(),
             },
-            description_of_origin="the option `--generate-lockfiles-resolve`",
+            description_of_origin="the option `--lock-resolve`",
         )
 
     return requested_user_resolve_names, specified_sentinels
@@ -275,7 +275,7 @@ def filter_tool_lockfile_requests(
             resolve = req.resolve_name
             raise ValueError(
                 f"You requested to generate a lockfile for {resolve} because "
-                "you included it in `--generate-lockfiles-resolve`, but "
+                "you included it in `--lock-resolve`, but "
                 f"`[{resolve}].lockfile` is set to `{req.lockfile_dest}` "
                 "so a lockfile will not be generated.\n\n"
                 f"If you would like to generate a lockfile for {resolve}, please "
@@ -286,9 +286,12 @@ def filter_tool_lockfile_requests(
     return result
 
 
-class GenerateLockfilesSubsystem(GoalSubsystem):
-    name = "generate-lockfiles"
-    help = "Generate lockfiles for Python third-party dependencies."
+class LockSubsystem(GoalSubsystem):
+    name = "lock"
+    help = "Generate lockfiles for third-party dependencies."
+
+    deprecated_options_scope = "generate-lockfiles"
+    deprecated_options_scope_removal_version = "2.16.0.dev0"
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -304,12 +307,12 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             Only generate lockfiles for the specified resolve(s).
 
             Resolves are the logical names for the different lockfiles used in your project.
-            For your own code's dependencies, these come from the option
-            `[python].resolves`. For tool lockfiles, resolve
+            For your own code's dependencies, these come from the options
+            `[python].resolves` and `[jvm].resolves`. For tool lockfiles, resolve
             names are the options scope for that tool such as `black`, `pytest`, and
             `mypy-protobuf`.
 
-            For example, you can run `{bin_name()} generate-lockfiles --resolve=black
+            For example, you can run `{bin_name()} lock --resolve=black
             --resolve=pytest --resolve=data-science` to only generate lockfiles for those
             two tools and your resolve named `data-science`.
 
@@ -326,21 +329,21 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         help=softwrap(
             f"""
             If set, lockfile headers will say to run this command to regenerate the lockfile,
-            rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal.
+            rather than running `{bin_name()} lock --resolve=<name>` like normal.
             """
         ),
     )
 
 
 class GenerateLockfilesGoal(Goal):
-    subsystem_cls = GenerateLockfilesSubsystem
+    subsystem_cls = LockSubsystem
 
 
 @goal_rule
 async def generate_lockfiles_goal(
     workspace: Workspace,
     union_membership: UnionMembership,
-    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    generate_lockfiles_subsystem: LockSubsystem,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())

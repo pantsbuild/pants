@@ -85,10 +85,10 @@ class PythonToolRequirementsBase(Subsystem):
             do not recommend this, though, as lockfiles are essential for reproducible builds.
 
             To use a custom lockfile, set this option to a file path relative to the
-            build root, then run `{bin_name()} generate-lockfiles --resolve={cls.options_scope}`.
+            build root, then run `{bin_name()} lock --resolve={cls.options_scope}`.
 
             As explained at {doc_url('python-third-party-dependencies')}, lockfile generation
-            via `generate-lockfiles` does not always work and you may want to manually generate
+            via `lock` does not always work and you may want to manually generate
             the lockfile. You will want to set `[python].invalid_lockfile_behavior = 'ignore'` so
             that Pants does not complain about missing lockfile headers.
             """

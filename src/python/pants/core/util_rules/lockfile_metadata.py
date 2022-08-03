@@ -103,7 +103,7 @@ class LockfileMetadata:
 
         error_suffix = (
             "To resolve this error, you will need to regenerate the lockfile by running "
-            f"`{bin_name()} generate-lockfiles"
+            f"`{bin_name()} lock"
         )
         if resolve_name:
             error_suffix += f" --resolve={resolve_name}"

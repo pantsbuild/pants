@@ -29,7 +29,7 @@ class ConflictingScalaLibraryVersionInResolveError(ValueError):
             "of Scala for this resolve from the `[scala].version_for_resolve` option. "
             "Please remove the `jvm_artifact` target with JVM coordinate "
             f"{conflicting_coordinate.to_coord_str()}, then re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`"
+            f"`{bin_name()} lock --resolve={resolve_name}`"
         )
 
 
@@ -40,7 +40,7 @@ class MissingScalaLibraryInResolveError(ValueError):
             "Since at least one Scala target type in this repository consumes this resolve, the resolve "
             "must contain a `jvm_artifact` target for the Scala runtime.\n\n"
             "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            f"`{bin_name()} lock --resolve={resolve_name}`:\n"
             "jvm_artifact(\n"
             f'  name="{SCALA_LIBRARY_GROUP}_{SCALA_LIBRARY_ARTIFACT}_{scala_version}",\n'
             f'  group="{SCALA_LIBRARY_GROUP}",\n',

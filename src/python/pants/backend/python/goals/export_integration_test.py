@@ -81,9 +81,7 @@ def build_config(tmpdir: str) -> Mapping:
 
 def test_export() -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
-        run_pants(
-            ["generate-lockfiles", "export", f"{tmpdir}/::"], config=build_config(tmpdir)
-        ).assert_success()
+        run_pants(["lock", "export", f"{tmpdir}/::"], config=build_config(tmpdir)).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
     py_minor_version = f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"

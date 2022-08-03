@@ -402,13 +402,13 @@ def _invalid_tool_lockfile_error(
     yield softwrap(
         f"""
         To regenerate your lockfile based on your current configuration, run
-        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
+        `{bin_name()} lock --resolve={tool_name}`.
         """
     ) if isinstance(lockfile, ToolCustomLockfile) else softwrap(
         f"""
         To generate a custom lockfile based on your current configuration, set
         `[{tool_name}].lockfile` to where you want to create the lockfile, then run
-        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
+        `{bin_name()} lock --resolve={tool_name}`.
         """
     )
 
@@ -447,8 +447,7 @@ def _invalid_user_lockfile_error(
             - The targets depend on requirements that are not in the lockfile: {not_in_lock}
 
             This most often happens when adding a new requirement to your project, or bumping
-            requirement versions. You can fix this by regenerating the lockfile with
-            `generate-lockfiles`.
+            requirement versions. You can fix this by regenerating the lockfile with `lock`.
             """
         ) + "\n\n"
 
@@ -470,12 +469,12 @@ def _invalid_user_lockfile_error(
             To fix this, you can either adjust the interpreter constraints of the targets
             which use the resolve '{lockfile.resolve_name}', or adjust
             `[python].resolves_to_interpreter_constraints`
-            then run `generate-lockfiles`.
+            then run `lock`.
             """
         ) + "\n\n"
 
     yield "To regenerate your lockfile, "
-    yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
+    yield f"run `{bin_name()} lock --resolve={lockfile.resolve_name}`." if isinstance(
         lockfile, Lockfile
     ) else f"update your plugin generating this object: {lockfile}"
 

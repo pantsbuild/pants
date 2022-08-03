@@ -12,6 +12,7 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfileResult,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    LockSubsystem,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
@@ -62,7 +63,7 @@ def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLo
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
 async def generate_jvm_lockfile(
-    request: GenerateJvmLockfile,
+    request: GenerateJvmLockfile, lock_subsystem: LockSubsystem
 ) -> GenerateLockfileResult:
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, request.artifacts)
 
@@ -70,7 +71,9 @@ async def generate_jvm_lockfile(
     metadata = JVMLockfileMetadata.new(request.artifacts)
     resolved_lockfile_contents = metadata.add_header_to_lockfile(
         resolved_lockfile_contents,
-        regenerate_command=f"{bin_name()} generate-lockfiles",
+        regenerate_command=(
+            lock_subsystem.custom_command or f"{bin_name()} lock --resolve={request.resolve_name}"
+        ),
         delimeter="#",
     )
 

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tupl
 import toml
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, LockSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -506,7 +506,7 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
     ):
         raise ValueError(
             f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
-            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
+            f"for {request.resolve.path} was generated. Run `{bin_name()} lock` to update your "
             "lockfile based on the new requirements."
         )
 
@@ -751,7 +751,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
     else:
         lockfile_req = request.lockfile
         assert lockfile_req is not None
-        regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
+        regen_command = f"`{LockSubsystem.name} --resolve={lockfile_req.resolve_name}`"
         if lockfile_req.read_lockfile_dest == DEFAULT_TOOL_LOCKFILE:
             lockfile_bytes = importlib.resources.read_binary(
                 *lockfile_req.default_lockfile_resource

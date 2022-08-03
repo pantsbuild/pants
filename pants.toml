@@ -185,7 +185,7 @@ interpreter_constraints = [">=3.7,<3.10"]
 [regex-lint]
 config = "@build-support/regexes/config.yaml"
 
-[generate-lockfiles]
+[lock]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
 
 [jvm]

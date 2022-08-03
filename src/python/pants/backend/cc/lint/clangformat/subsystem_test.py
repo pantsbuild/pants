@@ -12,7 +12,7 @@ def test_generate_lockfile_without_python_backend() -> None:
         [
             "--backend-packages=pants.backend.experimental.cc.lint.clangformat",
             "--clang-format-lockfile=cf.lock",
-            "generate-lockfiles",
+            "lock",
             "--resolve=clang-format",
         ]
     ).assert_success()

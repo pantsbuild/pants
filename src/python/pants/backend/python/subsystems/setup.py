@@ -90,7 +90,7 @@ class PythonSetup(Subsystem):
             Set to true to enable lockfiles for user code. See `[python].resolves` for an
             explanation of this feature.
 
-            Warning: the `generate-lockfiles` goal does not yet work if you have local
+            Warning: the `lock` goal does not yet work if you have local
             requirements, regardless of using Pex vs. Poetry for the lockfile generator.
             Support is coming in a future Pants release. In the meantime, the workaround is to host
             the files in a custom repository with `[python-repos]`
@@ -125,7 +125,7 @@ class PythonSetup(Subsystem):
             resolves, such as if you use two conflicting versions of a requirement in
             your repository.
 
-            If you only need a single resolve, run `{bin_name()} generate-lockfiles` to
+            If you only need a single resolve, run `{bin_name()} lock` to
             generate the lockfile.
 
             If you need multiple resolves:
@@ -139,7 +139,7 @@ class PythonSetup(Subsystem):
                 so you only need to update targets that you want in non-default resolves.\
                 (Often you'll set this via the `python_requirements` or `poetry_requirements`\
                 target generators)
-              4. Run `{bin_name()} generate-lockfiles` to generate the lockfiles. If the results\
+              4. Run `{bin_name()} lock` to generate the lockfiles. If the results\
                 aren't what you'd expect, adjust the prior step.
               5. Update any targets like `python_source` / `python_sources`,\
                 `python_test` / `python_tests`, and `pex_binary` which need to set a non-default\
@@ -187,7 +187,7 @@ class PythonSetup(Subsystem):
         help=softwrap(
             """
             Override the interpreter constraints to use when generating a resolve's lockfile
-            with the `generate-lockfiles` goal.
+            with the `lock` goal.
 
             By default, each resolve from `[python].resolves` will use your
             global interpreter constraints set in `[python].interpreter_constraints`. With
@@ -221,7 +221,7 @@ class PythonSetup(Subsystem):
             Note that `warn` will still expect a Pants lockfile header, it only won't error if
             the lockfile is stale and should be regenerated. Use `ignore` to avoid needing a
             lockfile header at all, e.g. if you are manually managing lockfiles rather than
-            using the `generate-lockfiles` goal.
+            using the `lock` goal.
             """
         ),
         advanced=True,
@@ -230,7 +230,7 @@ class PythonSetup(Subsystem):
         default=LockfileGenerator.PEX,
         help=softwrap(
             f"""
-            Whether to use Pex or Poetry with the `generate-lockfiles` goal.
+            Whether to use Pex or Poetry with the `lock` goal.
 
             Poetry does not support these features:
 
@@ -249,7 +249,7 @@ class PythonSetup(Subsystem):
             are seen as direct requirements, rather than transitive. For tool lockfiles, add the
             problematic transitive dependency to `[tool].extra_requirements`, e.g.
             `[isort].extra_requirements`. Then, regenerate the lockfile(s) with the
-            `generate-lockfiles` goal. Alternatively, use Pex for generation.
+            `lock` goal. Alternatively, use Pex for generation.
 
             Finally, installing from a Poetry-generated lockfile is slower than installing from a
             Pex lockfile. When using a Pex lockfile, Pants will only install the subset needed
@@ -272,7 +272,7 @@ class PythonSetup(Subsystem):
         help=softwrap(
             """
             If False, Pants will not attempt to generate lockfiles for `[python].resolves` when
-            running the `generate-lockfiles` goal.
+            running the `lock` goal.
 
             This is intended to allow you to manually generate lockfiles as a workaround for the
             issues described in the `[python].lockfile_generator` option, if you are not yet ready
@@ -362,7 +362,7 @@ class PythonSetup(Subsystem):
             for details.
 
             Note: Only takes effect if you use Pex lockfiles. Set
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            `[python].lockfile_generator = "pex"` and run the `lock` goal.
             """
         ),
     )
@@ -378,7 +378,7 @@ class PythonSetup(Subsystem):
             details.
 
             Note: Only takes effect if you use Pex lockfiles. Set
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            `[python].lockfile_generator = "pex"` and run the `lock` goal.
             """
         ),
     )

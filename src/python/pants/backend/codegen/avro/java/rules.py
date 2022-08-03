@@ -303,7 +303,7 @@ class MissingApacheAvroRuntimeInResolveError(ValueError):
             "Since at least one JVM target type in this repository consumes a `avro_sources` target "
             "in this resolve, the resolve must contain a `jvm_artifact` target for the Apache Avro runtime.\n\n"
             "Please add the following `jvm_artifact` targets somewhere in the repository and re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            f"`{bin_name()} lock --resolve={resolve_name}`:\n"
             "jvm_artifact(\n"
             f'  name="{_AVRO_GROUP}_avro",\n'
             f'  group="{_AVRO_GROUP}",\n'

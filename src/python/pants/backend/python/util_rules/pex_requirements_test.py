@@ -197,7 +197,7 @@ def test_validate_user_lockfiles(
         if_=invalid_reqs,
     )
     contains("The targets use interpreter constraints", if_=invalid_constraints)
-    contains("./pants generate-lockfiles --resolve=a`")
+    contains("./pants lock --resolve=a`")
 
 
 def test_is_probably_pex_json_lockfile():
