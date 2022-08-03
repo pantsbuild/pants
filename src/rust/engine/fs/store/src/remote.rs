@@ -480,13 +480,13 @@ impl ByteStore {
     }
   }
 
-  pub fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
+  pub fn find_missing_blobs_request(
     &self,
-    digests: Digests,
+    digests: impl IntoIterator<Item = Digest>,
   ) -> remexec::FindMissingBlobsRequest {
     remexec::FindMissingBlobsRequest {
       instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
-      blob_digests: digests.map(|d| d.into()).collect::<Vec<_>>(),
+      blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
     }
   }
 

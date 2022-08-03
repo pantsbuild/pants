@@ -5,7 +5,6 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cache::PersistentCache;
-use futures::{future, FutureExt};
 use log::{debug, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -17,8 +16,8 @@ use workunit_store::{
 };
 
 use crate::{
-  CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
-  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
+  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -205,28 +204,7 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    // Optionally validate that all digests in the result are loadable, erroring if any are not.
-    // If content loading is deferred, a Digest which is discovered to be missing later on during
-    // execution will cause backtracking.
-    if self.cache_content_behavior != CacheContentBehavior::Defer {
-      // TODO: Should only validate that the Digest exists either locally or remotely: not
-      // fetch/`ensure_local_has` it.
-      let _ = future::try_join_all(vec![
-        self
-          .file_store
-          .ensure_local_has_file(result.stdout_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_file(result.stderr_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_recursive_directory(result.output_directory.clone())
-          .boxed(),
-      ])
-      .await?;
-    }
+    check_cache_content(&result, &self.file_store, self.cache_content_behavior).await?;
 
     Ok(Some(result))
   }

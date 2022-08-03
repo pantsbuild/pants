@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath};
-use futures::future::{self, BoxFuture, TryFutureExt};
+use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
@@ -23,8 +23,8 @@ use workunit_store::{
 
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
-  CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
-  ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
+  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
@@ -555,12 +555,17 @@ async fn check_action_cache(
         .await
         .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
 
-        check_action_cache_content(&response, store, cache_content_behavior)
+        let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
           .await
           .map_err(|e| {
             Status::unavailable(format!("Output content could not be validated: {e}"))
           })?;
-        Ok(response)
+
+        if cache_content_valid {
+          Ok(response)
+        } else {
+          Err(Status::not_found(""))
+        }
       })
       .await;
 
@@ -589,35 +594,4 @@ async fn check_action_cache(
     }
   )
   .await
-}
-
-async fn check_action_cache_content(
-  response: &FallibleProcessResultWithPlatform,
-  store: Store,
-  cache_content_behavior: CacheContentBehavior,
-) -> Result<(), StoreError> {
-  match cache_content_behavior {
-    CacheContentBehavior::Fetch | CacheContentBehavior::Validate => {
-      // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
-      // retried.
-      let response = response.clone();
-      let _ = in_workunit!(
-        "eager_fetch_action_cache",
-        Level::Trace,
-        |_workunit| async move {
-          future::try_join_all(vec![
-            store.ensure_local_has_file(response.stdout_digest).boxed(),
-            store.ensure_local_has_file(response.stderr_digest).boxed(),
-            store
-              .ensure_local_has_recursive_directory(response.output_directory)
-              .boxed(),
-          ])
-          .await
-        }
-      )
-      .await?;
-    }
-    CacheContentBehavior::Defer => {}
-  }
-  Ok(())
 }

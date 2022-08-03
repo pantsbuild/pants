@@ -44,7 +44,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use store::{SnapshotOps, Store, StoreError};
-use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
+use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
 #[cfg(test)]
@@ -761,6 +761,59 @@ pub enum CacheContentBehavior {
   Fetch,
   Validate,
   Defer,
+}
+
+///
+/// Optionally validate that all digests in the result are loadable, returning false if any are not.
+///
+/// If content loading is deferred, a Digest which is discovered to be missing later on during
+/// execution will cause backtracking.
+///
+pub(crate) async fn check_cache_content(
+  response: &FallibleProcessResultWithPlatform,
+  store: &Store,
+  cache_content_behavior: CacheContentBehavior,
+) -> Result<bool, StoreError> {
+  match cache_content_behavior {
+    CacheContentBehavior::Fetch => {
+      let response = response.clone();
+      let fetch_result = in_workunit!(
+        "eager_fetch_action_cache",
+        Level::Trace,
+        |_workunit| async move {
+          try_join_all(vec![
+            store.ensure_local_has_file(response.stdout_digest).boxed(),
+            store.ensure_local_has_file(response.stderr_digest).boxed(),
+            store
+              .ensure_local_has_recursive_directory(response.output_directory)
+              .boxed(),
+          ])
+          .await
+        }
+      )
+      .await;
+      match fetch_result {
+        Err(StoreError::MissingDigest { .. }) => Ok(false),
+        Ok(_) => Ok(true),
+        Err(e) => Err(e),
+      }
+    }
+    CacheContentBehavior::Validate => {
+      let directory_digests = vec![response.output_directory.clone()];
+      let file_digests = vec![response.stdout_digest, response.stderr_digest];
+      in_workunit!(
+        "eager_validate_action_cache",
+        Level::Trace,
+        |_workunit| async move {
+          store
+            .exists_recursive(directory_digests, file_digests)
+            .await
+        }
+      )
+      .await
+    }
+    CacheContentBehavior::Defer => Ok(true),
+  }
 }
 
 #[derive(Clone)]
