@@ -64,7 +64,7 @@ async def setup_assembly_pre_compilation(
 ) -> FallibleAssemblyPreCompilation:
     # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
     # See https://go.dev/doc/go1.19#assembler and
-    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rule_go).
+    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
     maybe_package_path_args = (
         ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
     )
