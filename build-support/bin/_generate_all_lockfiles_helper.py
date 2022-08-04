@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
+from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
@@ -126,6 +127,9 @@ AllTools = (
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
     DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
+    DefaultTool.jvm(
+        JavaProtobufGrpcSubsystem, backend="pants.backend.experimental.codegen.protobuf.java"
+    ),
     DefaultTool.jvm(ScalafmtSubsystem),
     DefaultTool.jvm(Scalatest),
     DefaultTool.jvm(
