@@ -53,7 +53,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
-from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
@@ -146,7 +146,7 @@ def assert_build(
             docker_options,
             global_options,
             DockerBinary("/dummy/docker"),
-            ProcessCleanupOption(True),
+            KeepSandboxes.never,
         ],
         mock_gets=[
             MockGet(

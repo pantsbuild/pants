@@ -106,7 +106,7 @@ pub struct RemotingOptions {
 pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
-  pub local_cleanup: bool,
+  pub local_keep_sandboxes: local::KeepSandboxes,
   pub local_cache: bool,
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
@@ -216,7 +216,7 @@ impl Core {
         local_execution_root_dir.to_path_buf(),
         named_caches.clone(),
         immutable_inputs.clone(),
-        exec_strategy_opts.local_cleanup,
+        exec_strategy_opts.local_keep_sandboxes,
       );
 
       let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
