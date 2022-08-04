@@ -391,7 +391,7 @@ class PythonSetup(Subsystem):
             is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
             for details.
 
-            Note: Only takes effect if you use Pex lockfiles. Set
+            Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
@@ -407,7 +407,7 @@ class PythonSetup(Subsystem):
             them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
             details.
 
-            Note: Only takes effect if you use Pex lockfiles. Set
+            Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
