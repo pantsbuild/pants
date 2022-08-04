@@ -9,6 +9,7 @@ import time
 import warnings
 from textwrap import dedent
 
+from pants import ox  # noqa: F401
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
