@@ -61,7 +61,7 @@ class Subsystem(metaclass=ABCMeta):
         if not ox.is_oxidized:
             _, class_definition_lineno = inspect.getsourcelines(cls)
         else:
-            class_definition_lineno = 57
+            class_definition_lineno = 0  # `inspect.getsourcelines` returns 0 when undefined.
         partial_construct_subsystem.__line_number__ = class_definition_lineno
 
         return dict(
