@@ -9,5 +9,9 @@ is_oxidized = False
 
 # Patch for PyOxidizer
 if not sys.argv[0]:
-    sys.argv[0] = "PLACEHOLDER_BINARY"
+    # A giant pile of pants consumer code copies around `sys.argv`, which is modified in an
+    # invalid way by python's `pymain_run_module` support. For our purposes, the executable
+    # distribution is the correct `argv[0]`.
+    # See https://github.com/indygreg/PyOxidizer/issues/307
+    sys.argv[0] = sys.executable
     is_oxidized = True
