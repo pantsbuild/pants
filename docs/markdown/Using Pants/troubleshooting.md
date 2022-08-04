@@ -27,19 +27,21 @@ Setting the option `--pex-verbosity=9` can help debug exceptions that occur when
 
 Once you have this stack trace, we recommend copying it into Pastebin or a GitHub Gist, then opening a GitHub issue or posting on Slack. Someone from the Pants team would be happy to help. See [Getting Help](doc:getting-help).
 
-Debug tip: inspect the sandbox with `--no-process-cleanup`
+Debug tip: inspect the sandbox with `--keep-sandboxes`
 ----------------------------------------------------------
 
 Pants runs most processes in a hermetic sandbox (temporary directory), which allows for safely caching and running multiple processes in parallel. 
 
-Use the option `--no-process-cleanup` for Pants to log the paths to these sandboxes, and to keep them around after the run. You can then inspect them to check if the files you are expecting are present.
+Use the option `--keep-sandboxes=always` for Pants to log the paths to these sandboxes, and to keep them around after the run. You can then inspect them to check if the files you are expecting are present.
 
 ```bash
-./pants --no-process-cleanup lint src/project/app.py
+./pants --keep-sandboxes=always lint src/project/app.py
 ...
 21:26:13.55 [INFO] preserving local process execution dir `"/private/var/folders/hm/qjjq4w3n0fsb07kp5bxbn8rw0000gn/T/process-executionQgIOjb"` for "Run isort on 1 file."
 ...
 ```
+
+You can also pass `--keep-sandboxes=on_failure`, to preserve only the sandboxes of failing processes.
 
 There is even a `__run.sh` script in the directory that will run the process using the same argv and environment that Pants would use.
 

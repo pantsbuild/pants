@@ -15,7 +15,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -216,7 +216,7 @@ class ProcessExecutionFailure(Exception):
         stderr: bytes,
         process_description: str,
         *,
-        process_cleanup: bool,
+        keep_sandboxes: KeepSandboxes,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -239,9 +239,9 @@ class ProcessExecutionFailure(Exception):
             "stderr:",
             try_decode(stderr),
         ]
-        if process_cleanup:
+        if keep_sandboxes == KeepSandboxes.never:
             err_strings.append(
-                "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
+                "\n\nUse `--keep-sandboxes=on_failure` to preserve the process chroot for inspection."
             )
         super().__init__("\n".join(err_strings))
 
@@ -255,7 +255,7 @@ def get_multi_platform_request_description(req: Process) -> ProductDescription:
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -274,7 +274,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
-        process_cleanup=process_cleanup.val,
+        keep_sandboxes=keep_sandboxes,
     )
 
 
@@ -292,7 +292,7 @@ class InteractiveProcess(SideEffecting):
     run_in_workspace: bool
     forward_signals_to_process: bool
     restartable: bool
-    cleanup: bool
+    keep_sandboxes: KeepSandboxes
 
     def __init__(
         self,
@@ -303,9 +303,10 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
-        cleanup: bool = True,
+        cleanup: bool | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
+        keep_sandboxes: KeepSandboxes | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -329,7 +330,19 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
-        self.cleanup = cleanup
+        if cleanup is not None:
+            warn_or_error(
+                removal_version="2.15.0.dev1",
+                entity="InteractiveProcess.cleanup",
+                hint="Use `InteractiveProcess.keep_sandboxes` instead.",
+            )
+            if keep_sandboxes is not None:
+                raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
+            self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always
+        elif keep_sandboxes is not None:
+            self.keep_sandboxes = keep_sandboxes
+        else:
+            self.keep_sandboxes = KeepSandboxes.never
 
     @classmethod
     def from_process(
