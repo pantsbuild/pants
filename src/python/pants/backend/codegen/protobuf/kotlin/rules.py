@@ -94,7 +94,7 @@ async def generate_kotlin_from_protobuf(
     ]
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
-    argv = [downloaded_protoc_binary.exe, "--kotlin_out", output_dir]
+    argv = [downloaded_protoc_binary.exe, "--kotlin_out", output_dir, "--java_out", output_dir]
 
     argv.extend(target_sources_stripped.snapshot.files)
     result = await Get(

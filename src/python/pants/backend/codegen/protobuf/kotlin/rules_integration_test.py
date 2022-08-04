@@ -153,7 +153,7 @@ def test_generates_kotlin(
             "src/jvm/TestKotlinProtobuf.kt": dedent(
                 """\
                 package org.pantsbuild.kotlin.example;
-                import org.pantsbuild.kotlin.proto.Person;
+                import org.pantsbuild.kotlin.proto.F.Person;
                 fun main() {
                   val person = Person()
                 }
@@ -173,19 +173,22 @@ def test_generates_kotlin(
     assert_gen(
         Address("src/protobuf/dir1", relative_file_path="f.proto"),
         [
+            "src/protobuf/org/pantsbuild/kotlin/proto/F.java",
             "src/protobuf/org/pantsbuild/kotlin/proto/FKt.kt",
             "src/protobuf/org/pantsbuild/kotlin/proto/PersonKt.kt",
         ],
     )
     assert_gen(
-        Address("src/protobuf/dir1", relative_file_path="f2.proto"), ["src/protobuf/dir1/F2Kt.kt"]
+        Address("src/protobuf/dir1", relative_file_path="f2.proto"),
+        ["src/protobuf/dir1/F2.java", "src/protobuf/dir1/F2Kt.kt"],
     )
     assert_gen(
-        Address("src/protobuf/dir2", relative_file_path="f.proto"), ["src/protobuf/dir2/FKt.kt"]
+        Address("src/protobuf/dir2", relative_file_path="f.proto"),
+        ["src/protobuf/dir2/F.java", "src/protobuf/dir2/FKt.kt"],
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
-        ["tests/protobuf/test_protos/FKt.kt"],
+        ["tests/protobuf/test_protos/F.java", "tests/protobuf/test_protos/FKt.kt"],
     )
 
     request = CompileKotlinSourceRequest(
