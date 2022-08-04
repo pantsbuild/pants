@@ -11,6 +11,7 @@ DEFAULT_TEMPLATE = """
 def make_exe():
     dist = default_python_distribution()
     policy = dist.make_python_packaging_policy()
+    policy.extension_module_filter = "no-copyleft"
 
     # Note: Adding this for pydanic and libs that have the "unable to load from memory" error
     # https://github.com/indygreg/PyOxidizer/issues/438
