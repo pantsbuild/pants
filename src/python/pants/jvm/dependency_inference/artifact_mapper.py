@@ -388,7 +388,7 @@ class MissingRequiredJvmArtifactsInResolve(ValueError):
             if isinstance(coordinate, Coordinate):
                 msg += (
                     "\njvm_artifact(\n"
-                    f'  name="{coordinate.group}_{coordinate.artifact}",\n"'
+                    f'  name="{coordinate.group}_{coordinate.artifact}",\n'
                     f'  group="{coordinate.group}",\n'
                     f'  artifact="{coordinate.artifact}",\n'
                     f'  version="{coordinate.version}",\n'

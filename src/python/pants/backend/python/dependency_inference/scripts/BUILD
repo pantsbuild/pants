@@ -1,8 +1,17 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-resource(name="dependency_parser", source="dependency_parser_py", dependencies=[":init_py",])
-resource(name="init_py", source="__init__.py",)
+resource(
+    name="dependency_parser",
+    source="dependency_parser_py",
+    dependencies=[
+        ":init_py",
+    ],
+)
+resource(
+    name="init_py",
+    source="__init__.py",
+)
 
 # Also expose scripts as python sources so they get formatted/linted/checked.
 python_source(
