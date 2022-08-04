@@ -40,11 +40,19 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -154,6 +162,7 @@ async def generate_lockfile(
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_repos: PythonRepos,
     python_setup: PythonSetup,
+    union_membership: UnionMembership,
 ) -> GenerateLockfileResult:
     if req.use_pex:
         pip_args_file = "__pip_args.txt"
@@ -161,9 +170,38 @@ async def generate_lockfile(
             [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
             + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
         )
-        pip_args_file_digest = await Get(
+        pip_args_digest_get = Get(
             Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
         )
+
+        all_tool_resolve_names = tuple(
+            sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+        )
+        constraints_file_path = python_setup.resolves_to_constraints_file(
+            all_tool_resolve_names
+        ).get(req.resolve_name)
+        constraints_digest_get = Get(
+            Digest,
+            PathGlobs(
+                [constraints_file_path] if constraints_file_path else [],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=softwrap(
+                    f"""
+                    the option `[python].resolves_to_constraints_file` for the resolve
+                    '{req.resolve_name}'
+                    """
+                ),
+            ),
+        )
+        constraints_args = (
+            (f"--constraints={constraints_file_path}",) if constraints_file_path else ()
+        )
+
+        pip_args_digest, constraints_digest = await MultiGet(
+            pip_args_digest_get, constraints_digest_get
+        )
+        input_digest = await Get(Digest, MergeDigests([pip_args_digest, constraints_digest]))
+
         header_delimiter = "//"
         result = await Get(
             ProcessResult,
@@ -194,12 +232,13 @@ async def generate_lockfile(
                     "--indent=2",
                     "-r",
                     pip_args_file,
+                    *constraints_args,
                     *python_repos.pex_args,
                     *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
                     *req.requirements,
                 ),
-                additional_input_digest=pip_args_file_digest,
+                additional_input_digest=input_digest,
                 output_files=("lock.json",),
                 description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
