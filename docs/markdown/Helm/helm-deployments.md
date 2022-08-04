@@ -14,7 +14,7 @@ updatedAt: "2022-07-19T13:16:00.000Z"
 Motivation
 ----------
 
-Helm's ultimate purpose is to simplify the deployment of Kubernetes resources and help in making these reproducible. However is quite common to deploy the same software application into different kind of environments using slightly different configuration overrides.
+Helm's ultimate purpose is to simplify the deployment of Kubernetes resources and help in making these reproducible. However it is quite common to deploy the same software application into different kind of environments using slightly different configuration overrides.
 
 This hinders reproducibility since operators end up having a set of configuration files and additional shell scripts that ensure that the Helm command line usued to deploy a piece of software into a given environment is always the same.
 
