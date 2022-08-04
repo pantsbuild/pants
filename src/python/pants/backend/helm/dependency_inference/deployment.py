@@ -26,6 +26,7 @@ from pants.backend.helm.util_rules.renderer import (
 from pants.backend.helm.utils.docker import ImageRef
 from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest, DigestEntries, FileEntry
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -64,12 +65,14 @@ async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymen
         ),
     )
 
+    rendered_entries = await Get(DigestEntries, Digest, rendered_deployment.snapshot.digest)
     parsed_manifests = await MultiGet(
         Get(
             ParsedKubeManifest,
-            ParseKubeManifestRequest(filename=file, digest=rendered_deployment.snapshot.digest),
+            ParseKubeManifestRequest(file=entry),
         )
-        for file in rendered_deployment.snapshot.files
+        for entry in rendered_entries
+        if isinstance(entry, FileEntry)
     )
 
     # Build YAML index of `ImageRef`s for future processing during depedendecy inference or post-rendering.
@@ -134,7 +137,7 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
     infer_from = HelmDeploymentDependenciesInferenceFieldSet
 
 
-@rule(desc="Find the dependencies needed by a Helm deployment", level=LogLevel.DEBUG)
+@rule(desc="Find the dependencies needed by a Helm deployment")
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest, mapping: FirstPartyHelmDeploymentMappings
 ) -> InferredDependencies:
@@ -144,8 +147,6 @@ async def inject_deployment_dependencies(
     candidate_docker_addresses = mapping.referenced_by(request.field_set.address)
 
     dependencies: OrderedSet[Address] = OrderedSet()
-
-    # We disambiguate just to help
     for imager_ref, candidate_address in candidate_docker_addresses:
         matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(

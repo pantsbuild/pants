@@ -3,13 +3,15 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from pants.backend.helm.subsystems import k8s_parser
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.testutil import K8S_POD_FILE
 from pants.backend.helm.utils.yaml import YamlPath
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import CreateDigest, Digest, DigestEntries, FileContent, FileEntry
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -20,6 +22,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *k8s_parser.rules(),
             QueryRule(ParsedKubeManifest, (ParseKubeManifestRequest,)),
+            QueryRule(DigestEntries, (Digest,)),
         ]
     )
     rule_runner.set_options(
@@ -33,9 +36,10 @@ def test_parser_can_run(rule_runner: RuleRunner) -> None:
     file_digest = rule_runner.request(
         Digest, [CreateDigest([FileContent("pod.yaml", K8S_POD_FILE.encode("utf-8"))])]
     )
+    file_entries = rule_runner.request(DigestEntries, [file_digest])
 
     parsed_manifest = rule_runner.request(
-        ParsedKubeManifest, [ParseKubeManifestRequest("pod.yaml", file_digest)]
+        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
     )
 
     expected_image_refs = [

@@ -18,7 +18,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -94,11 +94,10 @@ async def build_k8s_parser_tool(k8s_parser: HelmKubeParserSubsystem) -> _HelmKub
 
 @dataclass(frozen=True)
 class ParseKubeManifestRequest(EngineAwareParameter):
-    filename: str
-    digest: Digest
+    file: FileEntry
 
     def debug_hint(self) -> str | None:
-        return self.filename
+        return self.file.path
 
 
 @dataclass(frozen=True)
@@ -107,17 +106,19 @@ class ParsedKubeManifest:
     found_image_refs: tuple[tuple[int, YamlPath, str], ...]
 
 
-@rule(desc="Parse Kubernetes resource manifest", level=LogLevel.DEBUG)
+@rule(desc="Parse Kubernetes resource manifest")
 async def parse_kube_manifest(
     request: ParseKubeManifestRequest, tool: _HelmKubeParserTool
 ) -> ParsedKubeManifest:
+    file_digest = await Get(Digest, CreateDigest([request.file]))
+
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             tool.pex,
-            argv=[request.filename],
-            input_digest=request.digest,
-            description=f"Parsing Kubernetes manifest {request.filename}",
+            argv=[request.file.path],
+            input_digest=file_digest,
+            description=f"Parsing Kubernetes manifest {request.file.path}",
             level=LogLevel.DEBUG,
         ),
     )
@@ -129,7 +130,7 @@ async def parse_kube_manifest(
         if len(parts) != 3:
             raise Exception(
                 softwrap(
-                    f"""Unexpected output from k8s parser when parsing file {request.filename}:
+                    f"""Unexpected output from k8s parser when parsing file {request.file.path}:
 
                     {line}
                     """
@@ -138,7 +139,7 @@ async def parse_kube_manifest(
 
         image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
-    return ParsedKubeManifest(filename=request.filename, found_image_refs=tuple(image_refs))
+    return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
 
 
 def rules():
