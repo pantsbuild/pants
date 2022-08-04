@@ -27,7 +27,7 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.manifest import ImageRef
+from pants.backend.helm.utils.docker import ImageRef
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
@@ -91,7 +91,9 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     )
 
     source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(source_root_patterns)}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
 
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = HelmDeploymentFieldSet.create(target)

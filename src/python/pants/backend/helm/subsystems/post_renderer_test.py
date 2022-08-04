@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
-from pants.backend.helm.util_rules.yaml_utils import MutableYamlIndex, YamlPath
+from pants.backend.helm.utils.yaml import MutableYamlIndex, YamlPath
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule

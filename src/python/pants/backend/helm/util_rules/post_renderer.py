@@ -24,7 +24,7 @@ from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDep
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
-from pants.backend.helm.util_rules.manifest import ImageRef
+from pants.backend.helm.utils.docker import ImageRef
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.rules import Get, MultiGet, collect_rules, rule

@@ -33,8 +33,7 @@ resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_ma
 python_requirement(
     name="k8s",
     requirements=[
-        "kubernetes>=24.2.0,<25.0",
-        "kubernetes_typed>=18.20.0,<19.0"
+        "hikaru==0.11.0b"
     ],
     resolve="helm-k8s-parser"
 )
@@ -43,7 +42,7 @@ python_sources(
     name="__k8s_parser_main",
     sources=["k8s_parser_main.py"],
     resolve="helm-k8s-parser",
-    # skip_mypy=True,
+    skip_mypy=True,
 )
 
 resources(name="k8s_parser", sources=["k8s_parser.lock", "k8s_parser_main.py"])

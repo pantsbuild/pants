@@ -5,24 +5,26 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.docker.target_types import AllDockerImageTargets
 from pants.backend.docker.target_types import rules as docker_target_types_rules
+from pants.backend.helm.subsystems import k8s_parser
+from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.target_types import (
     AllHelmDeploymentTargets,
     HelmDeploymentDependenciesField,
     HelmDeploymentFieldSet,
 )
 from pants.backend.helm.target_types import rules as helm_target_types_rules
-from pants.backend.helm.util_rules import manifest as k8s_manifest
 from pants.backend.helm.util_rules import renderer
-from pants.backend.helm.util_rules.manifest import ImageRef, KubeManifests, ParseKubeManifests
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
     RenderedHelmFiles,
 )
-from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex, MutableYamlIndex
+from pants.backend.helm.utils.docker import ImageRef
+from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -62,20 +64,23 @@ async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymen
         ),
     )
 
-    manifests = await Get(
-        KubeManifests,
-        ParseKubeManifests(rendered_deployment.snapshot.digest, field_set.address.spec),
+    parsed_manifests = await MultiGet(
+        Get(
+            ParsedKubeManifest,
+            ParseKubeManifestRequest(filename=file, digest=rendered_deployment.snapshot.digest),
+        )
+        for file in rendered_deployment.snapshot.files
     )
 
     # Build YAML index of `ImageRef`s for future processing during depedendecy inference or post-rendering.
     image_refs_index: MutableYamlIndex[ImageRef] = MutableYamlIndex()
-    for manifest in manifests:
-        for container in manifest.all_containers:
+    for manifest in parsed_manifests:
+        for (idx, path, image_ref) in manifest.found_image_refs:
             image_refs_index.insert(
-                file_path=manifest.filename,
-                document_index=manifest.document_index,
-                yaml_path=container.element_path / "image",
-                item=container.image,
+                file_path=PurePath(manifest.filename),
+                document_index=idx,
+                yaml_path=path,
+                item=ImageRef.parse(image_ref),
             )
 
     return HelmDeploymentReport(address=field_set.address, image_refs=image_refs_index.frozen())
@@ -168,7 +173,7 @@ def rules():
     return [
         *collect_rules(),
         *renderer.rules(),
-        *k8s_manifest.rules(),
+        *k8s_parser.rules(),
         *helm_target_types_rules(),
         *docker_target_types_rules(),
         UnionRule(InferDependenciesRequest, InferHelmDeploymentDependenciesRequest),

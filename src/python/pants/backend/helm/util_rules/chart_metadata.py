@@ -12,7 +12,7 @@ from typing import Any, cast
 import yaml
 
 from pants.backend.helm.target_types import HelmChartMetaSourceField
-from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
+from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,

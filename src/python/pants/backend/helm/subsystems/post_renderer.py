@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from pants.backend.helm.util_rules.yaml_utils import FrozenYamlIndex
+from pants.backend.helm.utils.yaml import FrozenYamlIndex
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase

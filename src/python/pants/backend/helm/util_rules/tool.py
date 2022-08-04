@@ -14,7 +14,7 @@ import yaml
 from typing_extensions import final
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
+from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
