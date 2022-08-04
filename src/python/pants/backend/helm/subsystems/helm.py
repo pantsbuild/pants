@@ -159,7 +159,7 @@ def _cleanup_passthrough_args(args: Iterable[str]) -> tuple[list[str], list[str]
     removed_args: list[str] = []
 
     skip = False
-    for arg in list(args):
+    for arg in args:
         if skip:
             valid_args.append(arg)
             skip = False
