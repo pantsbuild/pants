@@ -17,11 +17,13 @@ from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -91,18 +93,21 @@ async def build_k8s_parser_tool(k8s_parser: HelmKubeParserSubsystem) -> _HelmKub
 
 
 @dataclass(frozen=True)
+class ParseKubeManifestRequest(EngineAwareParameter):
+    filename: str
+    digest: Digest
+
+    def debug_hint(self) -> str | None:
+        return self.filename
+
+
+@dataclass(frozen=True)
 class ParsedKubeManifest:
     filename: str
     found_image_refs: tuple[tuple[int, YamlPath, str], ...]
 
 
-@dataclass(frozen=True)
-class ParseKubeManifestRequest:
-    filename: str
-    digest: Digest
-
-
-@rule
+@rule(desc="Parse Kubernetes resource manifest", level=LogLevel.DEBUG)
 async def parse_kube_manifest(
     request: ParseKubeManifestRequest, tool: _HelmKubeParserTool
 ) -> ParsedKubeManifest:
@@ -112,7 +117,8 @@ async def parse_kube_manifest(
             tool.pex,
             argv=[request.filename],
             input_digest=request.digest,
-            description="Parsing test",
+            description=f"Parsing Kubernetes manifest {request.filename}",
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -125,8 +131,8 @@ async def parse_kube_manifest(
                 softwrap(
                     f"""Unexpected output from k8s parser when parsing file {request.filename}:
 
-                {line}
-                """
+                    {line}
+                    """
                 )
             )
 
