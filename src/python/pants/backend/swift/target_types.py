@@ -10,6 +10,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 
 SWIFT_FILE_EXTENSIONS = (".swift",)
@@ -44,6 +45,9 @@ class SwiftSourceTarget(Target):
 
 class SwiftSourcesGeneratorSourcesField(SwiftGeneratorSourcesField):
     default = tuple(f"*{ext}" for ext in SWIFT_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['utils.swift', 'subdir/*.swift', '!ignore_me.swift']`"
+    )
 
 
 class SwiftSourcesGeneratorTarget(TargetFilesGenerator):
