@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import textwrap
 from dataclasses import dataclass
 from functools import partial
 from typing import Iterator, cast
@@ -36,6 +37,8 @@ from pants.backend.docker.value_interpolation import (
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
@@ -256,10 +259,24 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
+    upstream_image_ids_str = "\n".join(context.upstream_image_ids)
+    upstream_image_id_content = textwrap.dedent(
+        f"""\
+        # This file ensures that Pants invalidates this image-building process correctly
+        # when the upstream image changes, even though the process itself does not require
+        # this file in order to succeed.
+        {upstream_image_ids_str}
+        """
+    ).encode()
+    upstream_image_id_file = await Get(
+        Digest, CreateDigest([FileContent("__upstream_image_ids.txt", upstream_image_id_content)])
+    )
+    digest = await Get(Digest, MergeDigests([context.digest, upstream_image_id_file]))
+
     context_root = field_set.get_context_root(options.default_context_root)
     process = docker.build_image(
         build_args=context.build_args,
-        digest=context.digest,
+        digest=digest,
         dockerfile=context.dockerfile,
         context_root=context_root,
         env=context.build_env.environment,
@@ -317,6 +334,9 @@ async def build_docker_image(
 
 def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    # NB: We use the extracted image id for invalidation. The short_id may theoretically
+    #  not be unique enough, although in a non adversarial situation, this is highly unlikely
+    #  to be an issue in practice.
     image_id_regexp = re.compile(
         "|".join(
             (

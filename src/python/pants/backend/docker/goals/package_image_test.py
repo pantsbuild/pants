@@ -92,6 +92,7 @@ def assert_build(
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
             snapshot=build_context_snapshot,
+            upstream_image_ids=[],
             dockerfile_info=DockerfileInfo(
                 request.address,
                 digest=EMPTY_DIGEST,

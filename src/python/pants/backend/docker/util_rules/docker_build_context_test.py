@@ -93,6 +93,7 @@ def assert_build_context(
     expected_files: list[str],
     expected_interpolation_context: dict[str, str | dict[str, str] | DockerInterpolationValue]
     | None = None,
+    expected_upstream_images: list[str] | None = None,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
 ) -> DockerBuildContext:
@@ -127,6 +128,8 @@ def assert_build_context(
             DockerInterpolationContext.from_dict(expected_interpolation_context)
         )
 
+    if build_upstream_images:
+        assert context.upstream_image_ids == tuple(expected_upstream_images or [])
     return context
 
 
@@ -224,7 +227,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                   name="image",
                   repository="upstream/{name}",
                   image_tags=["1.0"],
-                  instructions=["FROM alpine"],
+                  instructions=["FROM alpine:3.16.1"],
                 )
                 """
             ),
@@ -252,6 +255,13 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                 "BASE_IMAGE": "upstream/image:1.0",
             },
         },
+        # TODO: It's unclear if this sha is expected to remain stable over time, i.e., if the
+        #  alpine:3.16.1 tag could be repointed over time. If this test breaks for that reason,
+        #  we'll need to be more subtle with this check (e.g., compute the sha for the upstream
+        #  image, or check the count of expected_upstream_images instead of the individual values.
+        expected_upstream_images=[
+            "sha256:41366efd695adbcabfb866b569d6007f75e4acde922115978c4e7bee41e097c3"
+        ],
     )
 
 
@@ -343,7 +353,7 @@ def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:
             "src/docker/Dockerfile": dedent(
                 """\
                 FROM python:3.8
-                FROM alpine as interim
+                FROM alpine:3.16.1 as interim
                 FROM interim
                 FROM scratch:1-1 as output
                 """
@@ -359,7 +369,7 @@ def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:
             "tags": {
                 "baseimage": "3.8",
                 "stage0": "3.8",
-                "interim": "latest",
+                "interim": "3.16.1",
                 "stage2": "latest",
                 "output": "1-1",
             },
@@ -376,7 +386,7 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
                 docker_image(
                   instructions=[
                     "FROM python:3.8",
-                    "FROM alpine as interim",
+                    "FROM alpine:3.16.1 as interim",
                     "FROM interim",
                     "FROM scratch:1-1 as output",
                   ]
@@ -394,7 +404,7 @@ def test_synthetic_dockerfile(rule_runner: RuleRunner) -> None:
             "tags": {
                 "baseimage": "3.8",
                 "stage0": "3.8",
-                "interim": "latest",
+                "interim": "3.16.1",
                 "stage2": "latest",
                 "output": "1-1",
             },
@@ -621,6 +631,7 @@ def test_create_docker_build_context() -> None:
         build_args=DockerBuildArgs.from_strings("ARGNAME=value1"),
         snapshot=EMPTY_SNAPSHOT,
         build_env=DockerBuildEnvironment.create({"ENVNAME": "value2"}),
+        upstream_image_ids=["def", "abc"],
         dockerfile_info=DockerfileInfo(
             address=Address("test"),
             digest=EMPTY_DIGEST,
@@ -633,6 +644,7 @@ def test_create_docker_build_context() -> None:
     )
     assert list(context.build_args) == ["ARGNAME=value1"]
     assert dict(context.build_env.environment) == {"ENVNAME": "value2"}
+    assert context.upstream_image_ids == ("abc", "def")
     assert context.dockerfile == "test/Dockerfile"
     assert context.stages == ("base", "dev", "prod")
 
