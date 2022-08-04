@@ -60,9 +60,10 @@ class MetalintTool(PythonToolBase):
         default=True,
         advanced=True,
         help=lambda cls: softwrap(
-            f"""
+            """
             If true, Pants will include any relevant config files during
-            runs (`.pylintrc`, `pylintrc`, `pyproject.toml`, and `setup.cfg`).
+            runs, as defined by the `config_request` function. By default
+            pulls in `pyproject.toml`.
 
             Use `[{cls.options_scope}].config` instead if your config is in a
             non-standard location.
@@ -82,7 +83,7 @@ class MetalintTool(PythonToolBase):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_content={"pyproject.toml": b"[tool.vulture"},
+            check_existence="pyproject.toml",  # default to pull in pyproject.toml, since that's probably expected
         )
 
 
