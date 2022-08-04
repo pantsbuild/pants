@@ -417,7 +417,7 @@ class HelmDeploymentValuesField(DictStringToStringField):
 class HelmDeploymentCreateNamespaceField(BoolField):
     alias = "create_namespace"
     default = False
-    help = "If true, the namespace will created if it doesn't exist."
+    help = "If true, the namespace will be created if it doesn't exist."
 
 
 class HelmDeploymentNoHooksField(BoolField):
