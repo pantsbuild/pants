@@ -49,7 +49,7 @@ from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import KeepSandboxes
 from pants.option.option_types import (
     BoolOption,
     EnumListOption,
@@ -487,7 +487,7 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
     distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
@@ -566,7 +566,7 @@ async def generate_coverage_reports(
                 res.stdout,
                 res.stderr,
                 proc.description,
-                process_cleanup=process_cleanup.val,
+                keep_sandboxes=keep_sandboxes,
             )
 
     # In practice if one result triggers --fail-under, they all will, but no need to rely on that.
