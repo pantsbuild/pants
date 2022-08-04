@@ -9,7 +9,7 @@ from textwrap import indent
 
 DEFAULT_TEMPLATE = """
 def make_exe():
-    dist = default_python_distribution(python_version="3.9")
+    dist = default_python_distribution()
     policy = dist.make_python_packaging_policy()
 
     # Note: Adding this for pydanic and libs that have the "unable to load from memory" error
