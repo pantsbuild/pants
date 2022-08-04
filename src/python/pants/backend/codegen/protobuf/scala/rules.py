@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.codegen import export_codegen_goal
@@ -55,6 +54,7 @@ from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
@@ -245,7 +245,7 @@ async def setup_scalapb_shim_classfiles(
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 
-    scalapb_shim_content = pkgutil.get_data(
+    scalapb_shim_content = read_resource(
         "pants.backend.codegen.protobuf.scala", "ScalaPBShim.scala"
     )
     if not scalapb_shim_content:
