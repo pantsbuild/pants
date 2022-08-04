@@ -7,7 +7,7 @@ updatedAt: "2022-07-19T13:16:00.000Z"
 ---
 > 🚧 Helm deployment support is in alpha stage
 > 
-> Pants has experimental support managing deployments via the `experimental-deploy` goal. Helm deployments provides with a basic implementation of this goal.
+> Pants has experimental support for managing deployments via the `experimental-deploy` goal. Helm deployments provides with a basic implementation of this goal.
 > 
 > Please share feedback for what you need to use Pants with your Helm deployments by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:getting-help)!
 
