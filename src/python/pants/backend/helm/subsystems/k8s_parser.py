@@ -35,7 +35,6 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
     default_version = "hikaru==0.11.0b"
-    # default_extra_requirements = ["kubernetes-stubs==22.6.0.post1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
