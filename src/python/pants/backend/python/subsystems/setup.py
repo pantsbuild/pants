@@ -219,9 +219,10 @@ class PythonSetup(Subsystem):
             We recommend keeping the default of `error` for CI builds.
 
             Note that `warn` will still expect a Pants lockfile header, it only won't error if
-            the lockfile is stale and should be regenerated. Use `ignore` to avoid needing a
-            lockfile header at all, e.g. if you are manually managing lockfiles rather than
-            using the `generate-lockfiles` goal.
+            the lockfile is stale and should be regenerated.
+
+            Use `ignore` to avoid needing a lockfile header at all, e.g. if you are manually
+            managing lockfiles rather than using the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -266,6 +267,31 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            Pants will soon only support generating lockfiles via the Pex format, given the several
+            limitations of Poetry listed in this option.
+
+            If you do not want to use Pex lockfiles, you will still be able to manually generate
+            lockfiles, e.g. by manually running `poetry export --dev` on your `poetry.lock`. See
+            {doc_url("python-third-party-dependencies#manually-generating-lockfiles")} for more
+            information.
+
+            While Pex generates locks in a proprietary JSON format, you can use the
+            `{bin_name()} export` goal for Pants to create a virtual environment for
+            interoperability with tools like IDEs.
+
+            Please open a GitHub issue or reach out on Slack if you encounter issues while
+            migrating: {doc_url("getting-help")}
+
+            Tip: you can incrementally migrate one lockfile at-a-time by dynamically setting the
+            option `--python-lockfile-generator`. For example:
+
+              ./pants --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
+              ./pants --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
+            """
+        )
     )
     resolves_generate_lockfiles = BoolOption(
         default=True,
@@ -274,14 +300,19 @@ class PythonSetup(Subsystem):
             If False, Pants will not attempt to generate lockfiles for `[python].resolves` when
             running the `generate-lockfiles` goal.
 
-            This is intended to allow you to manually generate lockfiles as a workaround for the
-            issues described in the `[python].lockfile_generator` option, if you are not yet ready
-            to use Pex.
+            This is intended to allow you to manually generate lockfiles for your own code,
+            rather than using Pex lockfiles. For example, when adopting Pants in a project already
+            using Poetry, you can use `poetry export --dev` to create a requirements.txt-style
+            lockfile understood by Pants, then point `[python].resolves` to the file.
 
             If you set this to False, Pants will not attempt to validate the metadata headers
             for your user lockfiles. This is useful so that you can keep
             `[python].invalid_lockfile_behavior` to `error` or `warn` if you'd like so that tool
             lockfiles continue to be validated, while user lockfiles are skipped.
+
+            Warning: it will likely be slower to install manually generated user lockfiles than Pex
+            ones because Pants cannot as efficiently extract the subset of requirements used for a
+            particular task. See the option `[python].run_against_entire_lockfile`. 
             """
         ),
         advanced=True,
@@ -293,11 +324,10 @@ class PythonSetup(Subsystem):
             If enabled, when running binaries, tests, and repls, Pants will use the entire
             lockfile file instead of just the relevant subset.
 
-            We generally do not recommend this if `[python].lockfile_generator` is set to `"pex"`
-            thanks to performance enhancements we've made. When using Pex lockfiles, you should
-            get similar performance to using this option but without the downsides mentioned below.
+            If you are using Pex lockfiles, we generally do not recommend this. You will already
+            get similar performance benefits to this option, without the downsides.
 
-            Otherwise, if not using Pex lockfiles, this option can improve
+            Otherwise, this option can improve
             performance and reduce cache size. But it has two consequences: 1) All cached test
             results will be invalidated if any requirement in the lockfile changes, rather
             than just those that depend on the changed requirement. 2) Requirements unneeded

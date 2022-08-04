@@ -121,7 +121,6 @@ interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
-lockfile_generator = "pex"
 
 [python-infer]
 assets = true
