@@ -57,7 +57,6 @@ async def compile_cc_source(
         InferredDependencies,
         InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(request.target)),
     )
-    logger.warning(inferred_dependencies)
 
     # Convert inferred dependency addresses into targets
     wrapped_targets = await MultiGet(
@@ -79,33 +78,34 @@ async def compile_cc_source(
             [wrapped_target.target.get(SourcesField) for wrapped_target in wrapped_targets]
         ),
     )
-    logger.info(inferred_source_files.snapshot)
+    logger.debug(inferred_source_files.snapshot)
 
     input_digest = await Get(
         Digest,
         MergeDigests((target_source_file.snapshot.digest, inferred_source_files.snapshot.digest)),
     )
 
-    # Run compilation
-    target_file = target_source_file.files[0]
-    compiled_object_name = f"{target_file}.o"
-
-    # Add header include directories to compilation args
+    # Add header include directories to compilation args prefixed with "-I"
     inferred_header_files = [
         file
         for file in inferred_source_files.files
         if PurePath(file).suffix in CC_HEADER_FILE_EXTENSIONS
     ]
+    # TODO: This "/inc" is hardcoded - not a robust way to determine which folders should be included here
     include_directories = [
         file.split("/inc")[0] for file in inferred_header_files if "/inc" in file
     ]
 
+    target_file = target_source_file.files[0]
+    compiled_object_name = f"{target_file}.o"
+
+    # TODO: While gcc will usually pick the correct tool under the hood, we may want to make it explicit
+    # TODO: How should we handle compiling .c files with C++?
     argv = [toolchain.c]
     for d in include_directories:
         argv += ["-I", f"{d}/include"]
     argv += ["-c", target_file]
 
-    # argv = (toolchain.c, "-I", "examples/cc/core/include", "-c", target_file)
     compile_result = await Get(
         FallibleProcessResult,
         Process(
@@ -115,7 +115,6 @@ async def compile_cc_source(
             output_files=(compiled_object_name,),
         ),
     )
-
     return FallibleCompiledCCObject(compiled_object_name, compile_result)
 
 

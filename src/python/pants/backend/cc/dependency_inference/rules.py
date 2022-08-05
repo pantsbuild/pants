@@ -196,7 +196,7 @@ async def infer_cc_source_dependencies(
         )
         if maybe_relative_address:
             result.add(maybe_relative_address)
-            logger.warning(f"Maybe: {maybe_relative_address}")
+            logger.debug(f"Maybe: {maybe_relative_address}")
             continue
 
         # Otherwise try source roots.
@@ -205,7 +205,7 @@ async def infer_cc_source_dependencies(
             ambiguous = cc_files_mapping.ambiguous_files.get(include.path)
             if unambiguous:
                 result.add(unambiguous)
-                logger.info("Unambiguous --- continuing")
+                logger.debug("Unambiguous --- continuing")
                 continue
 
             if ambiguous:
@@ -231,7 +231,7 @@ async def infer_cc_source_dependencies(
         if alternative:
             result.add(alternative)
 
-    logger.warning(f"Results: {result}")
+    logger.debug(f"Results: {result}")
     return InferredDependencies(sorted(result))
 
 
