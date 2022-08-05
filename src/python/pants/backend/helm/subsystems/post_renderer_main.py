@@ -33,7 +33,7 @@ def build_manifest_map(input_file: str) -> dict[str, list[str]]:
     Since there are cases in which the same source may produce more than
     one YAML structure, the returned type represents this with a dictionary
     of lists, in which the key is the source filename and each item in the list
-    is th content following the `# Source: ...` header.
+    is the content following the `# Source: ...` header.
     """
 
     result = defaultdict(list)
