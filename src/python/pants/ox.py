@@ -1,7 +1,16 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import sys
+
+_logger = logging.getLogger(__name__)
+
+
+def bootstrap_pyoxidizer() -> None:
+    if is_oxidized:
+        _logger.info("Pants is running as a PyOxidizer binary.")
+
 
 # Provide the `is_oxidized` symbol, to allow for workarounds in Pants code where we use things
 # that don't work under PyOxidizer's custom importer. `oxidized_importer` is only accessible

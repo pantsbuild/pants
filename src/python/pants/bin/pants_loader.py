@@ -9,7 +9,7 @@ import time
 import warnings
 from textwrap import dedent
 
-from pants import ox  # noqa: F401
+from pants import ox
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
@@ -110,6 +110,7 @@ class PantsLoader:
 
 
 def main() -> None:
+    ox.bootstrap_pyoxidizer()
     PantsLoader.main()
 
 
