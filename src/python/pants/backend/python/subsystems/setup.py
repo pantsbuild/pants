@@ -270,8 +270,8 @@ class PythonSetup(Subsystem):
         removal_version="2.15.0.dev0",
         removal_hint=softwrap(
             f"""
-            Pants will soon only support generating lockfiles via the Pex format, given the several
-            limitations of Poetry listed in this option.
+            Pants will soon only support generating lockfiles via the Pex format, as
+            Poetry-generated lockfiles mismatch with Pants's pip-based approach.
 
             If you do not want to use Pex lockfiles, you will still be able to manually generate
             lockfiles, e.g. by manually running `poetry export --dev` on your `poetry.lock`. See

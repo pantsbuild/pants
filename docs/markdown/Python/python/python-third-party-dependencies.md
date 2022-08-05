@@ -366,16 +366,16 @@ freezegun==1.2.0 \
   --hash=sha256:e19563d0b05...
 ```
 
-For user lockfiles, set `[python].resolves` to the path of your lockfile(s). Also set
-`[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its metadata header.
-Warning: it will likely be slower to install manually generated user lockfiles than Pex ones
-because Pants cannot as efficiently extract the subset of requirements used for a particular
-task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
+For manually-generated user lockfiles, set `[python].resolves` to the path of your lockfile(s).
+Also set `[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its
+metadata header. Warning: it will likely be slower to install manually generated user lockfiles
+than Pex ones because Pants cannot as efficiently extract the subset of requirements used for a
+particular task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
 
-For tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g. `[black].lockfile`.
-Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not expect metadata
-headers. Note that this option will disable the check for all lockfiles, including user lockfiles,
-which may not be desirable. Feel free to open a
+For manually-generated tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g.
+`[black].lockfile`. Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not
+expect metadata headers. Note that this option will disable the check for all lockfiles, including
+user lockfiles, which may not be desirable. Feel free to open a
 [GitHub issue](https://github.com/pantsbuild/pants/issues/new) if you want more precise control.
 
 Advanced usage
