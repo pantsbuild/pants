@@ -21,7 +21,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.102",
+//     "pex==2.1.103",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -135,13 +135,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2d27e3784d7a565d36ab851fe94887c5eccd6a463168875832a1be79c82828b4",
-              "url": "https://files.pythonhosted.org/packages/be/be/7abce643bfdf8ca01c48afa2ddf8308c2308b0c3b239a44e57d020afa0ef/attrs-21.4.0-py2.py3-none-any.whl"
+              "hash": "86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c",
+              "url": "https://files.pythonhosted.org/packages/f2/bc/d817287d1aa01878af07c19505fafd1165cd6a119e9d0821ca1d1c20312d/attrs-22.1.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "626ba8234211db98e869df76230a137c4c40a12d72445c45d5f5b716f076e2fd",
-              "url": "https://files.pythonhosted.org/packages/d7/77/ebb15fc26d0f815839ecd897b919ed6d85c050feeb83e100e020df9153d2/attrs-21.4.0.tar.gz"
+              "hash": "29adc2665447e5191d0e7c568fde78b21f9672d344281d0c6e1ab085429b22b6",
+              "url": "https://files.pythonhosted.org/packages/1a/cb/c4ffeb41e7137b23755a45e1bfec9cbb76ecf51874c6f1d113984ecaa32c/attrs-22.1.0.tar.gz"
             }
           ],
           "project_name": "attrs",
@@ -157,9 +157,9 @@
             "hypothesis; extra == \"dev\"",
             "hypothesis; extra == \"tests\"",
             "hypothesis; extra == \"tests_no_zope\"",
-            "mypy; extra == \"dev\"",
-            "mypy; extra == \"tests\"",
-            "mypy; extra == \"tests_no_zope\"",
+            "mypy!=0.940,>=0.900; extra == \"dev\"",
+            "mypy!=0.940,>=0.900; extra == \"tests\"",
+            "mypy!=0.940,>=0.900; extra == \"tests_no_zope\"",
             "pre-commit; extra == \"dev\"",
             "pympler; extra == \"dev\"",
             "pympler; extra == \"tests\"",
@@ -170,9 +170,6 @@
             "pytest>=4.3.0; extra == \"dev\"",
             "pytest>=4.3.0; extra == \"tests\"",
             "pytest>=4.3.0; extra == \"tests_no_zope\"",
-            "six; extra == \"dev\"",
-            "six; extra == \"tests\"",
-            "six; extra == \"tests_no_zope\"",
             "sphinx-notfound-page; extra == \"dev\"",
             "sphinx-notfound-page; extra == \"docs\"",
             "sphinx; extra == \"dev\"",
@@ -181,8 +178,8 @@
             "zope.interface; extra == \"docs\"",
             "zope.interface; extra == \"tests\""
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "21.4"
+          "requires_python": ">=3.5",
+          "version": "22.1"
         },
         {
           "artifacts": [
@@ -856,13 +853,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3743864e09e1017224c5dc6476463ed24b6fea3ac62d379fedc2c6182b2f2159",
-              "url": "https://files.pythonhosted.org/packages/ef/41/a242ae32220cd2951faedddfed3db85393906497526060954b064f9022b7/pex-2.1.102-py2.py3-none-any.whl"
+              "hash": "b91b8e67647331a5b6bcfe15090ec764fcf06f7293b415c3d3f739563ce8c779",
+              "url": "https://files.pythonhosted.org/packages/fd/10/ada3b3de63355f007606307a934e1d762cda2a5e9766abdc543f2cc291b2/pex-2.1.103-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "fa34cef083bede3ea45413638c24e84698949904ef0559994e734b6d21de363c",
-              "url": "https://files.pythonhosted.org/packages/71/f1/125bbeb76821dfe20fc78eb6ebaf963c67ee3a32cc37c907ae54f743c69e/pex-2.1.102.tar.gz"
+              "hash": "07bcd633626b7fd6d18eb0d6303acfd0a4fbcb31692e737b15794626da896bf0",
+              "url": "https://files.pythonhosted.org/packages/f2/9e/55f2e396dfad923a60e4fa2dcca4ef235bdf73739c2bb0569d23e145c568/pex-2.1.103.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -870,7 +867,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.102"
+          "version": "2.1.103"
         },
         {
           "artifacts": [
@@ -1440,13 +1437,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0d33c374d41c7863419fc8f6c10bfe25b7b498aa34164d135c622e52580c6b16",
-              "url": "https://files.pythonhosted.org/packages/a4/53/bfc6409447ca024558b8b19d055de94c813c3e32c0296c48a0873a161cf5/setuptools-63.2.0-py3-none-any.whl"
+              "hash": "dc2662692f47d99cb8ae15a784529adeed535bcd7c277fee0beccf961522baf6",
+              "url": "https://files.pythonhosted.org/packages/90/2e/109766d7f3cb854a083dd66bfc0bf2bf9e40f373829efedb4b5e0d104aa3/setuptools-63.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c04b44a57a6265fe34a4a444e965884716d34bae963119a76353434d6f18e450",
-              "url": "https://files.pythonhosted.org/packages/0a/ba/52611dc8278828eb9ec339e6914a0f865f9e2af967214905927835dfac0a/setuptools-63.2.0.tar.gz"
+              "hash": "7c7854ee1429a240090297628dc9f75b35318d193537968e2dc14010ee2f5bca",
+              "url": "https://files.pythonhosted.org/packages/63/2e/e1f3e1b02d7ff0baa356413e93ad8a88706accd6b3538e18204a8a00c42d/setuptools-63.4.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -1456,6 +1453,7 @@
             "filelock>=3.4.0; extra == \"testing\"",
             "filelock>=3.4.0; extra == \"testing-integration\"",
             "flake8-2020; extra == \"testing\"",
+            "flake8<5; extra == \"testing\"",
             "furo; extra == \"docs\"",
             "ini2toml[lite]>=0.9; extra == \"testing\"",
             "jaraco.envs>=2.2; extra == \"testing\"",
@@ -1482,7 +1480,9 @@
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx-favicon; extra == \"docs\"",
+            "sphinx-hoverxref<2; extra == \"docs\"",
             "sphinx-inline-tabs; extra == \"docs\"",
+            "sphinx-notfound-page==0.8.3; extra == \"docs\"",
             "sphinx-reredirects; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
@@ -1494,7 +1494,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "63.2"
+          "version": "63.4.1"
         },
         {
           "artifacts": [
@@ -1751,19 +1751,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0d027fcd27dbb3cb532453b4d977e05bc1e13aefd70519866af211b3003d895d",
-              "url": "https://files.pythonhosted.org/packages/92/6f/37d8bc1572c4e6f1562ed7847f9ce3a48e23bd54ddbaf6786a6adee9f24d/types_urllib3-1.26.17-py3-none-any.whl"
+              "hash": "09a8783e1002472e8d1e1f3792d4c5cca1fffebb9b48ee1512aae6d16fe186bc",
+              "url": "https://files.pythonhosted.org/packages/19/8c/b9f75c5b52f79402baeabbb065067f72e922f96a114fe471ce4069b0cb69/types_urllib3-1.26.22-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "73fd274524c3fc7cd8cd9ceb0cb67ed99b45f9cb2831013e46d50c1451044800",
-              "url": "https://files.pythonhosted.org/packages/ac/2f/79494805b4f9b55b9c09d78c4bef776e6bf59b49463a046cb3851d1dbd60/types-urllib3-1.26.17.tar.gz"
+              "hash": "b05af90e73889e688094008a97ca95788db8bf3736e2776fd43fb6b171485d94",
+              "url": "https://files.pythonhosted.org/packages/d2/d8/764ca957d9601d956a87a311b107c9b6171ed5bb0c269e8ae60d91fc0fbf/types-urllib3-1.26.22.tar.gz"
             }
           ],
           "project_name": "types-urllib3",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.26.17"
+          "version": "1.26.22"
         },
         {
           "artifacts": [
@@ -2313,7 +2313,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.102",
+  "pex_version": "2.1.103",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -2328,7 +2328,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.102",
+    "pex==2.1.103",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
