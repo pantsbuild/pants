@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict
+from typing import DefaultDict, Iterable
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
@@ -17,7 +17,7 @@ from pants.core.util_rules.stripped_source_files import StrippedFileName, Stripp
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     DependenciesRequest,
@@ -30,7 +30,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.source.source_root import SourceRoot, SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -72,8 +72,42 @@ class CCFilesMapping:
     alternative_source_roots: FrozenDict[str, Address]
 
 
+@rule_helper
+async def _header_(
+    cc_file_mapping: dict[str, Address], include_dir_names: Iterable[str] = tuple("include")
+) -> dict[str, Address]:
+    # Get unique source roots for all CC source fields
+    paths: set[PurePath] = set()
+    for source_file_path in cc_file_mapping.keys():
+        paths = paths.union(PurePath(source_file_path).parents)
+
+    source_roots_result = await Get(SourceRootsResult, SourceRootsRequest([], paths))
+    source_roots = set(source_roots_result.path_to_root.values())
+    source_roots.remove(SourceRoot(path="."))
+
+    alternative_source_roots: dict[str, Address] = {}
+
+    # Determine if there is a source root in the file's path, and create an alternative mapping with those roots
+    # This is particularly useful to discover if there are include directories that need to be passed to compiler
+    for file_path, address in cc_file_mapping.items():
+        for source_root in source_roots:
+            include_path = next(
+                (
+                    path
+                    for name in include_dir_names
+                    if (path := f"{source_root.path}/{name}/") in file_path
+                ),
+                "",
+            )
+            if include_path:
+                stripped_path = file_path.replace(include_path, "")
+                alternative_source_roots[stripped_path] = address
+
+    return alternative_source_roots
+
+
 @rule(desc="Creating map of CC file names to CC targets", level=LogLevel.DEBUG)
-async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
+async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> CCFilesMapping:
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[CCSourceField].file_path))
         for tgt in cc_targets
@@ -95,22 +129,9 @@ async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
 
     mapping_not_stripped = {tgt[CCSourceField].file_path: tgt.address for tgt in cc_targets}
 
-    paths: set[PurePath] = set()
-    for key in mapping_not_stripped.keys():
-        paths = paths.union(PurePath(key).parents)
-    source_roots = await Get(SourceRootsResult, SourceRootsRequest([], paths))
-    cc_roots = source_roots.path_to_root.values()
-
-    # TODO: Put rule_helper back in
-    alternative_source_roots: dict[str, Address] = {}
-    # Determine if there is a source root in the file's path, and create an alternative mapping with those roots
-    # TODO: There are probably better built-ins to optimize this double/triple loop
-    for file_path, address in mapping_not_stripped.items():
-        for root in cc_roots:
-            include_path = root.path + "/include/"
-            if include_path in file_path:
-                sub_path = file_path.replace(include_path, "")
-                alternative_source_roots[sub_path] = address
+    alternative_source_roots = await _header_(
+        mapping_not_stripped, tuple(cc_infer.include_dir_names)
+    )
 
     return CCFilesMapping(
         mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),
