@@ -330,6 +330,7 @@ async def setup_pytest_for_target(
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
+                *(("-c", pytest.config) if pytest.config else ()),
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,

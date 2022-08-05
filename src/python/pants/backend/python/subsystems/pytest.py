@@ -37,7 +37,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, IntOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, IntOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -134,15 +134,30 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    config = FileOption(
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to a config file understood by Pytest
+            (https://docs.pytest.org/en/latest/reference/customize.html#configuration-file-formats).
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
+        ),
+    )
     config_discovery = BoolOption(
         default=True,
         advanced=True,
-        help=softwrap(
-            """
+        help=lambda cls: softwrap(
+            f"""
             If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`)
             during runs. See
             https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where
             config files should be located for Pytest to discover them.
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
             """
         ),
     )
@@ -165,6 +180,8 @@ class PyTest(PythonToolBase):
             check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
 
         return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
             check_existence=check_existence,
             check_content=check_content,

@@ -270,10 +270,14 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
 
 
-def test_config_file(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "config_path,extra_args",
+    (["pytest.ini", []], ["custom_config.ini", ["--pytest-config=custom_config.ini"]]),
+)
+def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
     rule_runner.write_files(
         {
-            "pytest.ini": dedent(
+            config_path: dedent(
                 """\
                 [pytest]
                 addopts = -s
@@ -289,7 +293,7 @@ def test_config_file(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
-    result = run_pytest(rule_runner, tgt)
+    result = run_pytest(rule_runner, tgt, extra_args=extra_args)
     assert result.exit_code == 0
     assert "All good!" in result.stdout and "Captured" not in result.stdout
 
