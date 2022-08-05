@@ -88,6 +88,8 @@ class DockerBinary(BinaryPath):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            # We must run the docker build commands every time, even if nothing has changed,
+            # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
