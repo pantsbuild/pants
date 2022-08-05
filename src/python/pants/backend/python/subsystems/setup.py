@@ -288,10 +288,10 @@ class PythonSetup(Subsystem):
             Tip: you can incrementally migrate one lockfile at-a-time by dynamically setting the
             option `--python-lockfile-generator`. For example:
 
-              ./pants --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
-              ./pants --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
+              {bin_name()} --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
+              {bin_name()} --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
             """
-        )
+        ),
     )
     resolves_generate_lockfiles = BoolOption(
         default=True,
@@ -312,7 +312,7 @@ class PythonSetup(Subsystem):
 
             Warning: it will likely be slower to install manually generated user lockfiles than Pex
             ones because Pants cannot as efficiently extract the subset of requirements used for a
-            particular task. See the option `[python].run_against_entire_lockfile`. 
+            particular task. See the option `[python].run_against_entire_lockfile`.
             """
         ),
         advanced=True,
