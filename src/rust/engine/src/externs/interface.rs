@@ -256,8 +256,10 @@ impl PyExecutionStrategyOptions {
     Self(ExecutionStrategyOptions {
       local_parallelism,
       remote_parallelism,
-      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(&local_keep_sandboxes)
-        .unwrap(),
+      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(
+        &local_keep_sandboxes,
+      )
+      .unwrap(),
       local_cache,
       local_enable_nailgun,
       remote_cache_read,
