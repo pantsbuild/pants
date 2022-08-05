@@ -44,7 +44,7 @@ from pants.backend.docker.value_interpolation import (
     DockerInterpolationError,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot, CreateDigest
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, CreateDigest, Snapshot
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import (
@@ -161,16 +161,8 @@ def assert_build(
                 input_type=WrappedTargetRequest,
                 mock=lambda _: WrappedTarget(tgt),
             ),
-            MockGet(
-                output_type=Digest,
-                input_type=CreateDigest,
-                mock=lambda _: EMPTY_DIGEST
-            ),
-            MockGet(
-                output_type=Digest,
-                input_type=MergeDigests,
-                mock=lambda _: EMPTY_DIGEST
-            ),
+            MockGet(output_type=Digest, input_type=CreateDigest, mock=lambda _: EMPTY_DIGEST),
+            MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
             MockGet(
                 output_type=FallibleProcessResult,
                 input_type=Process,
