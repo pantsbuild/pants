@@ -92,6 +92,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -127,6 +128,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             be removed in. You must also set `removal_hint`.
         :param removal_hint: If the option is deprecated, provides a message to display to the
             user when running `help`.
+        :param deprecation_start_version: If the option is deprecated, sets the version at which the
+            deprecation will begin. Must be less than the `removal_version`.
         """
         self = super().__new__(cls)
         self._flag_names = (flag_name,)
@@ -145,6 +148,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
                 "mutually_exclusive_group": mutually_exclusive_group,
                 "removal_hint": removal_hint,
                 "removal_version": removal_version,
+                "deprecation_start_version": deprecation_start_version,
             }.items()
             if v is not None
         }
@@ -220,6 +224,7 @@ class _ListOptionBase(
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -240,6 +245,7 @@ class _ListOptionBase(
             mutually_exclusive_group=mutually_exclusive_group,
             removal_hint=removal_hint,
             removal_version=removal_version,
+            deprecation_start_version=deprecation_start_version,
         )
         return instance
 
@@ -435,6 +441,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -459,6 +466,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -483,6 +491,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -505,6 +514,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         mutually_exclusive_group=None,
         removal_version=None,
         removal_hint=None,
+        deprecation_start_version=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -522,6 +532,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             mutually_exclusive_group=mutually_exclusive_group,
             removal_version=removal_version,
             removal_hint=removal_hint,
+            deprecation_start_version=deprecation_start_version,
             daemon=daemon,
             fingerprint=fingerprint,
         )
@@ -573,6 +584,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -597,6 +609,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -620,6 +633,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -642,6 +656,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         mutually_exclusive_group=None,
         removal_version=None,
         removal_hint=None,
+        deprecation_start_version=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -659,6 +674,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
             mutually_exclusive_group=mutually_exclusive_group,
             removal_version=removal_version,
             removal_hint=removal_hint,
+            deprecation_start_version=deprecation_start_version,
             daemon=daemon,
             fingerprint=fingerprint,
         )
@@ -723,6 +739,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
         removal_hint: str | None = None,
+        deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -742,6 +759,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
             mutually_exclusive_group=mutually_exclusive_group,
             removal_hint=removal_hint,
             removal_version=removal_version,
+            deprecation_start_version=deprecation_start_version,
         )
 
     def _convert_(self, val: Any) -> dict[str, _ValueT]:

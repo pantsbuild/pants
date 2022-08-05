@@ -27,7 +27,7 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
@@ -86,7 +86,9 @@ def single_target_run(
                     port="5678",
                 ),
                 create_subsystem(
-                    GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
+                    GlobalOptions,
+                    pants_workdir=rule_runner.pants_workdir,
+                    keep_sandboxes=KeepSandboxes.never,
                 ),
                 workspace,
                 BuildRoot(),

@@ -244,7 +244,7 @@ impl PyExecutionStrategyOptions {
   fn __new__(
     local_parallelism: usize,
     remote_parallelism: usize,
-    local_cleanup: bool,
+    local_keep_sandboxes: String,
     local_cache: bool,
     local_enable_nailgun: bool,
     remote_cache_read: bool,
@@ -256,7 +256,8 @@ impl PyExecutionStrategyOptions {
     Self(ExecutionStrategyOptions {
       local_parallelism,
       remote_parallelism,
-      local_cleanup,
+      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(&local_keep_sandboxes)
+        .unwrap(),
       local_cache,
       local_enable_nailgun,
       remote_cache_read,
