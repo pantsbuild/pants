@@ -92,13 +92,13 @@ class HelmDeploymentRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class _HelmDeploymentAction(EngineAwareParameter, EngineAwareReturnType):
+class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType):
     """Intermediate representation of a `HelmProcess` that will produce a fully rendered set of
     manifests from a given chart.
 
-    The encapsulated `process` will correspond to the `cmd` that was originally requested.
+    The encapsulated `process` will be side-effecting dependening on the `cmd` that was originally requested.
 
-    This is meant only to be used internally by this module
+    This is meant to only be used internally by this module.
     """
 
     chart: HelmChart
@@ -126,7 +126,7 @@ class _HelmDeploymentAction(EngineAwareParameter, EngineAwareReturnType):
     def message(self) -> str | None:
         msg = softwrap(
             f"""
-            Built renderer for {self.address} using chart {self.chart.address}
+            Built deployment process for {self.address} using chart {self.chart.address}
             with{'out' if not self.output_directory else ''} a post-renderer stage
             """
         )
@@ -158,7 +158,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return softwrap(
             f"""
             Generated {pluralize(len(self.snapshot.files), 'file')} from deployment {self.address}
-            using chart {self.chart}.
+            using chart {self.chart.address}.
             """
         )
 
@@ -218,10 +218,10 @@ async def _sort_value_file_names_for_evaluation(
     return result
 
 
-@rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
+@rule(desc="Prepare Helm deployment renderer")
 async def setup_render_helm_deployment_process(
     request: HelmDeploymentRequest,
-) -> _HelmDeploymentAction:
+) -> _HelmDeploymentProcessWrapper:
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(
@@ -322,7 +322,7 @@ async def setup_render_helm_deployment_process(
         output_directories=output_directories,
     )
 
-    return _HelmDeploymentAction(
+    return _HelmDeploymentProcessWrapper(
         cmd=request.cmd,
         chart=chart,
         process=process,
@@ -335,9 +335,9 @@ _YAML_FILE_SEPARATOR = "---"
 _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
-@rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
-async def run_renderer(action: _HelmDeploymentAction) -> RenderedHelmFiles:
-    assert not action.is_side_effect
+@rule(desc="Render Helm deployment", level=LogLevel.DEBUG)
+async def run_renderer(process_wrapper: _HelmDeploymentProcessWrapper) -> RenderedHelmFiles:
+    assert not process_wrapper.is_side_effect
 
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         sanitised_lines = list(lines)
@@ -370,29 +370,35 @@ async def run_renderer(action: _HelmDeploymentAction) -> RenderedHelmFiles:
 
         return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
 
-    logger.debug(f"Running Helm renderer process for {action.address}")
-    result = await Get(ProcessResult, HelmProcess, action.process)
+    logger.debug(f"Rendering Helm files for {process_wrapper.address}")
+    result = await Get(ProcessResult, HelmProcess, process_wrapper.process)
 
     output_snapshot = EMPTY_SNAPSHOT
-    if not action.output_directory:
-        logger.debug(f"Parsing Helm renderer files from the process' output of {action.address}.")
+    if not process_wrapper.output_directory:
+        logger.debug(
+            f"Parsing Helm rendered files from the process' output of {process_wrapper.address}."
+        )
         output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
     else:
         logger.debug(
-            f"Obtaining Helm renderer files from the process' output directory of {action.address}."
+            f"Obtaining Helm rendered files from the process' output directory of {process_wrapper.address}."
         )
         output_snapshot = await Get(
-            Snapshot, RemovePrefix(result.output_digest, action.output_directory)
+            Snapshot, RemovePrefix(result.output_digest, process_wrapper.output_directory)
         )
 
-    return RenderedHelmFiles(address=action.address, chart=action.chart, snapshot=output_snapshot)
+    return RenderedHelmFiles(
+        address=process_wrapper.address, chart=process_wrapper.chart, snapshot=output_snapshot
+    )
 
 
 @rule
-async def materialize_deployment_action(action: _HelmDeploymentAction) -> InteractiveProcess:
-    assert action.is_side_effect
+async def materialize_deployment_process_wrapper_into_interactive_process(
+    process_wrapper: _HelmDeploymentProcessWrapper,
+) -> InteractiveProcess:
+    assert process_wrapper.is_side_effect
 
-    process = await Get(Process, HelmProcess, action.process)
+    process = await Get(Process, HelmProcess, process_wrapper.process)
     return InteractiveProcess.from_process(process)
 
 

@@ -23,7 +23,6 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRequest,
     RenderedHelmFiles,
 )
-from pants.backend.helm.utils.docker import ImageRef
 from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DigestEntries, FileEntry
@@ -47,10 +46,10 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class HelmDeploymentReport:
     address: Address
-    image_refs: FrozenYamlIndex[ImageRef]
+    image_refs: FrozenYamlIndex[str]
 
     @property
-    def all_image_refs(self) -> FrozenOrderedSet[ImageRef]:
+    def all_image_refs(self) -> FrozenOrderedSet[str]:
         return FrozenOrderedSet(self.image_refs.values())
 
 
@@ -75,15 +74,15 @@ async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymen
         if isinstance(entry, FileEntry)
     )
 
-    # Build YAML index of `ImageRef`s for future processing during depedendecy inference or post-rendering.
-    image_refs_index: MutableYamlIndex[ImageRef] = MutableYamlIndex()
+    # Build YAML index of Docker image refs for future processing during depedendecy inference or post-rendering.
+    image_refs_index: MutableYamlIndex[str] = MutableYamlIndex()
     for manifest in parsed_manifests:
         for (idx, path, image_ref) in manifest.found_image_refs:
             image_refs_index.insert(
                 file_path=PurePath(manifest.filename),
                 document_index=idx,
                 yaml_path=path,
-                item=ImageRef.parse(image_ref),
+                item=image_ref,
             )
 
     return HelmDeploymentReport(address=field_set.address, image_refs=image_refs_index.frozen())
@@ -91,9 +90,16 @@ async def analyse_deployment(field_set: HelmDeploymentFieldSet) -> HelmDeploymen
 
 @dataclass(frozen=True)
 class FirstPartyHelmDeploymentMappings:
-    deployment_to_docker_addresses: FrozenDict[Address, FrozenYamlIndex[tuple[ImageRef, Address]]]
+    """A mapping between `helm_deployment` target addresses and tuples made up of a Docker image
+    reference and a `docker_image` target address.
 
-    def referenced_by(self, address: Address) -> list[tuple[ImageRef, Address]]:
+    The tuples of Docker image references and addresses are stored in a YAML index so we can track
+    the locations in which the Docker image refs appear in the deployment files.
+    """
+
+    deployment_to_docker_addresses: FrozenDict[Address, FrozenYamlIndex[tuple[str, Address]]]
+
+    def docker_addresses_referenced_by(self, address: Address) -> list[tuple[str, Address]]:
         if address not in self.deployment_to_docker_addresses:
             return []
         return list(self.deployment_to_docker_addresses[address].values())
@@ -110,7 +116,7 @@ async def first_party_helm_deployment_mappings(
 
     docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
 
-    def lookup_docker_addreses(image_ref: ImageRef) -> tuple[ImageRef, Address] | None:
+    def lookup_docker_addreses(image_ref: str) -> tuple[str, Address] | None:
         addr = docker_target_addresses.get(str(image_ref), None)
         if addr:
             return image_ref, addr
@@ -144,7 +150,7 @@ async def inject_deployment_dependencies(
     explicitly_provided_deps = await Get(
         ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
-    candidate_docker_addresses = mapping.referenced_by(request.field_set.address)
+    candidate_docker_addresses = mapping.docker_addresses_referenced_by(request.field_set.address)
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for imager_ref, candidate_address in candidate_docker_addresses:
@@ -166,7 +172,6 @@ async def inject_deployment_dependencies(
     logging.debug(
         f"Found {pluralize(len(dependencies), 'dependency')} for target {request.field_set.address}"
     )
-
     return InferredDependencies(dependencies)
 
 

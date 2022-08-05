@@ -113,6 +113,9 @@ _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 @dataclass(frozen=True)
 class SetupHelmPostRenderer(EngineAwareParameter):
+    """Request for a post-renderer process that will perform a series of replacements in the
+    generated files."""
+
     replacements: FrozenYamlIndex[str]
     description_of_origin: str
 

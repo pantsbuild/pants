@@ -27,7 +27,6 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.utils.docker import ImageRef
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
@@ -101,9 +100,9 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     dependencies_report = rule_runner.request(HelmDeploymentReport, [field_set])
 
     expected_container_refs = [
-        ImageRef(registry=None, repository="busybox", tag="1.28"),
-        ImageRef(registry=None, repository="busybox", tag="1.29"),
-        ImageRef(registry="example.com", repository="containers/busybox", tag="1.28"),
+        "busybox:1.28",
+        "busybox:1.29",
+        "example.com/containers/busybox:1.28",
     ]
 
     assert len(dependencies_report.all_image_refs) == 3
@@ -146,11 +145,11 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     deployment_addr = Address("src/deployment", target_name="foo")
     tgt = rule_runner.get_target(deployment_addr)
 
-    expected_image_ref = ImageRef.parse("src/image:myapp")
+    expected_image_ref = "src/image:myapp"
     expected_dependency_addr = Address("src/image", target_name="myapp")
 
     mappings = rule_runner.request(FirstPartyHelmDeploymentMappings, [])
-    assert mappings.referenced_by(deployment_addr) == [
+    assert mappings.docker_addresses_referenced_by(deployment_addr) == [
         (expected_image_ref, expected_dependency_addr)
     ]
 

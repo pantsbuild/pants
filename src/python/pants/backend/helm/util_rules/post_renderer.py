@@ -24,7 +24,6 @@ from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDep
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
-from pants.backend.helm.utils.docker import ImageRef
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -110,7 +109,7 @@ async def prepare_post_renderer_for_helm_deployment(
         for addr, ctx in zip(docker_addresses, docker_contexts)
     }
 
-    def find_replacement(value: tuple[ImageRef, Address]) -> str | None:
+    def find_replacement(value: tuple[str, Address]) -> str | None:
         _, addr = value
         return docker_addr_ref_mapping.get(addr)
 
