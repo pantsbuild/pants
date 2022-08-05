@@ -30,6 +30,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -94,8 +95,22 @@ async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
 
     mapping_not_stripped = {tgt[CCSourceField].file_path: tgt.address for tgt in cc_targets}
 
+    paths: set[PurePath] = set()
+    for key in mapping_not_stripped.keys():
+        paths = paths.union(PurePath(key).parents)
+    source_roots = await Get(SourceRootsResult, SourceRootsRequest([], paths))
+    cc_roots = source_roots.path_to_root.values()
+
     # TODO: Put rule_helper back in
     alternative_source_roots: dict[str, Address] = {}
+    # Determine if there is a source root in the file's path, and create an alternative mapping with those roots
+    # TODO: There are probably better built-ins to optimize this double/triple loop
+    for file_path, address in mapping_not_stripped.items():
+        for root in cc_roots:
+            include_path = root.path + "/include/"
+            if include_path in file_path:
+                sub_path = file_path.replace(include_path, "")
+                alternative_source_roots[sub_path] = address
 
     return CCFilesMapping(
         mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.cc.dependency_inference.rules import (
@@ -12,6 +13,7 @@ from pants.backend.cc.dependency_inference.rules import (
     InferCCDependenciesRequest,
 )
 from pants.backend.cc.subsystems.toolchain import CCToolchain
+from pants.backend.cc.target_types import CC_HEADER_FILE_EXTENSIONS
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
@@ -77,7 +79,7 @@ async def compile_cc_source(
             [wrapped_target.target.get(SourcesField) for wrapped_target in wrapped_targets]
         ),
     )
-    logger.error(inferred_source_files.snapshot)
+    logger.info(inferred_source_files.snapshot)
 
     input_digest = await Get(
         Digest,
@@ -87,8 +89,23 @@ async def compile_cc_source(
     # Run compilation
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
-    # TODO: Hardcoded test
-    argv = (toolchain.c, "-I /examples/cc/core/include", "-c", target_file)
+
+    # Add header include directories to compilation args
+    inferred_header_files = [
+        file
+        for file in inferred_source_files.files
+        if PurePath(file).suffix in CC_HEADER_FILE_EXTENSIONS
+    ]
+    include_directories = [
+        file.split("/inc")[0] for file in inferred_header_files if "/inc" in file
+    ]
+
+    argv = [toolchain.c]
+    for d in include_directories:
+        argv += ["-I", f"{d}/include"]
+    argv += ["-c", target_file]
+
+    # argv = (toolchain.c, "-I", "examples/cc/core/include", "-c", target_file)
     compile_result = await Get(
         FallibleProcessResult,
         Process(
