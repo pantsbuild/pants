@@ -98,6 +98,10 @@ def load_plugins(
         if "rules" in entries:
             rules = entries["rules"].load()()
             build_configuration.register_rules(req.key, rules)
+        if "remote_auth" in entries:
+            remote_auth_func = entries["remote_auth"].load()
+            build_configuration.register_remote_auth_plugin(remote_auth_func)
+
         loaded[dist.as_requirement().key] = dist
 
 

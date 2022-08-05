@@ -15,7 +15,7 @@ humbug==0.2.7
 
 ijson==3.1.4
 packaging==21.3
-pex==2.1.99
+pex==2.1.102
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -48,3 +48,6 @@ fastapi==0.78.0
 starlette==0.19.1
 strawberry-graphql[fastapi]==0.114.0
 uvicorn[standard]==0.17.6
+
+beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
+python-gnupg==0.4.9 # For validating signatures

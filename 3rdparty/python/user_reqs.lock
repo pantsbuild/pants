@@ -11,6 +11,7 @@
 //   "generated_with_requirements": [
 //     "PyYAML<7.0,>=6.0",
 //     "ansicolors==1.1.8",
+//     "beautifulsoup4==4.11.1",
 //     "chevron==0.14.0",
 //     "debugpy==1.6.0",
 //     "fastapi==0.78.0",
@@ -20,10 +21,11 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.99",
+//     "pex==2.1.102",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
+//     "python-gnupg==0.4.9",
 //     "python-lsp-jsonrpc==1.0.0",
 //     "requests[security]>=2.28.1",
 //     "setproctitle==1.2.2",
@@ -201,6 +203,28 @@
           ],
           "requires_python": ">=3.6.0",
           "version": "1.0.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "58d5c3d29f5a36ffeb94f02f0d786cd53014cf9b3b3951d42e0080d8a9498d30",
+              "url": "https://files.pythonhosted.org/packages/9c/d8/909c4089dbe4ade9f9705f143c9f13f065049a9d5e7d34c828aefdd0a97c/beautifulsoup4-4.11.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "ad9aa55b65ef2808eb405f46cf74df7fcb7044d5cbc26487f96eb2ef2e436693",
+              "url": "https://files.pythonhosted.org/packages/e8/b0/cd2b968000577ec5ce6c741a54d846dfa402372369b8b6861720aa9ecea7/beautifulsoup4-4.11.1.tar.gz"
+            }
+          ],
+          "project_name": "beautifulsoup4",
+          "requires_dists": [
+            "html5lib; extra == \"html5lib\"",
+            "lxml; extra == \"lxml\"",
+            "soupsieve>1.2"
+          ],
+          "requires_python": ">=3.6.0",
+          "version": "4.11.1"
         },
         {
           "artifacts": [
@@ -832,13 +856,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b9e7a1070c4f616b9114e10475e9c49f3ff9332789e581edf4b5646ae477d0b1",
-              "url": "https://files.pythonhosted.org/packages/cf/44/b4bddb5599370e86a8366e21fb6b2bb2a703e0d0d7a594e20d70f7082940/pex-2.1.99-py2.py3-none-any.whl"
+              "hash": "3743864e09e1017224c5dc6476463ed24b6fea3ac62d379fedc2c6182b2f2159",
+              "url": "https://files.pythonhosted.org/packages/ef/41/a242ae32220cd2951faedddfed3db85393906497526060954b064f9022b7/pex-2.1.102-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3feaf424e495c0855691044ebec6e9528730078c741eb572cbda18f4274d8fab",
-              "url": "https://files.pythonhosted.org/packages/f8/76/7e17f82344dd14a5a9cf76391cdf6edeede0e409432a319db98512d11375/pex-2.1.99.tar.gz"
+              "hash": "fa34cef083bede3ea45413638c24e84698949904ef0559994e734b6d21de363c",
+              "url": "https://files.pythonhosted.org/packages/71/f1/125bbeb76821dfe20fc78eb6ebaf963c67ee3a32cc37c907ae54f743c69e/pex-2.1.102.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -846,7 +870,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.99"
+          "version": "2.1.102"
         },
         {
           "artifacts": [
@@ -1194,6 +1218,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "012960bde4d25dad631bb7650f563dda5e7271248a73f3584240063a293d99d8",
+              "url": "https://files.pythonhosted.org/packages/a7/01/7cd32f2e2b1db9ee7eeeb0fb729bedf71903d00ccc2c13a590576a62aa91/python_gnupg-0.4.9-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "aaa748795572591aaf127b4ac8985684f3673ff82b39f370c836b006e68fc537",
+              "url": "https://files.pythonhosted.org/packages/c8/cb/46fb80639cf0dd4251aeb075a1a5e2ebbb8c9656f28ddfe9d8c99b68b6da/python-gnupg-0.4.9.tar.gz"
+            }
+          ],
+          "project_name": "python-gnupg",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "0.4.9"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "079b143be64b0a378bdb21dff5e28a8c1393fe7e8a654ef068322d754e545fc7",
               "url": "https://files.pythonhosted.org/packages/06/ee/754bfd5f6bfe7162c10d3ecb0aeef6f882f91d3231596c83f761a75efd0b/python_lsp_jsonrpc-1.0.0-py3-none-any.whl"
             },
@@ -1496,6 +1538,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "3b2503d3c7084a42b1ebd08116e5f81aadfaea95863628c80a3b774a11b7c759",
+              "url": "https://files.pythonhosted.org/packages/16/e3/4ad79882b92617e3a4a0df1960d6bce08edfb637737ac5c3f3ba29022e25/soupsieve-2.3.2.post1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fc53893b3da2c33de295667a0e19f078c14bf86544af307354de5fcf12a3f30d",
+              "url": "https://files.pythonhosted.org/packages/f3/03/bac179d539362319b4779a00764e95f7542f4920084163db6b0fd4742d38/soupsieve-2.3.2.post1.tar.gz"
+            }
+          ],
+          "project_name": "soupsieve",
+          "requires_dists": [
+            "backports-functools-lru-cache; python_version < \"3\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "2.3.2.post1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "5a60c5c2d051f3a8eb546136aa0c9399773a689595e099e0877704d5888279bf",
               "url": "https://files.pythonhosted.org/packages/f1/9d/1fa96008b302dd3e398f89f3fc5afb19fb0b0f341fefa05c65b3a38d64cf/starlette-0.19.1-py3-none-any.whl"
             },
@@ -1689,19 +1751,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "20588c285e5ca336d908d2705994830a83cfb6bda40fc356bbafaf430a262013",
-              "url": "https://files.pythonhosted.org/packages/04/9f/65ce26fb8b191c91ec7afe3804da305c02331111d8abec7bf706a35b68a5/types_urllib3-1.26.16-py3-none-any.whl"
+              "hash": "0d027fcd27dbb3cb532453b4d977e05bc1e13aefd70519866af211b3003d895d",
+              "url": "https://files.pythonhosted.org/packages/92/6f/37d8bc1572c4e6f1562ed7847f9ce3a48e23bd54ddbaf6786a6adee9f24d/types_urllib3-1.26.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8bb3832c684c30cbed40b96e28bc04703becb2b97d82ac65ba4b968783453b0e",
-              "url": "https://files.pythonhosted.org/packages/7f/71/f6078ac156b931e70ab206fc84938697ca1f3a08510a2e08a683ba1b0317/types-urllib3-1.26.16.tar.gz"
+              "hash": "73fd274524c3fc7cd8cd9ceb0cb67ed99b45f9cb2831013e46d50c1451044800",
+              "url": "https://files.pythonhosted.org/packages/ac/2f/79494805b4f9b55b9c09d78c4bef776e6bf59b49463a046cb3851d1dbd60/types-urllib3-1.26.17.tar.gz"
             }
           ],
           "project_name": "types-urllib3",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.26.16"
+          "version": "1.26.17"
         },
         {
           "artifacts": [
@@ -1893,13 +1955,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8298d6d56d39be0e3bc13c1c97d133f9b45d797169a0e11cdd0e0489d786f7ec",
-              "url": "https://files.pythonhosted.org/packages/68/47/93d3d28e97c7577f563903907912f4b3804054e4877a5ba6651f7182c53b/urllib3-1.26.10-py2.py3-none-any.whl"
+              "hash": "c33ccba33c819596124764c23a97d25f32b28433ba0dedeb77d873a38722c9bc",
+              "url": "https://files.pythonhosted.org/packages/d1/cb/4783c8f1a90f89e260dbf72ebbcf25931f3a28f8f80e2e90f8a589941b19/urllib3-1.26.11-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "879ba4d1e89654d9769ce13121e0f94310ea32e8d2f8cf587b77c08bbcdb30d6",
-              "url": "https://files.pythonhosted.org/packages/25/36/f056e5f1389004cf886bb7a8514077f24224238a7534497c014a6b9ac770/urllib3-1.26.10.tar.gz"
+              "hash": "ea6e8fb210b19d950fab93b60c9009226c63a28808bc8386e05301e25883ac0a",
+              "url": "https://files.pythonhosted.org/packages/6d/d5/e8258b334c9eb8eb78e31be92ea0d5da83ddd9385dc967dd92737604d239/urllib3-1.26.11.tar.gz"
             }
           ],
           "project_name": "urllib3",
@@ -1915,7 +1977,7 @@
             "pyOpenSSL>=0.14; extra == \"secure\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<4,>=2.7",
-          "version": "1.26.10"
+          "version": "1.26.11"
         },
         {
           "artifacts": [
@@ -2251,11 +2313,12 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.99",
+  "pex_version": "2.1.102",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
+    "beautifulsoup4==4.11.1",
     "chevron==0.14.0",
     "debugpy==1.6.0",
     "fastapi==0.78.0",
@@ -2265,10 +2328,11 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.99",
+    "pex==2.1.102",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
+    "python-gnupg==0.4.9",
     "python-lsp-jsonrpc==1.0.0",
     "requests[security]>=2.28.1",
     "setproctitle==1.2.2",

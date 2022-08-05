@@ -35,7 +35,7 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
@@ -749,8 +749,11 @@ impl Store {
         if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
           ingested_digests.keys().cloned().collect()
         } else {
-          let request = remote.find_missing_blobs_request(ingested_digests.keys());
-          remote.list_missing_digests(request).await?
+          remote
+            .list_missing_digests(
+              remote.find_missing_blobs_request(ingested_digests.keys().cloned()),
+            )
+            .await?
         };
 
       future::try_join_all(
@@ -851,6 +854,69 @@ impl Store {
         }
       })
       .await
+  }
+
+  ///
+  /// Return true if the given directory and file digests are loadable from either the local or remote
+  /// Store, without downloading any file content.
+  ///
+  /// The given directory digests will be recursively expanded, so it is not necessary to
+  /// explicitly list their file digests in the file digests list.
+  ///
+  pub async fn exists_recursive(
+    &self,
+    directory_digests: impl IntoIterator<Item = DirectoryDigest>,
+    file_digests: impl IntoIterator<Item = Digest>,
+  ) -> Result<bool, StoreError> {
+    // Load directories, which implicitly validates that they exist.
+    let digest_tries = future::try_join_all(
+      directory_digests
+        .into_iter()
+        .map(|dd| self.load_digest_trie(dd)),
+    )
+    .await?;
+
+    // Collect all file digests.
+    let mut file_digests = file_digests.into_iter().collect::<HashSet<_>>();
+    for digest_trie in digest_tries {
+      digest_trie.walk(&mut |_, entry| match entry {
+        directory::Entry::File(f) => {
+          file_digests.insert(f.digest());
+        }
+        directory::Entry::Directory(_) => (),
+      });
+    }
+
+    // Filter out file digests that exist locally.
+    // TODO: Implement a local batch API: see https://github.com/pantsbuild/pants/issues/16400.
+    let local_file_exists = future::try_join_all(
+      file_digests
+        .iter()
+        .map(|file_digest| self.local.exists(EntryType::File, *file_digest))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    let missing_locally = local_file_exists
+      .into_iter()
+      .zip(file_digests.into_iter())
+      .filter_map(|(exists, digest)| if exists { None } else { Some(digest) })
+      .collect::<Vec<_>>();
+
+    // If there are any digests which don't exist locally, check remotely.
+    if missing_locally.is_empty() {
+      return Ok(true);
+    }
+    let remote = if let Some(remote) = self.remote.clone() {
+      remote
+    } else {
+      return Ok(false);
+    };
+    let missing = remote
+      .store
+      .list_missing_digests(remote.store.find_missing_blobs_request(missing_locally))
+      .await?;
+
+    Ok(missing.is_empty())
   }
 
   ///

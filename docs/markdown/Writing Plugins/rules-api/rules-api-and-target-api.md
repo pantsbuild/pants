@@ -4,7 +4,7 @@ slug: "rules-api-and-target-api"
 excerpt: "How to use the Target API in rules."
 hidden: false
 createdAt: "2020-05-07T22:38:40.217Z"
-updatedAt: "2022-04-27T17:50:52.879Z"
+updatedAt: "2022-07-25T17:50:52.879Z"
 ---
 Start by reading the [Concepts](doc:target-api-concepts) of the Target API.
 
@@ -101,22 +101,48 @@ async def example(targets: Targets) -> Foo:
     ...
 ```
 
-You can also request `Addresses` (from `pants.engine.addresses`) as a parameter to your `@rule` if you only need the addresses specified on the command line by a user.
+(You can also request `Addresses` (from `pants.engine.addresses`) as a parameter to your `@rule` if you only need the addresses specified on the command line by a user.)
+
+Use `AllTargets` to instead get all targets defined in the repository.
+
+```python
+from pants.engine.target import AllTargets
+
+@rule
+async def example(targets: AllTargets) -> Foo:
+    logger.info(f"All targets: {[tgt.address.spec for tgt in targets]}")
+    ...
+```
 
 For most [Common plugin tasks](doc:common-plugin-tasks), like adding a linter, Pants will have already filtered out the relevant targets for you and will pass you only the targets you care about.
 
 Given targets, you can find their direct and transitive dependencies. See the below section "The Dependencies field".
 
-You can also find targets by writing your own `Spec`s, rather than using what the user provided. (All of these types come from `pants.base.specs`.)
+You can also find targets by writing your own `Spec`s, rather than using what the user provided. (The types come from `pants.base.specs`.)
 
-- `await Get(Targets, AddressSpecs([DescendantAddresses("dir")])` -> `./pants list dir::`
-- `await Get(Targets, AddressSpecs([SiblingAddresses("dir")])` -> `./pants list dir:`
-- `await Get(Targets, AddressSpecs([AscendantAddresess("dir")])` -> will find all targets in this directory and above
-- `await Get(Targets, AddressSpecs([AddressLiteral("dir", "tgt")])` -> `./pants list dir:tgt`
-- `await Get(Targets, FilesystemSpecs([FilesystemLiteralSpec("dir/f.ext")])` -> `./pants list dir/f.ext`
-- `await Get(Targets, FilesystemSpecs([FilesystemGlobSpec("dir/_.ext")])` -> `./pants list 'dir/_.ext'`
+```python
+# Inside an `@rule`, use `await Get` like this.
+await Get(
+    Targets,
+    RawSpecs(
+        description_of_origin="my plugin",  # Used in error messages for invalid specs.
+        # Each of these keyword args are optional.
+        address_literals=(
+            AddressLiteralSpec("my_dir", target_component="tgt"),  # `my_dir:tgt`
+            AddressLiteralSpec("my_dir", target_component="tgt", generated_component="gen"),  # `my_dir:tgt#gen`
+            AddressLiteralSpec("my_dir/f.ext", target_component="tgt"),  # `my_dir/f.ext:tgt`
+        ),
+        file_literals=(FileLiteralSpec("my_dir/f.ext"),),  # `my_dir/f.ext`
+        file_globs=(FileGlobSpec("my_dir/*.ext"),),  # `my_dir/*.ext`
+        dir_literals=(DirLiteralSpec("my_dir"),),  # `my_dir/`
+        dir_globs=(DirGlobSpec("my_dir"),),  # `my_dir:`
+        recursive_globs=(RecursiveGlobs("my_dir"),),  # `my_dir::`
+        ancestor_globs=(AncestorGlobs("my_dir"),),  # i.e. `my_dir` and all ancestors
+    )
+)
+```
 
-Finally, you can look up an `Address` given a raw address string. This is often useful to allow a user to refer to targets in [Options](doc:rules-api-subsystems) and in `Field`s in your `Target`. For example, this mechanism is how the `dependencies` field works. This will error if the address does not exist.
+Finally, you can look up an `Address` given a raw address string, using `AddressInput`. This is often useful to allow a user to refer to targets in [Options](doc:rules-api-subsystems) and in `Field`s in your `Target`. For example, this mechanism is how the `dependencies` field works. This will error if the address does not exist.
 
 ```python
 from pants.engine.addresses import AddressInput, Address
@@ -124,7 +150,11 @@ from pants.engine.rules import Get, rule
 
 @rule
 async def example(...) -> Foo:
-    address = await Get(Address, AddressInput, AddressInput.parse("project/util:tgt"))
+    address = await Get(
+        Address,
+        AddressInput,
+        AddressInput.parse("project/util:tgt", description_of_origin="my custom rule"),
+    )
 ```
 
 Given an `Address`, there are two ways to find its corresponding `Target`:
@@ -132,18 +162,21 @@ Given an `Address`, there are two ways to find its corresponding `Target`:
 ```python
 from pants.engine.addresses import AddressInput, Address, Addresses
 from pants.engine.rules import Get, rule
-from pants.engine.target import Targets, WrappedTarget
+from pants.engine.target import Targets, WrappedTarget, WrappedTargetRequest
 
 @rule
 async def example(...) -> Foo:
     address = Address("project/util", target_name="tgt")
 
     # Approach #1
-    wrapped_target = await Get(WrappedTarget, Address, address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(address, description_of_origin="my custom rule"),
+    )
     target = wrapped_target.target
 
     # Approach #2
-    targets = await Get(Targets, Addresses([address])
+    targets = await Get(Targets, Addresses([address]))
     target = targets[0]
 ```
 
@@ -201,26 +234,25 @@ class MyTarget(Target):
     core_fields = (..., PackagesField)
 ```
 
-Then, to resolve the addresses, you can use:
+Then, to resolve the addresses, you can use `UnparsedAddressInputs`:
 
 ```python
-from pants.engine.addresses import Address, Addresses, UnparsedAddressedInputs
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.target import Targets
 from pants.engine.rules import Get, rule
 
 @rule
 async def demo(...) -> Foo:
-    
     addresses = await Get(
         Addresses,
-        UnparsedAddressedInputs,
-        my_tgt[MyField]].to_unparsed_address_inputs()
+        UnparsedAddressInputs,
+        my_tgt[MyField].to_unparsed_address_inputs()
     )
     # Or, use this:
     targets = await Get(
         Targets,
-        UnparsedAddressedInputs,
-        my_tgt[MyField]].to_unparsed_address_inputs()
+        UnparsedAddressInputs,
+        my_tgt[MyField].to_unparsed_address_inputs()
     )
 ```
 

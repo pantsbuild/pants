@@ -61,12 +61,12 @@ Pants will also memoize in-memory the evaluation of all `@rule`s. This means tha
 Debugging: Look inside the chroot
 ---------------------------------
 
-When Pants runs most processes, it runs in a `chroot` (temporary directory). Usually, this gets cleaned up after the `Process` finishes. You can instead run `./pants --no-process-cleanup`, which will keep around the folder.
+When Pants runs most processes, it runs in a `chroot` (temporary directory). Usually, this gets cleaned up after the `Process` finishes. You can instead pass `--keep-sandboxes=always` to keep those directories for all processes, or `--keep-sandboxes=on_failure` to keep those directories for only processes which have failed.
 
 Pants will log the path to the chroot, e.g.:
 
 ```
-▶ ./pants --no-process-cleanup test src/python/pants/util/strutil_test.py
+▶ ./pants --keep-sandboxes=always test src/python/pants/util/strutil_test.py
 ...
 12:29:45.08 [INFO] preserving local process execution dir `"/private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/process-executionN9Kdk0"` for "Test binary /Users/pantsbuild/.pyenv/shims/python3."
 ...

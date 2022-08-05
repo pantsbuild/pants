@@ -81,7 +81,7 @@ You can leave off the `/` prefix to match any directory whose suffix matches a p
 - `src/python`
 - `project1/src/python`
 
-You can use `_` as a glob. For example, `root_patterns = ["/src/_"]` would consider all of these to be source roots:
+You can use `*` as a glob. For example, `root_patterns = ["/src/*"]` would consider all of these to be source roots:
 
 - `src/python`
 - `src/java`

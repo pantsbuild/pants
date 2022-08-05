@@ -468,6 +468,19 @@ impl ExecuteProcess {
       }
     }
 
+    if backtrack_level > 0 {
+      // TODO: This message is symmetrical to the "Making attempt {} to backtrack and retry {}"
+      // message in `context.rs`, but both of them are effectively debug output. They should be
+      // quieted down as part of https://github.com/pantsbuild/pants/issues/15867 once all bugs
+      // have been shaken out.
+      log::info!(
+        "On backtrack attempt {} for `{}`, produced: {:?}",
+        backtrack_level,
+        request.description,
+        res.output_directory.digests()
+      );
+    }
+
     Ok(ProcessResult {
       result: res,
       backtrack_level,

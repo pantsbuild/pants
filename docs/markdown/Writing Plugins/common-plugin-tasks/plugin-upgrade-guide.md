@@ -4,7 +4,7 @@ slug: "plugin-upgrade-guide"
 excerpt: "How to adjust for changes made to the Plugin API."
 hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
-updatedAt: "2022-04-27T20:02:17.695Z"
+updatedAt: "2022-07-25T20:02:17.695Z"
 ---
 2.14
 ----
@@ -50,7 +50,84 @@ on `FieldSet`'s mechanisms for matching targets and getting field values.
 
 See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.13.x.md> for the changelog.
 
-(TODO. Come back later)
+### `AddressInput` and `UnparsedAddressInputs` require `description_of_origin`
+
+Both types now require the keyword argument `description_of_origin: str`, which is used to make better error messages when the address cannot be found.
+
+If the address is hardcoded in your rules, then use a description like `"the rule find_my_binary"`. If the address comes from user inputs, it is helpful to mention where the user defines the value, for example `f"the dependencies field from the target {my_tgt.address}"`.
+
+You can now also set `UnparsedAddressInputs(skip_invalid_addresses=True, ...)`, which will not error when addresses are invalid.
+
+### `WrappedTarget` requires `WrappedTargetRequest`
+
+Before:
+
+```python
+from pants.engine.addresses import Address
+from pants.engine.target import WrappedTarget
+
+await Get(WrappedTarget, Address, my_address)
+```
+
+After:
+
+```python
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
+
+await Get(WrappedTarget, WrappedTargetRequest(my_address, description_of_origin="my rule"))
+```
+
+### Redesign of `Specs`
+
+Specs, aka command line arguments, were redesigned in Pants 2.13:
+
+* The globs `::` and `:` now match all files, even if there are no owning targets.
+* Directory args like `my_dir/` can be set to match everything in the current directory, rather than the default target `my_dir:my_dir`.
+* Ignore globs were added with a `-` prefix, like `:: -ignore_me::`
+
+To support these changes, we redesigned the class `Specs` and its sibling classes like `AddressSpecs`.
+
+Renames for `Spec` subclass:
+
+* `SiblingAddresses` -> `DirGlobSpec` (vs. `DirLiteralSpec`)
+* `DescendantAddresses` -> `RecursiveGlobSpec`
+* `AscendantAddresses` -> `AncestorGlobSpec`
+
+Those classes now have a keyword arg `error_if_no_target_matches`, rather than having a distinct class like `MaybeDescendantAddresses`.
+
+`AddressSpecs` was renamed to `SpecsWithoutFileOwners`, and `FilesystemSpecs` to `SpecsWithOnlyFileOwners`. But almost always, you should instead use the new `RawSpecs` class because it is simpler. See [Rules API and Target API](doc:rules-api-and-target-api#how-to-resolve-targets) for how to use `Get(Targets, RawSpecs)`, including its keyword arguments.
+
+If you were directly creating `Specs` objects before, you likely want to change to `RawSpecs`. `Specs` allows us to handle "ignore specs" like `-ignore_me/`, which is usually not necessary in rules. See the above paragraph for how to use `RawSpecs`.
+
+### `SpecsSnapshot` is now `SpecsPaths`
+
+`SpecsSnapshot` was replaced with the more performant `SpecsPaths` from `pants.engine.fs`, which avoids digesting any files into the LMDB store.
+
+Instead of `specs_snapshot.snapshot.files`, use `specs_paths.files` to get a list of all matching files.
+
+If you still need the `Digest` (`specs_snapshot.snapshot.digest`), use `await Get(Digest, PathGlobs(globs=specs_paths.files))`.
+
+### Removed `PutativeTargetsSearchPaths` for `tailor` plugins
+
+Before:
+
+```python
+all_proto_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.proto"))
+```
+
+After:
+
+```python
+all_proto_files = await Get(Paths, PathGlobs, req.path_globs("*.proto"))
+```
+
+You can also now specify multiple globs, e.g. `req.path_globs("*.py", "*.pyi")`.
+
+### Banned short option names like `-x`
+
+You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option. 
+
+(These changes allowed us to introduce ignore specs, like `./pants list :: -ignore_me::`.)
 
 2.12
 ----

@@ -241,6 +241,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Timur Abishev
 + Tina Huang
 + Todd Stumpf
++ Tom Dimiduk
 + Tom Dyas
 + Tom Howland
 + Tomasz Godzik

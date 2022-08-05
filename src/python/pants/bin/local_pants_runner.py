@@ -69,7 +69,9 @@ class LocalPantsRunner:
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
         if scheduler is None:
-            dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, env)
+            dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
+                options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
+            )
             bootstrap_options = options.bootstrap_option_values()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(

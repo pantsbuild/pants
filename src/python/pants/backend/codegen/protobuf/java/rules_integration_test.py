@@ -212,3 +212,82 @@ def test_generates_java(
         resolve=make_resolve(rule_runner),
     )
     _ = rule_runner.request(RenderedClasspath, [request])
+
+
+@pytest.fixture
+def protobuf_java_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protobuf-grpc-java.test.lock",
+        [
+            "com.google.protobuf:protobuf-java:3.19.4",
+            "io.grpc:grpc-netty-shaded:1.48.0",
+            "io.grpc:grpc-protobuf:1.48.0",
+            "io.grpc:grpc-stub:1.48.0",
+            "org.apache.tomcat:annotations-api:6.0.53",
+        ],
+    )
+
+
+@pytest.fixture
+def protobuf_java_grpc_lockfile(
+    protobuf_java_grpc_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return protobuf_java_grpc_lockfile_def.load(request)
+
+
+def test_generates_grpc_java(
+    rule_runner: RuleRunner, protobuf_java_grpc_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "protos/BUILD": "protobuf_sources(grpc=True)",
+            "protos/service.proto": dedent(
+                """\
+            syntax = "proto3";
+            option java_package = "org.pantsbuild.java.proto";
+
+            package service;
+
+            message TestMessage {
+              string foo = 1;
+            }
+
+            service TestService {
+              rpc noStreaming (TestMessage) returns (TestMessage);
+              rpc clientStreaming (stream TestMessage) returns (TestMessage);
+              rpc serverStreaming (TestMessage) returns (stream TestMessage);
+              rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
+            }
+            """
+            ),
+            "3rdparty/jvm/default.lock": protobuf_java_grpc_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_java_grpc_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "java_sources(dependencies=['protos'])",
+            "src/jvm/TestJavaProtobufGrpc.java": dedent(
+                """\
+                package org.pantsbuild.java.example;
+                import org.pantsbuild.java.proto.TestServiceGrpc;
+                public class TestJavaProtobufGrpc {
+                  TestServiceGrpc service;
+                }
+                """
+            ),
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="service.proto"),
+        source_roots=["/"],
+        expected_files=[
+            "org/pantsbuild/java/proto/Service.java",
+            "org/pantsbuild/java/proto/TestServiceGrpc.java",
+        ],
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    _ = rule_runner.request(RenderedClasspath, [request])

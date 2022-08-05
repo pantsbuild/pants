@@ -40,7 +40,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessExecutio
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ async def build_docker_image(
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
     context, wrapped_target = await MultiGet(
@@ -290,7 +290,7 @@ async def build_docker_image(
             result.stdout,
             result.stderr,
             process.description,
-            process_cleanup=process_cleanup.val,
+            keep_sandboxes=keep_sandboxes,
         )
 
     image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
@@ -373,34 +373,36 @@ def format_docker_build_context_help_message(
         # No issues found.
         return None
 
-    msg = (
-        f"Docker build failed for `docker_image` {address}. The {context.dockerfile} have `COPY` "
-        "instructions where the source files may not have been found in the Docker build context."
-        "\n\n"
-    )
-
-    renames = sorted(
-        format_rename_suggestion(src, dst, colors=colors)
-        for src, dst in copy_source_vs_context_source
-        if src and dst
-    )
-    if renames:
+    msg = f"Docker build failed for `docker_image` {address}. "
+    has_unsourced_copy = any(src for src, _ in copy_source_vs_context_source)
+    if has_unsourced_copy:
         msg += (
-            f"However there are possible matches. Please review the following list of suggested "
-            f"renames:\n\n{bullet_list(renames)}\n\n"
+            f"The {context.dockerfile} has `COPY` instructions for source files that may not have "
+            f"been found in the Docker build context.\n\n"
         )
 
-    unknown = sorted(src for src, dst in copy_source_vs_context_source if src and not dst)
-    if unknown:
-        msg += (
-            f"The following files were not found in the Docker build context:\n\n"
-            f"{bullet_list(unknown)}\n\n"
+        renames = sorted(
+            format_rename_suggestion(src, dst, colors=colors)
+            for src, dst in copy_source_vs_context_source
+            if src and dst
         )
+        if renames:
+            msg += (
+                f"However there are possible matches. Please review the following list of "
+                f"suggested renames:\n\n{bullet_list(renames)}\n\n"
+            )
+
+        unknown = sorted(src for src, dst in copy_source_vs_context_source if src and not dst)
+        if unknown:
+            msg += (
+                f"The following files were not found in the Docker build context:\n\n"
+                f"{bullet_list(unknown)}\n\n"
+            )
 
     unreferenced = sorted(dst for src, dst in copy_source_vs_context_source if dst and not src)
     if unreferenced:
         msg += (
-            f"There are additional files in the Docker build context that were not referenced by "
+            f"There are files in the Docker build context that were not referenced by "
             f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced, 10)}\n\n"
         )
 
@@ -411,8 +413,8 @@ def format_docker_build_context_help_message(
         msg += (
             "There are unreachable files in these directories, excluded from the build context "
             f"due to `context_root` being {context_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
-            f"Suggested `context_root` setting is {new_context_root!r} in order to include all files "
-            "in the build context, otherwise relocate the files to be part of the current "
+            f"Suggested `context_root` setting is {new_context_root!r} in order to include all "
+            "files in the build context, otherwise relocate the files to be part of the current "
             f"`context_root` {context_root!r}."
         )
 

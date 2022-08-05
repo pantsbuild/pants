@@ -47,7 +47,7 @@ async fn invalidate_and_clean() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|n| n.id == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -82,7 +82,7 @@ async fn invalidate_and_rerun() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|n| n.id == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -112,7 +112,7 @@ async fn invalidate_with_changed_dependencies() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|n| n.id == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -130,7 +130,7 @@ async fn invalidate_with_changed_dependencies() {
   // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
   // longer depend on it.
   assert_eq!(
-    graph.invalidate_from_roots(|n| n.id == 0),
+    graph.invalidate_from_roots(true, |n| n.id == 0),
     InvalidationResult {
       cleared: 1,
       dirtied: 0,
@@ -159,7 +159,7 @@ async fn invalidate_randomly() {
 
       // Invalidate a random node in the graph.
       let candidate = rng.gen_range(0..range);
-      graph2.invalidate_from_roots(|n: &TNode| n.id == candidate);
+      graph2.invalidate_from_roots(true, |n: &TNode| n.id == candidate);
 
       thread::sleep(sleep_per_invalidation);
     }
@@ -234,7 +234,7 @@ async fn poll_cacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|n| n.id == 0);
+  graph.invalidate_from_roots(true, |n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token2), None, &context)
     .await
@@ -268,7 +268,7 @@ async fn poll_uncacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|n| n.id == 0);
+  graph.invalidate_from_roots(true, |n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token1), None, &context)
     .await
@@ -339,7 +339,7 @@ async fn non_restartable_node_only_runs_once() {
   let _join = thread::spawn(move || {
     recv.recv_timeout(Duration::from_secs(10)).unwrap();
     thread::sleep(Duration::from_millis(50));
-    graph2.invalidate_from_roots(|n| n.id == 0);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
   });
 
   send.send(()).unwrap();
@@ -423,7 +423,7 @@ async fn dirtied_uncacheable_deps_node_re_runs() {
   };
 
   // Clear the middle node, which will dirty the top node, and then clean both of them.
-  graph.invalidate_from_roots(|n| n.id == 1);
+  graph.invalidate_from_roots(true, |n| n.id == 1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -468,7 +468,7 @@ async fn retries() {
   let graph2 = graph.clone();
   let join_handle = thread::spawn(move || loop {
     thread::sleep(sleep_per_invalidation);
-    graph2.invalidate_from_roots(|n| n.id == 0);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
     if Instant::now() > invalidation_deadline {
       break;
     }
@@ -509,7 +509,7 @@ async fn canceled_on_invalidation() {
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
       thread::sleep(sleep_per_invalidation);
-      graph2.invalidate_from_roots(|n| n.id == 1);
+      graph2.invalidate_from_roots(true, |n| n.id == 1);
     }
   });
   assert_eq!(
@@ -597,7 +597,7 @@ async fn clean_speculatively() {
     graph.create(TNode::new(3), &context).await,
     Ok(vec![T(0, 0), T(2, 0), T(3, 0)])
   );
-  graph.invalidate_from_roots(|n| n == &TNode::new(0));
+  graph.invalidate_from_roots(true, |n| n == &TNode::new(0));
 
   // Then request again with the slow node removed from the dependencies, and confirm that it is
   // cleaned much sooner than it would been if it had waited for the slow node.
@@ -645,7 +645,7 @@ async fn cyclic_dirtying() {
   );
 
   // Clear the bottom node, and then clean it with a context that causes the path to reverse.
-  graph.invalidate_from_roots(|n| n == &initial_bot);
+  graph.invalidate_from_roots(true, |n| n == &initial_bot);
   let context_up = context_down.with_salt(1).with_dependencies(
     // Reverse the path from bottom to top.
     vec![

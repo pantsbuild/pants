@@ -47,11 +47,12 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
+use crate::future::FutureExt;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
-use futures::future::{self, TryFutureExt};
+use futures::future::{self, BoxFuture, TryFutureExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -709,38 +710,39 @@ impl Vfs<String> for DigestTrie {
   }
 }
 
-#[async_trait]
 pub trait PathStatGetter<E> {
-  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, E>;
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Result<Vec<Option<PathStat>>, E>>;
 }
 
-#[async_trait]
 impl PathStatGetter<io::Error> for Arc<PosixFS> {
-  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, io::Error> {
-    future::try_join_all(
-      paths
-        .into_iter()
-        .map(|path| {
-          let fs = self.clone();
-          let fs2 = self.clone();
-          self
-            .executor
-            .spawn_blocking(move || fs2.stat_sync(path))
-            .and_then(move |maybe_stat| {
-              async move {
-                match maybe_stat {
-                  // Note: This will drop PathStats for symlinks which don't point anywhere.
-                  Some(Stat::Link(link)) => fs.canonicalize_link(link.0.clone(), link).await,
-                  Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
-                  Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
-                  None => Ok(None),
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Result<Vec<Option<PathStat>>, io::Error>> {
+    async move {
+      future::try_join_all(
+        paths
+          .into_iter()
+          .map(|path| {
+            let fs = self.clone();
+            let fs2 = self.clone();
+            self
+              .executor
+              .spawn_blocking(move || fs2.stat_sync(path))
+              .and_then(move |maybe_stat| {
+                async move {
+                  match maybe_stat {
+                    // Note: This will drop PathStats for symlinks which don't point anywhere.
+                    Some(Stat::Link(link)) => fs.canonicalize_link(link.0.clone(), link).await,
+                    Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
+                    Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
+                    None => Ok(None),
+                  }
                 }
-              }
-            })
-        })
-        .collect::<Vec<_>>(),
-    )
-    .await
+              })
+          })
+          .collect::<Vec<_>>(),
+      )
+      .await
+    }
+    .boxed()
   }
 }
 
