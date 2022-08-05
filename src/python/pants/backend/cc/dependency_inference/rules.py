@@ -69,11 +69,11 @@ class CCFilesMapping:
     mapping: FrozenDict[str, Address]
     ambiguous_files: FrozenDict[str, tuple[Address, ...]]
     mapping_not_stripped: FrozenDict[str, Address]
-    alternative_source_roots: FrozenDict[str, Address]
+    subdirectory_mapping: FrozenDict[str, Address]
 
 
 @rule_helper
-async def _header_(
+async def _subdirectory_mapping(
     cc_file_mapping: dict[str, Address], include_dir_names: Iterable[str] = tuple("include")
 ) -> dict[str, Address]:
     # Get unique source roots for all CC source fields
@@ -85,7 +85,7 @@ async def _header_(
     source_roots = set(source_roots_result.path_to_root.values())
     source_roots.remove(SourceRoot(path="."))
 
-    alternative_source_roots: dict[str, Address] = {}
+    subdirectory_mapping: dict[str, Address] = {}
 
     # Determine if there is a source root in the file's path, and create an alternative mapping with those roots
     # This is particularly useful to discover if there are include directories that need to be passed to compiler
@@ -101,9 +101,9 @@ async def _header_(
             )
             if include_path:
                 stripped_path = file_path.replace(include_path, "")
-                alternative_source_roots[stripped_path] = address
+                subdirectory_mapping[stripped_path] = address
 
-    return alternative_source_roots
+    return subdirectory_mapping
 
 
 @rule(desc="Creating map of CC file names to CC targets", level=LogLevel.DEBUG)
@@ -129,7 +129,7 @@ async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> 
 
     mapping_not_stripped = {tgt[CCSourceField].file_path: tgt.address for tgt in cc_targets}
 
-    alternative_source_roots = await _header_(
+    subdirectory_mapping = await _subdirectory_mapping(
         mapping_not_stripped, tuple(cc_infer.include_dir_names)
     )
 
@@ -139,7 +139,7 @@ async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> 
             (k, tuple(sorted(v))) for k, v in sorted(stripped_files_with_multiple_owners.items())
         ),
         mapping_not_stripped=FrozenDict(mapping_not_stripped),
-        alternative_source_roots=FrozenDict(alternative_source_roots),
+        subdirectory_mapping=FrozenDict(subdirectory_mapping),
     )
 
 
@@ -227,9 +227,9 @@ async def infer_cc_source_dependencies(
 
         # Finally, check the alternative source roots
         logger.debug(f"Checking alternatives for {include.path}")
-        alternative = cc_files_mapping.alternative_source_roots.get(include.path)
-        if alternative:
-            result.add(alternative)
+        subdir = cc_files_mapping.subdirectory_mapping.get(include.path)
+        if subdir:
+            result.add(subdir)
 
     logger.debug(f"Results: {result}")
     return InferredDependencies(sorted(result))
