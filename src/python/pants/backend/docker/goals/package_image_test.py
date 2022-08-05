@@ -44,8 +44,7 @@ from pants.backend.docker.value_interpolation import (
     DockerInterpolationError,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, CreateDigest, Snapshot
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResult,
@@ -161,8 +160,6 @@ def assert_build(
                 input_type=WrappedTargetRequest,
                 mock=lambda _: WrappedTarget(tgt),
             ),
-            MockGet(output_type=Digest, input_type=CreateDigest, mock=lambda _: EMPTY_DIGEST),
-            MockGet(output_type=Digest, input_type=MergeDigests, mock=lambda _: EMPTY_DIGEST),
             MockGet(
                 output_type=FallibleProcessResult,
                 input_type=Process,
@@ -448,6 +445,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             {
                 "INHERIT": "from Pants env",
                 "VAR": "value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -489,6 +487,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "INHERIT": "from Pants env",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -585,6 +584,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "FROM_ENV": "env value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
