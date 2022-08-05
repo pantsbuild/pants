@@ -93,7 +93,7 @@ def assert_build_context(
     expected_files: list[str],
     expected_interpolation_context: dict[str, str | dict[str, str] | DockerInterpolationValue]
     | None = None,
-    expected_upstream_images: list[str] | None = None,
+    expected_num_upstream_images: int = 0,
     pants_args: list[str] | None = None,
     runner_options: dict[str, Any] | None = None,
 ) -> DockerBuildContext:
@@ -129,7 +129,7 @@ def assert_build_context(
         )
 
     if build_upstream_images:
-        assert context.upstream_image_ids == tuple(expected_upstream_images or [])
+        assert len(context.upstream_image_ids) == expected_num_upstream_images
     return context
 
 
@@ -255,13 +255,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                 "BASE_IMAGE": "upstream/image:1.0",
             },
         },
-        # TODO: It's unclear if this sha is expected to remain stable over time, i.e., if the
-        #  alpine:3.16.1 tag could be repointed over time. If this test breaks for that reason,
-        #  we'll need to be more subtle with this check (e.g., compute the sha for the upstream
-        #  image, or check the count of expected_upstream_images instead of the individual values.
-        expected_upstream_images=[
-            "sha256:41366efd695adbcabfb866b569d6007f75e4acde922115978c4e7bee41e097c3"
-        ],
+        expected_num_upstream_images=1,
     )
 
 
