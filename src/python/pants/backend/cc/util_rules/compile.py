@@ -77,6 +77,7 @@ async def compile_cc_source(
             [wrapped_target.target.get(SourcesField) for wrapped_target in wrapped_targets]
         ),
     )
+    logger.error(inferred_source_files.snapshot)
 
     input_digest = await Get(
         Digest,
@@ -86,7 +87,8 @@ async def compile_cc_source(
     # Run compilation
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
-    argv = (toolchain.c, "-c", target_file)
+    # TODO: Hardcoded test
+    argv = (toolchain.c, "-I /examples/cc/core/include", "-c", target_file)
     compile_result = await Get(
         FallibleProcessResult,
         Process(

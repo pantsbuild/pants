@@ -54,16 +54,29 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         for wrapped_target in wrapped_targets
     )
 
-    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
-    exit_code = next(
-        (
-            result.process_result.exit_code
+    # For some reason, using the commented out code wasn't returning the actual errors
+    return CheckResults(
+        [
+            CheckResult(
+                result.process_result.exit_code,
+                str(result.process_result.stdout),
+                str(result.process_result.stderr),
+            )
             for result in compile_results
-            if result.process_result.exit_code != 0
-        ),
-        0,
+        ],
+        checker_name=request.name,
     )
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.name)
+
+    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
+    # exit_code = next(
+    #     (
+    #         result.process_result.exit_code
+    #         for result in compile_results
+    #         if result.process_result.exit_code != 0
+    #     ),
+    #     0,
+    # )
+    # return CheckResults([CheckResult(exit_code, result.process_result, "")], checker_name=request.name)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

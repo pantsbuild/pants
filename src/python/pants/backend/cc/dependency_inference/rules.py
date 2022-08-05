@@ -68,6 +68,7 @@ class CCFilesMapping:
     mapping: FrozenDict[str, Address]
     ambiguous_files: FrozenDict[str, tuple[Address, ...]]
     mapping_not_stripped: FrozenDict[str, Address]
+    alternative_source_roots: FrozenDict[str, Address]
 
 
 @rule(desc="Creating map of CC file names to CC targets", level=LogLevel.DEBUG)
@@ -93,12 +94,16 @@ async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
 
     mapping_not_stripped = {tgt[CCSourceField].file_path: tgt.address for tgt in cc_targets}
 
+    # TODO: Put rule_helper back in
+    alternative_source_roots: dict[str, Address] = {}
+
     return CCFilesMapping(
         mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),
         ambiguous_files=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(stripped_files_with_multiple_owners.items())
         ),
         mapping_not_stripped=FrozenDict(mapping_not_stripped),
+        alternative_source_roots=FrozenDict(alternative_source_roots),
     )
 
 
@@ -113,7 +118,6 @@ def parse_includes(content: str) -> frozenset[CCIncludeDirective]:
     for line in content.splitlines():
         m = INCLUDE_REGEX.match(line)
         if m:
-            logger.error(line)
             if m.group(2):
                 includes.add(CCIncludeDirective(m.group(2)[1:-1], False))
             elif m.group(3):
@@ -161,15 +165,14 @@ async def infer_cc_source_dependencies(
 
         # Otherwise try source roots.
         if cc_infer.include_from_source_roots:
-            logger.warning(f"source_roots: {include.path}")
-            logger.error(cc_files_mapping)
             unambiguous = cc_files_mapping.mapping.get(include.path)
             ambiguous = cc_files_mapping.ambiguous_files.get(include.path)
-            logger.warning(f"Unambiguous {unambiguous}")
-            logger.warning(f"Ambiguous: {ambiguous}")
             if unambiguous:
                 result.add(unambiguous)
-            elif ambiguous:
+                logger.info("Unambiguous --- continuing")
+                continue
+
+            if ambiguous:
                 explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                     ambiguous,
                     address,
@@ -184,6 +187,13 @@ async def infer_cc_source_dependencies(
                 maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
+                    continue
+
+        # Finally, check the alternative source roots
+        logger.debug(f"Checking alternatives for {include.path}")
+        alternative = cc_files_mapping.alternative_source_roots.get(include.path)
+        if alternative:
+            result.add(alternative)
 
     logger.warning(f"Results: {result}")
     return InferredDependencies(sorted(result))
