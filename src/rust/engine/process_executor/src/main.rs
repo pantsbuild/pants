@@ -339,7 +339,7 @@ async fn main() {
           .unwrap_or_else(NamedCaches::default_path),
       ),
       ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-      true,
+      process_execution::local::KeepSandboxes::Always,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
