@@ -12,10 +12,10 @@ Active Maintainers
 * Eric Arellano
 * Henry Fuller
 * Ity Kaul
-* Patrick Lawson
 * John Sirois
 * Joshua Cannon
 * Kris Wilson
+* Patrick Lawson
 * Stu Hood
 * Tom Dyas
 * Yi Cheng

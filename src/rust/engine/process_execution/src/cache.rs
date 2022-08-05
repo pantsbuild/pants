@@ -5,7 +5,6 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cache::PersistentCache;
-use futures::{future, FutureExt};
 use log::{debug, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -17,8 +16,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -34,7 +33,7 @@ pub struct CommandRunner {
   cache: PersistentCache,
   file_store: Store,
   cache_read: bool,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   metadata: ProcessMetadata,
 }
 
@@ -44,7 +43,7 @@ impl CommandRunner {
     cache: PersistentCache,
     file_store: Store,
     cache_read: bool,
-    eager_fetch: bool,
+    cache_content_behavior: CacheContentBehavior,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
@@ -52,7 +51,7 @@ impl CommandRunner {
       cache,
       file_store,
       cache_read,
-      eager_fetch,
+      cache_content_behavior,
       metadata,
     }
   }
@@ -205,28 +204,11 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    // If eager_fetch is enabled, ensure that all digests in the result are loadable, erroring
-    // if any are not. If eager_fetch is disabled, a Digest which is discovered to be missing later
-    // on during execution will cause backtracking.
-    if self.eager_fetch {
-      let _ = future::try_join_all(vec![
-        self
-          .file_store
-          .ensure_local_has_file(result.stdout_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_file(result.stderr_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_recursive_directory(result.output_directory.clone())
-          .boxed(),
-      ])
-      .await?;
+    if check_cache_content(&result, &self.file_store, self.cache_content_behavior).await? {
+      Ok(Some(result))
+    } else {
+      Ok(None)
     }
-
-    Ok(Some(result))
   }
 
   async fn store(

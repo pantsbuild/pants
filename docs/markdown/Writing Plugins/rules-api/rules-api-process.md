@@ -38,7 +38,7 @@ The process will run in a temporary directory and is hermetic, meaning that it c
 
 > 📘 Debugging a `Process`
 > 
-> Setting the [`--no-process-cleanup`](docs:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
+> Setting the [`--keep-sandboxes=always`](docs:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
 > 
 > It can be very helpful while editing `Process` definitions!
 

@@ -26,8 +26,8 @@ use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, bounded, local, nailgun, remote, remote_cache, CommandRunner, ImmutableInputs, NamedCaches,
-  Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
+  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
+  ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -93,7 +93,7 @@ pub struct RemotingOptions {
   pub store_rpc_concurrency: usize,
   pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
-  pub cache_eager_fetch: bool,
+  pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
   pub cache_read_timeout: Duration,
   pub execution_extra_platform_properties: Vec<(String, String)>,
@@ -106,7 +106,7 @@ pub struct RemotingOptions {
 pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
-  pub local_cleanup: bool,
+  pub local_keep_sandboxes: local::KeepSandboxes,
   pub local_cache: bool,
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
@@ -216,7 +216,7 @@ impl Core {
         local_execution_root_dir.to_path_buf(),
         named_caches.clone(),
         immutable_inputs.clone(),
-        exec_strategy_opts.local_cleanup,
+        exec_strategy_opts.local_keep_sandboxes,
       );
 
       let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
@@ -273,9 +273,13 @@ impl Core {
     local_cache_read: bool,
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    // TODO: Until we can deprecate letting the flag default, we implicitly disable
-    // eager_fetch when remote execution is in use. See the TODO in `global_options.py`.
-    let eager_fetch = remoting_opts.cache_eager_fetch && !remoting_opts.execution_enable;
+    // TODO: Until we can deprecate letting the flag default, we implicitly default
+    // cache_content_behavior when remote execution is in use. See the TODO in `global_options.py`.
+    let cache_content_behavior = if remoting_opts.execution_enable {
+      CacheContentBehavior::Defer
+    } else {
+      remoting_opts.cache_content_behavior
+    };
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
@@ -289,7 +293,7 @@ impl Core {
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,
-        eager_fetch,
+        cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
         remoting_opts.cache_read_timeout,
       )?);
@@ -301,7 +305,7 @@ impl Core {
         local_cache.clone(),
         full_store.clone(),
         local_cache_read,
-        eager_fetch,
+        cache_content_behavior,
         process_execution_metadata.clone(),
       ));
     }
@@ -475,7 +479,7 @@ impl Core {
     )?;
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
-      && remoting_opts.cache_eager_fetch
+      && remoting_opts.cache_content_behavior == CacheContentBehavior::Defer
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the

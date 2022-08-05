@@ -43,7 +43,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessExecutio
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -236,7 +236,7 @@ async def build_docker_image(
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
     context, wrapped_target = await MultiGet(
@@ -307,7 +307,7 @@ async def build_docker_image(
             result.stdout,
             result.stderr,
             process.description,
-            process_cleanup=process_cleanup.val,
+            keep_sandboxes=keep_sandboxes,
         )
 
     image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)

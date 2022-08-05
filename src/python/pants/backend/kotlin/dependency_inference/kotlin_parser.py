@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator
 
@@ -21,10 +20,11 @@ from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProc
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 _PARSER_KOTLIN_VERSION = "1.6.20"
 
@@ -207,7 +207,7 @@ async def analyze_kotlin_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleKotlinSourceDependencyAnalysisResult,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> KotlinSourceDependencyAnalysis:
     # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
@@ -222,7 +222,7 @@ async def resolve_fallible_result_to_analysis(
         fallible_result.process_result.stdout,
         fallible_result.process_result.stderr,
         "Kotlin source dependency analysis failed.",
-        process_cleanup=process_cleanup.val,
+        keep_sandboxes=keep_sandboxes,
     )
 
 
@@ -230,7 +230,7 @@ async def resolve_fallible_result_to_analysis(
 async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = pkgutil.get_data(
+    parser_source_content = read_resource(
         "pants.backend.kotlin.dependency_inference", "KotlinParser.kt"
     )
     if not parser_source_content:

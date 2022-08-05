@@ -36,7 +36,8 @@ use std::time::Duration;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-  Context, ImmutableInputs, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
+  CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches, Platform,
+  ProcessCacheScope, ProcessMetadata,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -318,7 +319,7 @@ async fn main() {
             true,
             true,
             process_execution::remote_cache::RemoteCacheWarningsBehavior::Backoff,
-            false,
+            CacheContentBehavior::Defer,
             args.cache_rpc_concurrency,
             Duration::from_secs(2),
           )

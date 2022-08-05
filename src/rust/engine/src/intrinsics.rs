@@ -3,6 +3,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::str::FromStr;
 use std::time::Duration;
 
 use crate::context::Context;
@@ -20,12 +21,12 @@ use crate::Failure;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
-use pyo3::{PyRef, Python, ToPyObject};
+use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use fs::{DirectoryDigest, RelativePath};
 use hashing::Digest;
-use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir};
+use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
 use process_execution::ManagedChild;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -521,22 +522,23 @@ fn interactive_process(
       (py_interactive_process.extract().unwrap(), py_process)
     });
     let mut process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
-    let (run_in_workspace, restartable, cleanup) = Python::with_gil(|py| {
+    let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
       let py_interactive_process_obj = py_interactive_process.to_object(py);
       let py_interactive_process = py_interactive_process_obj.as_ref(py);
       let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
-      let cleanup: bool = externs::getattr(py_interactive_process, "cleanup").unwrap();
-      (run_in_workspace, restartable, cleanup)
+      let keep_sandboxes_value: &PyAny = externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
+      let keep_sandboxes = KeepSandboxes::from_str(externs::getattr(keep_sandboxes_value, "value").unwrap()).unwrap();
+      (run_in_workspace, restartable, keep_sandboxes)
     });
 
     let session = context.session;
 
-    let tempdir = create_sandbox(
+    let mut tempdir = create_sandbox(
       context.core.executor.clone(),
       &context.core.local_execution_root_dir,
       "interactive process",
-      cleanup,
+      keep_sandboxes,
     )?;
     prepare_workdir(
       tempdir.path().to_owned(),
@@ -626,6 +628,10 @@ fn interactive_process(
       .await?;
 
     let code = exit_status.code().unwrap_or(-1);
+    if keep_sandboxes == KeepSandboxes::OnFailure && code != 0 {
+      tempdir.keep("interactive process");
+    }
+
     let result = {
       let gil = Python::acquire_gil();
       let py = gil.python();
