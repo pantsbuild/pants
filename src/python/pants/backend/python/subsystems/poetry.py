@@ -24,7 +24,7 @@ from pants.util.docutil import git_url
 class PoetrySubsystem(PythonToolRequirementsBase):
     options_scope = "poetry"
     name = "Poetry"
-    help = "Used to generate lockfiles for third-party Python dependencies."
+    help = "Used to generate lockfiles for third-party Python dependencies (deprecated)."
 
     default_version = "poetry==1.1.14"
 
