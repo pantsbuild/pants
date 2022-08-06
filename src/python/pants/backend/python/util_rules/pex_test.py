@@ -556,7 +556,9 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     # We create a lockfile that claims it works with no requirements. It should fail when we try
     # to build a PEX with a requirement.
     lock_content = PythonLockfileMetadata.new(
-        InterpreterConstraints(), set()
+        valid_for_interpreter_constraints=InterpreterConstraints(),
+        requirements=set(),
+        constraints_file_hash=None,
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

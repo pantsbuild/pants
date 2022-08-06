@@ -222,7 +222,8 @@ class LockfileMetadata:
         `lockfile_metadata_version`
         """
         for (scope, ver), cls in _concrete_metadata_classes.items():
-            if isinstance(self, cls):
+            # Note that we do exact version matches so that authors can subclass earlier versions.
+            if type(self) is cls:
                 return ver
         raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
 

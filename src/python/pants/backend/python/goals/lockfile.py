@@ -27,7 +27,11 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import (
+    PexRequirements,
+    ResolvePexConfig,
+    ResolvePexConfigRequest,
+)
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -40,19 +44,12 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -155,6 +152,37 @@ def maybe_warn_python_repos(
     return MaybeWarnPythonRepos()
 
 
+@rule_helper
+async def _setup_pip_args_and_constraints_file(
+    python_setup: PythonSetup, *, resolve_name: str
+) -> tuple[list[str], Digest, FileDigest | None]:
+    extra_args = []
+    extra_digests = []
+    constraints_file_digest: None | FileDigest = None
+
+    if python_setup.no_binary or python_setup.only_binary:
+        pip_args_file = "__pip_args.txt"
+        extra_args.extend(["-r", pip_args_file])
+        pip_args_file_content = "\n".join(
+            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
+            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
+        )
+        pip_args_digest = await Get(
+            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
+        )
+        extra_digests.append(pip_args_digest)
+
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+    if resolve_config.constraints_file:
+        _constraints_file_entry = resolve_config.constraints_file[1]
+        extra_args.append(f"--constraints={_constraints_file_entry.path}")
+        constraints_file_digest = _constraints_file_entry.file_digest
+        extra_digests.append(resolve_config.constraints_file[0])
+
+    input_digest = await Get(Digest, MergeDigests(extra_digests))
+    return extra_args, input_digest, constraints_file_digest
+
+
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: GeneratePythonLockfile,
@@ -162,45 +190,17 @@ async def generate_lockfile(
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_repos: PythonRepos,
     python_setup: PythonSetup,
-    union_membership: UnionMembership,
 ) -> GenerateLockfileResult:
+    constraints_file_hash: str | None = None
+
     if req.use_pex:
-        pip_args_file = "__pip_args.txt"
-        pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
-            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
-        )
-        pip_args_digest_get = Get(
-            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
-        )
-
-        all_tool_resolve_names = tuple(
-            sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)
-        )
-        constraints_file_path = python_setup.resolves_to_constraints_file(
-            all_tool_resolve_names
-        ).get(req.resolve_name)
-        constraints_digest_get = Get(
-            Digest,
-            PathGlobs(
-                [constraints_file_path] if constraints_file_path else [],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=softwrap(
-                    f"""
-                    the option `[python].resolves_to_constraints_file` for the resolve
-                    '{req.resolve_name}'
-                    """
-                ),
-            ),
-        )
-        constraints_args = (
-            (f"--constraints={constraints_file_path}",) if constraints_file_path else ()
-        )
-
-        pip_args_digest, constraints_digest = await MultiGet(
-            pip_args_digest_get, constraints_digest_get
-        )
-        input_digest = await Get(Digest, MergeDigests([pip_args_digest, constraints_digest]))
+        (
+            extra_args,
+            input_digest,
+            constraints_file_digest,
+        ) = await _setup_pip_args_and_constraints_file(python_setup, resolve_name=req.resolve_name)
+        if constraints_file_digest:
+            constraints_file_hash = constraints_file_digest.fingerprint
 
         header_delimiter = "//"
         result = await Get(
@@ -230,9 +230,7 @@ async def generate_lockfile(
                     "mac",
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
-                    "-r",
-                    pip_args_file,
-                    *constraints_args,
+                    *extra_args,
                     *python_repos.pex_args,
                     *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
@@ -303,8 +301,9 @@ async def generate_lockfile(
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
     # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = PythonLockfileMetadata.new(
-        req.interpreter_constraints,
-        {PipRequirement.parse(i) for i in req.requirements},
+        valid_for_interpreter_constraints=req.interpreter_constraints,
+        requirements={PipRequirement.parse(i) for i in req.requirements},
+        constraints_file_hash=constraints_file_hash,
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
