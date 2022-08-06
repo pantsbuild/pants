@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
@@ -11,7 +12,6 @@ from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.resources import read_resource
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class LoadedGoBinaryRequest(EngineAwareParameter):
 
 def setup_files(dir_name: str, file_names: tuple[str, ...]) -> tuple[FileContent, ...]:
     def get_file(file_name: str) -> bytes:
-        content = read_resource(f"pants.backend.go.go_sources.{dir_name}", file_name)
+        content = pkgutil.get_data(f"pants.backend.go.go_sources.{dir_name}", file_name)
         if not content:
             raise AssertionError(f"Unable to find resource for `{file_name}`.")
         return content

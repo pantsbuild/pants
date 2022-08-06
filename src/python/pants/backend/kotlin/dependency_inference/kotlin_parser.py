@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator
 
@@ -24,7 +25,6 @@ from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.resources import read_resource
 
 _PARSER_KOTLIN_VERSION = "1.6.20"
 
@@ -230,7 +230,7 @@ async def resolve_fallible_result_to_analysis(
 async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = read_resource(
+    parser_source_content = pkgutil.get_data(
         "pants.backend.kotlin.dependency_inference", "KotlinParser.kt"
     )
     if not parser_source_content:
