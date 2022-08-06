@@ -26,6 +26,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Bruno Bieth
 + Caitie McCaffrey
 + Caleb Lloyd
++ Carina C. Zona
 + Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
@@ -73,6 +74,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Eric Arellano
 + Eric Ayers
 + Eric Danielson
++ Eric Jacob
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
@@ -185,6 +187,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Neil Sanchala
 + Nicholas Santos
 + Nik Shkrob
++ Nimrod Shlagman
 + Nitay Joffe
 + Nora Howard
 + Ny Saechao
