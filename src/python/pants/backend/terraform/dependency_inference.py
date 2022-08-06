@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -32,7 +33,6 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-from pants.util.resources import read_resource
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -72,7 +72,7 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_script_content = read_resource("pants.backend.terraform", "hcl2_parser.py")
+    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
     if not parser_script_content:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -31,7 +32,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
-from pants.util.resources import read_resource
 
 _DOCKERFILE_SANDBOX_TOOL = "dockerfile_wrapper_script.py"
 _DOCKERFILE_PACKAGE = "pants.backend.docker.subsystems"
@@ -74,7 +74,7 @@ class ParserSetup:
 
 @rule
 async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
-    parser_script_content = read_resource(_DOCKERFILE_PACKAGE, _DOCKERFILE_SANDBOX_TOOL)
+    parser_script_content = pkgutil.get_data(_DOCKERFILE_PACKAGE, _DOCKERFILE_SANDBOX_TOOL)
     if not parser_script_content:
         raise ValueError(
             f"Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
