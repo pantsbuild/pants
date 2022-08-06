@@ -36,8 +36,8 @@ use std::time::Duration;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-  CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches, Platform,
-  ProcessCacheScope, ProcessMetadata,
+  local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
+  Platform, ProcessCacheScope, ProcessMetadata,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -339,7 +339,7 @@ async fn main() {
           .unwrap_or_else(NamedCaches::default_path),
       ),
       ImmutableInputs::new(store.clone(), &workdir).unwrap(),
-      true,
+      KeepSandboxes::Never,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
