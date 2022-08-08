@@ -479,7 +479,7 @@ impl Core {
     )?;
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
-      && remoting_opts.cache_content_behavior == CacheContentBehavior::Defer
+      && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the
