@@ -683,14 +683,14 @@ def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
     steps.append(
         {
             "name": "Build wheels",
-            "run": helper.wrap_cmd('./build-support/bin/release.sh build-wheels'),
+            "run": helper.wrap_cmd("./build-support/bin/release.sh build-wheels"),
             "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
         }
     )
     steps.append(
         {
             "name": "Build fs_util",
-            "run": helper.wrap_cmd('./build-support/bin/release.sh build-fs-util'),
+            "run": helper.wrap_cmd("./build-support/bin/release.sh build-fs-util"),
             # We only build fs_util on branch builds, given that Pants compilation already
             # checks the code compiles and the release process is simple and low-stakes.
             "if": "github.event_name == 'push'",
