@@ -21,7 +21,6 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from time import sleep
 from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
 from urllib.parse import quote_plus
@@ -32,6 +31,7 @@ from common import banner, die, green
 from packaging.version import Version
 from reversion import reversion
 
+from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap, strip_prefix
 
@@ -348,7 +348,7 @@ def install_exercising_namespace_packages(
     :return: The PYTHONPATH that can be used along with venv_bin_dir / "python" to test the
         installed packages with.
     """
-    with TemporaryDirectory() as td:
+    with temporary_dir() as td:
         tempdir = Path(td)
         wheel_dir = tempdir / "wheels"
         pip = venv_bin_dir / "pip"
@@ -555,7 +555,7 @@ def create_tmp_venv() -> Iterator[Path]:
     Note that the venv is not sourced. You should run bin_path / "pip" and bin_path / "python"
     directly.
     """
-    with TemporaryDirectory() as tempdir:
+    with temporary_dir() as tempdir:
         bin_dir = create_venv(Path(tempdir))
         subprocess.run([(bin_dir / "pip"), "install", "--quiet", "wheel"], check=True)
         yield bin_dir
@@ -588,7 +588,7 @@ def download_pex_bin() -> Iterator[Path]:
             )
         )
 
-    with TemporaryDirectory() as tempdir:
+    with temporary_dir() as tempdir:
         resp = requests.get(
             f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
         )
@@ -863,7 +863,7 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    with TemporaryDirectory() as tmpdir:
+    with temporary_dir() as tmpdir:
         validated_pex_path = Path(tmpdir, "pants.pex")
         shutil.copyfile(dest, validated_pex_path)
         validated_pex_path.chmod(0o777)
@@ -1287,7 +1287,7 @@ def main() -> None:
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
     if args.command == "check-pants-wheels":
-        with TemporaryDirectory() as tempdir:
+        with temporary_dir() as tempdir:
             fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
             check_pants_wheels_present(tempdir)
 
