@@ -92,6 +92,7 @@ def assert_build(
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
             snapshot=build_context_snapshot,
+            upstream_image_ids=[],
             dockerfile_info=DockerfileInfo(
                 request.address,
                 digest=EMPTY_DIGEST,
@@ -444,6 +445,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             {
                 "INHERIT": "from Pants env",
                 "VAR": "value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -485,6 +487,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "INHERIT": "from Pants env",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -581,6 +584,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "FROM_ENV": "env value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
