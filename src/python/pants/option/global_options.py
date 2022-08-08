@@ -1195,8 +1195,8 @@ class BootstrapOptions:
             fetching it.
 
             The `defer` behavior, on the other hand, will neither fetch nor validate the cache
-            content before calling a cache hit a hit. This "defers" actually consuming the cache
-            entry until a consumer consumes it.
+            content before calling a cache hit a hit. This "defers" actually fetching the cache
+            entry until Pants needs it (which may be never).
 
             The `defer` mode is the most network efficient (because it will completely skip network
             requests in many cases), followed by the `validate` mode (since it can still skip
