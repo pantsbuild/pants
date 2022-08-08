@@ -12,12 +12,12 @@ BASH_COMPLETION_TEMPLATE = """# DO NOT EDIT.
 
 function pants_completions()
 {{
-    readonly PANTS_GOALS="\\
+    local -r PANTS_GOALS="\\
         {goals}"
 
     {goal_options}
 
-    readonly PANTS_GLOBAL_OPTIONS="\\
+    local -r PANTS_GLOBAL_OPTIONS="\\
         {global_options}"
 
     local current_word previous_word previous_goal
@@ -60,15 +60,11 @@ function get_previous_goal()
     echo $previous_goal
 }}
 
-# TODO: Need to create a separate .zsh script instead of this
-autoload -U +X bashcompinit && bashcompinit
-autoload -Uz compinit && compinit
-
 complete -o default -o bashdefault -F pants_completions pants
 """
 
 GOAL_OPTIONS_TEMPLATE = """
-    readonly PANTS_{name}_OPTIONS="\\
+    local -r PANTS_{name}_OPTIONS="\\
         {options}"
 """
 
