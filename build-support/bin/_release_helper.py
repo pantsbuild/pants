@@ -794,7 +794,7 @@ def build_pex(fetch: bool) -> None:
             "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
-                for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+                for plat in ("linux_x86_64", "macosx_11.0_x86_64")
                 for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
             ),
         ]
