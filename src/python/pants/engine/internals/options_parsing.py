@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
@@ -11,7 +10,6 @@ from pants.option.global_options import (
     GlobalOptions,
     KeepSandboxes,
     NamedCachesDirOption,
-    ProcessCleanupOption,
     UseDeprecatedPexBinaryRunSemanticsOption,
 )
 from pants.option.options import Options
@@ -58,16 +56,6 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 @rule
 def log_level(global_options: GlobalOptions) -> LogLevel:
     return global_options.level
-
-
-@rule
-def extract_process_cleanup_option(keep_sandboxes: KeepSandboxes) -> ProcessCleanupOption:
-    warn_or_error(
-        removal_version="2.15.0.dev1",
-        entity="ProcessCleanupOption",
-        hint="Instead, use `KeepSandboxes`.",
-    )
-    return ProcessCleanupOption(keep_sandboxes == KeepSandboxes.never)
 
 
 @rule
