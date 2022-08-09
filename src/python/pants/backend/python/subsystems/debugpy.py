@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -80,7 +83,7 @@ class DebugPy(PythonToolBase):
         )
 
 
-class DebugPyLockfileSentinel(GenerateToolLockfileSentinel):
+class DebugPyLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = DebugPy.options_scope
 
 

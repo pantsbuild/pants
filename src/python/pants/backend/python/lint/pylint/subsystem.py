@@ -10,7 +10,10 @@ from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -271,7 +274,7 @@ async def _pylint_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(GenerateToolLockfileSentinel):
+class PylintLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Pylint.options_scope
 
 

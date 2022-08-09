@@ -53,7 +53,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -66,7 +66,7 @@ class GenerateJavaFromAvroRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class AvroToolLockfileSentinel(GenerateToolLockfileSentinel):
+class AvroToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = AvroSubsystem.options_scope
 
 

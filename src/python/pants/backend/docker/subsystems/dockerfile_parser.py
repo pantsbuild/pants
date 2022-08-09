@@ -11,7 +11,10 @@ from pathlib import PurePath
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -52,7 +55,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class DockerfileParserLockfileSentinel(GenerateToolLockfileSentinel):
+class DockerfileParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = DockerfileParser.options_scope
 
 

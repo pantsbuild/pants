@@ -8,7 +8,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -269,7 +272,7 @@ async def _flake8_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
+class Flake8LockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Flake8.options_scope
 
 

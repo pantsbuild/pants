@@ -12,7 +12,10 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -238,7 +241,7 @@ async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> Interpre
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
-class PytestLockfileSentinel(GenerateToolLockfileSentinel):
+class PytestLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PyTest.options_scope
 
 

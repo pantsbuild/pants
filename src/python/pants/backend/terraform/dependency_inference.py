@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -50,7 +53,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
+class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = TerraformHcl2Parser.options_scope
 
 
