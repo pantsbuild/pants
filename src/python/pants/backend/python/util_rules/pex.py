@@ -367,7 +367,6 @@ async def build_pex(
         "--output-file",
         request.output_filename,
         "--no-emit-warnings",
-        *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
 
@@ -416,8 +415,15 @@ async def build_pex(
 
     # Include any additional arguments and input digests required by the requirements.
     requirements_digests = []
-    pex_lock_resolver_args = [*python_repos.pex_args]
-    pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
+    pex_lock_resolver_args = [
+        "--no-manylinux",  # manylinux is ignored, so we hardcode to avoid unnecessary invalidation.
+    ]
+    pip_resolver_args = [
+        *python_repos.pex_args,
+        *python_setup.manylinux_pex_args,
+        "--resolver-version",
+        "pip-2020-resolver",
+    ]
     if isinstance(request.requirements, EntireLockfile):
         lockfile, resolve_config = await MultiGet(
             Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)),
@@ -429,12 +435,12 @@ async def build_pex(
         concurrency_available = lockfile.requirement_estimate
         requirements_digests.append(lockfile.lockfile_digest)
         if lockfile.is_pex_native:
-            argv.extend(["--lock", lockfile.lockfile_path])
-            argv.extend(pex_lock_resolver_args)
+            argv.extend(["--lock", lockfile.lockfile_path, *pex_lock_resolver_args])
         else:
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            argv.extend(["--requirement", lockfile.lockfile_path, "--no-transitive"])
-            argv.extend(pip_resolver_args)
+            argv.extend(
+                ["--requirement", lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+            )
         if lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
                 lockfile.metadata,
@@ -461,13 +467,10 @@ async def build_pex(
                 ResolvePexConfig,
                 ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
             )
-            # NB: This is also validated in the constructor.
-            assert loaded_lockfile.is_pex_native
+            assert loaded_lockfile.is_pex_native  # NB: This is also validated in the constructor.
             if request.requirements.req_strings:
                 requirements_digests.append(loaded_lockfile.lockfile_digest)
-                argv.extend(["--lock", loaded_lockfile.lockfile_path])
-                argv.extend(pex_lock_resolver_args)
-
+                argv.extend(["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args])
                 if loaded_lockfile.metadata:
                     validate_metadata(
                         loaded_lockfile.metadata,
@@ -478,9 +481,8 @@ async def build_pex(
                         constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
                     )
         else:
-            assert request.requirements.from_superset is None
-
             # We use pip to perform a normal resolve.
+            assert request.requirements.from_superset is None
             argv.extend(pip_resolver_args)
             if request.requirements.constraints_strings:
                 constraints_file = "__constraints.txt"
