@@ -217,7 +217,7 @@ Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g
 
 ### Setting environment variables
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `junit_test` / `junit_tests` / `scala_junit_test` / `scala_junit_tests` / `scalatest_test` / `scalatest_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
