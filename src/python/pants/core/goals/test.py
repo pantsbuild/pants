@@ -471,7 +471,8 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
          Additional environment variables to include in test processes.
          Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
          `ENV_VAR` to copy the value of a variable in Pants's own environment.
-         This will be merged with and override values from [test].extra_env_vars.
+
+         This will be merged with and override values from `[test].extra_env_vars`.
         """
     )
 
