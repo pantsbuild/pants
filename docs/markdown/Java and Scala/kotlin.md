@@ -228,7 +228,7 @@ The Kotlin backend currently supports JUnit tests specified using the `kotlin_ju
 
 ### Setting environment variables
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `kotlin_junit_test` / `kotlin_junit_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
