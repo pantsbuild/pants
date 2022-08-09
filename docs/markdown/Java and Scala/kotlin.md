@@ -226,6 +226,32 @@ To run tests, use `./pants test`:
 
 The Kotlin backend currently supports JUnit tests specified using the `kotlin_junit_tests` target type.
 
+### Setting environment variables
+
+Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This important for reproducibility, and it also increases cache hits.
+
+To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `kotlin_junit_test` / `kotlin_junit_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
+
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+
+```toml pants.toml
+[test]
+extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+```
+```python project/BUILD
+kotlin_junit_tests(
+    name="tests",
+    # Adds to all generated `kotlin_junit_test` targets,
+    # i.e. each file in the `sources` field.
+    extra_env_vars=["VAR3", "VAR4=hardcoded"],
+    # Even better, use `overrides` to be more granular.
+    overrides={
+        "StrUtilTest.kt": {"extra_env_vars": ["VAR"]},
+        ("DirUtilTest.kt", "OSUtilTest.kt"): {"extra_env_vars": ["VAR5"]},
+    },
+)
+```
+
 ## Lint and Format
 
 [`ktlint`](https://ktlint.github.io/) can be enabled by adding the `pants.backend.experimental.kotlin.lint.ktlint`
