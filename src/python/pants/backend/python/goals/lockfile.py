@@ -58,6 +58,10 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+class GeneratePythonToolLockfileSentinel(GenerateToolLockfileSentinel):
+    pass
+
+
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]

@@ -62,9 +62,12 @@ class GenerateToolLockfileSentinel:
     Each language ecosystem should set up a union member of `GenerateLockfile`, like
     `GeneratePythonLockfile`, as explained in that class's docstring.
 
-    Then, each tool should subclass `GenerateToolLockfileSentinel` and set up a rule that goes from the
+    Each language ecosystem should also subclass `GenerateToolLockfileSentinel`, e.g.
+    `GeneratePythonToolLockfileSentinel`. The subclass does not need to do anything - it is only used to know which language ecosystems tools correspond to.
+
+    Then, each tool should subclass their language ecosystem's subclass of `GenerateToolLockfileSentinel` and set up a rule that goes from the
     subclass -> the language's lockfile request, e.g. BlackLockfileSentinel ->
-    GeneratePythonLockfile. Register a union rule for the `GenerateToolLockfileSentinel` subclass.
+    GeneratePythonLockfile. Register `UnionRule(GenerateToolLockfileSentinel, MySubclass)`.
     """
 
     resolve_name: ClassVar[str]

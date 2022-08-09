@@ -45,6 +45,19 @@ likely include the relevant `Dependencies` subclass. Likewise for pre-2.14 `Infe
 Note that in most cases, you no longer need to request the target in your rule code, and should rely
 on `FieldSet`'s mechanisms for matching targets and getting field values.
 
+### `GenerateToolLockfileSentinel` encouraged to use language-specific subclasses
+
+Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
+`GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
+distinguish what language a tool belongs to, which is used for options like
+`[python].resolves_to_constraints_file` to validate which resolve names are recognized. 
+
+Things will still work if you do not make this change, other than the new options not recognizing
+your tool.
+
+However, keep the `UnionRule` the same, i.e. with the first argument still
+`GenerateToolLockfileSentinel`.
+
 2.13
 ----
 

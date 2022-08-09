@@ -39,8 +39,8 @@ class PythonToolRequirementsBase(Subsystem):
     # If this tool does not mix with user requirements (e.g. Flake8 and Isort, but not Pylint and
     # Pytest), you should set this to True.
     #
-    # You also need to subclass `GenerateToolLockfileSentinel` and create a rule that goes from
-    # it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
+    # You also need to subclass `GeneratePythonToolLockfileSentinel` and create a rule that goes
+    # from it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
     # Register the UnionRule.
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
