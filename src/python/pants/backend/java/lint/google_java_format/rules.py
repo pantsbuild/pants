@@ -18,7 +18,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -41,7 +41,7 @@ class GoogleJavaFormatRequest(FmtRequest):
     name = GoogleJavaFormatSubsystem.options_scope
 
 
-class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
+class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = GoogleJavaFormatSubsystem.options_scope
 
 

@@ -32,7 +32,7 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.option.global_options import KeepSandboxes
@@ -47,7 +47,7 @@ _PARSER_SCALA_VERSION = "2.13.8"
 _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
 
 
-class ScalaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "scala-parser"
 
 

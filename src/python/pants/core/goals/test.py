@@ -439,6 +439,15 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     alias = "timeout"
     required = False
     valid_numbers = ValidNumbers.positive_only
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each test file belonging to this target.
+
+        If unset, will default to `[test].timeout_default`; if that option is also unset,
+        then the test will never time out. Will never exceed `[test].timeout_maximum`. Only
+        applies if the option `--test-timeouts` is set to true (the default).
+        """
+    )
 
     def calculate_from_global_options(self, test: TestSubsystem) -> Optional[int]:
         if not test.timeouts:

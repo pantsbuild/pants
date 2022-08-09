@@ -13,7 +13,10 @@ from typing import Any, MutableMapping, cast
 import toml
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -226,7 +229,7 @@ class CoverageSubsystem(PythonToolBase):
         )
 
 
-class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
+class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = CoverageSubsystem.options_scope
 
 

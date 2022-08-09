@@ -8,7 +8,10 @@ from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -100,7 +103,7 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel(GenerateToolLockfileSentinel):
+class YapfLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Yapf.options_scope
 
 

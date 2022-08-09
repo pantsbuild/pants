@@ -104,11 +104,7 @@ class ScalatestTestSourceField(ScalaSourceField):
 
 
 class ScalatestTestTimeoutField(TestTimeoutField):
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each ScalaTest test file belonging to this target.
-        """
-    )
+    pass
 
 
 class ScalatestTestTarget(Target):
@@ -223,12 +219,14 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
         ScalaJunitTestsSourcesOverridesField,
+        JunitTestTimeoutField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
+        JunitTestTimeoutField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,

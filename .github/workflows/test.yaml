@@ -153,7 +153,7 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  bootstrap_pants_macos_x86_64:
+  bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -376,14 +376,13 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 65
-  build_wheels_macos_10_15_x86_64:
+  build_wheels_macos10_15_x86_64:
     env:
-      ARCHFLAGS: -arch x86_64
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
-    name: Bootstrap Pants, build wheels and fs_util (macOS10-15-x86_64)
+    name: Build wheels and fs_util (macOS10-15-x86_64)
     needs:
     - check_labels
     - docs_only_check
@@ -412,11 +411,9 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
     - name: Cache Rust toolchain
@@ -445,79 +442,43 @@ jobs:
         restore-keys: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
 
           '
-    - id: get-engine-hash
-      name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
+    - env:
+        ARCHFLAGS: -arch x86_64
+      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+      name: Build wheels
+      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+
+        ./build-support/bin/release.sh build-local-pex
+
+        ./build-support/bin/release.sh build-wheels
+
+        USE_PY38=true ./build-support/bin/release.sh build-wheels
+
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
+
+        ./build-support/bin/release.sh build-fs-util
 
         '
-      shell: bash
-    - name: Cache native engine
-      uses: actions/cache@v3
-      with:
-        key: 'macOS10-15-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
-
-          '
-        path: '.pants
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Bootstrap Pants
-      run: './pants --version
-
-        '
-    - name: Run smoke tests
-      run: './pants list ::
-
-        ./pants roots
-
-        ./pants help goals
-
-        ./pants help targets
-
-        ./pants help subsystems
-
-        '
+    - env:
+        ARCHFLAGS: -arch x86_64
+      if: github.event_name == 'push'
+      name: Build fs_util
+      run: ./build-support/bin/release.sh build-fs-util
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-macOS10-15-x86_64
+        name: pants-log-wheels-macOS10-15-x86_64
         path: .pants.d/pants.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: native_binaries.${ matrix.python-version }.macOS10-15-x86_64
-        path: '.pants
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: (github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]'))
-        && (github.repository_owner == 'pantsbuild')
-      name: Build wheels
-      run: ./build-support/bin/release.sh build-wheels
-    - if: github.event_name == 'push'
-      name: Build fs_util
-      run: ./build-support/bin/release.sh build-fs-util
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 60
-  build_wheels_macos_arm64:
+    timeout-minutes: 80
+  build_wheels_macos11_arm64:
     env:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -658,7 +619,7 @@ jobs:
         python-version:
         - '3.9'
     timeout-minutes: 60
-  build_wheels_macos_x86_64:
+  build_wheels_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -903,18 +864,18 @@ jobs:
     needs:
     - docs_only_check
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos_x86_64
+    - bootstrap_pants_macos11_x86_64
     - build_wheels_linux_x86_64
-    - build_wheels_macos_10_15_x86_64
-    - build_wheels_macos_arm64
-    - build_wheels_macos_x86_64
+    - build_wheels_macos10_15_x86_64
+    - build_wheels_macos11_arm64
+    - build_wheels_macos11_x86_64
     - check_labels
     - docs_only_check
     - lint_python
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
-    - test_python_macos_x86_64
+    - test_python_macos11_x86_64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -1198,14 +1159,14 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_macos_x86_64:
+  test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
     name: Test Python (macOS11-x86_64)
     needs:
-    - bootstrap_pants_macos_x86_64
+    - bootstrap_pants_macos11_x86_64
     - check_labels
     - docs_only_check
     runs-on:

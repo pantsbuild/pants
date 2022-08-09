@@ -18,6 +18,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 )
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError, LockfileMetadataValidation
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -273,6 +274,12 @@ class PexRequirements:
         return bool(self.req_strings)
 
 
+# NB: This is defined here so that our rule for ResolvePexConfigRequest -> ResolvePexConfig
+# can avoid an import cycle. We re-export this out of goals/lockfile.py.
+class GeneratePythonToolLockfileSentinel(GenerateToolLockfileSentinel):
+    pass
+
+
 @dataclass(frozen=True)
 class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
@@ -288,24 +295,29 @@ class ResolvePexConfig:
 
 
 @dataclass(frozen=True)
-class ResolvePexConfigRequest:
+class ResolvePexConfigRequest(EngineAwareParameter):
     """Find all configuration from `[python]` that impacts how the resolve is created."""
 
     resolve_name: str
+
+    def debug_hint(self) -> str:
+        return self.resolve_name
 
 
 @rule
 async def determine_resolve_pex_config(
     request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
 ) -> ResolvePexConfig:
-    all_tool_resolve_names = tuple(
-        sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+    all_python_tool_resolve_names = tuple(
+        sentinel.resolve_name
+        for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+        if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
 
     constraints_file: tuple[Digest, FileEntry] | None = None
-    _constraints_file_path = python_setup.resolves_to_constraints_file(all_tool_resolve_names).get(
-        request.resolve_name
-    )
+    _constraints_file_path = python_setup.resolves_to_constraints_file(
+        all_python_tool_resolve_names
+    ).get(request.resolve_name)
     if _constraints_file_path:
         _constraints_origin = softwrap(
             f"""

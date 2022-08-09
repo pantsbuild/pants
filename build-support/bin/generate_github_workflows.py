@@ -596,10 +596,10 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
-def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
-        "bootstrap_pants_macos_x86_64": {
+        "bootstrap_pants_macos11_x86_64": {
             "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
@@ -619,10 +619,10 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_macos_x86_64": {
+        "test_python_macos11_x86_64": {
             "name": f"Test Python ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
-            "needs": "bootstrap_pants_macos_x86_64",
+            "needs": "bootstrap_pants_macos11_x86_64",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": helper.platform_env(),
             "timeout-minutes": 60,
@@ -650,7 +650,7 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     if not cron:
         jobs.update(
             {
-                "build_wheels_macos_x86_64": {
+                "build_wheels_macos11_x86_64": {
                     "name": f"Build wheels and fs_util ({helper.platform_name()})",
                     "runs-on": helper.runs_on(),
                     "timeout-minutes": 80,
@@ -676,41 +676,29 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
 
 def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.MACOS10_15_X86_64)
-    # We've preinstalled 3.7-3.9 Pythons on the self-hosted runner.
-    steps = list(helper.bootstrap_pants(install_python=False))
-    # TODO: Build local pex? Will require some changes to _release_helper.py to qualify
-    #  the .pex file name with the architecture, intead of just "darwin".
-    steps.append(
-        {
-            "name": "Build wheels",
-            "run": helper.wrap_cmd("./build-support/bin/release.sh build-wheels"),
-            "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
-        }
-    )
-    steps.append(
-        {
-            "name": "Build fs_util",
-            "run": helper.wrap_cmd("./build-support/bin/release.sh build-fs-util"),
-            # We only build fs_util on branch builds, given that Pants compilation already
-            # checks the code compiles and the release process is simple and low-stakes.
-            "if": "github.event_name == 'push'",
-        }
-    )
-    steps.append(deploy_to_s3())
     return {
-        "build_wheels_macos_10_15_x86_64": {
-            "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS10_15_X86_64.value})",
+        "build_wheels_macos10_15_x86_64": {
+            "name": f"Build wheels and fs_util ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "timeout-minutes": 60,
-            "if": IS_PANTS_OWNER,
-            "steps": steps,
-            "env": {**helper.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
+            "timeout-minutes": 80,
+            **helper.build_wheels_common,
+            "steps": [
+                *checkout(),
+                setup_toolchain_auth(),
+                # NB: We only cache Rust, but not `native_engine.so` and the Pants
+                # virtualenv. This is because we must build both these things with
+                # multiple Python versions, whereas that caching assumes only one primary
+                # Python version (marked via matrix.strategy).
+                *helper.rust_caches(),
+                *helper.build_steps(),
+                helper.upload_log_artifacts(name="wheels"),
+                deploy_to_s3(),
+            ],
         },
     }
 
 
-def macos_arm64_jobs() -> Jobs:
+def macos11_arm64_jobs() -> Jobs:
     helper = Helper(Platform.MACOS11_ARM64)
     # The setup-python action doesn't yet support installing ARM64 Pythons.
     # Instead we pre-install Python 3.9 on the self-hosted runner.
@@ -735,7 +723,7 @@ def macos_arm64_jobs() -> Jobs:
     )
     steps.append(deploy_to_s3())
     return {
-        "build_wheels_macos_arm64": {
+        "build_wheels_macos11_arm64": {
             "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
@@ -758,10 +746,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         },
     }
     jobs.update(**linux_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_x86_64_jobs(python_versions, cron=cron))
+    jobs.update(**macos11_x86_64_jobs(python_versions, cron=cron))
     if not cron:
         jobs.update(**macos_10_15_x86_64_jobs(python_versions))
-        jobs.update(**macos_arm64_jobs())
+        jobs.update(**macos11_arm64_jobs())
     jobs.update(
         {
             "lint_python": {
