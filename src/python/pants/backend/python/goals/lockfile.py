@@ -44,12 +44,22 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestEntries,
+    FileContent,
+    FileEntry,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -389,6 +399,55 @@ async def setup_poetry_lockfile(
     return GeneratePythonLockfile.from_tool(
         poetry_subsystem, use_pex=python_setup.generate_lockfiles_with_pex
     )
+
+
+@rule
+async def determine_resolve_pex_config(
+    request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
+) -> ResolvePexConfig:
+    all_python_tool_resolve_names = tuple(
+        sentinel.resolve_name
+        for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+        if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
+    )
+
+    constraints_file: tuple[Digest, FileEntry] | None = None
+    _constraints_file_path = python_setup.resolves_to_constraints_file(
+        all_python_tool_resolve_names
+    ).get(request.resolve_name)
+    if _constraints_file_path:
+        _constraints_origin = softwrap(
+            f"""
+            the option `[python].resolves_to_constraints_file` for the resolve
+            '{request.resolve_name}'
+            """
+        )
+        _constraints_path_globs = PathGlobs(
+            [_constraints_file_path] if _constraints_file_path else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=_constraints_origin,
+        )
+        _constraints_digest, _constraints_digest_entries = await MultiGet(
+            Get(Digest, PathGlobs, _constraints_path_globs),
+            Get(DigestEntries, PathGlobs, _constraints_path_globs),
+        )
+
+        if len(_constraints_digest_entries) != 1:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Expected only one file from {_constraints_origin}, but matched:
+                    {_constraints_digest_entries}
+
+                    Did you use a glob like `*`?
+                    """
+                )
+            )
+        _constraints_file_entry = next(iter(_constraints_digest_entries))
+        assert isinstance(_constraints_file_entry, FileEntry)
+        constraints_file = (_constraints_digest, _constraints_file_entry)
+
+    return ResolvePexConfig(constraints_file=constraints_file)
 
 
 def rules():
