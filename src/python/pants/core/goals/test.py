@@ -469,6 +469,7 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     help = softwrap(
         """
          Additional environment variables to include in test processes.
+
          Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
          `ENV_VAR` to copy the value of a variable in Pants's own environment.
 
