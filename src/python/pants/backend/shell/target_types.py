@@ -7,7 +7,7 @@ import re
 from enum import Enum
 
 from pants.backend.shell.shell_setup import ShellSetup
-from pants.core.goals.test import RuntimePackageDependenciesField
+from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -112,16 +112,8 @@ class Shunit2TestDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class Shunit2TestTimeoutField(IntField):
-    alias = "timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each test file belonging to this target.
-
-        If unset, the test will never time out.
-        """
-    )
-    valid_numbers = ValidNumbers.positive_only
+class Shunit2TestTimeoutField(TestTimeoutField):
+    pass
 
 
 class SkipShunit2TestsField(BoolField):

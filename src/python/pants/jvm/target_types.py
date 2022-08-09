@@ -310,11 +310,7 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 
 
 class JunitTestTimeoutField(TestTimeoutField):
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each JUnit test file belonging to this target.
-        """
-    )
+    pass
 
 
 # -----------------------------------------------------------------------------------------------
