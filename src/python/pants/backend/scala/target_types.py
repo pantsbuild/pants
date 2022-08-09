@@ -105,12 +105,10 @@ class ScalatestTestSourceField(ScalaSourceField):
 
 
 class ScalatestTestTimeoutField(TestTimeoutField):
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each ScalaTest test file belonging to this target.
-        """
-    )
+    pass
 
+class ScalatestTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
 
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
@@ -154,7 +152,6 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         ScalatestTestsSourcesOverridesField,
-        ScalatestTestTimeoutField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = COMMON_TARGET_FIELDS

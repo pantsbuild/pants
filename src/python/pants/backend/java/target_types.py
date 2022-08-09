@@ -82,7 +82,7 @@ class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
 
 class JunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "junit_tests"
-    core_fields = (*COMMON_TARGET_FIELDS, JavaTestsGeneratorSourcesField, JunitTestTimeoutField)
+    core_fields = (*COMMON_TARGET_FIELDS, JavaTestsGeneratorSourcesField,)
     generated_target_cls = JunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
