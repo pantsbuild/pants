@@ -8,6 +8,7 @@ import logging
 import os
 from typing import Iterable, Iterator, Optional, cast
 
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -18,7 +19,7 @@ from pants.option.option_types import (
 )
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -204,7 +205,32 @@ class PythonSetup(Subsystem):
             using a resolve whose interpreter constraints are set to ['==3.7.*'], then
             Pants will error explaining the incompatibility.
 
-            The keys must be defined as resolves in `[python].resolves`.
+            The keys must be defined as resolves in `[python].resolves`. To change the interpreter
+            constraints for tool lockfiles, change `[tool].interpreter_constraints`, e.g.
+            `[black].interpreter_constraints`; if the tool does not have that option, it determines
+            its interpreter constraints from your user code.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_constraints_file = DictOption[str](
+        help=softwrap(
+            """
+            When generating a resolve's lockfile, use a constraints file to pin the version of
+            certain requirements. This is particularly useful to pin the versions of transitive
+            dependencies of your direct requirements.
+
+            See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information on
+            the format of constraint files and how constraints are applied in Pex and pip.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to file paths for
+            constraints files. For example,
+            `{'data-science': '3rdparty/data-science-constraints.txt'}`.
+            If a resolve is not set in the dictionary, it will not use a constraints file.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -521,20 +547,32 @@ class PythonSetup(Subsystem):
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
         result = {}
+        unrecognized_resolves = []
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
-                raise KeyError(
-                    softwrap(
-                        f"""
-                        Unrecognized resolve name in the option
-                        `[python].resolves_to_interpreter_constraints`: {resolve}. Each
-                        key must be one of the keys in `[python].resolves`:
-                        {sorted(self.resolves.keys())}
-                        """
-                    )
-                )
+                unrecognized_resolves.append(resolve)
             result[resolve] = tuple(ics)
+        if unrecognized_resolves:
+            raise UnrecognizedResolveNamesError(
+                unrecognized_resolves,
+                self.resolves.keys(),
+                description_of_origin="the option `[python].resolves_to_interpreter_constraints`",
+            )
         return result
+
+    @memoized_method
+    def resolves_to_constraints_file(
+        self, all_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, str]:
+        all_valid_resolves = {*self.resolves, *all_tool_resolve_names}
+        unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - all_valid_resolves
+        if unrecognized_resolves:
+            raise UnrecognizedResolveNamesError(
+                sorted(unrecognized_resolves),
+                all_valid_resolves,
+                description_of_origin="the option `[python].resolves_to_constraints_file`",
+            )
+        return self._resolves_to_constraints_file
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")

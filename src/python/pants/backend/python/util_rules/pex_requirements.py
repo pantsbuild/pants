@@ -16,16 +16,20 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadata,
     PythonLockfileMetadataV2,
 )
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError, LockfileMetadataValidation
 from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     FileContent,
+    FileEntry,
     GlobMatchErrorBehavior,
     PathGlobs,
 )
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -269,6 +273,74 @@ class PexRequirements:
         return bool(self.req_strings)
 
 
+@dataclass(frozen=True)
+class ResolvePexConfig:
+    """Configuration from `[python]` that impacts how the resolve is created."""
+
+    constraints_file: tuple[Digest, FileEntry] | None
+
+    @property
+    def constraints_file_path_and_hash(self) -> tuple[str, str] | None:
+        if self.constraints_file is None:
+            return None
+        file_entry = self.constraints_file[1]
+        return file_entry.path, file_entry.file_digest.fingerprint
+
+
+@dataclass(frozen=True)
+class ResolvePexConfigRequest:
+    """Find all configuration from `[python]` that impacts how the resolve is created."""
+
+    resolve_name: str
+
+
+@rule
+async def determine_resolve_pex_config(
+    request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
+) -> ResolvePexConfig:
+    all_tool_resolve_names = tuple(
+        sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+    )
+
+    constraints_file: tuple[Digest, FileEntry] | None = None
+    _constraints_file_path = python_setup.resolves_to_constraints_file(all_tool_resolve_names).get(
+        request.resolve_name
+    )
+    if _constraints_file_path:
+        _constraints_origin = softwrap(
+            f"""
+            the option `[python].resolves_to_constraints_file` for the resolve
+            '{request.resolve_name}'
+            """
+        )
+        _constraints_path_globs = PathGlobs(
+            [_constraints_file_path] if _constraints_file_path else [],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=_constraints_origin,
+        )
+        _constraints_digest, _constraints_digest_entries = await MultiGet(
+            Get(Digest, PathGlobs, _constraints_path_globs),
+            Get(DigestEntries, PathGlobs, _constraints_path_globs),
+        )
+
+        if len(_constraints_digest_entries) != 1:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Expected only one file from {_constraints_origin}, but matched:
+                    {_constraints_digest_entries}
+
+                    Did you use a glob like `*`?
+                    """
+                )
+            )
+        _constraints_file_entry = next(iter(_constraints_digest_entries))
+        assert isinstance(_constraints_file_entry, FileEntry)
+        constraints_file = (_constraints_digest, _constraints_file_entry)
+
+    return ResolvePexConfig(constraints_file=constraints_file)
+
+
 def should_validate_metadata(
     lockfile: Lockfile | LockfileContent,
     python_setup: PythonSetup,
@@ -285,6 +357,8 @@ def validate_metadata(
     lockfile: Lockfile | LockfileContent,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
+    *,
+    constraints_file_path_and_hash: tuple[str, str] | None,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
@@ -296,6 +370,7 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
+        constraints_file_path_and_hash=constraints_file_path_and_hash,
     )
     if validation:
         return
@@ -306,6 +381,9 @@ def validate_metadata(
         lockfile=lockfile,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
+        maybe_constraints_file_path=constraints_file_path_and_hash[0]
+        if constraints_file_path_and_hash
+        else None,
     )
     is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
     msg_iter = (
@@ -319,6 +397,15 @@ def validate_metadata(
     logger.warning("%s", msg)
 
 
+def _stale_constraints_file_error(file_path: str) -> str:
+    return softwrap(
+        f"""
+        - The constraints file at {file_path} has changed from when the lockfile was generated.
+        (Constraints files are set via the option `[python].resolves_to_constraints_file`)
+        """
+    )
+
+
 def _invalid_tool_lockfile_error(
     metadata: PythonLockfileMetadata,
     validation: LockfileMetadataValidation,
@@ -326,6 +413,7 @@ def _invalid_tool_lockfile_error(
     *,
     user_requirements: set[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
+    maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
     tool_name = lockfile.resolve_name
 
@@ -399,6 +487,10 @@ def _invalid_tool_lockfile_error(
         )
         yield "\n\n"
 
+    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
+        assert maybe_constraints_file_path is not None
+        yield _stale_constraints_file_error(maybe_constraints_file_path)
+
     yield softwrap(
         f"""
         To regenerate your lockfile based on your current configuration, run
@@ -420,6 +512,7 @@ def _invalid_user_lockfile_error(
     *,
     user_requirements: set[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
+    maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
     yield "You are using the lockfile "
     yield f"at {lockfile.file_path} " if isinstance(
@@ -473,6 +566,10 @@ def _invalid_user_lockfile_error(
             then run `generate-lockfiles`.
             """
         ) + "\n\n"
+
+    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
+        assert maybe_constraints_file_path is not None
+        yield _stale_constraints_file_error(maybe_constraints_file_path)
 
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(

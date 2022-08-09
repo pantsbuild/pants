@@ -43,7 +43,11 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import validate_metadata
+from pants.backend.python.util_rules.pex_requirements import (
+    ResolvePexConfig,
+    ResolvePexConfigRequest,
+    validate_metadata,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
@@ -415,7 +419,13 @@ async def build_pex(
     pex_lock_resolver_args = [*python_repos.pex_args]
     pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
     if isinstance(request.requirements, EntireLockfile):
-        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
+        lockfile, resolve_config = await MultiGet(
+            Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)),
+            Get(
+                ResolvePexConfig,
+                ResolvePexConfigRequest(request.requirements.lockfile.resolve_name),
+            ),
+        )
         concurrency_available = lockfile.requirement_estimate
         requirements_digests.append(lockfile.lockfile_digest)
         if lockfile.is_pex_native:
@@ -432,6 +442,7 @@ async def build_pex(
                 lockfile.original_lockfile,
                 request.requirements.complete_req_strings,
                 python_setup,
+                constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
             )
     else:
         # TODO: This is not the best heuristic for available concurrency, since the
@@ -446,6 +457,10 @@ async def build_pex(
             requirements_digests.append(repository_pex.digest)
         elif isinstance(request.requirements.from_superset, LoadedLockfile):
             loaded_lockfile = request.requirements.from_superset
+            resolve_config = await Get(
+                ResolvePexConfig,
+                ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
+            )
             # NB: This is also validated in the constructor.
             assert loaded_lockfile.is_pex_native
             if request.requirements.req_strings:
@@ -460,6 +475,7 @@ async def build_pex(
                         loaded_lockfile.original_lockfile,
                         request.requirements.req_strings,
                         python_setup,
+                        constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
                     )
         else:
             assert request.requirements.from_superset is None
