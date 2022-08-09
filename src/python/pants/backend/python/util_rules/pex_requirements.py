@@ -270,6 +270,14 @@ class PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements(field_requirements, constraints_strings=constraints_strings)
 
+    @classmethod
+    def req_strings_from_requirement_fields(
+        cls, fields: Iterable[PythonRequirementsField]
+    ) -> FrozenOrderedSet[str]:
+        """A convenience when you only need the raw requirement strings from fields and don't need
+        to consider things like constraints or resolves."""
+        return cls.create_from_requirement_fields(fields, constraints_strings=()).req_strings
+
     def __bool__(self) -> bool:
         return bool(self.req_strings)
 

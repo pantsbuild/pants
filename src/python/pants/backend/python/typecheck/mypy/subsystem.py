@@ -268,18 +268,17 @@ async def mypy_first_party_plugins(
         TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
     )
 
-    requirements = PexRequirements.create_from_requirement_fields(
+    requirements = PexRequirements.req_strings_from_requirement_fields(
         (
             plugin_tgt[PythonRequirementsField]
             for plugin_tgt in transitive_targets.closure
             if plugin_tgt.has_field(PythonRequirementsField)
         ),
-        constraints_strings=(),
     )
 
     sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
     return MyPyFirstPartyPlugins(
-        requirement_strings=requirements.req_strings,
+        requirement_strings=requirements,
         sources_digest=sources.source_files.snapshot.digest,
         source_roots=sources.source_roots,
     )

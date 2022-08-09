@@ -868,14 +868,13 @@ async def get_requirements(
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
     req_strs = list(
-        PexRequirements.create_from_requirement_fields(
+        PexRequirements.req_strings_from_requirement_fields(
             (
                 tgt[PythonRequirementsField]
                 for tgt in direct_deps_with_excl
                 if tgt.has_field(PythonRequirementsField)
             ),
-            constraints_strings=(),
-        ).req_strings
+        )
     )
 
     # Add the requirements on any exported targets on which we depend.
