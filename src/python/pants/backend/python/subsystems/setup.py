@@ -229,8 +229,7 @@ class PythonSetup(Subsystem):
             `{'data-science': '3rdparty/data-science-constraints.txt'}`.
             If a resolve is not set in the dictionary, it will not use a constraints file.
 
-            You can use the key `__all__` to use the same constraints file for all resolves.
-            Entries for specific resolves will override the `__all__` default.
+            You can use the key `__default__` to set a default value for all resolves.
 
             Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
@@ -569,7 +568,7 @@ class PythonSetup(Subsystem):
     ) -> dict[str, str]:
         all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
         unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
-            "__all__",
+            "__default__",
             *all_valid_resolves,
         }
         if unrecognized_resolves:
@@ -578,7 +577,7 @@ class PythonSetup(Subsystem):
                 all_valid_resolves,
                 description_of_origin="the option `[python].resolves_to_constraints_file`",
             )
-        default_val = self._resolves_to_constraints_file.get("__all__")
+        default_val = self._resolves_to_constraints_file.get("__default__")
         if not default_val:
             return self._resolves_to_constraints_file
         return {

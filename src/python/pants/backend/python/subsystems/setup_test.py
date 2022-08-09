@@ -32,7 +32,7 @@ def test_resolves_to_constraints_file() -> None:
         ).resolves_to_constraints_file(all_python_tool_resolve_names=("tool1", "tool2"))
 
     assert create({"a": "c1.txt", "tool1": "c2.txt"}) == {"a": "c1.txt", "tool1": "c2.txt"}
-    assert create({"__all__": "c.txt", "tool2": "override.txt"}) == {
+    assert create({"__default__": "c.txt", "tool2": "override.txt"}) == {
         "a": "c.txt",
         "tool1": "c.txt",
         "tool2": "override.txt",
