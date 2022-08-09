@@ -1,6 +1,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 import importlib
 import locale
 import os
@@ -111,8 +112,13 @@ class PantsLoader:
 
 def main() -> None:
     ox.bootstrap_pyoxidizer()
+
+    if ox.is_oxidized and ox.pex_main():
+        return
+
     PantsLoader.main()
 
 
 if __name__ == "__main__":
+    print(f"welcome to pants! {sys.argv=} {sys.executable=} {os.getcwd()=}", file=sys.stderr)
     main()
