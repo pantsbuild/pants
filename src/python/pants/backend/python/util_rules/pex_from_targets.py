@@ -573,13 +573,10 @@ async def _setup_constraints_repository_pex(
 
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
 
-    requirements = PexRequirements.create_from_requirement_fields(
-        (
-            tgt[PythonRequirementsField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(PythonRequirementsField)
-        ),
-        constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+    req_strings = PexRequirements.req_strings_from_requirement_fields(
+        tgt[PythonRequirementsField]
+        for tgt in transitive_targets.closure
+        if tgt.has_field(PythonRequirementsField)
     )
 
     # In requirement strings, Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
@@ -590,7 +587,7 @@ async def _setup_constraints_repository_pex(
     name_req_projects = set()
     constraints_file_reqs = set(global_requirement_constraints)
 
-    for req_str in requirements.req_strings:
+    for req_str in req_strings:
         req = PipRequirement.parse(req_str)
         if req.url:
             url_reqs.add(req)
