@@ -33,6 +33,7 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
+    MACOS10_15_X86_64 = "macOS10-15-x86_64"
     MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
@@ -336,14 +337,16 @@ class Helper:
         if self.platform == Platform.MACOS11_X86_64:
             return ["macos-11"]
         if self.platform == Platform.MACOS11_ARM64:
-            return ["self-hosted", "macOS11", "ARM64"]
+            return ["macOS-11-ARM64"]
+        if self.platform == Platform.MACOS10_15_X86_64:
+            return ["macOS-10.15-X64"]
         if self.platform == Platform.LINUX_X86_64:
             return ["ubuntu-20.04"]
         raise ValueError(f"Unsupported platform: {self.platform_name()}")
 
     def platform_env(self):
         ret = {}
-        if self.platform == Platform.MACOS11_X86_64:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -671,6 +674,42 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
+def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
+    helper = Helper(Platform.MACOS10_15_X86_64)
+    # We've preinstalled 3.7-3.9 Pythons on the self-hosted runner.
+    steps = list(helper.bootstrap_pants(install_python=False))
+    # TODO: Build local pex? Will require some changes to _release_helper.py to qualify
+    #  the .pex file name with the architecture, intead of just "darwin".
+    steps.append(
+        {
+            "name": "Build wheels",
+            "run": helper.wrap_cmd("./build-support/bin/release.sh build-wheels"),
+            "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
+        }
+    )
+    steps.append(
+        {
+            "name": "Build fs_util",
+            "run": helper.wrap_cmd("./build-support/bin/release.sh build-fs-util"),
+            # We only build fs_util on branch builds, given that Pants compilation already
+            # checks the code compiles and the release process is simple and low-stakes.
+            "if": "github.event_name == 'push'",
+        }
+    )
+    steps.append(deploy_to_s3())
+    return {
+        "build_wheels_macos_10_15_x86_64": {
+            "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS10_15_X86_64.value})",
+            "runs-on": helper.runs_on(),
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "timeout-minutes": 60,
+            "if": IS_PANTS_OWNER,
+            "steps": steps,
+            "env": {**helper.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
+        },
+    }
+
+
 def macos_arm64_jobs() -> Jobs:
     helper = Helper(Platform.MACOS11_ARM64)
     # The setup-python action doesn't yet support installing ARM64 Pythons.
@@ -720,7 +759,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     }
     jobs.update(**linux_x86_64_jobs(python_versions, cron=cron))
     jobs.update(**macos_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_arm64_jobs())
+    if not cron:
+        jobs.update(**macos_10_15_x86_64_jobs(python_versions))
+        jobs.update(**macos_arm64_jobs())
     jobs.update(
         {
             "lint_python": {
