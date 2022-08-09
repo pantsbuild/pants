@@ -229,6 +229,8 @@ class PythonSetup(Subsystem):
             `{'data-science': '3rdparty/data-science-constraints.txt'}`.
             If a resolve is not set in the dictionary, it will not use a constraints file.
 
+            You can use the key `__default__` to set a default value for all resolves.
+
             Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
@@ -562,17 +564,26 @@ class PythonSetup(Subsystem):
 
     @memoized_method
     def resolves_to_constraints_file(
-        self, all_tool_resolve_names: tuple[str, ...]
+        self, all_python_tool_resolve_names: tuple[str, ...]
     ) -> dict[str, str]:
-        all_valid_resolves = {*self.resolves, *all_tool_resolve_names}
-        unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - all_valid_resolves
+        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
+        unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
+            "__default__",
+            *all_valid_resolves,
+        }
         if unrecognized_resolves:
             raise UnrecognizedResolveNamesError(
                 sorted(unrecognized_resolves),
                 all_valid_resolves,
                 description_of_origin="the option `[python].resolves_to_constraints_file`",
             )
-        return self._resolves_to_constraints_file
+        default_val = self._resolves_to_constraints_file.get("__default__")
+        if not default_val:
+            return self._resolves_to_constraints_file
+        return {
+            resolve: self._resolves_to_constraints_file.get(resolve, default_val)
+            for resolve in all_valid_resolves
+        }
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
