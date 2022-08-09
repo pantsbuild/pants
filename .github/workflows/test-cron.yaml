@@ -150,7 +150,7 @@ jobs:
         - '3.8'
         - '3.9'
     timeout-minutes: 40
-  bootstrap_pants_macos_x86_64:
+  bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -634,12 +634,12 @@ jobs:
         - '3.8'
         - '3.9'
     timeout-minutes: 90
-  test_python_macos_x86_64:
+  test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
     if: github.repository_owner == 'pantsbuild'
     name: Test Python (macOS11-x86_64)
-    needs: bootstrap_pants_macos_x86_64
+    needs: bootstrap_pants_macos11_x86_64
     runs-on:
     - macos-11
     steps:
