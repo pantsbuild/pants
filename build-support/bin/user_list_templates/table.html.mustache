@@ -10,7 +10,7 @@ can be finicky, so be sure to test out changes!
             <td width="50%">
                 <a href="{{ a.website }}" target="_blank">
                     {{#a.image}}
-                        <img src="{{ a.image }}">
+                        <img src="{{ a.image }}" alt="{{ a.name }}">
                     {{/a.image}}
                     {{^a.image}}
                         <span class="org-bigname">{{ a.name }}</span>
@@ -20,7 +20,7 @@ can be finicky, so be sure to test out changes!
             <td width="50%">
                 <a href="{{ b.website }}" target="_blank">
                     {{#b.image}}
-                        <img src="{{ b.image }}">
+                        <img src="{{ b.image }}" alt="{{ b.name }}">
                     {{/b.image}}
                     {{^b.image}}
                         <span class="org-bigname">{{ b.name }}</span>
@@ -29,20 +29,7 @@ can be finicky, so be sure to test out changes!
             </td>
         </tr>
         <tr class="org-name">
-            <td width="50%">
-                <a href="{{ a.website }}" target="_blank">
-                    {{ a.name }}
-                </a>
-                <br>
-                <br>
-                <br>
-                <br>
-            </td>
-            <td width="50%">
-                <a href="{{ b.website }}" target="_blank">
-                    {{ b.name }}
-                </a>
-                <br>
+            <td colspan="2">
                 <br>
                 <br>
                 <br>
