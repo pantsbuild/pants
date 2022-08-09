@@ -220,10 +220,9 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     )
 
     return Flake8FirstPartyPlugins(
-        requirement_strings=PexRequirements.create_from_requirement_fields(
+        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
             requirements_fields,
-            constraints_strings=(),
-        ).req_strings,
+        ),
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
     )

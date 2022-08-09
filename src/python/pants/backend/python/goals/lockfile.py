@@ -357,10 +357,9 @@ async def setup_user_lockfile_requests(
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
-            requirements=PexRequirements.create_from_requirement_fields(
-                resolve_to_requirements_fields[resolve],
-                constraints_strings=(),
-            ).req_strings,
+            requirements=PexRequirements.req_strings_from_requirement_fields(
+                resolve_to_requirements_fields[resolve]
+            ),
             interpreter_constraints=InterpreterConstraints(
                 python_setup.resolves_to_interpreter_constraints.get(
                     resolve, python_setup.interpreter_constraints
