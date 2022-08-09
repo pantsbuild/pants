@@ -5,6 +5,7 @@ import importlib.machinery
 import logging
 import os
 import runpy
+import site
 import sys
 import zipimport
 
@@ -39,16 +40,18 @@ def pex_main() -> bool:
 
     with open("/Users/chrisjrn/src/pants/oxidized-invocations.txt", "a") as f:
         import datetime
+        import site
 
-        f.write(f"{datetime.datetime.now()}: {sys.argv=} {sys.path=}\n")
+        f.write(
+            f"{datetime.datetime.now()}: {sys.argv=} {sys.path=} {site.PREFIXES=} {site.getsitepackages()=}\n"
+        )
 
     if sys.argv[1] == "./pex":
         run_as_pex()
         return True
 
     if sys.argv[1] == "-sE" and sys.argv[2].endswith("/pex"):
-        print("bloop", file=sys.stderr)
-        run_as_pip()
+        run_pex_venv()
         return True
 
     if len(sys.argv) == 4 and sys.argv[1:3] == ["-s", "-c"]:
@@ -63,7 +66,7 @@ def pex_main() -> bool:
 
 
 def prepare_import_machinery():
-    print(f"pex main? {sys.version_info=} {sys.argv=}", flush=True)
+    # print(f"pex main? {sys.version_info=} {sys.argv=}", flush=True)
 
     # pex relies heavily on `__file__`, which the Oxidized importer does not
     # believe in. This reinstates the default Python import machinery before
@@ -109,7 +112,6 @@ def run_as_venv():
 
 def run_as_dash_c():
     prepare_import_machinery()
-    print(f"{os.environ=}", file=sys.stderr)
     if "PEX" in os.environ:
         # Get pex into the modules cache
         pex = runpy.run_path(os.environ["PEX"])
@@ -120,17 +122,11 @@ def run_as_dash_c():
     sys.exit(0)
 
 
-def run_as_pip():
+def run_pex_venv():
     prepare_import_machinery()
-    print("floop", file=sys.stderr)
-
-    start_path = os.path.join(os.path.dirname(sys.argv[2]), "lib")
-    ver = sys.version_info
-    py_name = f"python{ver.major}.{ver.minor}"
-    for (dirname, _, _) in os.walk(start_path):
-        if dirname.endswith(py_name) or dirname.endswith(os.path.join(py_name, "site-packages")):
-            sys.path.append(dirname)
-
+    path_to_run = sys.argv[2]
+    site.PREFIXES = [os.path.dirname(path_to_run)]
+    site.addsitepackages(set())
     del sys.argv[1:3]
-    runpy.run_module(mod_name="pip", run_name="__main__", alter_sys=True)
+    runpy.run_path(path_to_run, run_name="__main__")
     sys.exit(0)
