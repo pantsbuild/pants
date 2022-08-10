@@ -13,6 +13,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
+    ResolvePexConstraintsFile,
     ToolCustomLockfile,
     ToolDefaultLockfile,
     _pex_lockfile_requirement_count,
@@ -22,13 +23,14 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.engine.fs import FileContent
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
     {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
-    constraints_file_hash="abc",
+    requirement_constraints={PipRequirement.parse("abc")},
 )
 
 
@@ -123,7 +125,11 @@ def test_validate_tool_lockfiles(
         requirements,
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
-        constraints_file_path_and_hash=("c.txt", "xyz" if invalid_constraints_file else "abc"),
+        constraints_file=ResolvePexConstraintsFile(
+            EMPTY_DIGEST,
+            "c.txt",
+            FrozenOrderedSet({PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}),
+        ),
     )
 
     def contains(msg: str, if_: bool) -> None:
@@ -201,7 +207,11 @@ def test_validate_user_lockfiles(
         lockfile,
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
-        constraints_file_path_and_hash=("c.txt", "xyz" if invalid_constraints_file else "abc"),
+        constraints_file=ResolvePexConstraintsFile(
+            EMPTY_DIGEST,
+            "c.txt",
+            FrozenOrderedSet({PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}),
+        ),
     )
 
     def contains(msg: str, if_: bool = True) -> None:

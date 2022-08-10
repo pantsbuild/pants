@@ -145,7 +145,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
     default_metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints(["==2.7.*"]),
         requirements=set(),
-        constraints_file_hash=None,
+        requirement_constraints=set(),
     )
 
     def assert_ics(

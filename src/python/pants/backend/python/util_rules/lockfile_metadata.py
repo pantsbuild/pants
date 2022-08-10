@@ -39,7 +39,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         *,
         valid_for_interpreter_constraints: InterpreterConstraints,
         requirements: set[PipRequirement],
-        constraints_file_hash: str | None,
+        requirement_constraints: set[PipRequirement],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -50,7 +50,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         """
 
         return PythonLockfileMetadataV3(
-            valid_for_interpreter_constraints, requirements, constraints_file_hash
+            valid_for_interpreter_constraints, requirements, requirement_constraints
         )
 
     @classmethod
@@ -70,7 +70,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
-        constraints_file_path_and_hash: tuple[str, str] | None,
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -114,7 +114,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         interpreter_universe: Iterable[str],
         # Everything below is not used by v1.
         user_requirements: Iterable[PipRequirement],
-        constraints_file_path_and_hash: tuple[str, str] | None,
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -168,13 +168,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         instance = cast(PythonLockfileMetadataV2, instance)
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
-        return {
-            "generated_with_requirements": (
-                sorted(str(i) for i in instance.requirements)
-                if instance.requirements is not None
-                else None
-            )
-        }
+        return {"generated_with_requirements": (sorted(str(i) for i in instance.requirements))}
 
     def is_valid_for(
         self,
@@ -185,7 +179,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
         # Everything below is not used by V2.
-        constraints_file_path_and_hash: tuple[str, str] | None,
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
 
@@ -210,7 +204,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     """Lockfile version that considers constraints files."""
 
-    constraints_file_hash: str | None
+    requirement_constraints: set[PipRequirement]
 
     @classmethod
     def _from_json_dict(
@@ -221,19 +215,23 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     ) -> PythonLockfileMetadataV3:
         v2_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
-        constraints_file_hash = metadata(
-            "constraints_file_hash", str, lambda x: x  # type: ignore[no-any-return]
+        requirement_constraints = metadata(
+            "requirement_constraints",
+            Set[PipRequirement],
+            lambda l: {PipRequirement.parse(i) for i in l},
         )
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,
             requirements=v2_metadata.requirements,
-            constraints_file_hash=constraints_file_hash,
+            requirement_constraints=requirement_constraints,
         )
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadataV3, instance)
-        return {"constraints_file_hash": instance.constraints_file_hash}
+        return {
+            "requirement_constraints": (sorted(str(i) for i in instance.requirement_constraints))
+        }
 
     def is_valid_for(
         self,
@@ -243,7 +241,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
-        constraints_file_path_and_hash: tuple[str, str] | None,
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -253,14 +251,11 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 user_interpreter_constraints=user_interpreter_constraints,
                 interpreter_universe=interpreter_universe,
                 user_requirements=user_requirements,
-                constraints_file_path_and_hash=constraints_file_path_and_hash,
+                requirement_constraints=requirement_constraints,
             )
             .failure_reasons
         )
 
-        provided_constraints_file_hash = (
-            constraints_file_path_and_hash[1] if constraints_file_path_and_hash else None
-        )
-        if provided_constraints_file_hash != self.constraints_file_hash:
+        if self.requirement_constraints != set(requirement_constraints):
             failure_reasons.add(InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH)
         return LockfileMetadataValidation(failure_reasons)

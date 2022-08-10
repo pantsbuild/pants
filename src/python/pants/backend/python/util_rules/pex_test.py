@@ -745,7 +745,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     lock_content = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints(),
         requirements=set(),
-        constraints_file_hash=None,
+        requirement_constraints=set(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
