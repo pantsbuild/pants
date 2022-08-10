@@ -362,9 +362,6 @@ class _BuildPexPythonSetup:
 
 @rule_helper
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
-    python: PythonExecutable | None = None
-    argv = []
-
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
@@ -372,9 +369,15 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
         # Note that this means that this is not an internal-only pex.
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
-        argv.extend(request.platforms.generate_pex_arg_list())
-        argv.extend(request.complete_platforms.generate_pex_arg_list())
-    elif request.python:
+        return _BuildPexPythonSetup(
+            None,
+            [
+                *request.platforms.generate_pex_arg_list(),
+                *request.complete_platforms.generate_pex_arg_list(),
+            ],
+        )
+
+    if request.python:
         python = request.python
     elif request.internal_only:
         # NB: If it's an internal_only PEX, we do our own lookup of the interpreter based on the
@@ -386,12 +389,9 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
     else:
         # `--interpreter-constraint` options are mutually exclusive with the `--python` option,
         # so we only specify them if we have not already located a concrete Python.
-        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
+        return _BuildPexPythonSetup(None, request.interpreter_constraints.generate_pex_arg_list())
 
-    if python:
-        argv.extend(["--python", python.path])
-
-    return _BuildPexPythonSetup(python, argv)
+    return _BuildPexPythonSetup(python, ["--python", python.path])
 
 
 @dataclass
@@ -405,9 +405,7 @@ class _BuildPexRequirementsSetup:
 async def _setup_pex_requirements(
     request: PexRequest, python_repos: PythonRepos, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
-    digests = []
-    argv = []
-    pex_lock_resolver_args = [*python_repos.pex_args]
+    pex_lock_resolver_args = list(python_repos.pex_args)
     pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
 
     if isinstance(request.requirements, EntireLockfile):
@@ -418,15 +416,13 @@ async def _setup_pex_requirements(
                 ResolvePexConfigRequest(request.requirements.lockfile.resolve_name),
             ),
         )
-        concurrency_available = lockfile.requirement_estimate
-        digests.append(lockfile.lockfile_digest)
-        if lockfile.is_pex_native:
-            argv.extend(["--lock", lockfile.lockfile_path])
-            argv.extend(pex_lock_resolver_args)
-        else:
+        argv = (
+            ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
+            if lockfile.is_pex_native
+            else
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            argv.extend(["--requirement", lockfile.lockfile_path, "--no-transitive"])
-            argv.extend(pip_resolver_args)
+            ["--requirement", lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+        )
         if lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
                 lockfile.metadata,
@@ -436,56 +432,71 @@ async def _setup_pex_requirements(
                 python_setup,
                 constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
             )
-    else:
-        # TODO: This is not the best heuristic for available concurrency, since the
-        # requirements almost certainly have transitive deps which also need building, but it
-        # is better than using something hardcoded.
-        concurrency_available = len(request.requirements.req_strings)
-        argv.extend(request.requirements.req_strings)
 
-        if isinstance(request.requirements.from_superset, Pex):
-            repository_pex = request.requirements.from_superset
-            argv.extend(["--pex-repository", repository_pex.name])
-            digests.append(repository_pex.digest)
-        elif isinstance(request.requirements.from_superset, LoadedLockfile):
-            loaded_lockfile = request.requirements.from_superset
-            resolve_config = await Get(
-                ResolvePexConfig,
-                ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
+        return _BuildPexRequirementsSetup(
+            [lockfile.lockfile_digest], argv, lockfile.requirement_estimate
+        )
+
+    # TODO: This is not the best heuristic for available concurrency, since the
+    # requirements almost certainly have transitive deps which also need building, but it
+    # is better than using something hardcoded.
+    concurrency_available = len(request.requirements.req_strings)
+
+    if isinstance(request.requirements.from_superset, Pex):
+        repository_pex = request.requirements.from_superset
+        return _BuildPexRequirementsSetup(
+            [repository_pex.digest],
+            [*request.requirements.req_strings, "--pex-repository", repository_pex.name],
+            concurrency_available,
+        )
+
+    if isinstance(request.requirements.from_superset, LoadedLockfile):
+        loaded_lockfile = request.requirements.from_superset
+        # NB: This is also validated in the constructor.
+        assert loaded_lockfile.is_pex_native
+        resolve_config = await Get(
+            ResolvePexConfig,
+            ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
+        )
+        if not request.requirements.req_strings:
+            return _BuildPexRequirementsSetup([], [], concurrency_available)
+
+        if loaded_lockfile.metadata:
+            validate_metadata(
+                loaded_lockfile.metadata,
+                request.interpreter_constraints,
+                loaded_lockfile.original_lockfile,
+                request.requirements.req_strings,
+                python_setup,
+                constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
             )
-            # NB: This is also validated in the constructor.
-            assert loaded_lockfile.is_pex_native
-            if request.requirements.req_strings:
-                digests.append(loaded_lockfile.lockfile_digest)
-                argv.extend(["--lock", loaded_lockfile.lockfile_path])
-                argv.extend(pex_lock_resolver_args)
 
-                if loaded_lockfile.metadata:
-                    validate_metadata(
-                        loaded_lockfile.metadata,
-                        request.interpreter_constraints,
-                        loaded_lockfile.original_lockfile,
-                        request.requirements.req_strings,
-                        python_setup,
-                        constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
-                    )
-        else:
-            assert request.requirements.from_superset is None
+        return _BuildPexRequirementsSetup(
+            [loaded_lockfile.lockfile_digest],
+            [
+                *request.requirements.req_strings,
+                "--lock",
+                loaded_lockfile.lockfile_path,
+                *pex_lock_resolver_args,
+            ],
+            concurrency_available,
+        )
 
-            # We use pip to perform a normal resolve.
-            argv.extend(pip_resolver_args)
-            if request.requirements.constraints_strings:
-                constraints_file = "__constraints.txt"
-                constraints_content = "\n".join(request.requirements.constraints_strings)
-                digests.append(
-                    await Get(
-                        Digest,
-                        CreateDigest([FileContent(constraints_file, constraints_content.encode())]),
-                    )
-                )
-                argv.extend(["--constraints", constraints_file])
-
-    return _BuildPexRequirementsSetup(digests, argv, concurrency_available)
+    # We use pip to perform a normal resolve.
+    assert request.requirements.from_superset is None
+    digests = []
+    argv = [*request.requirements.req_strings, *pip_resolver_args]
+    if request.requirements.constraints_strings:
+        constraints_file = "__constraints.txt"
+        constraints_content = "\n".join(request.requirements.constraints_strings)
+        digests.append(
+            await Get(
+                Digest,
+                CreateDigest([FileContent(constraints_file, constraints_content.encode())]),
+            )
+        )
+        argv.extend(["--constraints", constraints_file])
+    return _BuildPexRequirementsSetup(digests, argv, concurrency_available=concurrency_available)
 
 
 @rule(level=LogLevel.DEBUG)
