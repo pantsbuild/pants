@@ -7,23 +7,32 @@ import logging
 import os
 from dataclasses import dataclass
 
-from pants.backend.go.target_types import GoModSourcesField
+from pants.backend.go.target_types import (
+    GoModSourcesField,
+    GoPackageSourcesField,
+    GoThirdPartyPackageDependenciesField,
+)
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     InvalidTargetException,
+    Targets,
     UnexpandedTargets,
     WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +50,23 @@ class OwningGoMod:
     address: Address
 
 
+@dataclass(frozen=True)
+class NearestAncestorGoModRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str | None:
+        return self.address.spec
+
+
+@dataclass(frozen=True)
+class NearestAncestorGoModResult:
+    address: Address
+
+
 @rule
-async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
+async def find_nearest_ancestor_go_mod(
+    request: NearestAncestorGoModRequest,
+) -> NearestAncestorGoModResult:
     # We don't expect `go_mod` targets to be generated, so we can use UnexpandedTargets.
     candidate_targets = await Get(
         UnexpandedTargets,
@@ -58,14 +82,79 @@ async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
+
     if not go_mod_targets:
         raise InvalidTargetException(
             f"The target {request.address} does not have a `go_mod` target in its BUILD file or "
             "any ancestor BUILD files. To fix, please make sure your project has a `go.mod` file "
             f"and add a `go_mod` target (you can run `{bin_name()} tailor` to do this)."
         )
-    nearest_go_mod_target = go_mod_targets[0]
-    return OwningGoMod(nearest_go_mod_target.address)
+
+    return NearestAncestorGoModResult(go_mod_targets[0].address)
+
+
+@rule_helper
+async def _find_go_mod_dependee(address: Address) -> Address:
+    # Find all targets that depend on the given target.
+    dependees = await Get(
+        Dependees,
+        DependeesRequest(
+            addresses=(address,),
+            transitive=True,
+            include_roots=False,
+        ),
+    )
+
+    # Resolve the owning `go_mod` targets for `go_package` targets in the dependees set.
+    targets = await Get(Targets, Addresses(dependees))
+    owning_go_mods = await MultiGet(
+        Get(NearestAncestorGoModResult, NearestAncestorGoModRequest(tgt.address))
+        for tgt in targets
+        if tgt.has_field(GoPackageSourcesField)
+    )
+
+    owning_go_mods_set = set(x.address for x in owning_go_mods)
+    if len(owning_go_mods_set) > 1:
+        addr_bullet_list = bullet_list([str(addr) for addr in owning_go_mods_set])
+        raise InvalidTargetException(
+            f"The target {address} has multiple `go_mod` targets as dependees. Pants currently is limited to "
+            "supporting a single `go_mod` target as a dependee for non-`go_package` targets. The dependee "
+            f"`go_mod` targets are:\n\n{addr_bullet_list}"
+        )
+    elif len(owning_go_mods_set) == 0:
+        raise InvalidTargetException(
+            f"The target {address} does not have a `go_mod` target as a dependee. This error should not have "
+            "happened because {address} is not part of the dependency graph of any Go-related target. "
+            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose"
+        )
+
+    return list(owning_go_mods_set)[0]
+
+
+@rule
+async def find_owning_go_mod(request: OwningGoModRequest) -> OwningGoMod:
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(request.address, description_of_origin="the `OwningGoMod` rule"),
+    )
+    target = wrapped_target.target
+
+    if target.has_field(GoModSourcesField):
+        return OwningGoMod(request.address)
+    elif target.has_field(GoPackageSourcesField):
+        # For `go_package` targets, use the nearest ancestor go_mod target.
+        nearest_go_mod_result = await Get(
+            NearestAncestorGoModResult, NearestAncestorGoModRequest(request.address)
+        )
+        return OwningGoMod(nearest_go_mod_result.address)
+    elif target.has_field(GoThirdPartyPackageDependenciesField):
+        # For `go_third_party_package` targets, use the generator which is the owning `go_mod` target.
+        generator_address = target.address.maybe_convert_to_target_generator()
+        return OwningGoMod(generator_address)
+    else:
+        # Otherwise, find the nearest ancestor dependency that is a go_package() and use its owning go_mod.
+        go_mod_dependee = await _find_go_mod_dependee(request.address)
+        return OwningGoMod(go_mod_dependee)
 
 
 @dataclass(frozen=True)

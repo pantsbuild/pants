@@ -215,14 +215,14 @@ async def infer_go_third_party_package_dependencies(
     request: InferGoThirdPartyPackageDependenciesRequest,
     std_lib_imports: GoStdLibImports,
 ) -> InferredDependencies:
-    go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
-    package_mapping = await Get(
-        ImportPathToPackages, ImportPathToPackagesRequest(go_mod_addr.address)
-    )
-
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+
+    package_mapping, go_mod_info = await MultiGet(
+        Get(ImportPathToPackages, ImportPathToPackagesRequest(go_mod_address)),
+        Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+    )
+
     pkg_info = await Get(
         ThirdPartyPkgAnalysis,
         ThirdPartyPkgAnalysisRequest(
