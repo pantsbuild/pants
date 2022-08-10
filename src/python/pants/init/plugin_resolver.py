@@ -12,19 +12,27 @@ from typing import Optional, cast
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import (
+    GeneratePythonToolLockfileSentinel,
+    PexRequirements,
+)
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import PLUGINS_RESOLVE_NAME, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -158,8 +166,31 @@ class PluginResolver:
         )
 
 
+class PluginsOptionLockfileSentinel(GeneratePythonToolLockfileSentinel):
+    resolve_name = PLUGINS_RESOLVE_NAME
+
+
+@rule(desc="Set up lockfile request for [GLOBAL].plugins", level=LogLevel.DEBUG)
+async def setup_plugins_option_lockfile(
+    request: PluginsOptionLockfileSentinel,
+    python_setup: PythonSetup,
+    global_options: GlobalOptions,
+) -> GeneratePythonLockfile:
+    use_pex = python_setup.generate_lockfiles_with_pex
+    return GeneratePythonLockfile(
+        requirements=FrozenOrderedSet(global_options.plugins),
+        # TODO: how to determine?
+        interpreter_constraints=InterpreterConstraints(),
+        resolve_name=request.resolve_name,
+        lockfile_dest=global_options.plugins_lockfile,
+        use_pex=use_pex,
+        # TODO: needs to use constraints from pantsbuild.pants itself, I believe
+    )
+
+
 def rules():
     return [
-        QueryRule(ResolvedPluginDistributions, [PluginsRequest]),
         *collect_rules(),
+        QueryRule(ResolvedPluginDistributions, [PluginsRequest]),
+        UnionRule(GenerateToolLockfileSentinel, PluginsOptionLockfileSentinel),
     ]

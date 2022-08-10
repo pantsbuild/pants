@@ -34,6 +34,7 @@ plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
   "toolchain.pants.plugin==0.21.0",
 ]
+plugins_lockfile = "3rdparty/python/global_plugins_option.lock"
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.

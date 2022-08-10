@@ -29,7 +29,7 @@ from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.init import specs_calculator
+from pants.init import plugin_resolver, specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
@@ -266,6 +266,7 @@ class EngineInitializer:
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
+                *plugin_resolver.rules(),
                 *rules,
             )
         )

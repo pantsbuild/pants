@@ -668,6 +668,9 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
         return self  # type: ignore[return-value]
 
 
+PLUGINS_RESOLVE_NAME = "global-plugins-option"
+
+
 class BootstrapOptions:
     """The set of options necessary to create a Scheduler.
 
@@ -700,6 +703,22 @@ class BootstrapOptions:
             The default backends for each plugin will be loaded automatically. Other backends
             in a plugin can be loaded by listing them in `backend_packages` in the
             `[GLOBAL]` scope.
+            """
+        ),
+    )
+    plugins_lockfile = StrOption(
+        advanced=True,
+        default="<none>",  # i.e. `NO_TOOL_LOCKFILE`, but avoid circular import.
+        help=softwrap(
+            f"""
+            Path to a lockfile for the option `[GLOBAL].plugins`.
+
+            Set to the string `<none>` to opt out of using a lockfile. We
+            do not recommend this if you use `[GLOBAL].plugins`, though, as lockfiles are
+            essential for reproducible builds and supply-chain security.
+
+            To use a lockfile, set this option to a file path relative to the
+            build root, then run `{bin_name()} generate-lockfiles --resolve={PLUGINS_RESOLVE_NAME}`.
             """
         ),
     )
