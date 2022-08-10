@@ -139,14 +139,18 @@ This should work with any kind of Kubernetes resource that leads to Docker image
 > Pants' will rely on the behaviour of the `docker_image` target when it comes down to generate the final image reference. Since a given image may have more than one valid image reference, **Pants will try to use the first one that is not tagged as `latest`**, falling back to `latest` if none could be found.
 > It's good practice to publish your Docker images using tags other than `latest` and Pants preferred behaviour is to choose those as this guarantees that the _version_ of the Docker image being deployed is the expected one.
 
-Value override files
---------------------
+Value files
+-----------
 
-As seen in the initial examples of the usage of the `helm_deployment` target, it can be seen that some of the source value files used the word `override` in the file name. This is a convenient naming convention that helps identifying which files provide with values that are overring more general ones.
+It's very common that Helm deployments use a series of files providing with values that customise the given chart. When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. For example, given the following `BUILD` file:
 
-When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant to get the right final result. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. If using any glob pattern in the `sources` field, the plugin will first group the files according to the order in which those glob patterns are listed. In this grouping, files that are resolved by more than one pattern will be part of the most specific group. Then we use alphanumeric ordering for the files that correspond each of the previous groups.
+```text src/deployment/BUILD
+helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "second.yaml", "last.yaml"])
+```
 
-To illustrate this scenario, consider the following list of files:
+This will result in the Helm command receiving the value files as in that exact order.
+
+If using any glob pattern in the `sources` field, the plugin will first group the files according to the order in which those glob patterns are listed. In this grouping, files that are resolved by more than one pattern will be part of the most specific group. Then we use alphanumeric ordering for the files that correspond to each of the previous groups. To illustrate this scenario, consider the following list of files:
 
 ```
 src/deployment/002-config_maps.yaml
