@@ -68,7 +68,7 @@ async def flake8_lint_partition(
         PathGlobs(
             globs=flake8.extra_files,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option flake8.extra_files",
+            description_of_origin="the option [flake8].extra_files",
         ),
     )
     # Ensure that the empty report dir exists.

@@ -98,7 +98,10 @@ class Flake8(PythonToolBase):
     extra_files = FileListOption(
         default=None,
         advanced=True,
-        help="Path to extra YAML config files used by flake8 plugins like `flake8-bandit`.",
+        help=softwrap(
+            """Paths to extra files to include in the sandbox. This can be useful for Flake8 plugins,
+            like including config files for the `flake8-bandit` plugin."""
+        ),
     )
     config_discovery = BoolOption(
         default=True,
