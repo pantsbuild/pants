@@ -23,9 +23,7 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DigestEntries,
     FileContent,
-    FileEntry,
     GlobMatchErrorBehavior,
     PathGlobs,
 )
@@ -289,17 +287,17 @@ class GeneratePythonToolLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @dataclass(frozen=True)
+class ResolvePexConstraintsFile:
+    digest: Digest
+    path: str
+    constraints: FrozenOrderedSet[PipRequirement]
+
+
+@dataclass(frozen=True)
 class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
-    constraints_file: tuple[Digest, FileEntry] | None
-
-    @property
-    def constraints_file_path_and_hash(self) -> tuple[str, str] | None:
-        if self.constraints_file is None:
-            return None
-        file_entry = self.constraints_file[1]
-        return file_entry.path, file_entry.file_digest.fingerprint
+    constraints_file: ResolvePexConstraintsFile | None
 
 
 @dataclass(frozen=True)
@@ -322,7 +320,7 @@ async def determine_resolve_pex_config(
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
 
-    constraints_file: tuple[Digest, FileEntry] | None = None
+    constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file(
         all_python_tool_resolve_names
     ).get(request.resolve_name)
@@ -338,25 +336,29 @@ async def determine_resolve_pex_config(
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=_constraints_origin,
         )
-        _constraints_digest, _constraints_digest_entries = await MultiGet(
+        _constraints_digest, _constraints_digest_contents = await MultiGet(
             Get(Digest, PathGlobs, _constraints_path_globs),
-            Get(DigestEntries, PathGlobs, _constraints_path_globs),
+            Get(DigestContents, PathGlobs, _constraints_path_globs),
         )
 
-        if len(_constraints_digest_entries) != 1:
+        if len(_constraints_digest_contents) != 1:
             raise ValueError(
                 softwrap(
                     f"""
                     Expected only one file from {_constraints_origin}, but matched:
-                    {_constraints_digest_entries}
+                    {sorted(fc.path for fc in _constraints_digest_contents)}
 
                     Did you use a glob like `*`?
                     """
                 )
             )
-        _constraints_file_entry = next(iter(_constraints_digest_entries))
-        assert isinstance(_constraints_file_entry, FileEntry)
-        constraints_file = (_constraints_digest, _constraints_file_entry)
+        _constraints_file_content = next(iter(_constraints_digest_contents))
+        constraints = parse_requirements_file(
+            _constraints_file_content.content.decode("utf-8"), rel_path=_constraints_file_path
+        )
+        constraints_file = ResolvePexConstraintsFile(
+            _constraints_digest, _constraints_file_path, FrozenOrderedSet(constraints)
+        )
 
     return ResolvePexConfig(constraints_file=constraints_file)
 
@@ -377,8 +379,7 @@ def validate_metadata(
     lockfile: Lockfile | LockfileContent,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
-    *,
-    constraints_file_path_and_hash: tuple[str, str] | None,
+    constraints_file: ResolvePexConstraintsFile | None,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
@@ -390,7 +391,7 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
-        constraints_file_path_and_hash=constraints_file_path_and_hash,
+        requirement_constraints=constraints_file.constraints if constraints_file else set(),
     )
     if validation:
         return
@@ -401,9 +402,7 @@ def validate_metadata(
         lockfile=lockfile,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
-        maybe_constraints_file_path=constraints_file_path_and_hash[0]
-        if constraints_file_path_and_hash
-        else None,
+        maybe_constraints_file_path=(constraints_file.path if constraints_file else None),
     )
     is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
     msg_iter = (
