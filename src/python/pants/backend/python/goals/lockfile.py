@@ -205,6 +205,7 @@ async def generate_lockfile(
         pip_args_setup = await _setup_pip_args_and_constraints_file(
             python_setup, resolve_name=req.resolve_name
         )
+        requirement_constraints = pip_args_setup.constraints
 
         header_delimiter = "//"
         result = await Get(
