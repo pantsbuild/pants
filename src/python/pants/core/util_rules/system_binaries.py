@@ -334,6 +334,10 @@ class MvBinary(BinaryPath):
     pass
 
 
+class CatBinary(BinaryPath):
+    pass
+
+
 class ChmodBinary(BinaryPath):
     pass
 
@@ -687,6 +691,14 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
+async def find_cat() -> CatBinary:
+    request = BinaryPathRequest(binary_name="cat", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
+    return CatBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
 async def find_mkdir() -> MkdirBinary:
     request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
@@ -776,7 +788,10 @@ class GunzipBinaryRequest:
     pass
 
 
-@dataclass(frozen=True)
+class CatBinaryRequest:
+    pass
+
+
 class TarBinaryRequest:
     pass
 
@@ -824,6 +839,11 @@ async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> G
 @rule
 async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
     return tar_binary
+
+
+@rule
+async def find_cat_wrapper(_: CatBinaryRequest, cat_binary: CatBinary) -> CatBinary:
+    return cat_binary
 
 
 @rule

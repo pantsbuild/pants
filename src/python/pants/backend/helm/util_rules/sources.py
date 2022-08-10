@@ -11,6 +11,7 @@ from pants.backend.helm.target_types import (
     HelmChartSourcesField,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import MergeDigests, Snapshot
@@ -112,4 +113,4 @@ async def get_helm_source_files(request: HelmChartSourceFilesRequest) -> HelmCha
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *stripped_source_files.rules()]

@@ -53,7 +53,7 @@ Adding `helm_chart` targets
 
 Helm charts are identified by the presence of a `Chart.yaml` or `Chart.yml` file, which contains relevant metadata about the chart like its name, version, dependencies, etc. To get started quickly you can create a simple `Chart.yaml` file in your sources folder:
 
-```text Chart.yaml
+```yaml Chart.yaml
 apiVersion: v2
 description: Example Helm chart
 name: example

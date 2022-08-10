@@ -119,8 +119,12 @@ venv_use_symlinks = true
 # + src/python/pants/testutil:testutil_wheel
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
+
+[python.resolves]
+python-default = "3rdparty/python/user_reqs.lock"
+helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
+helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python-infer]
 assets = true
