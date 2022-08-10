@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
 from typing import cast
 
 import pytest
@@ -48,3 +49,28 @@ def test_parser_can_run(rule_runner: RuleRunner) -> None:
     ]
 
     assert parsed_manifest.found_image_refs == tuple(expected_image_refs)
+
+
+def test_parser_returns_no_image_refs(rule_runner: RuleRunner) -> None:
+    config_map_contents = dedent(
+        """\
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: foo
+        data:
+          key: value
+        """
+    )
+
+    file_digest = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("config_map.yaml", config_map_contents.encode("utf-8"))])],
+    )
+    file_entries = rule_runner.request(DigestEntries, [file_digest])
+
+    parsed_manifest = rule_runner.request(
+        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
+    )
+
+    assert len(parsed_manifest.found_image_refs) == 0
