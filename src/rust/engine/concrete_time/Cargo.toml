@@ -11,5 +11,5 @@ deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443f
 log = "0.4"
 prost = "0.9"
 prost-types = "0.9"
-serde = "1.0.136"
+serde = "1.0.143"
 serde_derive = "1.0.98"
