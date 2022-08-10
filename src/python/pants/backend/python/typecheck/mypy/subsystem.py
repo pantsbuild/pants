@@ -218,7 +218,7 @@ class MyPy(PythonToolBase):
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
-                resolve_name=self.options_scope,
+                resolve_name=MyPyExtraTypeStubsLockfileSentinel.resolve_name,
                 uses_project_interpreter_constraints=True,
                 uses_source_plugins=False,
             )
