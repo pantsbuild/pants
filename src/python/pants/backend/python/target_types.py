@@ -32,7 +32,11 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import RuntimePackageDependenciesField, TestSubsystem
+from pants.core.goals.test import (
+    RuntimePackageDependenciesField,
+    TestExtraEnvVarsField,
+    TestSubsystem,
+)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -850,16 +854,8 @@ class PythonTestsTimeoutField(IntField):
         return result
 
 
-class PythonTestsExtraEnvVarsField(StringSequenceField):
-    alias = "extra_env_vars"
-    help = softwrap(
-        """
-        Additional environment variables to include in test processes.
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
-        This will be merged with and override values from [test].extra_env_vars.
-        """
-    )
+class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
 
 
 class SkipPythonTestsField(BoolField):

@@ -215,6 +215,32 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
+### Setting environment variables
+
+Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+
+To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `junit_test` / `junit_tests` / `scala_junit_test` / `scala_junit_tests` / `scalatest_test` / `scalatest_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
+
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+
+```toml pants.toml
+[test]
+extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+```
+```python project/BUILD
+junit_tests(
+    name="tests",
+    # Adds to all generated `junit_test` targets,
+    # i.e. each file in the `sources` field.
+    extra_env_vars=["VAR3", "VAR4=hardcoded"],
+    # Even better, use `overrides` to be more granular.
+    overrides={
+        "StrUtilTest.java": {"extra_env_vars": ["VAR"]},
+        ("DirUtilTest.java", "OSUtilTest.java"): {"extra_env_vars": ["VAR5"]},
+    },
+)
+```
+
 Lint and Format
 ---------------
 

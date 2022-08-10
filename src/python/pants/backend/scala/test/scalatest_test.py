@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
-import importlib.resources
 from textwrap import dedent
+from typing import Iterable, Mapping
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import (
@@ -19,7 +23,7 @@ from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test.scalatest import ScalatestTestFieldSet
 from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
@@ -27,7 +31,6 @@ from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
 from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
@@ -59,6 +62,7 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *target_types_rules(),
             *util_rules(),
+            get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (ScalatestTestFieldSet,)),
             QueryRule(Scalatest, ()),
@@ -72,31 +76,35 @@ def rule_runner() -> RuleRunner:
             ScalatestTestsGeneratorTarget,
         ],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
+@pytest.fixture
+def scalatest_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scalatest.test.lock", ["org.scalatest:scalatest_2.13:3.2.10"]
+    )
+
+
+@pytest.fixture
+def scalatest_lockfile(
+    scalatest_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scalatest_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-def test_simple_success(rule_runner: RuleRunner) -> None:
-    scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
+def test_simple_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": importlib.resources.read_text(
-                *Scalatest.default_lockfile_resource
-            ),
+            "3rdparty/jvm/default.lock": scalatest_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalatest_lockfile.requirements_as_jvm_artifact_targets(),
             "BUILD": dedent(
-                f"""\
-                jvm_artifact(
-                  name = 'org.scalatest_scalatest',
-                  group = '{scalatest_coord.group}',
-                  artifact = '{scalatest_coord.artifact}',
-                  version = '{scalatest_coord.version}',
-                )
-
+                """\
                 scalatest_tests(
                     name='example-test',
                     dependencies= [
-                        ':org.scalatest_scalatest',
+                        '3rdparty/jvm:org.scalatest_scalatest_2.13',
                     ],
                 )
                 """
@@ -127,22 +135,13 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_file_deps_success(rule_runner: RuleRunner) -> None:
-    scalatest_coord = Coordinate(group="org.scalatest", artifact="scalatest_2.13", version="3.2.10")
+def test_file_deps_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/default.lock": importlib.resources.read_text(
-                *Scalatest.default_lockfile_resource
-            ),
+            "3rdparty/jvm/default.lock": scalatest_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalatest_lockfile.requirements_as_jvm_artifact_targets(),
             "BUILD": dedent(
-                f"""\
-                jvm_artifact(
-                  name = 'org.scalatest_scalatest',
-                  group = '{scalatest_coord.group}',
-                  artifact = '{scalatest_coord.artifact}',
-                  version = '{scalatest_coord.version}',
-                )
-
+                """\
                 scala_sources(
                     name='example-sources',
                     dependencies=[':ducks'],
@@ -151,7 +150,7 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
                 scalatest_tests(
                     name='example-test',
                     dependencies= [
-                        ':org.scalatest_scalatest',
+                        '3rdparty/jvm:org.scalatest_scalatest_2.13',
                         ':example-sources',
                     ],
                 )
@@ -206,9 +205,74 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
     assert test_result.xml_results and test_result.xml_results.files
 
 
+@maybe_skip_jdk_test
+def test_extra_env_vars(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfileFixture) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": scalatest_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalatest_lockfile.requirements_as_jvm_artifact_targets(),
+            "BUILD": dedent(
+                """\
+            scalatest_tests(
+                name='example-test',
+                dependencies= [
+                    '3rdparty/jvm:org.scalatest_scalatest_2.13',
+                ],
+                extra_env_vars=[
+                    "SCALATEST_TESTS_VAR_WITHOUT_VALUE",
+                    "SCALATEST_TESTS_VAR_WITH_VALUE=scalatest_tests_var_with_value",
+                    "SCALATEST_TESTS_OVERRIDE_WITH_VALUE_VAR=scalatest_tests_override_with_value_var_override",
+                ],
+            )
+            """
+            ),
+            "ExtraEnvVarsSpec.scala": dedent(
+                """
+            package org.pantsbuild.example
+
+            import org.scalatest.flatspec.AnyFlatSpec
+            import org.scalatest.matchers.should.Matchers
+
+            class ExtraEnvVarsSpec extends AnyFlatSpec with Matchers {
+                "ExtraEnvVars" should "be readable from the test" in {
+                    sys.env("ARG_WITH_VALUE_VAR") shouldBe "arg_with_value_var"
+                    sys.env("ARG_WITHOUT_VALUE_VAR") shouldBe "arg_without_value_var"
+                    sys.env("SCALATEST_TESTS_VAR_WITH_VALUE") shouldBe "scalatest_tests_var_with_value"
+                    sys.env("SCALATEST_TESTS_VAR_WITHOUT_VALUE") shouldBe "scalatest_tests_var_without_value"
+                    sys.env("SCALATEST_TESTS_OVERRIDE_WITH_VALUE_VAR") shouldBe "scalatest_tests_override_with_value_var_override"
+                }
+            }
+            """
+            ),
+        }
+    )
+
+    test_result = run_scalatest_test(
+        rule_runner,
+        "example-test",
+        "ExtraEnvVarsSpec.scala",
+        extra_args=[
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "SCALATEST_TESTS_OVERRIDE_WITH_VALUE_VAR"]'
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_var",
+            "SCALATEST_TESTS_VAR_WITHOUT_VALUE": "scalatest_tests_var_without_value",
+            "SCALATEST_TESTS_OVERRIDE_WITH_VALUE_VAR": "scalatest_tests_override_with_value_var",
+        },
+    )
+    assert test_result.exit_code == 0
+
+
 def run_scalatest_test(
-    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+    rule_runner: RuleRunner,
+    target_name: str,
+    relative_file_path: str,
+    *,
+    extra_args: Iterable[str] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> TestResult:
+    args = extra_args or []
+    rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )

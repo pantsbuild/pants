@@ -38,6 +38,7 @@ from pants.engine.target import (
     NoApplicableTargetsBehavior,
     SourcesField,
     SpecialCasedDependencies,
+    StringSequenceField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -461,6 +462,20 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
         if test.timeout_maximum is not None:
             return min(result, test.timeout_maximum)
         return result
+
+
+class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
+    alias = "extra_env_vars"
+    help = softwrap(
+        """
+         Additional environment variables to include in test processes.
+
+         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+         This will be merged with and override values from `[test].extra_env_vars`.
+        """
+    )
 
 
 @rule_helper

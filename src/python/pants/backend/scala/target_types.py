@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
-from pants.core.goals.test import TestTimeoutField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -28,6 +28,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
@@ -107,6 +108,10 @@ class ScalatestTestTimeoutField(TestTimeoutField):
     pass
 
 
+class ScalatestTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
+
+
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
@@ -115,6 +120,7 @@ class ScalatestTestTarget(Target):
         ScalatestTestSourceField,
         ScalaConsumedPluginNamesField,
         ScalatestTestTimeoutField,
+        ScalatestTestExtraEnvVarsField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -148,7 +154,6 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
         ScalatestTestsSourcesOverridesField,
-        ScalatestTestTimeoutField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
@@ -156,6 +161,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         ScalatestTestTimeoutField,
+        ScalatestTestExtraEnvVarsField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -186,6 +192,7 @@ class ScalaJunitTestTarget(Target):
         ScalaJunitTestSourceField,
         ScalaConsumedPluginNamesField,
         JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -227,6 +234,7 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
