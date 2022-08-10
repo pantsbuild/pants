@@ -107,8 +107,10 @@ class ScalatestTestSourceField(ScalaSourceField):
 class ScalatestTestTimeoutField(TestTimeoutField):
     pass
 
+
 class ScalatestTestExtraEnvVarsField(TestExtraEnvVarsField):
     pass
+
 
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
