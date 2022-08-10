@@ -14,10 +14,11 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -62,10 +63,22 @@ async def flake8_lint_partition(
     source_files_get = Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
+    extra_files_get = Get(
+        Digest,
+        PathGlobs(
+            globs=flake8.extra_files,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option flake8.extra_files",
+        ),
+    )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
-    flake8_pex, config_files, report_directory, source_files = await MultiGet(
-        flake8_pex_get, config_files_get, report_directory_digest_get, source_files_get
+    flake8_pex, config_files, report_directory, source_files, extra_files = await MultiGet(
+        flake8_pex_get,
+        config_files_get,
+        report_directory_digest_get,
+        source_files_get,
+        extra_files_get,
     )
 
     input_digest = await Get(
@@ -75,6 +88,7 @@ async def flake8_lint_partition(
                 source_files.snapshot.digest,
                 first_party_plugins.sources_digest,
                 config_files.snapshot.digest,
+                extra_files,
                 report_directory,
             )
         ),

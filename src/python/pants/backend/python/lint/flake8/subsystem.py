@@ -43,6 +43,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    FileListOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -93,6 +94,11 @@ class Flake8(PythonToolBase):
             this option if the config is located in a non-standard location.
             """
         ),
+    )
+    extra_files = FileListOption(
+        default=None,
+        advanced=True,
+        help="Path to extra YAML config files used by flake8 plugins like `flake8-bandit`.",
     )
     config_discovery = BoolOption(
         default=True,
