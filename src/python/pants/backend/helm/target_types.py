@@ -27,8 +27,8 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     TriBoolField,
-    generate_file_based_overrides_field_help_message,
     ValidNumbers,
+    generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name

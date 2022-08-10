@@ -30,13 +30,7 @@ resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_ma
 
 # Kubernetes manifest parser
 
-python_requirement(
-    name="k8s",
-    requirements=[
-        "hikaru==0.11.0b"
-    ],
-    resolve="helm-k8s-parser"
-)
+python_requirement(name="k8s", requirements=["hikaru==0.11.0b"], resolve="helm-k8s-parser")
 
 python_sources(
     name="__k8s_parser_main",
