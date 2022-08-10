@@ -4,7 +4,10 @@
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -36,7 +39,7 @@ class Docformatter(PythonToolBase):
     export = ExportToolOption()
 
 
-class DocformatterLockfileSentinel(GenerateToolLockfileSentinel):
+class DocformatterLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Docformatter.options_scope
 
 

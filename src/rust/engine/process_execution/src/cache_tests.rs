@@ -11,7 +11,7 @@ use testutil::relative_paths;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+  local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Process, ProcessError,
   ProcessMetadata,
 };
@@ -33,7 +33,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     base_dir.path().to_owned(),
     NamedCaches::new(named_cache_dir),
     ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
-    true,
+    KeepSandboxes::Never,
   ));
   (runner, store, base_dir)
 }

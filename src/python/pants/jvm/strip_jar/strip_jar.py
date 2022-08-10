@@ -14,7 +14,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -22,7 +22,7 @@ _STRIP_JAR_BASENAME = "StripJar.java"
 _OUTPUT_PATH = "__stripped_jars"
 
 
-class StripJarToolLockfileSentinel(GenerateToolLockfileSentinel):
+class StripJarToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "strip-jar"
 
 

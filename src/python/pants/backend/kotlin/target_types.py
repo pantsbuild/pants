@@ -20,6 +20,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
@@ -137,6 +138,7 @@ class KotlinJunitTestTarget(Target):
         KotlinJunitTestSourceField,
         KotlincConsumedPluginIdsField,
         JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -156,7 +158,6 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         KotlinJunitTestsGeneratorSourcesField,
-        JunitTestTimeoutField,
     )
     generated_target_cls = KotlinJunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
@@ -164,6 +165,7 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
         KotlinJunitTestDependenciesField,
         KotlincConsumedPluginIdsField,
         JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,

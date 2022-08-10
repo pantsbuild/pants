@@ -288,19 +288,19 @@ python_tests(
 You can also set a default value and a maximum value in `pants.toml`:
 
 ```toml pants.toml
-[pytest]
+[test]
 timeout_default = 60
 timeout_maximum = 600
 ```
 
-If a target sets its `timeout` higher than `[pytest].timeout_maximum`, Pants will use the value in `[pytest].timeout_maximum`.
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
 > 📘 Tip: temporarily ignoring timeouts
 >
-> When debugging locally, such as with `pdb`, you might want to temporarily disable timeouts. To do this, set `--no-pytest-timeouts`:
+> When debugging locally, such as with `pdb`, you might want to temporarily disable timeouts. To do this, set `--no-test-timeouts`:
 >
 > ```bash
-> $ ./pants test project/app_test.py --no-pytest-timeouts
+> $ ./pants test project/app_test.py --no-test-timeouts
 > ```
 
 Test utilities and resources

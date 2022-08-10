@@ -30,7 +30,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -54,7 +54,7 @@ class ScalafmtRequest(FmtRequest):
     name = ScalafmtSubsystem.options_scope
 
 
-class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalafmtSubsystem.options_scope
 
 

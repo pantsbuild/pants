@@ -23,7 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options, warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1195,8 +1195,8 @@ class BootstrapOptions:
             fetching it.
 
             The `defer` behavior, on the other hand, will neither fetch nor validate the cache
-            content before calling a cache hit a hit. This "defers" actually consuming the cache
-            entry until a consumer consumes it.
+            content before calling a cache hit a hit. This "defers" actually fetching the cache
+            entry until Pants needs it (which may be never).
 
             The `defer` mode is the most network efficient (because it will completely skip network
             requests in many cases), followed by the `validate` mode (since it can still skip
@@ -1935,7 +1935,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if isinstance(resolved_value, bool):
             # Is `process_cleanup`.
-            return KeepSandboxes.always if resolved_value else KeepSandboxes.on_failure
+            warn_or_error(
+                removal_version="2.15.0.dev1",
+                entity="--process-cleanup",
+                hint="Instead, use `--keep-sandboxes`.",
+            )
+            return KeepSandboxes.never if resolved_value else KeepSandboxes.always
         elif isinstance(resolved_value, KeepSandboxes):
             return resolved_value
         else:
@@ -2031,16 +2036,6 @@ class GlobalOptionsFlags:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))
-
-
-@dataclass(frozen=True)
-class ProcessCleanupOption:
-    """A wrapper around the global option `process_cleanup`.
-
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
-    """
-
-    val: bool
 
 
 @dataclass(frozen=True)

@@ -2,11 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -32,7 +36,6 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-from pants.util.resources import read_resource
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -50,7 +53,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
+class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = TerraformHcl2Parser.options_scope
 
 
@@ -72,7 +75,7 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_script_content = read_resource("pants.backend.terraform", "hcl2_parser.py")
+    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
     if not parser_script_content:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
 

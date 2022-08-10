@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Iterable, Mapping, TypeVar
+from typing import Mapping, Sequence, TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
@@ -20,7 +20,7 @@ FS = TypeVar("FS", bound=FieldSet)
 
 @rule_helper
 async def _by_interpreter_constraints_and_resolve(
-    field_sets: Iterable[FS],
+    field_sets: Sequence[FS],
     python_setup: PythonSetup,
 ) -> Mapping[
     tuple[ResolveName, InterpreterConstraints],

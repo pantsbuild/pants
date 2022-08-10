@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -39,7 +42,7 @@ class PyUpgrade(PythonToolBase):
     export = ExportToolOption()
 
 
-class PyUpgradeLockfileSentinel(GenerateToolLockfileSentinel):
+class PyUpgradeLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PyUpgrade.options_scope
 
 

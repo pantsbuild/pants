@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.codegen import export_codegen_goal
@@ -49,12 +50,11 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.resources import read_resource
 
 
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
@@ -62,7 +62,7 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalapbcToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalaPBSubsystem.options_scope
 
 
@@ -245,7 +245,7 @@ async def setup_scalapb_shim_classfiles(
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 
-    scalapb_shim_content = read_resource(
+    scalapb_shim_content = pkgutil.get_data(
         "pants.backend.codegen.protobuf.scala", "ScalaPBShim.scala"
     )
     if not scalapb_shim_content:

@@ -10,7 +10,10 @@ from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -217,10 +220,9 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
     )
 
     return PylintFirstPartyPlugins(
-        requirement_strings=PexRequirements.create_from_requirement_fields(
+        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
             requirements_fields,
-            constraints_strings=(),
-        ).req_strings,
+        ),
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
     )
@@ -271,7 +273,7 @@ async def _pylint_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(GenerateToolLockfileSentinel):
+class PylintLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Pylint.options_scope
 
 

@@ -123,11 +123,16 @@ python_sources(name="lib")
 
 You can install third-party type stubs (e.g. `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, e.g. both `types-requests` and `requests`, which you can confirm by running `./pants dependencies path/to/f.py`.
 
-You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures the stubs are only used when running MyPy and are not included when, for example, [packaging a PEX](doc:python-package-goal).
+You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures
+the stubs are only used when running MyPy and are not included when, for example,
+[packaging a PEX](doc:python-package-goal). We recommend also setting
+`[mypy].extra_type_stubs_lockfile` for more reproducible builds and better supply-chain security.
 
 ```toml pants.toml
 [mypy]
 extra_type_stubs = ["types-requests==2.25.12"]
+# Set this to a path, then run `./pants generate-lockfiles --resolve=mypy-extra-type-stubs`. 
+extra_type_stubs_lockfile = "3rdparty/python/mypy_extra_type_stubs.lock
 ```
 
 ### Add a third-party plugin

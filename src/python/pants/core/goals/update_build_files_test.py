@@ -142,13 +142,18 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
 
 
 def test_find_python_interpreter_constraints_from_lockfile() -> None:
+    default_metadata = PythonLockfileMetadata.new(
+        valid_for_interpreter_constraints=InterpreterConstraints(["==2.7.*"]),
+        requirements=set(),
+        constraints_file_hash=None,
+    )
+
     def assert_ics(
         lockfile: str,
         expected: list[str],
         *,
         ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
-        metadata: PythonLockfileMetadata
-        | None = PythonLockfileMetadata.new(InterpreterConstraints(["==2.7.*"]), set()),
+        metadata: PythonLockfileMetadata | None = default_metadata,
     ) -> None:
         black = create_subsystem(
             Black,
