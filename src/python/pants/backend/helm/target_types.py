@@ -293,8 +293,6 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
-        HelmUnitTestStrictField,
-        HelmUnitTestTimeoutField,
         HelmUnitTestOverridesField,
     )
     generated_target_cls = HelmUnitTestTestTarget
