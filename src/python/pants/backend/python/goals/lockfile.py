@@ -154,11 +154,11 @@ def maybe_warn_python_repos(
     return MaybeWarnPythonRepos()
 
 
-@dataclass
+@dataclass(frozen=True)
 class _PipArgsAndConstraintsSetup:
-    args: list[str]
+    args: tuple[str, ...]
     digest: Digest
-    constraints: set[PipRequirement]
+    constraints: FrozenOrderedSet[PipRequirement]
 
 
 @rule_helper
@@ -180,15 +180,15 @@ async def _setup_pip_args_and_constraints_file(
         )
         digests.append(pip_args_digest)
 
-    constraints: set[PipRequirement] = set()
+    constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
     if resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
-        constraints = set(resolve_config.constraints_file.constraints)
+        constraints = resolve_config.constraints_file.constraints
 
     input_digest = await Get(Digest, MergeDigests(digests))
-    return _PipArgsAndConstraintsSetup(args, input_digest, constraints)
+    return _PipArgsAndConstraintsSetup(tuple(args), input_digest, constraints)
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
@@ -199,7 +199,7 @@ async def generate_lockfile(
     python_repos: PythonRepos,
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
-    requirement_constraints: set[PipRequirement] = set()
+    requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
 
     if req.use_pex:
         pip_args_setup = await _setup_pip_args_and_constraints_file(
@@ -308,7 +308,7 @@ async def generate_lockfile(
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=req.interpreter_constraints,
         requirements={PipRequirement.parse(i) for i in req.requirements},
-        requirement_constraints=requirement_constraints,
+        requirement_constraints=set(requirement_constraints),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
