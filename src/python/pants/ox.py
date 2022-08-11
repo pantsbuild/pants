@@ -40,6 +40,9 @@ if is_oxidized and not sys.argv[0]:
 
 def pex_main() -> bool:
 
+    if len(sys.argv) < 2:
+        return False
+
     if sys.argv[1] == "./pex":
         run_as_pex()
         return True
