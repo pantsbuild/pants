@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
@@ -265,17 +266,18 @@ async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmCha
         if HelmChartFieldSet.is_applicable(tgt)
     )
 
-    fetched_third_party_artifacts = await Get(
-        FetchedHelmArtifacts,
-        FetchHelmArfifactsRequest,
-        FetchHelmArfifactsRequest.for_targets(
-            explicit_targets, description_of_origin=request.field_set.address.spec
-        ),
+    third_party_charts: Iterable[HelmChart] = ()
+    fetch_third_party_request = FetchHelmArfifactsRequest.for_targets(
+        explicit_targets, description_of_origin=request.field_set.address.spec
     )
-    third_party_charts = await MultiGet(
-        Get(HelmChart, FetchedHelmArtifact, fetched_artifact)
-        for fetched_artifact in fetched_third_party_artifacts
-    )
+    if len(fetch_third_party_request.field_sets) > 0:
+        fetched_third_party_artifacts = await Get(
+            FetchedHelmArtifacts, FetchHelmArfifactsRequest, fetch_third_party_request
+        )
+        third_party_charts = await MultiGet(
+            Get(HelmChart, FetchedHelmArtifact, fetched_artifact)
+            for fetched_artifact in fetched_third_party_artifacts
+        )
 
     found_charts = [*first_party_charts, *third_party_charts]
     if not found_charts:

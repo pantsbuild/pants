@@ -17,6 +17,10 @@ def main(args: list[str]):
         try:
             parsed_docs = load_full_yaml(stream=file)
         except RuntimeError:
+            # Hikaru fails with a `RuntimeError` when it finds a K8S manifest for an
+            # API version and kind that doesn't understand.
+            #
+            # We use this exit code to notify the Pants rule that this file needs to be ignored.
             sys.exit(2)
 
     for idx, doc in enumerate(parsed_docs):
