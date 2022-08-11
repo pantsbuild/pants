@@ -243,11 +243,6 @@ class PythonSetup(Subsystem):
             not using `[python].resolves` yet, use the key `{RESOLVE_OPTION_KEY__NO_USER_RESOLVE}`
             to set a constraints file for your user code (or set it via the key
             `{RESOLVE_OPTION_KEY__DEFAULT}`).
-
-            If you are building PEP-517 pyproject.toml distributions via the `python_distribution`
-            target, use the key `{RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND} to set a constraints
-            file when initially installing the build backend (or set it via the key
-            `{RESOLVE_OPTION_KEY__DEFAULT}`).
             """
         ),
         advanced=True,
@@ -602,14 +597,16 @@ class PythonSetup(Subsystem):
                     """
                 )
             )
-        # NB: We intentionally do not include `PLUGINS_RESOLVE_KEY` here because we hardcode
-        # constraint strings to match pantsbuild.pants itself. So, it is not legal to use that
-        # resolve with this option.
+        # NB: We intentionally do not include here:
+        #   - `PLUGINS_RESOLVE_KEY` because we hardcode constraint strings to match
+        #      pantsbuild.pants itself.
+        #   - `RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND`, as a constraints file would not be
+        #      useful when the pyproject.toml is externally consumed. See
+        #      https://github.com/pantsbuild/pants/pull/16476#discussion_r943499577.
         all_valid_resolves = {
             *self.resolves,
             *all_python_tool_resolve_names,
             RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
-            RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND,
         }
         unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
             RESOLVE_OPTION_KEY__DEFAULT,
