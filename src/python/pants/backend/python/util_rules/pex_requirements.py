@@ -229,6 +229,7 @@ class PexRequirements:
 
     req_strings: FrozenOrderedSet[str]
     constraints_strings: FrozenOrderedSet[str]
+    resolve_name: str | None
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
@@ -238,6 +239,7 @@ class PexRequirements:
         self,
         req_strings: Iterable[str] = (),
         *,
+        resolve_name: str | None,
         constraints_strings: Iterable[str] = (),
         from_superset: Pex | LoadedLockfile | None = None,
     ) -> None:
@@ -245,6 +247,9 @@ class PexRequirements:
         :param req_strings: The requirement strings to resolve.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
+        :param resolve_name: What keys to look up in the `[python].resolves_to_x` options, e.g.
+            `[python].resolves_to_constraints_file`. None means that no options will be loaded,
+            which is usually not desirable because values like indexes will not be set.
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
@@ -258,15 +263,20 @@ class PexRequirements:
                 )
             )
         self.from_superset = from_superset
+        self.resolve_name = resolve_name
 
     @classmethod
     def create_from_requirement_fields(
         cls,
         fields: Iterable[PythonRequirementsField],
         constraints_strings: Iterable[str],
+        *,
+        resolve_name: str | None,
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
-        return PexRequirements(field_requirements, constraints_strings=constraints_strings)
+        return PexRequirements(
+            field_requirements, constraints_strings=constraints_strings, resolve_name=resolve_name
+        )
 
     @classmethod
     def req_strings_from_requirement_fields(
@@ -274,7 +284,9 @@ class PexRequirements:
     ) -> FrozenOrderedSet[str]:
         """A convenience when you only need the raw requirement strings from fields and don't need
         to consider things like constraints or resolves."""
-        return cls.create_from_requirement_fields(fields, constraints_strings=()).req_strings
+        return cls.create_from_requirement_fields(
+            fields, constraints_strings=(), resolve_name=None
+        ).req_strings
 
     def __bool__(self) -> bool:
         return bool(self.req_strings)
@@ -304,16 +316,19 @@ class ResolvePexConfig:
 class ResolvePexConfigRequest(EngineAwareParameter):
     """Find all configuration from `[python]` that impacts how the resolve is created."""
 
-    resolve_name: str
+    resolve_name: str | None
 
     def debug_hint(self) -> str:
-        return self.resolve_name
+        return self.resolve_name or "<no resolve>"
 
 
 @rule
 async def determine_resolve_pex_config(
     request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
 ) -> ResolvePexConfig:
+    if request.resolve_name is None:
+        return ResolvePexConfig(None)
+
     all_python_tool_resolve_names = tuple(
         sentinel.resolve_name
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)

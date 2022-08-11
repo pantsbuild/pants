@@ -184,7 +184,10 @@ async def build_local_dists(
         Pex,
         PexRequest(
             output_filename="local_dists.pex",
-            requirements=PexRequirements(wheels),
+            # It is safe to not set the resolve_name because building this PEX will not make
+            # network calls, thanks to `--intransitive` and having the wheel sources present.
+            # TODO: is that actually true?
+            requirements=PexRequirements(wheels, resolve_name=None),
             interpreter_constraints=request.interpreter_constraints,
             additional_inputs=wheels_digest,
             internal_only=request.internal_only,

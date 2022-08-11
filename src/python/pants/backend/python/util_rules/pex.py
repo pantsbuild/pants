@@ -150,7 +150,7 @@ class PexRequest(EngineAwareParameter):
         internal_only: bool,
         layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
-        requirements: PexRequirements | EntireLockfile = PexRequirements(),
+        requirements: PexRequirements | EntireLockfile = PexRequirements(resolve_name=None),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         complete_platforms=CompletePlatforms(),
@@ -408,21 +408,15 @@ async def _setup_pex_requirements(
     pex_lock_resolver_args = list(python_repos.pex_args)
     pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
 
+    resolve_name = (
+        request.requirements.lockfile.resolve_name
+        if isinstance(request.requirements, EntireLockfile)
+        else request.requirements.resolve_name
+    )
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+
     if isinstance(request.requirements, EntireLockfile):
-        lockfile, resolve_config = await MultiGet(
-            Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)),
-            Get(
-                ResolvePexConfig,
-                ResolvePexConfigRequest(request.requirements.lockfile.resolve_name),
-            ),
-        )
-        argv = (
-            ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
-            if lockfile.is_pex_native
-            else
-            # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            ["--requirement", lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
-        )
+        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
         if lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
                 lockfile.metadata,
@@ -433,9 +427,17 @@ async def _setup_pex_requirements(
                 resolve_config.constraints_file,
             )
 
-        return _BuildPexRequirementsSetup(
-            [lockfile.lockfile_digest], argv, lockfile.requirement_estimate
-        )
+        digests = [lockfile.lockfile_digest]
+        if lockfile.is_pex_native:
+            # Note that constraints files will have already been used at lock-time.
+            argv = ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
+        else:
+            # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
+            argv = ["--requirement", lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+            if resolve_config.constraints_file:
+                argv.extend(["--constraints", resolve_config.constraints_file.path])
+                digests.append(resolve_config.constraints_file.digest)
+        return _BuildPexRequirementsSetup(digests, argv, lockfile.requirement_estimate)
 
     # TODO: This is not the best heuristic for available concurrency, since the
     # requirements almost certainly have transitive deps which also need building, but it
@@ -454,10 +456,6 @@ async def _setup_pex_requirements(
         loaded_lockfile = request.requirements.from_superset
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
-        resolve_config = await Get(
-            ResolvePexConfig,
-            ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
-        )
         if not request.requirements.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
 
@@ -482,11 +480,29 @@ async def _setup_pex_requirements(
             concurrency_available,
         )
 
-    # We use pip to perform a normal resolve.
+    # Else, we use pip to perform a normal resolve.
     assert request.requirements.from_superset is None
     digests = []
     argv = [*request.requirements.req_strings, *pip_resolver_args]
+
     if request.requirements.constraints_strings:
+        # Constraints can be hardcoded in the PexRequest, which is used by Pants's plugin resolver
+        # and `[python].requirement_constraints`. All other uses should use
+        # `[python].resolves_to_constraints_file`.
+        if resolve_config.constraints_file:
+            raise AssertionError(
+                softwrap(
+                    f"""
+                    Constraints specified for the resolve {request.requirements.resolve_name} via
+                    [python].resolves_to_constraints_file at the same time as constraint_strings
+                    were hardcoded in the PexRequirements: {request.requirements}
+
+                    This state is not legal because it would mean there's ambiguity with which
+                    constraints to use. If you encountered this in core Pants, please open a bug at
+                    https://github.com/pantsbuild/pants/issues/new/choose
+                    """
+                )
+            )
         constraints_file = "__constraints.txt"
         constraints_content = "\n".join(request.requirements.constraints_strings)
         digests.append(
@@ -496,6 +512,9 @@ async def _setup_pex_requirements(
             )
         )
         argv.extend(["--constraints", constraints_file])
+    elif resolve_config.constraints_file:
+        argv.extend(["--constraints", resolve_config.constraints_file.path])
+        digests.append(resolve_config.constraints_file.digest)
     return _BuildPexRequirementsSetup(digests, argv, concurrency_available=concurrency_available)
 
 

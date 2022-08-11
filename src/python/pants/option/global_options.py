@@ -668,6 +668,9 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
         return self  # type: ignore[return-value]
 
 
+PLUGINS_RESOLVE_KEY = "global-plugins-option"
+
+
 class BootstrapOptions:
     """The set of options necessary to create a Scheduler.
 

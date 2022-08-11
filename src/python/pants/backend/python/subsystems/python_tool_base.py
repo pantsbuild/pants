@@ -145,7 +145,7 @@ class PythonToolRequirementsBase(Subsystem):
         requirements = (*self.all_requirements, *extra_requirements)
 
         if not self.uses_lockfile:
-            return PexRequirements(requirements)
+            return PexRequirements(requirements, resolve_name=self.options_scope)
 
         hex_digest = calculate_invalidation_digest(requirements)
 

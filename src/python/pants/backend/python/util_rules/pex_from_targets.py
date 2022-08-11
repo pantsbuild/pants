@@ -11,7 +11,7 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE, PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
@@ -301,6 +301,7 @@ class _PexRequirementsRequest:
     """
 
     addresses: Addresses
+    resolve_name: str
 
 
 @rule
@@ -315,6 +316,7 @@ async def determine_requirement_strings_in_closure(
             if tgt.has_field(PythonRequirementsField)
         ),
         constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+        resolve_name=request.resolve_name,
     )
 
 
@@ -361,10 +363,8 @@ class _ConstraintsRepositoryPexRequest:
 async def create_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequest:
-    requirements: PexRequirements | EntireLockfile = PexRequirements()
+    requirements: PexRequirements | EntireLockfile = PexRequirements(resolve_name=None)
     if request.include_requirements:
-        requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
-
         pex_native_subsetting_supported = False
         if python_setup.enable_resolves:
             # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
@@ -373,14 +373,26 @@ async def create_pex_from_targets(
             chosen_resolve = await Get(
                 ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
             )
-            loaded_lockfile = await Get(
-                LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
+            requirements, loaded_lockfile = await MultiGet(
+                Get(
+                    PexRequirements,
+                    _PexRequirementsRequest(request.addresses, resolve_name=chosen_resolve.name),
+                ),
+                Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)),
             )
             pex_native_subsetting_supported = loaded_lockfile.is_pex_native
             if loaded_lockfile.constraints_strings:
                 requirements = dataclasses.replace(
-                    requirements, constraints_strings=loaded_lockfile.constraints_strings
+                    requirements,
+                    constraints_strings=loaded_lockfile.constraints_strings,
                 )
+        else:
+            requirements = await Get(
+                PexRequirements,
+                _PexRequirementsRequest(
+                    request.addresses, resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE
+                ),
+            )
 
         should_return_entire_lockfile = (
             python_setup.run_against_entire_lockfile and request.internal_only
@@ -636,6 +648,7 @@ async def _setup_constraints_repository_pex(
         requirements=PexRequirements(
             all_constraints,
             constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         # Monolithic PEXes like the repository PEX should always use the Packed layout.
         layout=PexLayout.PACKED,
