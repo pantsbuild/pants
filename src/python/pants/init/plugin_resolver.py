@@ -22,7 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
-from pants.option.global_options import PLUGINS_RESOLVE_KEY, GlobalOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
 
@@ -56,7 +56,7 @@ async def resolve_plugins(
     requirements = PexRequirements(
         req_strings=sorted(global_options.plugins),
         constraints_strings=(str(constraint) for constraint in request.constraints),
-        resolve_name=PLUGINS_RESOLVE_KEY,
+        resolve_name=None,
     )
     if not requirements:
         return ResolvedPluginDistributions()

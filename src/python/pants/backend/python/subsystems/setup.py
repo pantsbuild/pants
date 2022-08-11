@@ -9,7 +9,6 @@ import os
 from typing import Iterable, Iterator, Optional, cast
 
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
-from pants.option.errors import MutuallyExclusiveOptionError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -40,8 +39,6 @@ class LockfileGenerator(enum.Enum):
 
 
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
-RESOLVE_OPTION_KEY__NO_USER_RESOLVE = "no-user-resolve"
-RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND = "pep-517-build-backend"
 
 
 class PythonSetup(Subsystem):
@@ -239,10 +236,9 @@ class PythonSetup(Subsystem):
             resolves.
 
             The constraints file will still be used if you are using a custom-managed lockfile
-            for a particular resolve, or if you disabled lockfiles for a certain tool. If you are
-            not using `[python].resolves` yet, use the key `{RESOLVE_OPTION_KEY__NO_USER_RESOLVE}`
-            to set a constraints file for your user code (or set it via the key
-            `{RESOLVE_OPTION_KEY__DEFAULT}`).
+            for a particular resolve, or if you disabled lockfiles for a certain tool. It will not
+            be used for your user requirements if `[python].enable_resolves` is false; to constrain
+            user requirements in that case, use `[python].requirement_constraints`.
             """
         ),
         advanced=True,
@@ -389,19 +385,13 @@ class PythonSetup(Subsystem):
             Mutually exclusive with `[python].enable_resolves`, which we generally recommend as an
             improvement over constraints file.
 
-            Mutually exclusive with `[python].resolves_to_constraints_file`. If you are not yet
-            using `[python].enable_resolves`, but still want to set a constraints file for your
-            user code, you can either use this option or set
-            `[python].resolves_to_constraints_file` with the key
-            `{RESOLVE_OPTION_KEY__NO_USER_RESOLVE}`.
-
             See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more
             information on the format of constraint files and how constraints are applied in
             Pex and pip.
 
             This only applies when resolving user requirements, rather than tools you run
-            like Black and Pytest. To constrain tools, use the improved option
-            `[python].resolves_to_constraints_file`.
+            like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g.
+            `[black].lockfile`.
             """
         ),
         advanced=True,
@@ -582,32 +572,7 @@ class PythonSetup(Subsystem):
     def resolves_to_constraints_file(
         self, all_python_tool_resolve_names: tuple[str, ...]
     ) -> dict[str, str]:
-        if not self.options.is_default(
-            "resolves_to_constraints_file"
-        ) and not self.options.is_default("requirement_constraints"):
-            raise MutuallyExclusiveOptionError(
-                softwrap(
-                    """\
-                    `[python].resolves_to_constraints_files` cannot be set at the same time as
-                    `[python].requirement_constraints`.
-
-                    We recommend using `[python].resolves_to_constraints_files` because it allows
-                    you to set constraints files for other contexts, e.g. when building Python
-                    tools like Black and Pytest.
-                    """
-                )
-            )
-        # NB: We intentionally do not include here:
-        #   - `PLUGINS_RESOLVE_KEY` because we hardcode constraint strings to match
-        #      pantsbuild.pants itself.
-        #   - `RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND`, as a constraints file would not be
-        #      useful when the pyproject.toml is externally consumed. See
-        #      https://github.com/pantsbuild/pants/pull/16476#discussion_r943499577.
-        all_valid_resolves = {
-            *self.resolves,
-            *all_python_tool_resolve_names,
-            RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
-        }
+        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
         unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
             RESOLVE_OPTION_KEY__DEFAULT,
             *all_valid_resolves,

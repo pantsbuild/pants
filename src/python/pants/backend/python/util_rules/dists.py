@@ -11,10 +11,7 @@ from typing import Any, Mapping
 
 import toml
 
-from pants.backend.python.subsystems.setup import (
-    RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND,
-    PythonSetup,
-)
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
@@ -97,10 +94,7 @@ async def find_build_system(request: BuildSystemRequest, setuptools: Setuptools)
                 raise InvalidBuildConfigError(
                     f"No requires found in the [build-system] table in {file_content.path}"
                 )
-            ret = BuildSystem(
-                PexRequirements(requires, resolve_name=RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND),
-                build_backend,
-            )
+            ret = BuildSystem(PexRequirements(requires, resolve_name=None), build_backend)
     # Per PEP 517: "If the pyproject.toml file is absent, or the build-backend key is missing,
     #   the source tree is not using this specification, and tools should revert to the legacy
     #   behaviour of running setup.py."

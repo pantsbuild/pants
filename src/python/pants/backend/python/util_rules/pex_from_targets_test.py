@@ -15,7 +15,6 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.subsystems import setuptools
-from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexLayout,
@@ -326,7 +325,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
     assert pex_req1.requirements == PexRequirements(
         ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req],
         constraints_strings=constraints1_strings,
-        resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
+        resolve_name=None,
     )
 
     pex_req2 = get_pex_request(
@@ -478,7 +477,7 @@ def test_cross_platform_pex_disables_subsetting(
     assert result.requirements == PexRequirements(
         ["foo"],
         constraints_strings=constraints,
-        resolve_name="python-default" if enable_resolves else RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
+        resolve_name="python-default" if enable_resolves else None,
     )
 
 
