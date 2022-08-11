@@ -5,14 +5,6 @@
 import pytest
 
 
-def pytest_sessionstart(session) -> None:
-    pass
-
-
-def pytest_sessionfinish(session) -> None:
-    pass
-
-
 @pytest.fixture(autouse=True, scope="session")
 def dedicated_target_fields():
     """Ensures we follow our convention of dedicated source and dependencies field per-target.
