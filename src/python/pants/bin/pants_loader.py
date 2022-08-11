@@ -120,5 +120,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    print(f"welcome to pants! {sys.argv=} {sys.executable=} {os.getcwd()=}", file=sys.stderr)
     main()
