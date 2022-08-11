@@ -185,21 +185,26 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+    # Test extra_files option
     rule_runner.write_files(
-        {"f.py": "'constant' and 'constant2'\n", "BUILD": "python_sources(name='t')"}
+        {
+            "f.py": "assert None == 1\n",
+            ".bandit": 'skips: ["B101"]\n',
+            "BUILD": "python_sources(name='t')",
+        }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
         rule_runner,
         [tgt],
         extra_args=[
-            "--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3",
+            "--flake8-extra-requirements=flake8-bandit==3.0.0",
             "--flake8-lockfile=<none>",
+            "--flake8-extra-files=['.bandit']",
         ],
     )
     assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert "f.py:1:1: PB11" in result[0].stdout
+    assert result[0].exit_code == 0
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
