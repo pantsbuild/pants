@@ -16,6 +16,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+_DEFAULT_COMPILER_FLAGS = ("-g", "-O2")
+
+
 class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
@@ -141,6 +144,30 @@ class GolangSubsystem(Subsystem):
         default="gfortran",
         advanced=True,
         help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
+    )
+
+    cgo_default_cflags = StrListOption(
+        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+        advanced=True,
+        help="Default options used for CFLAGS when compiling cgo code. Equivalent to CGO_CFLAGS passed to `go`.",
+    )
+
+    cgo_default_cxxflags = StrListOption(
+        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+        advanced=True,
+        help="Default options used for CXXFLAGS when compiling cgo code. Equivalent to CGO_CXXFLAGS passed to `go`.",
+    )
+
+    cgo_default_fflags = StrListOption(
+        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+        advanced=True,
+        help="Default options used for FFLAGS when compiling cgo code. Equivalent to CGO_FFLAGS passed to `go`.",
+    )
+
+    cgo_default_ldflags = StrListOption(
+        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+        advanced=True,
+        help="Default options used for LDFLAGS when compiling cgo code. Equivalent to CGO_LDFLAGS passed to `go`.",
     )
 
     asdf_tool_name = StrOption(

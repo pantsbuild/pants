@@ -557,6 +557,16 @@ async def cgo_compile_request(
     # Extract the cgo flags instance from the request so it can be updated as necessary.
     flags = request.cgo_flags
 
+    # Prepend the default compiler options (`-g -O2`) before any package-specific options extracted from cgo
+    # directives.
+    flags = dataclasses.replace(
+        flags,
+        cflags=golang_subsystem.cgo_default_cflags + flags.cflags,
+        cxxflags=golang_subsystem.cgo_default_cxxflags + flags.cxxflags,
+        fflags=golang_subsystem.cgo_default_fflags + flags.fflags,
+        ldflags=golang_subsystem.cgo_default_ldflags + flags.ldflags,
+    )
+
     # Resolve pkg-config flags into compiler and linker flags.
     if request.cgo_flags.pkg_config:
         pkg_config_flags = await Get(
@@ -567,7 +577,7 @@ async def cgo_compile_request(
         )
         flags = dataclasses.replace(
             flags,
-            cflags=flags.cflags + pkg_config_flags.cflags,
+            cppflags=flags.cppflags + pkg_config_flags.cflags,
             ldflags=flags.ldflags + pkg_config_flags.ldflags,
         )
 
