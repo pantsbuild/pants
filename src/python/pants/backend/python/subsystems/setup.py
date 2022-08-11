@@ -8,6 +8,7 @@ import logging
 import os
 from typing import Iterable, Iterator, Optional, cast
 
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -18,7 +19,7 @@ from pants.option.option_types import (
 )
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -204,7 +205,34 @@ class PythonSetup(Subsystem):
             using a resolve whose interpreter constraints are set to ['==3.7.*'], then
             Pants will error explaining the incompatibility.
 
-            The keys must be defined as resolves in `[python].resolves`.
+            The keys must be defined as resolves in `[python].resolves`. To change the interpreter
+            constraints for tool lockfiles, change `[tool].interpreter_constraints`, e.g.
+            `[black].interpreter_constraints`; if the tool does not have that option, it determines
+            its interpreter constraints from your user code.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_constraints_file = DictOption[str](
+        help=softwrap(
+            """
+            When generating a resolve's lockfile, use a constraints file to pin the version of
+            certain requirements. This is particularly useful to pin the versions of transitive
+            dependencies of your direct requirements.
+
+            See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information on
+            the format of constraint files and how constraints are applied in Pex and pip.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to file paths for
+            constraints files. For example,
+            `{'data-science': '3rdparty/data-science-constraints.txt'}`.
+            If a resolve is not set in the dictionary, it will not use a constraints file.
+
+            You can use the key `__default__` to set a default value for all resolves.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -219,9 +247,10 @@ class PythonSetup(Subsystem):
             We recommend keeping the default of `error` for CI builds.
 
             Note that `warn` will still expect a Pants lockfile header, it only won't error if
-            the lockfile is stale and should be regenerated. Use `ignore` to avoid needing a
-            lockfile header at all, e.g. if you are manually managing lockfiles rather than
-            using the `generate-lockfiles` goal.
+            the lockfile is stale and should be regenerated.
+
+            Use `ignore` to avoid needing a lockfile header at all, e.g. if you are manually
+            managing lockfiles rather than using the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -266,6 +295,31 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            Pants will soon only support generating lockfiles via the Pex format, as
+            Poetry-generated lockfiles mismatch with Pants's pip-based approach.
+
+            If you do not want to use Pex lockfiles, you will still be able to manually generate
+            lockfiles, e.g. by manually running `poetry export --dev` on your `poetry.lock`. See
+            {doc_url("python-third-party-dependencies#manually-generating-lockfiles")} for more
+            information.
+
+            While Pex generates locks in a proprietary JSON format, you can use the
+            `{bin_name()} export` goal for Pants to create a virtual environment for
+            interoperability with tools like IDEs.
+
+            Please open a GitHub issue or reach out on Slack if you encounter issues while
+            migrating: {doc_url("getting-help")}
+
+            Tip: you can incrementally migrate one lockfile at-a-time by dynamically setting the
+            option `--python-lockfile-generator`. For example:
+
+              {bin_name()} --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
+              {bin_name()} --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
+            """
+        ),
     )
     resolves_generate_lockfiles = BoolOption(
         default=True,
@@ -274,14 +328,19 @@ class PythonSetup(Subsystem):
             If False, Pants will not attempt to generate lockfiles for `[python].resolves` when
             running the `generate-lockfiles` goal.
 
-            This is intended to allow you to manually generate lockfiles as a workaround for the
-            issues described in the `[python].lockfile_generator` option, if you are not yet ready
-            to use Pex.
+            This is intended to allow you to manually generate lockfiles for your own code,
+            rather than using Pex lockfiles. For example, when adopting Pants in a project already
+            using Poetry, you can use `poetry export --dev` to create a requirements.txt-style
+            lockfile understood by Pants, then point `[python].resolves` to the file.
 
             If you set this to False, Pants will not attempt to validate the metadata headers
             for your user lockfiles. This is useful so that you can keep
             `[python].invalid_lockfile_behavior` to `error` or `warn` if you'd like so that tool
             lockfiles continue to be validated, while user lockfiles are skipped.
+
+            Warning: it will likely be slower to install manually generated user lockfiles than Pex
+            ones because Pants cannot as efficiently extract the subset of requirements used for a
+            particular task. See the option `[python].run_against_entire_lockfile`.
             """
         ),
         advanced=True,
@@ -293,11 +352,10 @@ class PythonSetup(Subsystem):
             If enabled, when running binaries, tests, and repls, Pants will use the entire
             lockfile file instead of just the relevant subset.
 
-            We generally do not recommend this if `[python].lockfile_generator` is set to `"pex"`
-            thanks to performance enhancements we've made. When using Pex lockfiles, you should
-            get similar performance to using this option but without the downsides mentioned below.
+            If you are using Pex lockfiles, we generally do not recommend this. You will already
+            get similar performance benefits to this option, without the downsides.
 
-            Otherwise, if not using Pex lockfiles, this option can improve
+            Otherwise, this option can improve
             performance and reduce cache size. But it has two consequences: 1) All cached test
             results will be invalidated if any requirement in the lockfile changes, rather
             than just those that depend on the changed requirement. 2) Requirements unneeded
@@ -361,7 +419,7 @@ class PythonSetup(Subsystem):
             is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
             for details.
 
-            Note: Only takes effect if you use Pex lockfiles. Set
+            Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
@@ -377,7 +435,7 @@ class PythonSetup(Subsystem):
             them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
             details.
 
-            Note: Only takes effect if you use Pex lockfiles. Set
+            Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
@@ -491,20 +549,41 @@ class PythonSetup(Subsystem):
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
         result = {}
+        unrecognized_resolves = []
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
-                raise KeyError(
-                    softwrap(
-                        f"""
-                        Unrecognized resolve name in the option
-                        `[python].resolves_to_interpreter_constraints`: {resolve}. Each
-                        key must be one of the keys in `[python].resolves`:
-                        {sorted(self.resolves.keys())}
-                        """
-                    )
-                )
+                unrecognized_resolves.append(resolve)
             result[resolve] = tuple(ics)
+        if unrecognized_resolves:
+            raise UnrecognizedResolveNamesError(
+                unrecognized_resolves,
+                self.resolves.keys(),
+                description_of_origin="the option `[python].resolves_to_interpreter_constraints`",
+            )
         return result
+
+    @memoized_method
+    def resolves_to_constraints_file(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, str]:
+        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
+        unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
+            "__default__",
+            *all_valid_resolves,
+        }
+        if unrecognized_resolves:
+            raise UnrecognizedResolveNamesError(
+                sorted(unrecognized_resolves),
+                all_valid_resolves,
+                description_of_origin="the option `[python].resolves_to_constraints_file`",
+            )
+        default_val = self._resolves_to_constraints_file.get("__default__")
+        if not default_val:
+            return self._resolves_to_constraints_file
+        return {
+            resolve: self._resolves_to_constraints_file.get(resolve, default_val)
+            for resolve in all_valid_resolves
+        }
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")

@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BuiltHelmArtifact(BuiltPackageArtifact):
-    metadata: HelmChartMetadata | None = None
+    info: HelmChartMetadata | None = None
 
     @classmethod
-    def create(cls, relpath: str, metadata: HelmChartMetadata) -> BuiltHelmArtifact:
+    def create(cls, relpath: str, info: HelmChartMetadata) -> BuiltHelmArtifact:
         return cls(
             relpath=relpath,
-            metadata=metadata,
+            info=info,
             extra_log_lines=(f"Built Helm chart artifact: {relpath}",),
         )
 
@@ -57,7 +57,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     )
 
     input_digest = await Get(Digest, MergeDigests([chart.snapshot.digest, result_digest]))
-    process_output_file = os.path.join(result_dir, f"{chart.metadata.artifact_name}.tgz")
+    process_output_file = os.path.join(result_dir, f"{chart.info.artifact_name}.tgz")
 
     process_result = await Get(
         ProcessResult,
@@ -80,7 +80,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     return BuiltPackage(
         final_snapshot.digest,
         artifacts=tuple(
-            BuiltHelmArtifact.create(file, chart.metadata) for file in final_snapshot.files
+            BuiltHelmArtifact.create(file, chart.info) for file in final_snapshot.files
         ),
     )
 

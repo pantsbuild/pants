@@ -25,7 +25,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -110,14 +110,17 @@ class RunSubsystem(GoalSubsystem):
     )
     cleanup = BoolOption(
         default=True,
+        deprecation_start_version="2.15.0.dev1",
+        removal_version="2.16.0.dev1",
+        removal_hint="Use the global `keep_sandboxes` option instead.",
         help=softwrap(
             """
             Whether to clean up the temporary directory in which the binary is chrooted.
             Set this to false to retain the directory, e.g., for debugging.
 
-            Note that setting the global --process-cleanup option to false will also conserve
-            this directory, along with those of all other processes that Pants executes.
-            This option is more selective and controls just the target binary's directory.
+            Note that setting the global --keep-sandboxes option may also conserve this directory,
+            along with those of all other processes that Pants executes. This option is more
+            selective and controls just the target binary's directory.
             """
         ),
     )
@@ -168,8 +171,11 @@ async def run(
         WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
     )
     restartable = wrapped_target.target.get(RestartableField).value
-    # Cleanup is the default, so we want to preserve the chroot if either option is off.
-    cleanup = run_subsystem.cleanup and global_options.process_cleanup
+    keep_sandboxes = (
+        global_options.keep_sandboxes
+        if run_subsystem.options.is_default("cleanup")
+        else (KeepSandboxes.never if run_subsystem.cleanup else KeepSandboxes.always)
+    )
 
     if run_subsystem.debug_adapter:
         logger.info(
@@ -189,7 +195,7 @@ async def run(
             input_digest=request.digest,
             run_in_workspace=True,
             restartable=restartable,
-            cleanup=cleanup,
+            keep_sandboxes=keep_sandboxes,
             immutable_input_digests=request.immutable_input_digests,
             append_only_caches=request.append_only_caches,
         ),

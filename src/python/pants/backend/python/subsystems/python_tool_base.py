@@ -21,7 +21,7 @@ from pants.engine.fs import Digest, FileContent
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
@@ -39,8 +39,8 @@ class PythonToolRequirementsBase(Subsystem):
     # If this tool does not mix with user requirements (e.g. Flake8 and Isort, but not Pylint and
     # Pytest), you should set this to True.
     #
-    # You also need to subclass `GenerateToolLockfileSentinel` and create a rule that goes from
-    # it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
+    # You also need to subclass `GeneratePythonToolLockfileSentinel` and create a rule that goes
+    # from it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
     # Register the UnionRule.
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
@@ -82,15 +82,16 @@ class PythonToolRequirementsBase(Subsystem):
             {cls.default_lockfile_url} for the default lockfile contents.
 
             Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We
-            do not recommend this, though, as lockfiles are essential for reproducible builds.
+            do not recommend this, though, as lockfiles are essential for reproducible builds and
+            supply-chain security.
 
             To use a custom lockfile, set this option to a file path relative to the
             build root, then run `{bin_name()} generate-lockfiles --resolve={cls.options_scope}`.
 
-            As explained at {doc_url('python-third-party-dependencies')}, lockfile generation
-            via `generate-lockfiles` does not always work and you may want to manually generate
-            the lockfile. You will want to set `[python].invalid_lockfile_behavior = 'ignore'` so
-            that Pants does not complain about missing lockfile headers.
+            Alternatively, you can set this option to the path to a custom lockfile using pip's
+            requirements.txt-style, ideally with `--hash`. Set
+            `[python].invalid_lockfile_behavior = 'ignore'` so that Pants does not complain about
+            missing lockfile headers.
             """
         ),
     )

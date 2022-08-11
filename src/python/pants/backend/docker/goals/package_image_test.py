@@ -53,7 +53,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
-from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
@@ -92,6 +92,7 @@ def assert_build(
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
             snapshot=build_context_snapshot,
+            upstream_image_ids=[],
             dockerfile_info=DockerfileInfo(
                 request.address,
                 digest=EMPTY_DIGEST,
@@ -146,7 +147,7 @@ def assert_build(
             docker_options,
             global_options,
             DockerBinary("/dummy/docker"),
-            ProcessCleanupOption(True),
+            KeepSandboxes.never,
         ],
         mock_gets=[
             MockGet(
@@ -444,6 +445,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             {
                 "INHERIT": "from Pants env",
                 "VAR": "value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -485,6 +487,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "INHERIT": "from Pants env",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
@@ -581,6 +584,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.env == FrozenDict(
             {
                 "FROM_ENV": "env value",
+                "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 

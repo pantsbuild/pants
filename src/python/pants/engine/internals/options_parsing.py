@@ -8,8 +8,8 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import (
     GlobalOptions,
+    KeepSandboxes,
     NamedCachesDirOption,
-    ProcessCleanupOption,
     UseDeprecatedPexBinaryRunSemanticsOption,
 )
 from pants.option.options import Options
@@ -59,8 +59,8 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
 
 
 @rule
-def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessCleanupOption:
-    return ProcessCleanupOption(global_options.process_cleanup)
+def extract_keep_sandboxes(global_options: GlobalOptions) -> KeepSandboxes:
+    return GlobalOptions.resolve_keep_sandboxes(global_options.options)
 
 
 @rule

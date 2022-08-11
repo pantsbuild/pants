@@ -40,7 +40,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessExecutio
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions, ProcessCleanupOption
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ async def build_docker_image(
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> BuiltPackage:
     """Build a Docker image using `docker build`."""
     context, wrapped_target = await MultiGet(
@@ -256,13 +256,20 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
+    # Mix the upstream image ids into the env to ensure that Pants invalidates this
+    # image-building process correctly when an upstream image changes, even though the
+    # process itself does not consume this data.
+    env = {
+        **context.build_env.environment,
+        "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
+    }
     context_root = field_set.get_context_root(options.default_context_root)
     process = docker.build_image(
         build_args=context.build_args,
         digest=context.digest,
         dockerfile=context.dockerfile,
         context_root=context_root,
-        env=context.build_env.environment,
+        env=env,
         tags=tags,
         extra_args=tuple(
             get_build_options(
@@ -290,7 +297,7 @@ async def build_docker_image(
             result.stdout,
             result.stderr,
             process.description,
-            process_cleanup=process_cleanup.val,
+            keep_sandboxes=keep_sandboxes,
         )
 
     image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
@@ -317,6 +324,9 @@ async def build_docker_image(
 
 def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    # NB: We use the extracted image id for invalidation. The short_id may theoretically
+    #  not be unique enough, although in a non adversarial situation, this is highly unlikely
+    #  to be an issue in practice.
     image_id_regexp = re.compile(
         "|".join(
             (

@@ -32,7 +32,11 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import RuntimePackageDependenciesField, TestSubsystem
+from pants.core.goals.test import (
+    RuntimePackageDependenciesField,
+    TestExtraEnvVarsField,
+    TestSubsystem,
+)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -808,29 +812,34 @@ class PythonTestsTimeoutField(IntField):
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
-        If unset, will default to `[pytest].timeout_default`; if that option is also unset,
-        then the test will never time out. Will never exceed `[pytest].timeout_maximum`. Only
-        applies if the option `--pytest-timeouts` is set to true (the default).
+        If unset, will default to `[test].timeout_default`; if that option is also unset,
+        then the test will never time out. Will never exceed `[test].timeout_maximum`. Only
+        applies if the option `--test-timeouts` is set to true (the default).
         """
     )
     valid_numbers = ValidNumbers.positive_only
 
     def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
-        """Determine the timeout (in seconds) after applying global `pytest` options."""
+        """Determine the timeout (in seconds) after resolving conflicting global options in the
+        `pytest` and `test` scopes.
 
-        def resolve_opt(*, old_option: str, new_option: str) -> Any:
+        This function is deprecated and should be replaced by the similarly named one in
+        `TestTimeoutField` once the deprecated options in the `pytest` scope are removed.
+        """
+
+        def resolve_opt(*, option: str) -> Any:
             return resolve_conflicting_options(
-                old_option=old_option,
-                new_option=new_option,
+                old_option=option,
+                new_option=option,
                 old_scope="pytest",
                 new_scope="test",
                 old_container=pytest.options,
                 new_container=test.options,
             )
 
-        enabled = resolve_opt(old_option="timeouts", new_option="timeouts")
-        timeout_default = resolve_opt(old_option="timeout_default", new_option="timeout_default")
-        timeout_maximum = resolve_opt(old_option="timeout_maximum", new_option="timeout_maximum")
+        enabled = resolve_opt(option="timeouts")
+        timeout_default = resolve_opt(option="timeout_default")
+        timeout_maximum = resolve_opt(option="timeout_maximum")
 
         if not enabled:
             return None
@@ -845,16 +854,8 @@ class PythonTestsTimeoutField(IntField):
         return result
 
 
-class PythonTestsExtraEnvVarsField(StringSequenceField):
-    alias = "extra_env_vars"
-    help = softwrap(
-        """
-        Additional environment variables to include in test processes.
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
-        This will be merged with and override values from [test].extra_env_vars.
-        """
-    )
+class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
 
 
 class SkipPythonTestsField(BoolField):

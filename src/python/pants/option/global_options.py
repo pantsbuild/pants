@@ -23,7 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options, warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -117,6 +117,17 @@ class CacheContentBehavior(Enum):
     fetch = "fetch"
     validate = "validate"
     defer = "defer"
+
+
+class KeepSandboxes(Enum):
+    """An enum for the global option `keep_sandboxes`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    always = "always"
+    on_failure = "on_failure"
+    never = "never"
 
 
 @enum.unique
@@ -473,7 +484,7 @@ class ExecutionOptions:
     remote_instance_name: str | None
     remote_ca_certs_path: str | None
 
-    process_cleanup: bool
+    keep_sandboxes: KeepSandboxes
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
@@ -518,7 +529,7 @@ class ExecutionOptions:
             remote_instance_name=dynamic_remote_options.instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
             # Process execution setup.
-            process_cleanup=bootstrap_options.process_cleanup,
+            keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
@@ -607,7 +618,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
-    process_cleanup=True,
+    keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
@@ -1145,13 +1156,29 @@ class BootstrapOptions:
         ),
     )
     process_cleanup = BoolOption(
-        default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
+        default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
+        deprecation_start_version="2.15.0.dev1",
+        removal_version="2.16.0.dev1",
+        removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """
             If false, Pants will not clean up local directories used as chroots for running
             processes. Pants will log their location so that you can inspect the chroot, and
             run the `__run.sh` script to recreate the process using the same argv and
             environment variables used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+    keep_sandboxes = EnumOption(
+        default=DEFAULT_EXECUTION_OPTIONS.keep_sandboxes,
+        help=softwrap(
+            """
+            Controls whether Pants will clean up local directories used as chroots for running
+            processes.
+
+            Pants will log their location so that you can inspect the chroot, and run the
+            `__run.sh` script to recreate the process using the same argv and environment variables
+            used by Pants. This option is useful for debugging.
             """
         ),
     )
@@ -1168,8 +1195,8 @@ class BootstrapOptions:
             fetching it.
 
             The `defer` behavior, on the other hand, will neither fetch nor validate the cache
-            content before calling a cache hit a hit. This "defers" actually consuming the cache
-            entry until a consumer consumes it.
+            content before calling a cache hit a hit. This "defers" actually fetching the cache
+            entry until Pants needs it (which may be never).
 
             The `defer` mode is the most network efficient (because it will completely skip network
             requests in many cases), followed by the `validate` mode (since it can still skip
@@ -1894,6 +1921,32 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             )
 
     @staticmethod
+    def resolve_keep_sandboxes(
+        bootstrap_options: OptionValueContainer,
+    ) -> KeepSandboxes:
+        resolved_value = resolve_conflicting_options(
+            old_option="process_cleanup",
+            new_option="keep_sandboxes",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
+
+        if isinstance(resolved_value, bool):
+            # Is `process_cleanup`.
+            warn_or_error(
+                removal_version="2.15.0.dev1",
+                entity="--process-cleanup",
+                hint="Instead, use `--keep-sandboxes`.",
+            )
+            return KeepSandboxes.never if resolved_value else KeepSandboxes.always
+        elif isinstance(resolved_value, KeepSandboxes):
+            return resolved_value
+        else:
+            raise TypeError(f"Unexpected option value for `keep_sandboxes`: {resolved_value}")
+
+    @staticmethod
     def compute_pants_ignore(buildroot, global_options):
         """Computes the merged value of the `--pants-ignore` flag.
 
@@ -1983,16 +2036,6 @@ class GlobalOptionsFlags:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))
-
-
-@dataclass(frozen=True)
-class ProcessCleanupOption:
-    """A wrapper around the global option `process_cleanup`.
-
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
-    """
-
-    val: bool
 
 
 @dataclass(frozen=True)

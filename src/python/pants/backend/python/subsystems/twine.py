@@ -7,7 +7,10 @@ import os
 from pathlib import Path
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -107,7 +110,7 @@ class TwineSubsystem(PythonToolBase):
         return CreateDigest((FileContent(chrooted_ca_certs_path, ca_certs_content),))
 
 
-class TwineLockfileSentinel(GenerateToolLockfileSentinel):
+class TwineLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = TwineSubsystem.options_scope
 
 

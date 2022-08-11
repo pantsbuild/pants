@@ -9,13 +9,12 @@ import pkg_resources
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.option.global_options import ProcessCleanupOption
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -23,7 +22,7 @@ _STRIP_JAR_BASENAME = "StripJar.java"
 _OUTPUT_PATH = "__stripped_jars"
 
 
-class StripJarToolLockfileSentinel(GenerateToolLockfileSentinel):
+class StripJarToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "strip-jar"
 
 
@@ -45,7 +44,6 @@ class StripJarCompiledClassfiles:
 
 @rule(level=LogLevel.DEBUG)
 async def strip_jar(
-    process_cleanup: ProcessCleanupOption,
     processor_classfiles: StripJarCompiledClassfiles,
     jdk: InternalJdk,
     request: StripJarRequest,
@@ -76,7 +74,7 @@ async def strip_jar(
     }
 
     process_result = await Get(
-        FallibleProcessResult,
+        ProcessResult,
         JvmProcess(
             jdk=jdk,
             classpath_entries=[
@@ -93,16 +91,7 @@ async def strip_jar(
         ),
     )
 
-    if process_result.exit_code == 0:
-        digest = await Get(Digest, RemovePrefix(process_result.output_digest, _OUTPUT_PATH))
-        return digest
-    raise ProcessExecutionFailure(
-        process_result.exit_code,
-        process_result.stdout,
-        process_result.stderr,
-        "Strip jar failed.",
-        process_cleanup=process_cleanup.val,
-    )
+    return await Get(Digest, RemovePrefix(process_result.output_digest, _OUTPUT_PATH))
 
 
 def _load_strip_jar_source() -> bytes:

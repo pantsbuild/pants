@@ -24,6 +24,7 @@ class InvalidPythonLockfileReason(Enum):
     INVALIDATION_DIGEST_MISMATCH = "invalidation_digest_mismatch"
     INTERPRETER_CONSTRAINTS_MISMATCH = "interpreter_constraints_mismatch"
     REQUIREMENTS_MISMATCH = "requirements_mismatch"
+    CONSTRAINTS_FILE_MISMATCH = "constraints_file_mismatch"
 
 
 @dataclass(frozen=True)
@@ -35,8 +36,10 @@ class PythonLockfileMetadata(LockfileMetadata):
 
     @staticmethod
     def new(
+        *,
         valid_for_interpreter_constraints: InterpreterConstraints,
         requirements: set[PipRequirement],
+        requirement_constraints: set[PipRequirement],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -46,7 +49,9 @@ class PythonLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return PythonLockfileMetadataV2(valid_for_interpreter_constraints, requirements)
+        return PythonLockfileMetadataV3(
+            valid_for_interpreter_constraints, requirements, requirement_constraints
+        )
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
@@ -65,6 +70,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -106,7 +112,9 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
-        user_requirements: Iterable[PipRequirement],  # User requirements are not used by V1
+        # Everything below is not used by v1.
+        user_requirements: Iterable[PipRequirement],
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -160,22 +168,18 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         instance = cast(PythonLockfileMetadataV2, instance)
         # Requirements need to be stringified then sorted so that tests are deterministic. Sorting
         # followed by stringifying does not produce a meaningful result.
-        return {
-            "generated_with_requirements": (
-                sorted(str(i) for i in instance.requirements)
-                if instance.requirements is not None
-                else None
-            )
-        }
+        return {"generated_with_requirements": (sorted(str(i) for i in instance.requirements))}
 
     def is_valid_for(
         self,
         *,
         is_tool: bool,
-        expected_invalidation_digest: str | None,  # Validation digests are not used by V2.
+        expected_invalidation_digest: str | None,  # Not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
+        # Everything below is not used by V2.
+        requirement_constraints: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
 
@@ -192,4 +196,66 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         ):
             failure_reasons.add(InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH)
 
+        return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(3)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
+    """Lockfile version that considers constraints files."""
+
+    requirement_constraints: set[PipRequirement]
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV3],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV3:
+        v2_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+        requirement_constraints = metadata(
+            "requirement_constraints",
+            Set[PipRequirement],
+            lambda l: {PipRequirement.parse(i) for i in l},
+        )
+        return PythonLockfileMetadataV3(
+            valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,
+            requirements=v2_metadata.requirements,
+            requirement_constraints=requirement_constraints,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV3, instance)
+        return {
+            "requirement_constraints": (sorted(str(i) for i in instance.requirement_constraints))
+        }
+
+    def is_valid_for(
+        self,
+        *,
+        is_tool: bool,
+        expected_invalidation_digest: str | None,  # Validation digests are not used by V2.
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+        user_requirements: Iterable[PipRequirement],
+        requirement_constraints: Iterable[PipRequirement],
+    ) -> LockfileMetadataValidation:
+        failure_reasons = (
+            super()
+            .is_valid_for(
+                is_tool=is_tool,
+                expected_invalidation_digest=expected_invalidation_digest,
+                user_interpreter_constraints=user_interpreter_constraints,
+                interpreter_universe=interpreter_universe,
+                user_requirements=user_requirements,
+                requirement_constraints=requirement_constraints,
+            )
+            .failure_reasons
+        )
+
+        if self.requirement_constraints != set(requirement_constraints):
+            failure_reasons.add(InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH)
         return LockfileMetadataValidation(failure_reasons)

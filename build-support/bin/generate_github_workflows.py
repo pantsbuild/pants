@@ -33,6 +33,7 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
+    MACOS10_15_X86_64 = "macOS10-15-x86_64"
     MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
@@ -336,14 +337,16 @@ class Helper:
         if self.platform == Platform.MACOS11_X86_64:
             return ["macos-11"]
         if self.platform == Platform.MACOS11_ARM64:
-            return ["self-hosted", "macOS11", "ARM64"]
+            return ["macOS-11-ARM64"]
+        if self.platform == Platform.MACOS10_15_X86_64:
+            return ["macOS-10.15-X64"]
         if self.platform == Platform.LINUX_X86_64:
             return ["ubuntu-20.04"]
         raise ValueError(f"Unsupported platform: {self.platform_name()}")
 
     def platform_env(self):
         ret = {}
-        if self.platform == Platform.MACOS11_X86_64:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -593,10 +596,10 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
-def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
-        "bootstrap_pants_macos_x86_64": {
+        "bootstrap_pants_macos11_x86_64": {
             "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
@@ -616,10 +619,10 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_macos_x86_64": {
+        "test_python_macos11_x86_64": {
             "name": f"Test Python ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
-            "needs": "bootstrap_pants_macos_x86_64",
+            "needs": "bootstrap_pants_macos11_x86_64",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": helper.platform_env(),
             "timeout-minutes": 60,
@@ -647,7 +650,7 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     if not cron:
         jobs.update(
             {
-                "build_wheels_macos_x86_64": {
+                "build_wheels_macos11_x86_64": {
                     "name": f"Build wheels and fs_util ({helper.platform_name()})",
                     "runs-on": helper.runs_on(),
                     "timeout-minutes": 80,
@@ -671,7 +674,31 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
-def macos_arm64_jobs() -> Jobs:
+def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
+    helper = Helper(Platform.MACOS10_15_X86_64)
+    return {
+        "build_wheels_macos10_15_x86_64": {
+            "name": f"Build wheels and fs_util ({helper.platform_name()})",
+            "runs-on": helper.runs_on(),
+            "timeout-minutes": 80,
+            **helper.build_wheels_common,
+            "steps": [
+                *checkout(),
+                setup_toolchain_auth(),
+                # NB: We only cache Rust, but not `native_engine.so` and the Pants
+                # virtualenv. This is because we must build both these things with
+                # multiple Python versions, whereas that caching assumes only one primary
+                # Python version (marked via matrix.strategy).
+                *helper.rust_caches(),
+                *helper.build_steps(),
+                helper.upload_log_artifacts(name="wheels"),
+                deploy_to_s3(),
+            ],
+        },
+    }
+
+
+def macos11_arm64_jobs() -> Jobs:
     helper = Helper(Platform.MACOS11_ARM64)
     # The setup-python action doesn't yet support installing ARM64 Pythons.
     # Instead we pre-install Python 3.9 on the self-hosted runner.
@@ -696,7 +723,7 @@ def macos_arm64_jobs() -> Jobs:
     )
     steps.append(deploy_to_s3())
     return {
-        "build_wheels_macos_arm64": {
+        "build_wheels_macos11_arm64": {
             "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
@@ -719,8 +746,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         },
     }
     jobs.update(**linux_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_arm64_jobs())
+    jobs.update(**macos11_x86_64_jobs(python_versions, cron=cron))
+    if not cron:
+        jobs.update(**macos_10_15_x86_64_jobs(python_versions))
+        jobs.update(**macos11_arm64_jobs())
     jobs.update(
         {
             "lint_python": {

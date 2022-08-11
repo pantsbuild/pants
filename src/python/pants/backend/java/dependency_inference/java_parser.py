@@ -20,8 +20,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.option.global_options import ProcessCleanupOption
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _LAUNCHER_BASENAME = "PantsJavaParserLauncher.java"
 
 
-class JavaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class JavaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "java-parser"
 
 
@@ -53,7 +53,7 @@ class JavaParserCompiledClassfiles:
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleJavaSourceDependencyAnalysisResult,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> JavaSourceDependencyAnalysis:
     # TODO(#12725): Just convert directly to a ProcessResult like this:
     # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
@@ -68,7 +68,7 @@ async def resolve_fallible_result_to_analysis(
         fallible_result.process_result.stdout,
         fallible_result.process_result.stderr,
         "Java source dependency analysis failed.",
-        process_cleanup=process_cleanup.val,
+        keep_sandboxes=keep_sandboxes,
     )
 
 

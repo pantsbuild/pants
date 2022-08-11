@@ -106,7 +106,7 @@ pub struct RemotingOptions {
 pub struct ExecutionStrategyOptions {
   pub local_parallelism: usize,
   pub remote_parallelism: usize,
-  pub local_cleanup: bool,
+  pub local_keep_sandboxes: local::KeepSandboxes,
   pub local_cache: bool,
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
@@ -216,7 +216,7 @@ impl Core {
         local_execution_root_dir.to_path_buf(),
         named_caches.clone(),
         immutable_inputs.clone(),
-        exec_strategy_opts.local_cleanup,
+        exec_strategy_opts.local_keep_sandboxes,
       );
 
       let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
@@ -479,7 +479,7 @@ impl Core {
     )?;
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
-      && remoting_opts.cache_content_behavior == CacheContentBehavior::Defer
+      && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the

@@ -124,7 +124,7 @@ def test_async_backtracking() -> None:
             ProcessOutputEntries,
             [
                 Process(
-                    ["/bin/bash", "-c", "sleep 1; echo content > file.txt"],
+                    ["/bin/bash", "-c", "/bin/sleep 1 && echo content > file.txt"],
                     description="Create file.txt",
                     output_files=["file.txt"],
                     level=LogLevel.INFO,
@@ -146,14 +146,21 @@ def test_async_backtracking() -> None:
     assert metrics1["remote_cache_requests"] == 1
     assert metrics1["remote_cache_requests_uncached"] == 1
 
-    # Then, remove the content from the remote store and run again.
-    assert cas.remove(file_digest1)
+    # Confirm that we can hit the cache.
     file_digest2, metrics2 = run()
     assert file_digest1 == file_digest2
-    # Validate both that we hit the cache, and that we backtracked to actually run the process.
     assert metrics2["remote_cache_requests"] == 1
     assert metrics2["remote_cache_requests_cached"] == 1
-    assert metrics2["backtrack_attempts"] == 1
+    assert "backtrack_attempts" not in metrics2
+
+    # Then, remove the content from the remote store and run again.
+    assert cas.remove(file_digest1)
+    file_digest3, metrics3 = run()
+    assert file_digest1 == file_digest3
+    # Validate both that we hit the cache, and that we backtracked to actually run the process.
+    assert metrics3["remote_cache_requests"] == 1
+    assert metrics3["remote_cache_requests_cached"] == 1
+    assert metrics3["backtrack_attempts"] == 1
 
 
 class MockRunSubsystem(GoalSubsystem):
@@ -170,7 +177,7 @@ async def mock_run(workspace: Workspace, dist_dir: DistDir, mock_run: MockRunSub
     result = await Get(
         ProcessResult,
         Process(
-            ["/bin/bash", "-c", "sleep 1 ; echo content > file.txt"],
+            ["/bin/bash", "-c", "/bin/sleep 1 && echo content > file.txt"],
             description="Create file.txt",
             output_files=["file.txt"],
             level=LogLevel.INFO,
@@ -258,12 +265,18 @@ def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
     assert metrics1["remote_cache_requests"] == 1
     assert metrics1["remote_cache_requests_uncached"] == 1
 
+    # Ensure that we can hit the cache.
+    metrics2 = run()
+    assert metrics2["remote_cache_requests"] == 1
+    assert metrics2["remote_cache_requests_cached"] == 1
+    assert "backtrack_attempts" not in metrics2
+
     # Then, remove the content from the remote store and run again.
     assert cas.remove(
         FileDigest("434728a410a78f56fc1b5899c3593436e61ab0c731e9072d95e96db290205e53", 8)
     )
-    metrics2 = run()
+    metrics3 = run()
     # Validate that we missed the cache, and that we didn't backtrack.
-    assert metrics2["remote_cache_requests"] == 1
-    assert metrics2["remote_cache_requests_uncached"] == 1
-    assert "backtrack_attempts" not in metrics2
+    assert metrics3["remote_cache_requests"] == 1
+    assert metrics3["remote_cache_requests_uncached"] == 1
+    assert "backtrack_attempts" not in metrics3

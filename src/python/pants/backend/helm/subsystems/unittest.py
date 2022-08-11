@@ -3,7 +3,7 @@
 
 from enum import Enum
 
-from pants.backend.helm.util_rules.plugins import (
+from pants.backend.helm.util_rules.tool import (
     ExternalHelmPlugin,
     ExternalHelmPluginBinding,
     ExternalHelmPluginRequest,
@@ -62,7 +62,7 @@ class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]
 
 
 @rule
-def download_plugin_request(
+def download_unittest_plugin_request(
     _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem
 ) -> ExternalHelmPluginRequest:
     return ExternalHelmPluginRequest.from_subsystem(subsystem)

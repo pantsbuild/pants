@@ -217,6 +217,18 @@ To add a timeout, set the `test_timeout` field to an integer value of seconds, l
 go_package(test_timeout=120)
 ```
 
+You can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
+Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+
 Gofmt
 -----
 

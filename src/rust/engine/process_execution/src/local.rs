@@ -42,13 +42,21 @@ use crate::{
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum KeepSandboxes {
+  Always,
+  Never,
+  OnFailure,
+}
+
 pub struct CommandRunner {
   pub store: Store,
   executor: Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
-  cleanup_local_dirs: bool,
+  keep_sandboxes: KeepSandboxes,
   platform: Platform,
   spawn_lock: RwLock<()>,
 }
@@ -60,7 +68,7 @@ impl CommandRunner {
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
-    cleanup_local_dirs: bool,
+    keep_sandboxes: KeepSandboxes,
   ) -> CommandRunner {
     CommandRunner {
       store,
@@ -68,7 +76,7 @@ impl CommandRunner {
       work_dir_base,
       named_caches,
       immutable_inputs,
-      cleanup_local_dirs,
+      keep_sandboxes,
       platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
     }
@@ -271,11 +279,11 @@ impl super::CommandRunner for CommandRunner {
       // renders at the Process's level.
       desc = Some(req.description.clone()),
       |workunit| async move {
-        let workdir = create_sandbox(
+        let mut workdir = create_sandbox(
           self.executor.clone(),
           &self.work_dir_base,
           &req.description,
-          self.cleanup_local_dirs,
+          self.keep_sandboxes,
         )?;
 
         // Start working on a mutable version of the process.
@@ -320,7 +328,11 @@ impl super::CommandRunner for CommandRunner {
           })
           .await;
 
-        if !self.cleanup_local_dirs {
+        if self.keep_sandboxes == KeepSandboxes::Always
+          || self.keep_sandboxes == KeepSandboxes::OnFailure
+            && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
+        {
+          workdir.keep(&req.description);
           setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
         }
 
@@ -726,12 +738,17 @@ pub async fn prepare_workdir(
   Ok(exclusive_spawn)
 }
 
+///
 /// Creates an optionally-cleaned-up sandbox in the given base path.
+///
+/// If KeepSandboxes::Always, it is immediately marked preserved: otherwise, the caller should
+/// decide whether to preserve it.
+///
 pub fn create_sandbox(
   executor: Executor,
   base_directory: &Path,
   description: &str,
-  cleanup: bool,
+  keep_sandboxes: KeepSandboxes,
 ) -> Result<AsyncDropSandbox, String> {
   let workdir = tempfile::Builder::new()
     .prefix("pants-sandbox-")
@@ -743,22 +760,11 @@ pub fn create_sandbox(
       )
     })?;
 
-  let (workdir_path, maybe_workdir) = if cleanup {
-    // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
-    (workdir.path().to_owned(), Some(workdir))
-  } else {
-    // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-    // that the temporary directory will no longer be automatically deleted when dropped.
-    let preserved_path = workdir.into_path();
-    info!(
-      "Preserving local process execution dir {} for {}",
-      preserved_path.display(),
-      description,
-    );
-    (preserved_path, None)
-  };
-
-  Ok(AsyncDropSandbox(executor, workdir_path, maybe_workdir))
+  let mut sandbox = AsyncDropSandbox(executor, workdir.path().to_owned(), Some(workdir));
+  if keep_sandboxes == KeepSandboxes::Always {
+    sandbox.keep(description);
+  }
+  Ok(sandbox)
 }
 
 /// Dropping sandboxes can involve a lot of IO, so it is spawned to the background as a blocking
@@ -769,6 +775,21 @@ pub struct AsyncDropSandbox(Executor, PathBuf, Option<TempDir>);
 impl AsyncDropSandbox {
   pub fn path(&self) -> &Path {
     &self.1
+  }
+
+  ///
+  /// Consume the `TempDir` without deleting directory on the filesystem, meaning that the
+  /// temporary directory will no longer be automatically deleted when dropped.
+  ///
+  pub fn keep(&mut self, description: &str) {
+    if let Some(workdir) = self.2.take() {
+      let preserved_path = workdir.into_path();
+      info!(
+        "Preserving local process execution dir {} for {}",
+        preserved_path.display(),
+        description,
+      );
+    }
   }
 }
 

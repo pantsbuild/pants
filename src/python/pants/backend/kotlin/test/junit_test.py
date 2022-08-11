@@ -19,7 +19,7 @@ from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.backend.kotlin.target_types import KotlinJunitTestsGeneratorTarget
 from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -35,6 +35,7 @@ from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestFieldSet
 from pants.jvm.test.junit import rules as jvm_junit_rules
 from pants.jvm.test.junit_test import run_junit_test
+from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
@@ -78,6 +79,7 @@ def rule_runner() -> RuleRunner:
             *kotlinc.rules(),
             *kotlinc_plugins.rules(),
             *kotlin_dep_inf_rules(),
+            get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
@@ -97,6 +99,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@maybe_skip_jdk_test
 def test_vintage_kotlin_simple_success(
     rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
 ) -> None:
@@ -135,3 +138,59 @@ def test_vintage_kotlin_simple_success(
     assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
     assert re.search(r"1 tests successful", test_result.stdout) is not None
     assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@maybe_skip_jdk_test
+def test_vintage_extra_env_vars(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "BUILD": dedent(
+                """\
+                kotlin_junit_tests(
+                    name='example-test',
+                    extra_env_vars=[
+                        "JUNIT_TESTS_VAR_WITHOUT_VALUE",
+                        "JUNIT_TESTS_VAR_WITH_VALUE=junit_tests_var_with_value",
+                        "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR=junit_tests_override_with_value_var_override",
+                    ],
+                )
+                """
+            ),
+            "ExtraEnvVarsTest.kt": dedent(
+                """
+                package org.pantsbuild.example
+
+                import kotlin.test.Test
+                import kotlin.test.assertEquals
+
+                internal class ExtraEnvVarsTest {
+                   @Test
+                   fun testArgs() {
+                        assertEquals(System.getenv("ARG_WITH_VALUE_VAR"), "arg_with_value_var");
+                        assertEquals(System.getenv("ARG_WITHOUT_VALUE_VAR"), "arg_without_value_var");
+                        assertEquals(System.getenv("JUNIT_TESTS_VAR_WITH_VALUE"), "junit_tests_var_with_value");
+                        assertEquals(System.getenv("JUNIT_TESTS_VAR_WITHOUT_VALUE"), "junit_tests_var_without_value");
+                        assertEquals(System.getenv("JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR"), "junit_tests_override_with_value_var_override");
+                   }
+                }
+                """
+            ),
+        }
+    )
+
+    test_result = run_junit_test(
+        rule_runner,
+        "example-test",
+        "ExtraEnvVarsTest.kt",
+        extra_args=[
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR"]'
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_var",
+            "JUNIT_TESTS_VAR_WITHOUT_VALUE": "junit_tests_var_without_value",
+            "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR": "junit_tests_override_with_value_var",
+        },
+    )
+    assert test_result.exit_code == 0

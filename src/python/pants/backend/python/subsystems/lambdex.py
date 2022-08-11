@@ -2,7 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -28,7 +31,7 @@ class Lambdex(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class LambdexLockfileSentinel(GenerateToolLockfileSentinel):
+class LambdexLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Lambdex.options_scope
 
 
