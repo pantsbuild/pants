@@ -248,8 +248,7 @@ class PexRequirements:
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
         :param resolve_name: What keys to look up in the `[python].resolves_to_x` options, e.g.
-            `[python].resolves_to_constraints_file`. None means that no options will be loaded,
-            which is usually not desirable because values like indexes will not be set.
+            `[python].resolves_to_constraints_file`. None means that those options will not be loaded.
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
         self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
