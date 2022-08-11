@@ -361,7 +361,7 @@ class _ConstraintsRepositoryPexRequest:
 async def create_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequest:
-    requirements: PexRequirements | EntireLockfile = PexRequirements()
+    requirements = PexRequirements()
     if request.include_requirements:
         requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
 
@@ -377,9 +377,10 @@ async def create_pex_from_targets(
                 LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
             )
             pex_native_subsetting_supported = loaded_lockfile.is_pex_native
-            if loaded_lockfile.constraints_strings:
+            if loaded_lockfile.as_constraints_strings:
                 requirements = dataclasses.replace(
-                    requirements, constraints_strings=loaded_lockfile.constraints_strings
+                    requirements,
+                    constraints_strings=loaded_lockfile.as_constraints_strings,
                 )
 
         should_return_entire_lockfile = (
@@ -443,12 +444,13 @@ async def create_pex_from_targets(
         request.to_interpreter_constraints_request(),
     )
 
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-
     sources_digests = []
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(request.addresses)
+        )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
     else:
         sources = PythonSourceFiles.empty()
