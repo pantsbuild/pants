@@ -188,8 +188,8 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     # Test extra_files option
     rule_runner.write_files(
         {
-            "f.py": "assert None == 1\n",
-            ".bandit": 'skips: ["B101"]\n',
+            "f.py": "assert 1 == 1\n",
+            ".bandit": "[bandit]\nskips: B101\n",
             "BUILD": "python_sources(name='t')",
         }
     )
