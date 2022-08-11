@@ -242,13 +242,20 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
+    # Mix the upstream image ids into the env to ensure that Pants invalidates this
+    # image-building process correctly when an upstream image changes, even though the
+    # process itself does not consume this data.
+    env = {
+        **context.build_env.environment,
+        "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
+    }
     context_root = field_set.get_context_root(options.default_context_root)
     process = docker.build_image(
         build_args=context.build_args,
         digest=context.digest,
         dockerfile=context.dockerfile,
         context_root=context_root,
-        env=context.build_env.environment,
+        env=env,
         tags=tags,
         extra_args=tuple(
             get_build_options(
@@ -303,6 +310,9 @@ async def build_docker_image(
 
 def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    # NB: We use the extracted image id for invalidation. The short_id may theoretically
+    #  not be unique enough, although in a non adversarial situation, this is highly unlikely
+    #  to be an issue in practice.
     image_id_regexp = re.compile(
         "|".join(
             (
