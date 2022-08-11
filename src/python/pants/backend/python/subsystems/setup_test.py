@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE, PythonSetup
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.testutil.option_util import create_subsystem
 
@@ -34,6 +34,7 @@ def test_resolves_to_constraints_file() -> None:
     assert create({"a": "c1.txt", "tool1": "c2.txt"}) == {"a": "c1.txt", "tool1": "c2.txt"}
     assert create({"__default__": "c.txt", "tool2": "override.txt"}) == {
         "a": "c.txt",
+        RESOLVE_OPTION_KEY__NO_USER_RESOLVE: "c.txt",
         "tool1": "c.txt",
         "tool2": "override.txt",
     }
