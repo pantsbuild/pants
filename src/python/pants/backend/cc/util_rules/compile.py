@@ -12,27 +12,27 @@ from pants.backend.cc.dependency_inference.rules import (
     CCDependencyInferenceFieldSet,
     InferCCDependenciesRequest,
 )
-from pants.backend.cc.subsystems.toolchain import CCToolchain
-from pants.backend.cc.target_types import CC_HEADER_FILE_EXTENSIONS
+from pants.backend.cc.subsystems.toolchain import CCSubsystem, CCToolchain
+from pants.backend.cc.target_types import (
+    CC_HEADER_FILE_EXTENSIONS,
+    CPP_SOURCE_FILE_EXTENSIONS,
+    CCDependenciesField,
+    CCFieldSet,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     InferredDependencies,
     SourcesField,
-    Target,
     WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-# @dataclass(frozen=True)
-# class CompileCCSourceRequest:
-#     name: str
-#     targets: Iterable[Target]
 
 
 @dataclass(frozen=True)
@@ -43,19 +43,20 @@ class FallibleCompiledCCObject:
 
 @dataclass(frozen=True)
 class CompileCCSourceRequest:
-    # field_sets = (CCFieldSet, CCGeneratorFieldSet)
-    target: Target
+    field_set: CCFieldSet
 
 
-@rule(desc="Compile CC source with the current toolchain")
-async def compile_cc_source(
-    toolchain: CCToolchain, request: CompileCCSourceRequest
-) -> FallibleCompiledCCObject:
-
+@rule_helper
+async def _infer_source_files(field_set: CCFieldSet) -> SourceFiles:
     # Try to determine what this file needs in its digest to compile correctly (i.e. which header files)
+    # TODO: Switching to fieldsets makes this inference request weirder
     inferred_dependencies = await Get(
         InferredDependencies,
-        InferCCDependenciesRequest(CCDependencyInferenceFieldSet.create(request.target)),
+        InferCCDependenciesRequest(
+            CCDependencyInferenceFieldSet(
+                field_set.address, field_set.sources, CCDependenciesField(None, field_set.address)
+            )
+        ),
     )
 
     # Convert inferred dependency addresses into targets
@@ -67,24 +68,15 @@ async def compile_cc_source(
         for address in inferred_dependencies.include
     )
 
-    # Gather all required source files and dependencies
-    target_source_file = await Get(
-        SourceFiles, SourceFilesRequest([request.target.get(SourcesField)])
-    )
-
-    inferred_source_files = await Get(
+    return await Get(
         SourceFiles,
         SourceFilesRequest(
             [wrapped_target.target.get(SourcesField) for wrapped_target in wrapped_targets]
         ),
     )
-    logger.debug(inferred_source_files.snapshot)
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests((target_source_file.snapshot.digest, inferred_source_files.snapshot.digest)),
-    )
 
+def _extract_include_directories(inferred_source_files: SourceFiles) -> list[str]:
     # Add header include directories to compilation args prefixed with "-I"
     inferred_header_files = [
         file
@@ -92,20 +84,46 @@ async def compile_cc_source(
         if PurePath(file).suffix in CC_HEADER_FILE_EXTENSIONS
     ]
     # TODO: This "/inc" is hardcoded - not a robust way to determine which folders should be included here
-    include_directories = [
-        file.split("/inc")[0] for file in inferred_header_files if "/inc" in file
-    ]
+    return [file.split("/inc")[0] for file in inferred_header_files if "/inc" in file]
 
+
+# TODO: Probably should pull subsystem defines into toolchain - so the toolchain is self-sufficient
+@rule(desc="Compile CC source with the current toolchain")
+async def compile_cc_source(
+    subsystem: CCSubsystem, toolchain: CCToolchain, request: CompileCCSourceRequest
+) -> FallibleCompiledCCObject:
+
+    # Gather all required source files and dependencies
+    target_source_file = await Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
+
+    inferred_source_files = await _infer_source_files(request.field_set)
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests((target_source_file.snapshot.digest, inferred_source_files.snapshot.digest)),
+    )
+
+    include_directories = _extract_include_directories(inferred_source_files)
+
+    # Generate compilation args
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
 
-    # TODO: While gcc will usually pick the correct tool under the hood, we may want to make it explicit
-    # TODO: How should we handle compiling .c files with C++?
-    argv = [toolchain.c]
+    if PurePath(target_file).suffix in CPP_SOURCE_FILE_EXTENSIONS:
+        compiler = toolchain.cpp
+        compiler_options = list(subsystem.cpp_compile_options)
+    else:
+        compiler = toolchain.c
+        compiler_options = list(subsystem.c_compile_options)
+
+    argv = [compiler, *compiler_options]
     for d in include_directories:
         argv += ["-I", f"{d}/include"]
+    # TODO: Testing compilation database - clang only
+    argv += ["-MJ", "compile_commands.json", ""]
     argv += ["-c", target_file]
 
+    logger.debug(f"Compilation args for {target_file}: {argv}")
     compile_result = await Get(
         FallibleProcessResult,
         Process(
@@ -113,6 +131,7 @@ async def compile_cc_source(
             input_digest=input_digest,
             description=f"Compile CC source file: {target_file}",
             output_files=(compiled_object_name,),
+            level=LogLevel.DEBUG,
         ),
     )
     return FallibleCompiledCCObject(compiled_object_name, compile_result)

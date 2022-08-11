@@ -11,7 +11,6 @@ from pants.backend.cc.target_types import CC_SOURCE_FILE_EXTENSIONS, CCFieldSet
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
-from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -39,19 +38,10 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         if _source_file_extension(field_set) in CC_SOURCE_FILE_EXTENSIONS
     ]
 
-    # TODO: Should this be a target?
-    wrapped_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(field_set.address, description_of_origin="<build_pkg_target.py>"),
-        )
-        for field_set in source_file_field_sets
-    )
-
     # TODO: Should we pass targets? Or field sets? Or single source files?
     compile_results = await MultiGet(
-        Get(FallibleCompiledCCObject, CompileCCSourceRequest(wrapped_target.target))
-        for wrapped_target in wrapped_targets
+        Get(FallibleCompiledCCObject, CompileCCSourceRequest(field_set))
+        for field_set in source_file_field_sets
     )
 
     # For some reason, using the commented out code wasn't returning the actual errors

@@ -70,21 +70,22 @@ class CCSubsystem(Subsystem):
         ),
     )
 
-    c_defines = StrListOption(
-        default=[""],
+    c_compile_options = StrListOption(
+        default=["-std=c11"],
         help=softwrap(
             """
-            TODO
+            Flags passed to the C++ compiler.
+            These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
             """
         ),
     )
 
-    c_compile_options = StrListOption(
-        default=["--std=c11"],
+    c_defines = StrListOption(
+        default=[""],
         help=softwrap(
             """
-            TODO
-            Will be prefixed by -D at command line
+            A list of strings to define in the C preprocessor. Will be prefixed by -D at the command line.
+            These defines are merged with the target-level defines, with target-level definitions taking precedence.
             """
         ),
     )
@@ -93,7 +94,8 @@ class CCSubsystem(Subsystem):
         default=["-std=c++11"],
         help=softwrap(
             """
-            TODO
+            Flags passed to the C++ compiler.
+            These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
             """
         ),
     )
@@ -102,8 +104,8 @@ class CCSubsystem(Subsystem):
         default=[""],
         help=softwrap(
             """
-            TODO
-            Will be prefixed by -D at command line
+            A list of strings to define in the C++ preprocessor. Will be prefixed by -D at the command line.
+            These defines are merged with the target-level defines, with target-level definitions taking precedence.
             """
         ),
     )

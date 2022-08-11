@@ -25,12 +25,9 @@ CC_HEADER_FILE_EXTENSIONS = (
     ".hh",
     ".hpp",
 )
-CC_SOURCE_FILE_EXTENSIONS = (
-    ".c",
-    ".cc",
-    ".cpp",
-    ".cxx",
-)
+C_SOURCE_FILE_EXTENSIONS = (".c",)
+CPP_SOURCE_FILE_EXTENSIONS = (".cc", ".cpp", ".cxx")
+CC_SOURCE_FILE_EXTENSIONS = C_SOURCE_FILE_EXTENSIONS + CPP_SOURCE_FILE_EXTENSIONS
 CC_FILE_EXTENSIONS = CC_HEADER_FILE_EXTENSIONS + CC_SOURCE_FILE_EXTENSIONS
 
 
@@ -103,7 +100,8 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 #     alias = "compile_options"
 #     help = softwrap(
 #         """
-#         TODO
+#         Flags passed to the compiler.
+#         These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
 #         """
 #     )
 
@@ -112,7 +110,8 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 #     alias = "defines"
 #     help = softwrap(
 #         """
-#         TODO
+#         A list of strings to define in the preprocessor. Will be prefixed by -D at the command line.
+#         These defines are merged with the toolchain-level defines, with target-level definitions taking precedence.
 #         """
 #     )
 
@@ -121,8 +120,7 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 #     alias = "headers"
 #     help = softwrap(
 #         """
-#         TODO
-#         Public headers which are exported by this target, and can be imported by others.
+#         Public headers which are made available to dependent targets.
 #         """
 #     )
 
