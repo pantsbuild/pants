@@ -40,14 +40,6 @@ if is_oxidized and not sys.argv[0]:
 
 def pex_main() -> bool:
 
-    with open("/Users/chrisjrn/src/pants/oxidized-invocations.txt", "a") as f:
-        import datetime
-        import site
-
-        f.write(
-            f"{datetime.datetime.now()}: {sys.argv=} {sys.path=} {site.PREFIXES=} {site.getsitepackages()=}\n"
-        )
-
     if sys.argv[1] == "./pex":
         run_as_pex()
         return True
@@ -115,7 +107,6 @@ def run_as_pex():
     g = {}
     f = runpy.run_path("./pex", init_globals=g)
     del sys.argv[1]
-    # sys.argv += ["-v"] * 3
     f["bootstrap_pex"]("./pex")
     sys.exit(0)
 
@@ -126,6 +117,10 @@ def run_as_venv():
 
     import venv
 
+    # `venv` is supplied by the oxidized importer (the stdlib is embedded in the rust binary)
+    # but uses the `__file__` attribute to find the location of `activate` scripts. These scripts
+    # are not needed by pex, so we're setting the value to something bogus just to prevent
+    # subsequent exceptions.
     venv.__file__ = "SOMETHING/THAT/IS/NOT/NONE"
 
     sys.argv[1:] = sys.argv[index + 2 :]
