@@ -128,13 +128,17 @@ class PluginResolver:
         env: CompleteEnvironment,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-        for resolved_plugin_location in self._resolve_plugins(
-            options_bootstrapper, env, self._request
-        ):
-            site.addsitedir(
-                resolved_plugin_location
-            )  # Activate any .pth files plugin wheels may have.
-            self._working_set.add_entry(resolved_plugin_location)
+        from pants import ox
+
+        with ox.traditional_import_machinery():
+            for resolved_plugin_location in self._resolve_plugins(
+                options_bootstrapper, env, self._request
+            ):
+                logger.warning(f"{resolved_plugin_location=}")
+                site.addsitedir(
+                    resolved_plugin_location
+                )  # Activate any .pth files plugin wheels may have.
+                self._working_set.add_entry(resolved_plugin_location)
         return self._working_set
 
     def _resolve_plugins(

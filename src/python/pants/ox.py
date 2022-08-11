@@ -1,6 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import contextlib
+import functools
 import importlib.machinery
 import logging
 import os
@@ -65,30 +67,51 @@ def pex_main() -> bool:
     return False
 
 
-def prepare_import_machinery():
-    # print(f"pex main? {sys.version_info=} {sys.argv=}", flush=True)
-
+@contextlib.contextmanager
+def traditional_import_machinery():
     # pex relies heavily on `__file__`, which the Oxidized importer does not
     # believe in. This reinstates the default Python import machinery before
     # loading and running `pex`, but keeps the PyOxidizer machinery at lowest
     # priority, so we can still load interned `.py` sources (e.g. the stdlib)
-    sys.meta_path = [
-        importlib.machinery.BuiltinImporter,
-        importlib.machinery.FrozenImporter,
-        importlib.machinery.PathFinder,
-    ] + sys.meta_path
-    sys.path_hooks = [
-        zipimport.zipimporter,
-        importlib.machinery.FileFinder.path_hook(
-            (importlib.machinery.ExtensionFileLoader, [".cpython-39-darwin.so", ".abi3.so", ".so"]),
-            (importlib.machinery.SourceFileLoader, [".py"]),
-            (importlib.machinery.SourcelessFileLoader, [".pyc"]),
-        ),
-    ] + sys.path_hooks
+
+    old_sys_meta_path = sys.meta_path
+    old_sys_path_hooks = sys.path_hooks
+
+    if is_oxidized:
+        sys.meta_path = [
+            importlib.machinery.BuiltinImporter,
+            importlib.machinery.FrozenImporter,
+            importlib.machinery.PathFinder,
+        ] + sys.meta_path
+        sys.path_hooks = [
+            zipimport.zipimporter,
+            importlib.machinery.FileFinder.path_hook(
+                (
+                    importlib.machinery.ExtensionFileLoader,
+                    [".cpython-39-darwin.so", ".abi3.so", ".so"],
+                ),
+                (importlib.machinery.SourceFileLoader, [".py"]),
+                (importlib.machinery.SourcelessFileLoader, [".pyc"]),
+            ),
+        ] + sys.path_hooks
+
+    yield
+
+    sys.meta_path = old_sys_meta_path
+    sys.path_hooks = old_sys_path_hooks
 
 
+def use_traditional_import_machinery(f):
+    @functools.wraps(f)
+    def wrapped(*a, **k):
+        with traditional_import_machinery():
+            return f(*a, **k)
+
+    return wrapped
+
+
+@use_traditional_import_machinery
 def run_as_pex():
-    prepare_import_machinery()
     g = {}
     f = runpy.run_path("./pex", init_globals=g)
     del sys.argv[1]
@@ -97,21 +120,21 @@ def run_as_pex():
     sys.exit(0)
 
 
+@use_traditional_import_machinery
 def run_as_venv():
-    prepare_import_machinery()
     index = sys.argv.index("-m")
 
     import venv
 
-    venv.__file__ = "EXTREMELY/FLAH/BLAH"
+    venv.__file__ = "SOMETHING/THAT/IS/NOT/NONE"
 
     sys.argv[1:] = sys.argv[index + 2 :]
     runpy.run_module("venv")
     sys.exit(0)
 
 
+@use_traditional_import_machinery
 def run_as_dash_c():
-    prepare_import_machinery()
     if "PEX" in os.environ:
         # Get pex into the modules cache
         pex = runpy.run_path(os.environ["PEX"])
@@ -122,8 +145,8 @@ def run_as_dash_c():
     sys.exit(0)
 
 
+@use_traditional_import_machinery
 def run_pex_venv():
-    prepare_import_machinery()
     path_to_run = sys.argv[2]
     site.PREFIXES = [os.path.dirname(path_to_run)]
     site.addsitepackages(set())
