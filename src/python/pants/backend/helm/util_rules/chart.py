@@ -17,6 +17,7 @@ from pants.backend.helm.resolve.fetch import (
 )
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
+    HelmArtifactTarget,
     HelmChartFieldSet,
     HelmChartMetaSourceField,
     HelmChartTarget,
@@ -217,15 +218,20 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
 class MissingHelmDeploymentChartError(ValueError):
     def __init__(self, address: Address) -> None:
         super().__init__(
-            f"The target '{address}' is missing a dependency on a `{HelmChartTarget.alias}` target."
+            (
+                f"The target '{address}' is missing a dependency on a `{HelmChartTarget.alias}` "
+                f"or a `{HelmArtifactTarget.alias}` target."
+            )
         )
 
 
 class TooManyChartDependenciesError(ValueError):
     def __init__(self, address: Address) -> None:
         super().__init__(
-            f"The target '{address}' has too many `{HelmChartTarget.alias}` "
-            "addresses in its dependencies, it should have only one."
+            (
+                f"The target '{address}' has more than one `{HelmChartTarget.alias}` "
+                f"or `{HelmArtifactTarget.alias}` addresses in its dependencies, it should have only one."
+            )
         )
 
 
@@ -238,7 +244,7 @@ class FindHelmDeploymentChart(EngineAwareParameter):
 
 
 @rule(desc="Find Helm deployment's chart", level=LogLevel.DEBUG)
-async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmChartRequest:
+async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmChart:
     explicit_dependencies = await Get(
         ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
@@ -253,13 +259,31 @@ async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmCha
         ),
     )
 
-    found_charts = [tgt for tgt in explicit_targets if HelmChartFieldSet.is_applicable(tgt)]
+    first_party_charts = await MultiGet(
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(tgt))
+        for tgt in explicit_targets
+        if HelmChartFieldSet.is_applicable(tgt)
+    )
+
+    fetched_third_party_artifacts = await Get(
+        FetchedHelmArtifacts,
+        FetchHelmArfifactsRequest,
+        FetchHelmArfifactsRequest.for_targets(
+            explicit_targets, description_of_origin=request.field_set.address.spec
+        ),
+    )
+    third_party_charts = await MultiGet(
+        Get(HelmChart, FetchedHelmArtifact, fetched_artifact)
+        for fetched_artifact in fetched_third_party_artifacts
+    )
+
+    found_charts = [*first_party_charts, *third_party_charts]
     if not found_charts:
         raise MissingHelmDeploymentChartError(request.field_set.address)
     if len(found_charts) > 1:
         raise TooManyChartDependenciesError(request.field_set.address)
 
-    return HelmChartRequest.from_target(found_charts[0])
+    return found_charts[0]
 
 
 def rules():

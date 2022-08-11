@@ -19,7 +19,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
@@ -113,7 +113,7 @@ async def parse_kube_manifest(
     file_digest = await Get(Digest, CreateDigest([request.file]))
 
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         VenvPexProcess(
             tool.pex,
             argv=[request.file.path],
@@ -123,23 +123,38 @@ async def parse_kube_manifest(
         ),
     )
 
-    output = result.stdout.decode("utf-8").splitlines()
-    image_refs: list[tuple[int, YamlPath, str]] = []
-    for line in output:
-        parts = line.split(",")
-        if len(parts) != 3:
-            raise Exception(
-                softwrap(
-                    f"""Unexpected output from k8s parser when parsing file {request.file.path}:
+    if result.exit_code == 0:
+        output = result.stdout.decode("utf-8").splitlines()
+        image_refs: list[tuple[int, YamlPath, str]] = []
+        for line in output:
+            parts = line.split(",")
+            if len(parts) != 3:
+                raise Exception(
+                    softwrap(
+                        f"""Unexpected output from k8s parser when parsing file {request.file.path}:
 
-                    {line}
-                    """
+                        {line}
+                        """
+                    )
                 )
+
+            image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
+
+        return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
+    elif result.exit_code == 2:
+        # Unrecognised YAML manifests, we complete with an empty list of image references
+        return ParsedKubeManifest(filename=request.file.path, found_image_refs=())
+    else:
+        parser_error = result.stderr.decode("utf-8")
+        raise Exception(
+            softwrap(
+                f"""
+                Could not parse Kubernetes manifests in file: {request.file.path}.
+
+                {parser_error}
+                """
             )
-
-        image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
-
-    return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
+        )
 
 
 def rules():

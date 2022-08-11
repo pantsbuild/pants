@@ -271,7 +271,10 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
-    release_name = request.field_set.release_name.value or request.field_set.address.target_name
+    release_name = (
+        request.field_set.release_name.value
+        or request.field_set.address.target_name.replace("_", "-")
+    )
     inline_values = request.field_set.values.value
 
     def maybe_escape_string_value(value: str) -> str:
