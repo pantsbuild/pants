@@ -2452,7 +2452,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
         See {doc_url('targets')} for more about how addresses are formed, including for generated
         targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
-        `{bin_name()} list dir:` to find all addresses defined in that directory.
+        `{bin_name()} list dir` to find all addresses defined in that directory.
 
         If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
         `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
