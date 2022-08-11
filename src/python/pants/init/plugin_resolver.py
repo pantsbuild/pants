@@ -134,7 +134,6 @@ class PluginResolver:
             for resolved_plugin_location in self._resolve_plugins(
                 options_bootstrapper, env, self._request
             ):
-                logger.warning(f"{resolved_plugin_location=}")
                 site.addsitedir(
                     resolved_plugin_location
                 )  # Activate any .pth files plugin wheels may have.
