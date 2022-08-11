@@ -378,7 +378,7 @@ class PythonSetup(Subsystem):
     requirement_constraints = FileOption(
         default=None,
         help=softwrap(
-            f"""
+            """
             When resolving third-party requirements for your own code (vs. tools you run),
             use this constraints file to determine which versions to use.
 
