@@ -14,14 +14,13 @@ from pants.base.build_environment import get_default_pants_config_file, pants_ve
 from pants.base.exceptions import BuildConfigurationError
 from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.custom_types import ListValueComponent
+from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
-from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
@@ -167,12 +166,8 @@ class OptionsBootstrapper:
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
             alias_vals = post_bootstrap_config.get("cli", "alias")
-            alias_dict = parse_expression(
-                name="cli.alias",
-                val=alias_vals[-1] if alias_vals else "{}",
-                acceptable_types=dict,
-            )
-            alias = CliAlias.from_dict(alias_dict)
+            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
+            alias = CliAlias.from_dict(val)
 
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
