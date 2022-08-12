@@ -49,9 +49,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return PythonLockfileMetadataV3(
-            valid_for_interpreter_constraints, requirements, requirement_constraints
-        )
+        return PythonLockfileMetadataV2(valid_for_interpreter_constraints, requirements)
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
