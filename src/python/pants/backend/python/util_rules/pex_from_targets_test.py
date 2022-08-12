@@ -180,7 +180,7 @@ def test_determine_requirements_for_pex_from_targets() -> None:
         platforms: bool,
         include_requirements: bool = True,
         run_against_entire_lockfile: bool = False,
-        expected: PexRequirements | PexRequest | None,
+        expected: PexRequirements | PexRequest,
     ) -> None:
         lockfile_used = mode in (RequirementMode.PEX_LOCKFILE, RequirementMode.NON_PEX_LOCKFILE)
         requirement_constraints_used = mode in (
