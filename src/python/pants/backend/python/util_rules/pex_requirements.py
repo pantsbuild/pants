@@ -93,7 +93,7 @@ class LoadedLockfile:
     is_pex_native: bool
     # If !is_pex_native, the lockfile parsed as constraints strings, for use when the lockfile
     # needs to be subsetted (see #15031, ##12222).
-    constraints_strings: FrozenOrderedSet[str] | None
+    as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
     original_lockfile: Lockfile | LockfileContent

@@ -582,7 +582,7 @@ def test_setup_pex_requirements() -> None:
             metadata=None,
             requirement_estimate=2,
             is_pex_native=is_pex_lock,
-            constraints_strings=None,
+            as_constraints_strings=None,
             original_lockfile=lockfile_obj,
         )
 
