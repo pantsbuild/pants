@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(
+    dependencies=[":resources"],
     overrides={
         # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
         "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
