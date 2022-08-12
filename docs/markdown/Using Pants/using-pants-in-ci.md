@@ -15,23 +15,46 @@ Directories to cache
 
 In your CI's config file, we recommend caching these directories:
 
-- `$HOME/.cache/pants/setup`: The initial bootstrapping of Pants.
-- `$HOME/.cache/pants/named_caches`: Caches used by underlying tools like Pip and PEX.
 
-If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service, 
-such as the one provided by [Toolchain](https://toolchain.com/), the lead sponsor of Pants, 
-then you may also want to preserve the local Pants cache:
+- `$HOME/.cache/pants/setup`<br>
+  This is the Pants bootstrap directory. Cache this against the version, as specified
+  in `pants.toml`.  E.g., if using GitHub Actions you can use:
+  ```yaml
+  path: |
+    ~/.cache/pants/setup
+  key: pants-setup-${{ runner.os }}-${{ hashFiles('pants.toml') }}
+  restore-keys: |
+    pants-setup-${{ runner.os }}-${{ hashFiles('pants.toml') }}
+    pants-setup-${{ runner.os }}-
+  ```
+- `$HOME/.cache/pants/named_caches`<br>
+  Caches used by some underlying tools.  Cache this against the inputs to those tools.
+  For the `pants.backend.python` backend, named caches are used by PEX, and therefore
+  its inputs are your lockfiles. For example:
+  ```yaml
+  path: |
+    ~/.cache/pants/named_caches
+  key: named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python-default.lock') }}
+  restore-keys: |
+    named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python-default.lock') }}
+    named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-
+    named-caches-${{ runner.os }}-
+  ```
 
-- `$HOME/.cache/pants/lmdb_store`
-
-However, this directory gets large quickly, so saving and restoring it can become unwieldy. Hence,
-remote caching typically offers the best performance.
+If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service,
+then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`.
+This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')`.
+Computing such a coarse hash, and saving and restoring large directories, can be unwieldy.
+So this may be impractical and slow on medium and large repos.
+A [remote cache service](doc:remote-caching-execution) integrates with Pants's fine-grained
+invalidation and avoids these problems, and is recommended for the best CI performance.
 
 See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) for how to change these cache locations.
 
 > 📘 Nuking the cache when too big
 > 
-> In CI, the cache must be uploaded and downloaded every run. This takes time, so there is a tradeoff where too large of a cache will slow down your CI.
+> In CI, the cache must be uploaded and downloaded every run. This takes time, so there is a tradeoff where too
+> large a cache will slow down your CI.
 > 
 > You can use this script to nuke the cache when it gets too big:
 > 
@@ -45,8 +68,7 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 >     rm -rf ${path}
 >   fi
 > }
-> 
-> nuke_if_too_big ~/.cache/pants/lmdb_store 2048
+>
 > nuke_if_too_big ~/.cache/pants/setup 256
 > nuke_if_too_big ~/.cache/pants/named_caches 1024
 > ```
@@ -66,7 +88,8 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 
 > 👍 Remote caching
 > 
-> Rather than storing your cache with your CI provider, remote caching stores the cache in the cloud, using gRPC and the open-source Remote Execution API for low-latency and fine-grained caching. 
+> Rather than storing your cache with your CI provider, remote caching stores the cache in the cloud,
+> using gRPC and the open-source Remote Execution API for low-latency and fine-grained caching.
 > 
 > This brings several benefits over local caching:
 > 
@@ -75,12 +98,14 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 >   - No download and upload stage for your cache. 
 >   - No need to "nuke" your cache when it gets too big.
 > 
-> See [Remote Caching](doc:remote-caching) for more information.
+> See [Remote Caching and Execution](doc:remote-caching-execution) for more information.
 
 Recommended commands
 --------------------
 
-With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching).)
+With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism.
+See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). 
+(This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
 
 ### Approach #1: only run over changed files
 
