@@ -22,7 +22,29 @@ class TestStuff(TestCase):
 """
 
 
-def test_count_pytest_tests() -> None:
+def test_count_pytest_tests_empty() -> None:
+    digest_contents = DigestContents([FileContent(path="tests/test_empty.py", content=b"")])
+    test_count = _count_pytest_tests(digest_contents)
+    assert test_count == 0
+
+
+def test_count_pytest_tests_methods() -> None:
+    digest_contents = DigestContents(
+        [FileContent(path="tests/test_example1.py", content=EXAMPLE_TEST1)]
+    )
+    test_count = _count_pytest_tests(digest_contents)
+    assert test_count == 2
+
+
+def test_count_pytest_tests_in_class() -> None:
+    digest_contents = DigestContents(
+        [FileContent(path="tests/test_example1.py", content=EXAMPLE_TEST2)]
+    )
+    test_count = _count_pytest_tests(digest_contents)
+    assert test_count == 1
+
+
+def test_count_pytest_tests_multiple() -> None:
     digest_contents = DigestContents(
         [
             FileContent(path="tests/test_empty.py", content=b""),

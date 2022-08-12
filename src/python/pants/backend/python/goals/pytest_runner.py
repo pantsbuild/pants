@@ -169,7 +169,7 @@ class TestSetup:
 _TEST_PATTERN = re.compile(b"def\\s+test_")
 
 
-def _count_pytest_tests(contents: DigestContents):
+def _count_pytest_tests(contents: DigestContents) -> int:
     return sum([len(_TEST_PATTERN.findall(file.content)) for file in contents])
 
 
@@ -349,7 +349,7 @@ async def setup_pytest_for_target(
             pytest_runner_pex,
             argv=(
                 *(("-c", pytest.config) if pytest.config else ()),
-                *("-n", "{pants_concurrency}" if xdist_concurrency else "0"),
+                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,
