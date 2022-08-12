@@ -270,6 +270,28 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
 
 
+def test_xdist_enabled(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": dedent(
+                """\
+                def test_run_me():
+                  pass
+
+                def test_run_me_2():
+                  pass
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest(rule_runner, tgt, extra_args=["--pytest-xdist-enabled=True"])
+    assert result.exit_code == 0
+    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert "2 passed" in result.stdout
+
+
 @pytest.mark.parametrize(
     "config_path,extra_args",
     (["pytest.ini", []], ["custom_config.ini", ["--pytest-config=custom_config.ini"]]),

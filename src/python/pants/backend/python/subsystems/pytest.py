@@ -164,6 +164,16 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    xdist_enabled = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            """
+            If true, Pants will use `pytest-xdist` (https://pytest-xdist.readthedocs.io/en/latest/)
+            to parallelize tests within each `python_test` target.
+            """
+        ),
+    )
 
     export = ExportToolOption()
 
