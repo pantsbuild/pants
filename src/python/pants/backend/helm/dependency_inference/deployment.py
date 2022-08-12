@@ -78,7 +78,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     parsed_manifests = await MultiGet(
         Get(
             ParsedKubeManifest,
-            ParseKubeManifestRequest(owner=request.field_set.address, file=entry),
+            ParseKubeManifestRequest(file=entry),
         )
         for entry in rendered_entries
         if isinstance(entry, FileEntry)

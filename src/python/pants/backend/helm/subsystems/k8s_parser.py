@@ -18,7 +18,7 @@ from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -100,9 +100,12 @@ class ParseKubeManifestRequest(EngineAwareParameter):
     def debug_hint(self) -> str | None:
         return self.file.path
 
+    def metadata(self) -> dict[str, Any] | None:
+        return {"file": self.file}
+
 
 @dataclass(frozen=True)
-class ParsedKubeManifest:
+class ParsedKubeManifest(EngineAwareReturnType):
     filename: str
     found_image_refs: tuple[tuple[int, YamlPath, str], ...]
 
@@ -110,11 +113,10 @@ class ParsedKubeManifest:
         return LogLevel.DEBUG
 
     def message(self) -> str | None:
-        return f"Found {pluralize(len(self.found_image_refs), 'image reference')} in file {self.filename} owned by {self.owner}"
+        return f"Found {pluralize(len(self.found_image_refs), 'image reference')} in file {self.filename}"
 
     def metadata(self) -> dict[str, Any] | None:
         return {
-            "owner": self.owner,
             "filename": self.filename,
             "found_image_refs": self.found_image_refs,
         }
@@ -154,14 +156,10 @@ async def parse_kube_manifest(
 
             image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
-        return ParsedKubeManifest(
-            owner=request.owner, filename=request.file.path, found_image_refs=tuple(image_refs)
-        )
+        return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
     elif result.exit_code == 2:
         # Unrecognised YAML manifests, we complete with an empty list of image references
-        return ParsedKubeManifest(
-            owner=request.owner, filename=request.file.path, found_image_refs=()
-        )
+        return ParsedKubeManifest(filename=request.file.path, found_image_refs=())
     else:
         parser_error = result.stderr.decode("utf-8")
         raise Exception(
