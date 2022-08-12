@@ -7,6 +7,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass
 
+from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
 from pants.backend.helm.resolve.artifacts import ResolvedHelmArtifact
 from pants.backend.helm.resolve.fetch import (
@@ -195,4 +196,10 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
 
 
 def rules():
-    return [*collect_rules(), *sources.rules(), *chart_metadata.rules(), *fetch.rules()]
+    return [
+        *collect_rules(),
+        *sources.rules(),
+        *chart_metadata.rules(),
+        *chart_inference.rules(),
+        *fetch.rules(),
+    ]
