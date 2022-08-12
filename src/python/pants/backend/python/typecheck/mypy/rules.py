@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import shutil
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent
@@ -44,6 +45,7 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, shell_quote
@@ -144,6 +146,7 @@ async def mypy_typecheck_partition(
     mkdir: MkdirBinary,
     cp: CpBinary,
     mv: MvBinary,
+    global_options: GlobalOptions,
 ) -> CheckResult:
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
@@ -319,6 +322,8 @@ async def mypy_typecheck_partition(
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
+        "MYPY_FORCE_COLOR": "1" if global_options.colors else "0",
+        "MYPY_FORCE_TERMINAL_WIDTH": str(shutil.get_terminal_size().columns),
     }
 
     process = await Get(
