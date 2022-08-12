@@ -10,6 +10,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 
 JS_FILE_EXTENSIONS = (".js",)
@@ -40,6 +41,9 @@ class JSSourceTarget(Target):
 
 class JSSourcesGeneratorSourcesField(JSGeneratorSourcesField):
     default = tuple(f"*{ext}" for ext in JS_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['utils.js', 'subdir/*.js', '!ignore_me.js']`"
+    )
 
 
 class JSSourcesGeneratorTarget(TargetFilesGenerator):
