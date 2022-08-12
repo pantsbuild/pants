@@ -151,6 +151,17 @@ class PexFromTargetsRequest:
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.description = description
 
+        if self.internal_only and (self.platforms or self.complete_platforms):
+            raise AssertionError(
+                softwrap(
+                    """
+                    PexFromTargetsRequest set internal_only at the same time as setting
+                    `platforms` and/or `complete_platforms`. Platforms can only be used when
+                    `internal_only=False`.
+                    """
+                )
+            )
+
     def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
         return InterpreterConstraintsRequest(
             addresses=self.addresses,
