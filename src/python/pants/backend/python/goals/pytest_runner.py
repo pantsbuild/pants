@@ -1,7 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -44,6 +47,7 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestContents,
     DigestSubset,
     Directory,
     MergeDigests,
@@ -57,7 +61,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     Target,
     TransitiveTargets,
@@ -162,6 +166,16 @@ class TestSetup:
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+
+_TEST_PATTERN = re.compile(b"def\\s+test_")
+
+
+@rule_helper
+async def _pytest_sources_concurrency(field_set: PythonTestFieldSet) -> int:
+    source_files = await Get(SourceFiles, SourceFilesRequest([field_set.source]))
+    contents = await Get(DigestContents, Digest, source_files.snapshot.digest)
+    return sum([len(_TEST_PATTERN.findall(file.content)) for file in contents])
 
 
 @rule(level=LogLevel.DEBUG)
@@ -325,14 +339,20 @@ async def setup_pytest_for_target(
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
-    use_xdist = pytest.xdist_enabled and not request.is_debug
+
+    xdist_args: tuple[str, ...] = ()
+    xdist_concurrency: int = 0
+    if pytest.xdist_enabled and not request.is_debug:
+        xdist_args = ("-n", "{pants_concurrency}")
+        xdist_concurrency = await _pytest_sources_concurrency(request.field_set)
+
     process = await Get(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
                 *(("-c", pytest.config) if pytest.config else ()),
-                *(("-n", "{pants_concurrency}") if use_xdist else ()),
+                *xdist_args,
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,
@@ -346,7 +366,7 @@ async def setup_pytest_for_target(
                 test_subsystem, pytest
             ),
             execution_slot_variable=pytest.execution_slot_var,
-            concurrency_available=4 if use_xdist else 0,
+            concurrency_available=xdist_concurrency,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,
