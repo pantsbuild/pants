@@ -12,6 +12,7 @@ from pants.backend.helm.subsystems import k8s_parser
 from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
 from pants.backend.helm.testutil import K8S_POD_FILE
 from pants.backend.helm.utils.yaml import YamlPath
+from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, FileContent, FileEntry
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -40,7 +41,8 @@ def test_parser_can_run(rule_runner: RuleRunner) -> None:
     file_entries = rule_runner.request(DigestEntries, [file_digest])
 
     parsed_manifest = rule_runner.request(
-        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
+        ParsedKubeManifest,
+        [ParseKubeManifestRequest(owner=Address("foo"), file=cast(FileEntry, file_entries[0]))],
     )
 
     expected_image_refs = [
@@ -70,7 +72,8 @@ def test_parser_returns_no_image_refs(rule_runner: RuleRunner) -> None:
     file_entries = rule_runner.request(DigestEntries, [file_digest])
 
     parsed_manifest = rule_runner.request(
-        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
+        ParsedKubeManifest,
+        [ParseKubeManifestRequest(owner=Address("foo"), file=cast(FileEntry, file_entries[0]))],
     )
 
     assert len(parsed_manifest.found_image_refs) == 0

@@ -7,6 +7,7 @@ import logging
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Any
 
 from pants.backend.helm.utils.yaml import YamlPath
 from pants.backend.python.goals import lockfile
@@ -24,7 +25,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,19 @@ class ParsedKubeManifest:
     filename: str
     found_image_refs: tuple[tuple[int, YamlPath, str], ...]
 
+    def level(self) -> LogLevel | None:
+        return LogLevel.DEBUG
+
+    def message(self) -> str | None:
+        return f"Found {pluralize(len(self.found_image_refs), 'image reference')} in file {self.filename} owned by {self.owner}"
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "owner": self.owner,
+            "filename": self.filename,
+            "found_image_refs": self.found_image_refs,
+        }
+
 
 @rule(desc="Parse Kubernetes resource manifest")
 async def parse_kube_manifest(
@@ -133,24 +147,27 @@ async def parse_kube_manifest(
                     softwrap(
                         f"""Unexpected output from k8s parser when parsing file {request.file.path}:
 
-                        {line}
-                        """
-                    )
+                    {line}
+                    """
                 )
+            )
 
             image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
-        return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
+        return ParsedKubeManifest(
+            owner=request.owner, filename=request.file.path, found_image_refs=tuple(image_refs)
+        )
     elif result.exit_code == 2:
         # Unrecognised YAML manifests, we complete with an empty list of image references
-        return ParsedKubeManifest(filename=request.file.path, found_image_refs=())
+        return ParsedKubeManifest(
+            owner=request.owner, filename=request.file.path, found_image_refs=()
+        )
     else:
         parser_error = result.stderr.decode("utf-8")
         raise Exception(
             softwrap(
                 f"""
                 Could not parse Kubernetes manifests in file: {request.file.path}.
-
                 {parser_error}
                 """
             )
