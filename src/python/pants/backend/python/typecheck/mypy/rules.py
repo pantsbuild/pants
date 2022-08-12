@@ -245,9 +245,7 @@ async def mypy_typecheck_partition(
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
-        result,
-        partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
-        report=report,
+        result, partition_description=partition.description(), report=report
     )
 
 
