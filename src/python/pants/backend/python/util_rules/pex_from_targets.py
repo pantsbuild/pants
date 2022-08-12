@@ -47,7 +47,7 @@ from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
@@ -357,85 +357,97 @@ class _ConstraintsRepositoryPexRequest:
     repository_pex_request: _RepositoryPexRequest
 
 
+@rule_helper
+async def _determine_requirements_for_pex_from_targets(
+    request: PexFromTargetsRequest, python_setup: PythonSetup
+) -> PexRequirements | PexRequest:
+    if not request.include_requirements:
+        return PexRequirements()
+
+    requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
+    pex_native_subsetting_supported = False
+    if python_setup.enable_resolves:
+        # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
+        # `ChosenPythonResolveRequest` and `_PexRequirementsRequest` should merge and
+        # do a single transitive walk to replace this method.
+        chosen_resolve = await Get(
+            ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+        )
+        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile))
+        pex_native_subsetting_supported = loaded_lockfile.is_pex_native
+        if loaded_lockfile.as_constraints_strings:
+            requirements = dataclasses.replace(
+                requirements,
+                constraints_strings=loaded_lockfile.as_constraints_strings,
+            )
+
+    should_return_entire_lockfile = (
+        python_setup.run_against_entire_lockfile and request.internal_only
+    )
+    should_request_repository_pex = (
+        # The entire lockfile was explicitly requested.
+        should_return_entire_lockfile
+        # The legacy `resolve_all_constraints`+`requirement_constraints` options were used.
+        or (
+            # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as
+            # part of #12314.
+            python_setup.resolve_all_constraints
+            and python_setup.requirement_constraints
+        )
+        # A non-PEX-native lockfile was used, and so we cannot directly subset it from a
+        # LoadedLockfile.
+        or not pex_native_subsetting_supported
+    )
+
+    if not should_request_repository_pex:
+        if not pex_native_subsetting_supported:
+            return requirements
+
+        chosen_resolve = await Get(
+            ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+        )
+        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile))
+        return dataclasses.replace(requirements, from_superset=loaded_lockfile)
+
+    # Else, request the repository PEX and possibly subset it.
+    repository_pex_request = await Get(
+        OptionalPexRequest,
+        _RepositoryPexRequest(
+            request.addresses,
+            hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
+            platforms=request.platforms,
+            complete_platforms=request.complete_platforms,
+            internal_only=request.internal_only,
+            additional_lockfile_args=request.additional_lockfile_args,
+        ),
+    )
+    if should_return_entire_lockfile:
+        if repository_pex_request.maybe_pex_request is None:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    [python].run_against_entire_lockfile was set, but could not find a
+                    lockfile or constraints file for this target set. See
+                    {doc_url('python-third-party-dependencies')} for details.
+                    """
+                )
+            )
+        return repository_pex_request.maybe_pex_request
+
+    repository_pex = await Get(OptionalPex, OptionalPexRequest, repository_pex_request)
+    return dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex)
+
+
 @rule(level=LogLevel.DEBUG)
 async def create_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequest:
-    requirements: PexRequirements | EntireLockfile = PexRequirements()
-    if request.include_requirements:
-        requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
-
-        pex_native_subsetting_supported = False
-        if python_setup.enable_resolves:
-            # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
-            # `ChosenPythonResolveRequest` and `_PexRequirementsRequest` should merge and
-            # do a single transitive walk to replace this method.
-            chosen_resolve = await Get(
-                ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
-            )
-            loaded_lockfile = await Get(
-                LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
-            )
-            pex_native_subsetting_supported = loaded_lockfile.is_pex_native
-            if loaded_lockfile.constraints_strings:
-                requirements = dataclasses.replace(
-                    requirements, constraints_strings=loaded_lockfile.constraints_strings
-                )
-
-        should_return_entire_lockfile = (
-            python_setup.run_against_entire_lockfile and request.internal_only
-        )
-        should_request_repository_pex = (
-            # The entire lockfile was explicitly requested.
-            should_return_entire_lockfile
-            # The legacy `resolve_all_constraints`+`requirement_constraints` options were used.
-            or (
-                # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as
-                # part of #12314.
-                python_setup.resolve_all_constraints
-                and python_setup.requirement_constraints
-            )
-            # A non-PEX-native lockfile was used, and so we cannot subset it.
-            or not pex_native_subsetting_supported
-        )
-
-        if should_request_repository_pex:
-            repository_pex_request = await Get(
-                OptionalPexRequest,
-                _RepositoryPexRequest(
-                    request.addresses,
-                    hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-                    platforms=request.platforms,
-                    complete_platforms=request.complete_platforms,
-                    internal_only=request.internal_only,
-                    additional_lockfile_args=request.additional_lockfile_args,
-                ),
-            )
-            if should_return_entire_lockfile:
-                if repository_pex_request.maybe_pex_request is None:
-                    raise ValueError(
-                        softwrap(
-                            f"""
-                            [python].run_against_entire_lockfile was set, but could not find a
-                            lockfile or constraints file for this target set. See
-                            {doc_url('python-third-party-dependencies')} for details.
-                            """
-                        )
-                    )
-                return repository_pex_request.maybe_pex_request
-
-            repository_pex = await Get(OptionalPex, OptionalPexRequest, repository_pex_request)
-            requirements = dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex)
-        elif python_setup.enable_resolves:
-            # NB: We confirmed above that this is a PEX-native lockfile, so it can be used as a
-            # superset.
-            chosen_resolve = await Get(
-                ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
-            )
-            loaded_lockfile = await Get(
-                LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
-            )
-            requirements = dataclasses.replace(requirements, from_superset=loaded_lockfile)
+    requirements_or_pex_request = await _determine_requirements_for_pex_from_targets(
+        request, python_setup
+    )
+    if isinstance(requirements_or_pex_request, PexRequest):
+        return requirements_or_pex_request
+    requirements = requirements_or_pex_request
 
     interpreter_constraints = await Get(
         InterpreterConstraints,
@@ -443,12 +455,13 @@ async def create_pex_from_targets(
         request.to_interpreter_constraints_request(),
     )
 
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-
     sources_digests = []
     if request.additional_sources:
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
+        transitive_targets = await Get(
+            TransitiveTargets, TransitiveTargetsRequest(request.addresses)
+        )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
     else:
         sources = PythonSourceFiles.empty()
