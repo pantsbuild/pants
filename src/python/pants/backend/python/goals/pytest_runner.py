@@ -1,8 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import annotations
-
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -61,7 +59,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Target,
     TransitiveTargets,
@@ -171,10 +169,7 @@ class TestSetup:
 _TEST_PATTERN = re.compile(b"def\\s+test_")
 
 
-@rule_helper
-async def _pytest_sources_concurrency(field_set: PythonTestFieldSet) -> int:
-    source_files = await Get(SourceFiles, SourceFilesRequest([field_set.source]))
-    contents = await Get(DigestContents, Digest, source_files.snapshot.digest)
+def _count_pytest_tests(contents: DigestContents):
     return sum([len(_TEST_PATTERN.findall(file.content)) for file in contents])
 
 
@@ -340,13 +335,12 @@ async def setup_pytest_for_target(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    xdist_args: tuple[str, ...] = ()
     xdist_concurrency: int = 0
     if pytest.xdist_enabled and not request.is_debug:
-        xdist_args = ("-n", "{pants_concurrency}")
         concurrency = request.field_set.xdist_concurrency.value
         if concurrency is None:
-            concurrency = await _pytest_sources_concurrency(request.field_set)
+            contents = await Get(DigestContents, Digest, field_set_source_files.snapshot.digest)
+            concurrency = _count_pytest_tests(contents)
         xdist_concurrency = concurrency
 
     process = await Get(
@@ -355,7 +349,7 @@ async def setup_pytest_for_target(
             pytest_runner_pex,
             argv=(
                 *(("-c", pytest.config) if pytest.config else ()),
-                *xdist_args,
+                *("-n", "{pants_concurrency}" if xdist_concurrency else "0"),
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,
