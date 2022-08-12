@@ -24,7 +24,8 @@ preserve the local Pants cache:
 
 - `$HOME/.cache/pants/lmdb_store`
 
-However, this directory gets large quickly, and saving and restoring it can become unwieldy.
+However, this directory gets large quickly, so saving and restoring it can become unwieldy. Hence,
+remote caching typically offers the best performance.
 
 See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) for how to change these cache locations.
 
