@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -56,6 +57,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
+    xdist_concurrency: PythonTestsXdistConcurrencyField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

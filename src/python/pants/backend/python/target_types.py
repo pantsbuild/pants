@@ -858,6 +858,23 @@ class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
     pass
 
 
+class PythonTestsXdistConcurrencyField(IntField):
+    alias = "xdist_concurrency"
+    help = softwrap(
+        """
+        Number of CPUs that should be used to run each test file belonging to this target.
+
+        Tests are spread across multiple CPUs using `pytest-xdist`
+        (https://pytest-xdist.readthedocs.io/en/latest/index.html).
+        Use of `pytest-xdist` must be enabled using the `[pytest].xdist_enabled` option for
+        this field to have an effect.
+
+        If `pytest-xdist` is enabled and this field is unset, Pants will attempt to derive
+        the concurrency for test sources by counting the number of tests in each file.
+        """
+    )
+
+
 class SkipPythonTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -869,6 +886,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,

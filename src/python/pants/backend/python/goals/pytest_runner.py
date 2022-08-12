@@ -344,7 +344,10 @@ async def setup_pytest_for_target(
     xdist_concurrency: int = 0
     if pytest.xdist_enabled and not request.is_debug:
         xdist_args = ("-n", "{pants_concurrency}")
-        xdist_concurrency = await _pytest_sources_concurrency(request.field_set)
+        concurrency = request.field_set.xdist_concurrency.value
+        if concurrency is None:
+            concurrency = await _pytest_sources_concurrency(request.field_set)
+        xdist_concurrency = concurrency
 
     process = await Get(
         Process,
