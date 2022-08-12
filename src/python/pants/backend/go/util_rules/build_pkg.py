@@ -328,9 +328,6 @@ async def build_go_package(
             ),
         )
         assert cgo_compile_result is not None
-        await cgo._log_digest_contents(
-            cgo_compile_result.digest, "cgo_compile_result.digest", dump_c_files=True
-        )
         _logger.info(f"cgo_compile_result = {cgo_compile_result}")
         unmerged_input_digests.append(cgo_compile_result.digest)
 

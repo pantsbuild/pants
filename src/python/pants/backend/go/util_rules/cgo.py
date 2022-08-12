@@ -471,18 +471,6 @@ async def _dynimport(
     )
 
 
-@rule_helper
-async def _log_digest_contents(
-    digest: Digest, description: str, dump_c_files: bool = False
-) -> None:
-    contents = await Get(DigestContents, Digest, digest)
-    _logger.info(f"DIGEST: {description}")
-    for entry in sorted(contents, key=lambda x: x.path):
-        _logger.info(f"  PATH: {entry.path}")
-        # if (entry.path.endswith(".c") or entry.path.endswith(".go")) and dump_c_files:
-        #     _logger.info(f"{entry.path}:\n---\n{entry.content.decode()}\n---")
-
-
 def _check_link_args_in_content(src: bytes):
     cgo_ldflag_directive = b"//go:cgo_ldflag"
     idx = src.find(cgo_ldflag_directive)
@@ -662,10 +650,6 @@ async def cgo_compile_request(
         ),
     )
 
-    await _log_digest_contents(
-        cgo_result.output_digest, "from running `go tool cgo`", dump_c_files=True
-    )
-
     out_obj_files: list[str] = []
     oseq = 0
     compile_process_gets = []
@@ -751,7 +735,6 @@ async def cgo_compile_request(
     out_obj_files_digest = await Get(
         Digest, MergeDigests([r.output_digest for r in compile_results])
     )
-    await _log_digest_contents(out_obj_files_digest, "out_obj_files_digest")
 
     # Run dynimport process to create a Go source file named importGo containing
     # //go:cgo_import_dynamic directives for each symbol or library
