@@ -298,6 +298,8 @@ class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
     constraints_file: ResolvePexConstraintsFile | None
+    only_binary: tuple[str, ...]
+    no_binary: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -318,6 +320,17 @@ async def determine_resolve_pex_config(
         sentinel.resolve_name
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
+    )
+
+    no_binary = (
+        python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
+        or []
+    )
+    only_binary = (
+        python_setup.resolves_to_only_binary(all_python_tool_resolve_names).get(
+            request.resolve_name
+        )
+        or []
     )
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -360,7 +373,11 @@ async def determine_resolve_pex_config(
             _constraints_digest, _constraints_file_path, FrozenOrderedSet(constraints)
         )
 
-    return ResolvePexConfig(constraints_file=constraints_file)
+    return ResolvePexConfig(
+        constraints_file=constraints_file,
+        no_binary=tuple(no_binary),
+        only_binary=tuple(only_binary),
+    )
 
 
 def should_validate_metadata(

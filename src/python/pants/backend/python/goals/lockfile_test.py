@@ -14,7 +14,7 @@ from pants.backend.python.goals.lockfile import (
 )
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
 from pants.backend.python.goals.lockfile import setup_user_lockfile_requests
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -110,11 +110,12 @@ def test_poetry_lockfile_generation(rule_runner: RuleRunner) -> None:
 def test_pex_lockfile_generation(
     rule_runner: RuleRunner, no_binary: bool, only_binary: bool
 ) -> None:
-    args = []
+    args = ["--python-resolves={'test': 'foo.lock'}"]
+    no_binary_arg = f"{{'{RESOLVE_OPTION_KEY__DEFAULT}': ['ansicolors']}}"
     if no_binary:
-        args.append("--python-no-binary=ansicolors")
+        args.append(f"--python-resolves-to-no-binary={no_binary_arg}")
     if only_binary:
-        args.append("--python-only-binary=ansicolors")
+        args.append(f"--python-resolves-to-only-binary={no_binary_arg}")
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     lock_entry = json.loads(_generate(rule_runner=rule_runner, use_pex=True))
@@ -161,7 +162,7 @@ def test_constraints_file(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
             "--python-resolves={'test': 'foo.lock'}",
-            "--python-resolves-to-constraints-file={'test': 'constraints.txt'}",
+            f"--python-resolves-to-constraints-file={{'{RESOLVE_OPTION_KEY__DEFAULT}': 'constraints.txt'}}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

@@ -162,18 +162,17 @@ class _PipArgsAndConstraintsSetup:
 
 
 @rule_helper
-async def _setup_pip_args_and_constraints_file(
-    python_setup: PythonSetup, *, resolve_name: str
-) -> _PipArgsAndConstraintsSetup:
+async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
     args = []
     digests = []
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
-    if python_setup.no_binary or python_setup.only_binary:
+    if resolve_config.no_binary or resolve_config.only_binary:
         pip_args_file = "__pip_args.txt"
         args.extend(["-r", pip_args_file])
         pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
-            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
+            [f"--no-binary {pkg}" for pkg in resolve_config.no_binary]
+            + [f"--only-binary {pkg}" for pkg in resolve_config.only_binary]
         )
         pip_args_digest = await Get(
             Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
@@ -202,9 +201,7 @@ async def generate_lockfile(
     requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
 
     if req.use_pex:
-        pip_args_setup = await _setup_pip_args_and_constraints_file(
-            python_setup, resolve_name=req.resolve_name
-        )
+        pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
         requirement_constraints = pip_args_setup.constraints
 
         header_delimiter = "//"
