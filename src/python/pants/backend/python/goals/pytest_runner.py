@@ -325,12 +325,14 @@ async def setup_pytest_for_target(
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
+    use_xdist = pytest.xdist_enabled and not request.is_debug
     process = await Get(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
                 *(("-c", pytest.config) if pytest.config else ()),
+                *(("-n", "{pants_concurrency}") if use_xdist else ()),
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,
@@ -344,6 +346,7 @@ async def setup_pytest_for_target(
                 test_subsystem, pytest
             ),
             execution_slot_variable=pytest.execution_slot_var,
+            concurrency_available=4 if use_xdist else 0,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,

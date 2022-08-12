@@ -288,7 +288,6 @@ def test_xdist_enabled(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, tgt, extra_args=["--pytest-xdist-enabled=True"])
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
     assert "2 passed" in result.stdout
 
 
