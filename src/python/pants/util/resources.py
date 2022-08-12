@@ -3,8 +3,9 @@
 
 
 import importlib
-from importlib import resources
 from itertools import chain
+
+import importlib_resources as resources
 
 
 def read_resource(package_or_module: str, resource: str) -> bytes:
