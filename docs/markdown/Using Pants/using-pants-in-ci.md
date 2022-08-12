@@ -18,9 +18,9 @@ In your CI's config file, we recommend caching these directories:
 - `$HOME/.cache/pants/setup`: The initial bootstrapping of Pants.
 - `$HOME/.cache/pants/named_caches`: Caches used by underlying tools like Pip and PEX.
 
-If you're not using a fine-grained remote caching service, such as the one provided by
-[Toolchain](https://toolchain.com/), the lead sponsor of Pants, then you may also want to
-preserve the local Pants cache:
+If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service, 
+such as the one provided by [Toolchain](https://toolchain.com/), the lead sponsor of Pants, 
+then you may also want to preserve the local Pants cache:
 
 - `$HOME/.cache/pants/lmdb_store`
 

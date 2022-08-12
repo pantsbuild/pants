@@ -34,6 +34,10 @@ Server compatibility
 
 In order to use remote caching or remote execution, Pants will need access to a server that complies with REAPI. Pants is known to work with:
 
+**SaaS**:
+- [Toolchain](https://www.toolchain.com), designed specifically to work seamlessly with Pants.
+
+**Self-hosted**:
 - [BuildBarn](https://github.com/buildbarn/bb-remote-execution)
 - [Buildfarm](https://github.com/bazelbuild/bazel-buildfarm/) 
 - [BuildGrid](https://buildgrid.build/)
