@@ -75,7 +75,7 @@ class PyTest(PythonToolBase):
     # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
-    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
 
     default_main = ConsoleScript("pytest")
 
