@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.dependency_inference.chart import rules as chart_infer_rules
 from pants.backend.helm.target_types import HelmArtifactTarget, HelmChartTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
@@ -39,7 +38,6 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *chart.rules(),
-            *chart_infer_rules(),
             *sources.rules(),
             *tool.rules(),
             *process.rules(),
