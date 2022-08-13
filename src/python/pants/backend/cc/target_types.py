@@ -87,7 +87,7 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = CCSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
+    moved_fields = (CCDependenciesField,)
     help = "Generate a `cc_source` target for each file in the `sources` field."
 
 
