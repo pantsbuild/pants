@@ -33,7 +33,7 @@ from packaging.version import Version
 from reversion import reversion
 
 from pants.util.memo import memoized_property
-from pants.util.strutil import strip_prefix
+from pants.util.strutil import softwrap, strip_prefix
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -1152,11 +1152,16 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 6:
-            formatted_local_files = ", ".join(f.name for f in local_files)
+        if is_cross_platform(local_files) and len(local_files) != 10:
+            formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
-                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}}, "
-                f"but found {formatted_local_files})"
+                softwrap(
+                    f"""
+                    {package.name}. Expected 10 wheels ({{cp37m, cp38, cp39}} x
+                    {{macosx10.15-x86_64, macosx11-x86_64, linux-x86_64}} + cp39-macosx-arm64),
+                    but found {len(local_files)}:\n    {formatted_local_files}
+                    """
+                )
             )
     if missing_packages:
         formatted_missing = "\n  ".join(missing_packages)
