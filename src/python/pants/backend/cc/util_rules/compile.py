@@ -36,14 +36,19 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class FallibleCompiledCCObject:
-    name: str
-    process_result: FallibleProcessResult
+class CompileCCSourceRequest:
+    field_set: CCFieldSet
 
 
 @dataclass(frozen=True)
-class CompileCCSourceRequest:
-    field_set: CCFieldSet
+class CompiledCCObject:
+    digest: Digest
+
+
+@dataclass(frozen=True)
+class FallibleCompiledCCObject:
+    name: str
+    process_result: FallibleProcessResult
 
 
 @rule_helper
@@ -120,7 +125,7 @@ async def compile_cc_source(
     for d in include_directories:
         argv += ["-I", f"{d}/include"]
     # TODO: Testing compilation database - clang only
-    argv += ["-MJ", "compile_commands.json", ""]
+    # argv += ["-MJ", "compile_commands.json", ""]
     argv += ["-c", target_file]
 
     logger.debug(f"Compilation args for {target_file}: {argv}")
@@ -130,7 +135,7 @@ async def compile_cc_source(
             argv=argv,
             input_digest=input_digest,
             description=f"Compile CC source file: {target_file}",
-            output_files=(compiled_object_name,),
+            output_files=("main.o",),
             level=LogLevel.DEBUG,
         ),
     )

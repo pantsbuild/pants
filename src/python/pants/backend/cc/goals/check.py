@@ -38,7 +38,6 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         if _source_file_extension(field_set) in CC_SOURCE_FILE_EXTENSIONS
     ]
 
-    # TODO: Should we pass targets? Or field sets? Or single source files?
     compile_results = await MultiGet(
         Get(FallibleCompiledCCObject, CompileCCSourceRequest(field_set))
         for field_set in source_file_field_sets

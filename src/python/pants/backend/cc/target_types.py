@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -124,13 +125,6 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 #         """
 #     )
 
-
-# class CCBinaryFieldSet(FieldSet):
-#     required_fields = (CCDependenciesField,)
-
-#     dependencies: CCDependenciesField
-
-
 # class CCLibraryTarget(Target):
 #     alias = "cc_library"
 #     core_fields = (
@@ -147,19 +141,16 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 #     )
 
 
-# class CCBinaryTarget(Target):
-#     alias = "cc_binary"
-#     core_fields = (
-#         *COMMON_TARGET_FIELDS,
-#         CCCompileOptionsField,
-#         CCDefinesField,
-#         CCDependenciesField,
-#     )
-#     help = softwrap(
-#         """
-#         TODO
-#         """
-#     )
+class CCBinaryTarget(Target):
+    alias = "cc_binary"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        # CCCompileOptionsField,
+        # CCDefinesField,
+        CCDependenciesField,
+        OutputPathField,
+    )
+    help = "TODO"
 
 
 def rules():
