@@ -82,26 +82,32 @@ def test_cgo_compile(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
             go_mod(name="mod")
-            go_package(name="pkg")
+            go_package(name="pkg", dependencies=["foo:foo"])
             go_binary(name="bin")
             """
             ),
             "go.mod": "module example.pantsbuild.org/cgotest\n",
+            "foo/BUILD": "resource(source='constants.h')\n",
+            "foo/constants.h": "#define NUMBER 2\n",
             "printer.go": dedent(
                 """\
             package main
 
             // /* Define this constant to test passing CFLAGS through to compiler. */
-            // #cgo CFLAGS: -DDEFINE_DO_PRINT
+            // #cgo CFLAGS: -DDEFINE_DO_PRINT -I ${SRCDIR}/foo
             //
             // #include <stdio.h>
             // #include <stdlib.h>
             //
+            // #include "constants.h"
+            //
             // #ifdef DEFINE_DO_PRINT
+            // #ifdef NUMBER
             // void do_print(char * str) {
             //   fputs(str, stdout);
             //   fflush(stdout);
             // }
+            // #endif
             // #endif
             import "C"
             import "unsafe"

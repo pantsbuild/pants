@@ -6,6 +6,7 @@ import dataclasses
 import logging
 import os
 import shlex
+import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
@@ -248,6 +249,41 @@ async def setup_compiler_cmd(
     return SetupCompilerCmdResult(tuple(args))
 
 
+@dataclass(frozen=True)
+class CGoCompilerWrapperScriptRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class CGoCompilerWrapperScript:
+    digest: Digest
+
+
+@rule
+async def make_cgo_compile_wrapper_script(
+    _: CGoCompilerWrapperScriptRequest,
+) -> CGoCompilerWrapperScript:
+    digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    path="wrapper",
+                    content=textwrap.dedent(
+                        """\
+                sandbox_root="$(/bin/pwd)"
+                args=("${@//__SANDBOX_ROOT__/$sandbox_root}")
+                exec "${args[@]}"
+                """
+                    ).encode(),
+                    is_executable=True,
+                )
+            ]
+        ),
+    )
+    return CGoCompilerWrapperScript(digest=digest)
+
+
 @rule_helper
 async def _cc(
     binary_name: str,
@@ -266,13 +302,17 @@ async def _cc(
             binary_path_test=BinaryPathTest(["--version"]),
         ),
     )
-    compiler_args_result, env = await MultiGet(
+    wrapper_script = await Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest())
+    compiler_args_result, env, input_digest = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), work_dir)),
         Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
+        Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
     )
+    replaced_flags = _replace_srcdir_in_flags(flags, work_dir)
     args = [
+        "./wrapper",
         *compiler_args_result.args,
-        *flags,
+        *replaced_flags,
         "-o",
         obj_file,
         "-c",
@@ -534,6 +574,17 @@ async def _ensure_only_allowed_link_args(
         _check_link_args_in_content(entry.content)
 
 
+def _replace_srcdir_in_arg(flag: str, dir_path: str) -> str:
+    if "${SRCDIR}" in flag:
+        return flag.replace("${SRCDIR}", f"__SANDBOX_ROOT__/{dir_path}")
+    else:
+        return flag
+
+
+def _replace_srcdir_in_flags(flags: Iterable[str], dir_path: str) -> tuple[str, ...]:
+    return tuple(_replace_srcdir_in_arg(flag, dir_path) for flag in flags)
+
+
 @rule
 async def cgo_compile_request(
     request: CGoCompileRequest, goroot: GoRoot, golang_subsystem: GolangSubsystem
@@ -592,11 +643,14 @@ async def cgo_compile_request(
     #   absolute path to the directory containing the source file. This allows pre-compiled static libraries
     #   to be included in the package directory and linked properly. For example if package foo is in the
     #   directory /go/src/foo:
-    #
-    # TODO: Ensure that absolute path is used (which means knowing the sandbox path, see -trimpath note below).
-    if any("${SRCDIR}" in flag for flag in flags.ldflags):
-        new_ldflags = tuple(flag.replace("${SRCDIR}", dir_path) for flag in flags.ldflags)
-        flags = dataclasses.replace(flags, ldflags=new_ldflags)
+    flags = CGoCompilerFlags(
+        cflags=_replace_srcdir_in_flags(flags.cflags, dir_path),
+        cppflags=_replace_srcdir_in_flags(flags.cppflags, dir_path),
+        cxxflags=_replace_srcdir_in_flags(flags.cxxflags, dir_path),
+        fflags=_replace_srcdir_in_flags(flags.fflags, dir_path),
+        ldflags=_replace_srcdir_in_flags(flags.ldflags, dir_path),
+        pkg_config=flags.pkg_config,
+    )
 
     go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
     c_files: list[str] = ["_cgo_export.c"]
@@ -647,6 +701,7 @@ async def cgo_compile_request(
             description="Generate Go and C files from CGo files.",
             input_digest=input_digest,
             output_directories=(dir_path, obj_dir_path),
+            replace_sandbox_root_in_args=True,
         ),
     )
 
