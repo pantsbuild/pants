@@ -519,10 +519,10 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 helper.native_binaries_download(),
                 setup_toolchain_auth(),
                 {
-                    "name": f"Run Python tests",
-                    "run": f"./pants test ::\n",
+                    "name": "Run Python tests",
+                    "run": "./pants test ::\n",
                 },
-                helper.upload_log_artifacts(name=f"python-test"),
+                helper.upload_log_artifacts(name="python-test"),
             ],
         }
 
