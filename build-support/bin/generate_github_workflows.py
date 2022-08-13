@@ -501,9 +501,9 @@ class Helper:
 def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
-    def test_python_linux(shard: str) -> dict[str, Any]:
+    def test_python_linux() -> dict[str, Any]:
         return {
-            "name": f"Test Python ({helper.platform_name()}) Shard {shard}",
+            "name": f"Test Python ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "needs": "bootstrap_pants_linux_x86_64",
             "strategy": {"matrix": {"python-version": python_versions}},
@@ -519,10 +519,10 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 helper.native_binaries_download(),
                 setup_toolchain_auth(),
                 {
-                    "name": f"Run Python test shard {shard}",
-                    "run": f"./pants test --shard={shard} ::\n",
+                    "name": f"Run Python tests",
+                    "run": f"./pants test ::\n",
                 },
-                helper.upload_log_artifacts(name=f"python-test-{shard}"),
+                helper.upload_log_artifacts(name=f"python-test"),
             ],
         }
 
@@ -560,9 +560,7 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_linux_x86_64_0": test_python_linux("0/3"),
-        "test_python_linux_x86_64_1": test_python_linux("1/3"),
-        "test_python_linux_x86_64_2": test_python_linux("2/3"),
+        "test_python_linux_x86_64": test_python_linux(),
     }
     if not cron:
         jobs.update(

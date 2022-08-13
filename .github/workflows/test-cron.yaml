@@ -367,9 +367,9 @@ jobs:
         - '3.8'
         - '3.9'
     timeout-minutes: 30
-  test_python_linux_x86_64_0:
+  test_python_linux_x86_64:
     if: github.repository_owner == 'pantsbuild'
-    name: Test Python (Linux-x86_64) Shard 0/3
+    name: Test Python (Linux-x86_64)
     needs: bootstrap_pants_linux_x86_64
     runs-on:
     - ubuntu-20.04
@@ -439,8 +439,8 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Run Python test shard 0/3
-      run: './pants test --shard=0/3 ::
+    - name: Run Python tests
+      run: './pants test ::
 
         '
     - continue-on-error: true
@@ -448,185 +448,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-0_3-Linux-x86_64
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.8'
-        - '3.9'
-    timeout-minutes: 90
-  test_python_linux_x86_64_1:
-    if: github.repository_owner == 'pantsbuild'
-    name: Test Python (Linux-x86_64) Shard 1/3
-    needs: bootstrap_pants_linux_x86_64
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v3
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
-    - if: runner.os == 'Linux'
-      name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
-
-        chmod +x "$HOME/.thrift/thrift"
-
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 1/3
-      run: './pants test --shard=1/3 ::
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants-log-python-test-1_3-Linux-x86_64
-        path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.8'
-        - '3.9'
-    timeout-minutes: 90
-  test_python_linux_x86_64_2:
-    if: github.repository_owner == 'pantsbuild'
-    name: Test Python (Linux-x86_64) Shard 2/3
-    needs: bootstrap_pants_linux_x86_64
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v3
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
-    - if: runner.os == 'Linux'
-      name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
-
-        chmod +x "$HOME/.thrift/thrift"
-
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 2/3
-      run: './pants test --shard=2/3 ::
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants-log-python-test-2_3-Linux-x86_64
+        name: pants-log-python-test-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
