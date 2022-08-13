@@ -18,34 +18,22 @@ In your CI's config file, we recommend caching these directories:
 
 - `$HOME/.cache/pants/setup`<br>
   This is the Pants bootstrap directory. Cache this against the version, as specified
-  in `pants.toml`.  E.g., if using GitHub Actions you can use:
-  ```yaml
-  path: |
-    ~/.cache/pants/setup
-  key: pants-setup-${{ runner.os }}-${{ hashFiles('pants.toml') }}
-  restore-keys: |
-    pants-setup-${{ runner.os }}-${{ hashFiles('pants.toml') }}
-    pants-setup-${{ runner.os }}-
-  ```
+  in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml)
+  repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
 - `$HOME/.cache/pants/named_caches`<br>
   Caches used by some underlying tools.  Cache this against the inputs to those tools.
   For the `pants.backend.python` backend, named caches are used by PEX, and therefore
-  its inputs are your lockfiles. For example:
-  ```yaml
-  path: |
-    ~/.cache/pants/named_caches
-  key: named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python-default.lock') }}
-  restore-keys: |
-    named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python-default.lock') }}
-    named-caches-${{ runner.os }}-${{ hashFiles('pants.toml') }}-
-    named-caches-${{ runner.os }}-
-  ```
+  its inputs are your lockfiles. Again, see [pantsbuild/example-python]([pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml))
+  for an example.
 
 If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service,
 then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`.
-This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')`.
+This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')`
+on GitHub Actions.
+
 Computing such a coarse hash, and saving and restoring large directories, can be unwieldy.
 So this may be impractical and slow on medium and large repos.
+
 A [remote cache service](doc:remote-caching-execution) integrates with Pants's fine-grained
 invalidation and avoids these problems, and is recommended for the best CI performance.
 
