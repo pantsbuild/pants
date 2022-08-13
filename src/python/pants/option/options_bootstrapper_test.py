@@ -399,6 +399,7 @@ class TestOptionsBootstrapper:
                     [cli.alias]
                     pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
                     green = "lint test"
+                    unaliased = "this_should_be_unaliased"
                     """
             )
         )
@@ -408,7 +409,7 @@ class TestOptionsBootstrapper:
             dedent(
                 """\
                     [cli]
-                    alias.add = {green = "lint test --force check"}
+                    alias.add = {green = "lint test --force check", unaliased = -nan}
                     """
             )
         )
@@ -428,7 +429,7 @@ class TestOptionsBootstrapper:
             f"'{config0.as_posix()}','{config1.as_posix()}','{config2.as_posix()}']"
         )
         ob = OptionsBootstrapper.create(
-            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False
+            env={}, args=[config_arg, "pyupgrade", "green", "unaliased"], allow_pantsrc=False
         )
         assert (
             config_arg,
@@ -438,6 +439,7 @@ class TestOptionsBootstrapper:
             "test",
             "--force",
             "check",
+            "unaliased",
         ) == ob.args
         assert (
             "<ignored>",

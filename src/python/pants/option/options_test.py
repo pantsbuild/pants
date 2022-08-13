@@ -1042,6 +1042,17 @@ class OptionsTest(unittest.TestCase):
             flags='--dicty=\'+{"e": "f"}\'',
             expected={**all_args, "e": "f"},
         )
+        check(
+            config_val='+{"c": "d"}',
+            flags="--dicty='+{\"a\": None}'",
+            expected=specified_args,
+        )
+        check(
+            config_val='+{"c": "d", "a": None}',
+            config2_val='+{"c": None}',
+            flags='--dicty=\'+{"e": "f"}\'',
+            expected={"e": "f"},
+        )
 
         # Check that highest rank wins if we have multiple values for the same key.
         check(config_val='+{"a": "b+", "c": "d"}', expected={"a": "b+", "c": "d"})

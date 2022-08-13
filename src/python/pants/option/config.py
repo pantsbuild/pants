@@ -221,8 +221,22 @@ class _ConfigValues:
             return None
 
         def stringify(raw_val: _TomlValue, prefix: str = "") -> str:
+            if isinstance(raw_val, dict):
+                # In the wider options system we use a None value in a dict to mean
+                # "remove this key" (when merging dicts across option sources).
+                # TOML has no none/nil, but it does have nan, which is represented in Python as
+                # float('nan'), and its defining characteristic is that it does not equal anything,
+                # including itself. So we use that as the sentinel value, and turn it into None.
+                #
+                # Note however that the TOML parser currently fails if nan is used as a value in
+                # an inline table, but -nan (which also evaluates to float('nan')) does work.
+                # So until https://github.com/uiri/toml/issues/403 is fixed, you must use -nan
+                # as the sentinel value on the TOML side.
+                raw_val_str = str({k: (None if v != v else v) for (k, v) in raw_val.items()})
+            else:
+                raw_val_str = str(raw_val)
             string_val = self._possibly_interpolate_value(
-                raw_value=str(raw_val),
+                raw_value=raw_val_str,
                 option=option,
                 section=section,
                 section_values=section_values or {},

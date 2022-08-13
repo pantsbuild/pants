@@ -276,6 +276,7 @@ class ListValueComponent:
                       a string representation of a list or tuple (possibly prefixed by + or -
                       indicating modification instead of replacement), or any allowed member_type.
                       May also be a comma-separated sequence of modifications.
+        :param member_type: The expected type of members of the list.
         """
         if isinstance(value, cls):  # Ensure idempotency.
             return value

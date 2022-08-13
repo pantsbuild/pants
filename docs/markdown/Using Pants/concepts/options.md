@@ -254,12 +254,15 @@ will set the value to `[3, 4]`.
 > listopt.remove = [3, 4]
 > ```
 > 
-> But note that this only works in Pants's `.toml` config files, not in environment variables or command-line flags.
+> But note that this `.add`/`.remove` affordance only works in Pants's `.toml` config files,
+> not in environment variables or command-line flags.
 
 Dict values
 -----------
 
-Dict values are parsed as Python dict literals on the command-line and environment variables, so you must quote string keys and values, and you may need to apply shell-level quoting and/or escaping, as required.
+Dict values are parsed as Python dict literals on the command-line and environment variables,
+so you must quote string keys and values, and you may need to apply shell-level quoting and/or
+escaping, as required.
 
 ### Command-line flags:
 
@@ -275,7 +278,8 @@ PANTS_SCOPE_DICTOPT="{'foo':1,'bar':2}"
 
 ### Config file entries:
 
-You can use TOML's [nested table features](https://toml.io/en/v1.0.0#inline-table). These are equivalent:
+You can use TOML's [nested table features](https://toml.io/en/v1.0.0#inline-table).
+These are equivalent:
 
 ```toml pants.toml
 [scope]
@@ -300,22 +304,50 @@ dictopt = """{
 
 ### Add/replace semantics
 
-- A value can be preceded by `+`, which will _update_ the value obtained from lower-precedence sources with the entries.
-- Otherwise, the value _replaces_ the one obtained from lower-precendence sources. 
+- A dict literal can be preceded by `+`, which will _update_ the dict value obtained from
+  lower-precedence sources with this literal's entries. If an entry's value is `None`,
+  then the key will be _deleted_ from the value obtained from lower-precedence sources, if present.
+- Otherwise, the dict literal value _replaces_ the one obtained from lower-precendence sources.
 
-For example, if the value of `--dictopt` in `scope` is set to `{'foo', 1, 'bar': 2}` in a config file, then 
+For example, if the value of `--dictopt` in `scope` is set to
+`{'foo': 1, 'bar': 2, 'baz': 3}` in a config file, then
 
 ```bash
-./pants --scope-dictopt="+{'foo':42,'baz':3}"
+./pants --scope-dictopt="+{'foo': 42, 'baz': None}"
 ```
 
-will set the value to `{'foo': 42, 'bar': 2, 'baz': 3}`, and 
+will set the value to `{'foo': 42, 'bar': 2}`, and
 
 ```bash
-./pants --scope-dictopt="{'foo':42,'baz':3}"
+./pants --scope-dictopt="{'foo': 42, 'baz': 3}"
 ```
 
 will set the value to `{'foo': 42, 'baz': 3}`.
+
+> 📘 Add syntax in .toml files
+>
+> The + syntax works in .toml files, but the entire value must be quoted:
+>
+> ```toml pants.toml
+> [scope]
+> dictopt = "+{'foo':42,'baz':3,'qux':None}"
+> ```
+>
+> This means that TOML treats the value as a string, instead of a TOML table.
+>
+> Alternatively, you can use this syntactic sugar, which allows the values to be regular TOML tables:
+>
+> ```toml pants.toml
+> [scope]
+> dictopt.add = {foo = 42, baz = 3, qux = -nan}
+> ```
+>
+> TOML has no none/nil value. So to remove keys, use the value `-nan`.
+>
+> Note that this `.add` affordance only works in Pants's `.toml` config files,
+> not in environment variables or command-line flags.
+
+
 
 Reading individual option values from files
 ===========================================

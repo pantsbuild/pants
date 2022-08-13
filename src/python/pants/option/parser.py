@@ -641,8 +641,8 @@ class Parser:
         ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
         def group(value_component_type, process_val_func) -> list[RankedValue]:
-            # We group any values that are merged together, so that the history can reflect
-            # merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
+            # We group any list/dict values that are merged together, so that the history can
+            # reflect merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
             # and then replace it with [d, e], the history will contain:
             #   - [d, e] (from command-line flag)
             #   - [a, b, c] (from env var, from config)
@@ -673,7 +673,13 @@ class Parser:
 
             historic_ranked_vals = group(ListValueComponent, process_list)
         elif is_dict_option(kwargs):
-            historic_ranked_vals = group(DictValueComponent, lambda x: x)
+
+            def process_dict(dct):
+                # A None value is used to imply removal of a key in an EXTEND operation.
+                # We can only apply this logic here, after all merging has been processed.
+                return {k: v for (k, v) in dct.items() if v is not None}
+
+            historic_ranked_vals = group(DictValueComponent, process_dict)
         else:
             historic_ranked_vals = ranked_vals
 

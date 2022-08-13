@@ -206,7 +206,7 @@ class _ListOptionBase(
     _OptionBase["tuple[_ListMemberT, ...]", "tuple[_ListMemberT, ...]"],
     Generic[_ListMemberT],
 ):
-    """Descriptor base for a  subsystem option of  ahomogenous list of some type.
+    """Descriptor base for a  subsystem option of a homogenous list of some type.
 
     Don't use this class directly, instead use one of the conrete classes below.
 

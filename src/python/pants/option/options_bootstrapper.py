@@ -167,6 +167,9 @@ class OptionsBootstrapper:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
             alias_vals = post_bootstrap_config.get("cli", "alias")
             val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
+            # The options system uses None as a sentinel for "delete this key" when merging option
+            # values across sources. We bypass that mechanism, so we must filter ourselves here.
+            val = {k: v for (k, v) in val.items() if v is not None}
             alias = CliAlias.from_dict(val)
 
             args = alias.expand_args(tuple(args))

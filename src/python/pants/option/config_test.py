@@ -137,7 +137,7 @@ FILE_1 = ConfigFile(
         [dict_merging]
         dict1.add = {zz = "99"}
         dict2 = "+{'a': 'xx', 'bb': '22'}"
-        dict3.add = {cc = "33", dd = "44"}
+        dict3.add = {cc = "33", dd = "44", bb = -nan}
         dict4 = {ee = "55"}
         """
     ),
@@ -158,7 +158,7 @@ FILE_1 = ConfigFile(
         "dict_merging": {
             "dict1": "+{'zz': '99'}",
             "dict2": "+{'a': 'xx', 'bb': '22'}",
-            "dict3": "+{'cc': '33', 'dd': '44'}",
+            "dict3": "+{'cc': '33', 'dd': '44', 'bb': None}",
             "dict4": "{'ee': '55'}",
         },
     },
@@ -196,7 +196,7 @@ _expected_combined_values: dict[str, dict[str, list[str]]] = {
     "dict_merging": {
         "dict1": ["{}", "+{'zz': '99'}"],
         "dict2": ["{'a': '1', 'b': '2'}", "+{'a': 'xx', 'bb': '22'}"],
-        "dict3": ["+{'c': '3', 'd': '4'}", "+{'cc': '33', 'dd': '44'}"],
+        "dict3": ["+{'c': '3', 'd': '4'}", "+{'cc': '33', 'dd': '44', 'bb': None}"],
         "dict4": ["{'e': '5'}", "{'ee': '55'}"],
     },
 }
