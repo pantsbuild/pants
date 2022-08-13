@@ -35,7 +35,7 @@ npm install rdme
 ### Log in.
 
 ```
-npx rdme login --2fa
+npx rdme login --project pants --2fa
 ```
 
 (the `--2fa` flag makes `rdme` prompt for 2fa codes, which is necessary if you have TOTP 2fa set up on your account)
