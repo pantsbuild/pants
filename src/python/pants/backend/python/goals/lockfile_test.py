@@ -73,14 +73,13 @@ def _generate(
             //
             // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
             // {{
-            //   "version": 3,
+            //   "version": 2,
             //   "valid_for_interpreter_constraints": [],
             //   "generated_with_requirements": [
             //     "ansicolors{ansicolors_version}"
-            //   ],
-            """
+            //   ]"""
         )
-        + requirement_constraints_str
+        # + requirement_constraints_str
         + dedent(
             """
             // }

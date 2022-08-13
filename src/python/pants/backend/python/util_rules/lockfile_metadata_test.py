@@ -55,14 +55,13 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 3,
+#   "version": 2,
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
 #   ],
 #   "generated_with_requirements": [
 #     "ansicolors==0.1.0"
-#   ],
-#   "requirement_constraints": []
+#   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 dave==3.1.4 \\
