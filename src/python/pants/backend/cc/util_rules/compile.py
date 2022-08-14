@@ -12,13 +12,8 @@ from pants.backend.cc.dependency_inference.rules import (
     CCDependencyInferenceFieldSet,
     InferCCDependenciesRequest,
 )
-from pants.backend.cc.subsystems.toolchain import CCSubsystem, CCToolchain
-from pants.backend.cc.target_types import (
-    CC_HEADER_FILE_EXTENSIONS,
-    CPP_SOURCE_FILE_EXTENSIONS,
-    CCDependenciesField,
-    CCFieldSet,
-)
+from pants.backend.cc.subsystems.toolchain import CCToolchain, CCToolchainRequest
+from pants.backend.cc.target_types import CC_HEADER_FILE_EXTENSIONS, CCDependenciesField, CCFieldSet
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
@@ -92,11 +87,8 @@ def _extract_include_directories(inferred_source_files: SourceFiles) -> list[str
     return [file.split("/inc")[0] for file in inferred_header_files if "/inc" in file]
 
 
-# TODO: Probably should pull subsystem defines into toolchain - so the toolchain is self-sufficient
 @rule(desc="Compile CC source with the current toolchain")
-async def compile_cc_source(
-    subsystem: CCSubsystem, toolchain: CCToolchain, request: CompileCCSourceRequest
-) -> FallibleCompiledCCObject:
+async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiledCCObject:
 
     # Gather all required source files and dependencies
     target_source_file = await Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
@@ -114,31 +106,28 @@ async def compile_cc_source(
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
 
-    if PurePath(target_file).suffix in CPP_SOURCE_FILE_EXTENSIONS:
-        compiler = toolchain.cpp
-        compiler_options = list(subsystem.cpp_compile_options)
-    else:
-        compiler = toolchain.c
-        compiler_options = list(subsystem.c_compile_options)
+    toolchain = await Get(CCToolchain, CCToolchainRequest(target_file))
 
-    argv = [compiler, *compiler_options]
+    argv = list(toolchain.compile_argv)
     for d in include_directories:
         argv += ["-I", f"{d}/include"]
     # TODO: Testing compilation database - clang only
     # argv += ["-MJ", "compile_commands.json", ""]
-    argv += ["-c", target_file]
+    argv += ["-c", target_file, "-o", compiled_object_name]
 
-    logger.debug(f"Compilation args for {target_file}: {argv}")
+    logger.warning(f"Compilation args for {target_file}: {argv}")
     compile_result = await Get(
         FallibleProcessResult,
         Process(
             argv=argv,
             input_digest=input_digest,
             description=f"Compile CC source file: {target_file}",
-            output_files=("main.o",),
+            output_files=(compiled_object_name,),
             level=LogLevel.DEBUG,
+            env={"__PANTS_CC_COMPILER_FINGERPRINT": toolchain.compiler.fingerprint},
         ),
     )
+    logger.warning(compile_result.stderr)
     return FallibleCompiledCCObject(compiled_object_name, compile_result)
 
 

@@ -6,10 +6,15 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable
 
+from typing_extensions import Literal
+
+from pants.backend.cc.target_types import CPP_SOURCE_FILE_EXTENSIONS
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
+    BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
@@ -111,18 +116,45 @@ class CCSubsystem(Subsystem):
     )
 
 
+# TODO: What's a good way to grab the compiler (filename or target language) and linker (... language of compiled objects?)
+@dataclass(frozen=True)
+class CCToolchainRequest:
+    filename: str | None = None
+    language: Literal["c", "c++"] | None = None
+
+
 @dataclass(frozen=True)
 class CCToolchain:
     """A configured C/C++ toolchain for the current platform."""
 
-    c: str
-    cpp: str
-    # ld: str
-    # ar: str
+    compiler: BinaryPath
+    compile_flags: tuple[str, ...] = ()
+    compile_defines: tuple[str, ...] = ()
+    link_flags: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        # TODO: Should this error out to notify the user of a mistake? Or silently handle
+        # Or just ensure all defines have -D right now?
+        if self.compile_defines:
+            sanitized_defines = [define.lstrip("-D") for define in self.compile_defines]
+            object.__setattr__(self, "compile_defines", tuple(sanitized_defines))
+
+    @property
+    def compile_argv(self) -> tuple[str, ...]:
+        return (
+            self.compiler.path,
+            "-v",
+            *self.compile_defines,
+            *self.compile_flags,
+        )
+
+    @property
+    def link_argv(self) -> tuple[str, ...]:
+        return (self.compiler.path, "-v", *self.link_flags)
 
 
 @rule_helper
-async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> str:
+async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> BinaryPath:
     for name in binary_names:
         binary_paths = await Get(
             BinaryPaths,
@@ -135,13 +167,13 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
 
         if not binary_paths or not binary_paths.first_path:
             continue
-        return binary_paths.first_path.path
+        return binary_paths.first_path
 
     raise BinaryNotFoundError(f"Could not find any of '{binary_names}' in any of {search_paths}.")
 
 
 @rule(desc="Setup the CC Toolchain", level=LogLevel.DEBUG)
-async def setup_gcc_toolchain(subsystem: CCSubsystem) -> CCToolchain:
+async def setup_cc_toolchain(subsystem: CCSubsystem, request: CCToolchainRequest) -> CCToolchain:
     # Sanitize the search paths in case the "<PATH>" is specified
     raw_search_paths = list(subsystem.search_paths)
     if "<PATH>" in raw_search_paths:
@@ -152,10 +184,22 @@ async def setup_gcc_toolchain(subsystem: CCSubsystem) -> CCToolchain:
 
     search_paths = tuple(OrderedSet(raw_search_paths))
 
-    c_executable = await _executable_path(tuple(subsystem.c_executable), search_paths)
-    cpp_executable = await _executable_path(tuple(subsystem.cpp_executable), search_paths)
-
-    return CCToolchain(c=c_executable, cpp=cpp_executable)
+    # Populate the toolchain for C or C++ accordingly
+    filename = request.filename or ""
+    if request.language == "c++" or PurePath(filename).suffix in CPP_SOURCE_FILE_EXTENSIONS:
+        cpp_executable = await _executable_path(tuple(subsystem.cpp_executable), search_paths)
+        return CCToolchain(
+            cpp_executable,
+            compile_flags=tuple(subsystem.cpp_compile_options),
+            compile_defines=tuple(subsystem.cpp_defines),
+        )
+    else:
+        c_executable = await _executable_path(tuple(subsystem.c_executable), search_paths)
+        return CCToolchain(
+            c_executable,
+            compile_flags=tuple(subsystem.c_compile_options),
+            compile_defines=tuple(subsystem.c_defines),
+        )
 
 
 def rules() -> Iterable[Rule | UnionRule]:

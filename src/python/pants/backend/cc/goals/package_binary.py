@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
-from pants.backend.cc.subsystems.toolchain import CCSubsystem, CCToolchain
 from pants.backend.cc.target_types import CCDependenciesField, CCFieldSet
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
 from pants.backend.cc.util_rules.link import LinkCCBinaryRequest, LinkedCCBinary
@@ -40,8 +39,6 @@ class CCBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(level=LogLevel.DEBUG)
 async def package_cc_binary(
-    subsystem: CCSubsystem,
-    toolchain: CCToolchain,
     field_set: CCBinaryFieldSet,
 ) -> BuiltPackage:
     # Grab all dependency targets for this binary (i.e. CCSourceTarget(s) + CCLibraryTarget(s))
