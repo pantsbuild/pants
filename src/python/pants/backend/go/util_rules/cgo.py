@@ -22,7 +22,12 @@ from pants.backend.go.util_rules.cgo_security import check_linker_flags
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.system_binaries import BinaryPath, BinaryPathTest
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BashBinaryRequest,
+    BinaryPath,
+    BinaryPathTest,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -302,6 +307,7 @@ async def _cc(
             binary_path_test=BinaryPathTest(["--version"]),
         ),
     )
+    bash = await Get(BashBinary, BashBinaryRequest())
     wrapper_script = await Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest())
     compiler_args_result, env, input_digest = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), work_dir)),
@@ -310,6 +316,7 @@ async def _cc(
     )
     replaced_flags = _replace_srcdir_in_flags(flags, work_dir)
     args = [
+        bash.path,
         "./wrapper",
         *compiler_args_result.args,
         *replaced_flags,
