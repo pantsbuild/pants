@@ -159,6 +159,8 @@ class _PipArgsAndConstraintsSetup:
     args: tuple[str, ...]
     digest: Digest
     constraints: FrozenOrderedSet[PipRequirement]
+    only_binary: set[str]
+    no_binary: set[str]
 
 
 @rule_helper
@@ -187,7 +189,13 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
         constraints = resolve_config.constraints_file.constraints
 
     input_digest = await Get(Digest, MergeDigests(digests))
-    return _PipArgsAndConstraintsSetup(tuple(args), input_digest, constraints)
+    return _PipArgsAndConstraintsSetup(
+        tuple(args),
+        input_digest,
+        constraints,
+        only_binary=resolve_config.only_binary,
+        no_binary=resolve_config.no_binary,
+    )
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
@@ -199,10 +207,14 @@ async def generate_lockfile(
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
+    only_binary = set()
+    no_binary = set()
 
     if req.use_pex:
         pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
         requirement_constraints = pip_args_setup.constraints
+        only_binary = pip_args_setup.only_binary
+        no_binary = pip_args_setup.no_binary
 
         header_delimiter = "//"
         result = await Get(
@@ -306,6 +318,8 @@ async def generate_lockfile(
         valid_for_interpreter_constraints=req.interpreter_constraints,
         requirements={PipRequirement.parse(i) for i in req.requirements},
         requirement_constraints=set(requirement_constraints),
+        only_binary=only_binary,
+        no_binary=no_binary,
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
