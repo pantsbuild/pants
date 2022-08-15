@@ -194,20 +194,9 @@ async def generate_lockfile(
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
 ) -> GenerateLockfileResult:
-    requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
-    only_binary: tuple[str, ...] = ()
-    no_binary: tuple[str, ...] = ()
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
     if req.use_pex:
-        pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
-        requirement_constraints = (
-            pip_args_setup.resolve_config.constraints_file.constraints
-            if pip_args_setup.resolve_config.constraints_file
-            else FrozenOrderedSet()
-        )
-        only_binary = pip_args_setup.resolve_config.only_binary
-        no_binary = pip_args_setup.resolve_config.no_binary
-
         header_delimiter = "//"
         result = await Get(
             ProcessResult,
@@ -303,13 +292,17 @@ async def generate_lockfile(
         )
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
-    # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=req.interpreter_constraints,
+        # TODO(#12314) Improve error message on `Requirement.parse`
         requirements={PipRequirement.parse(i) for i in req.requirements},
-        requirement_constraints=set(requirement_constraints),
-        only_binary=set(only_binary),
-        no_binary=set(no_binary),
+        requirement_constraints=(
+            set(pip_args_setup.resolve_config.constraints_file.constraints)
+            if pip_args_setup.resolve_config.constraints_file
+            else set()
+        ),
+        only_binary=set(pip_args_setup.resolve_config.only_binary),
+        no_binary=set(pip_args_setup.resolve_config.no_binary),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
