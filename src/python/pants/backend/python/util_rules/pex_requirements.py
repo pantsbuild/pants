@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -297,25 +298,62 @@ class ResolvePexConstraintsFile:
 class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
+    indexes: tuple[str, ...]
+    find_links: tuple[str, ...]
+    manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
     only_binary: tuple[str, ...]
     no_binary: tuple[str, ...]
 
+    def indexes_and_find_links_and_manylinux_pex_args(self) -> Iterator[str]:
+        # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
+        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
+        # case. Why set `--no-pypi`, then? We need to do this so that
+        # `[python-repos].indexes = ['custom_url']` will only point to that index and not include
+        # PyPI.
+        yield "--no-pypi"
+        yield from (f"--index={index}" for index in self.indexes)
+        yield from (f"--find-links={repo}" for repo in self.find_links)
+
+        if self.manylinux:
+            yield "--manylinux"
+            yield self.manylinux
+        else:
+            yield "--no-manylinux"
+
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
-    """Find all configuration from `[python]` that impacts how the resolve is created."""
+    """Find all configuration from `[python]` that impacts how the resolve is created.
 
-    resolve_name: str
+    If `resolve_name` is None, then most per-resolve options will be ignored because there is no way
+    for users to configure them. However, some options like `[python-repos].indexes` will still be
+    loaded.
+    """
+
+    resolve_name: str | None
 
     def debug_hint(self) -> str:
-        return self.resolve_name
+        return self.resolve_name or "<no resolve>"
 
 
 @rule
 async def determine_resolve_pex_config(
-    request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
+    request: ResolvePexConfigRequest,
+    python_setup: PythonSetup,
+    python_repos: PythonRepos,
+    union_membership: UnionMembership,
 ) -> ResolvePexConfig:
+    if request.resolve_name is None:
+        return ResolvePexConfig(
+            indexes=python_repos.indexes,
+            find_links=python_repos.repos,
+            manylinux=python_setup.manylinux,
+            constraints_file=None,
+            no_binary=(),
+            only_binary=(),
+        )
+
     all_python_tool_resolve_names = tuple(
         sentinel.resolve_name
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)
@@ -374,6 +412,9 @@ async def determine_resolve_pex_config(
         )
 
     return ResolvePexConfig(
+        indexes=python_repos.indexes,
+        find_links=python_repos.repos,
+        manylinux=python_setup.manylinux,
         constraints_file=constraints_file,
         no_binary=tuple(no_binary),
         only_binary=tuple(only_binary),

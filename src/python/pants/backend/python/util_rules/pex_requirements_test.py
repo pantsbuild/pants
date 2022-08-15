@@ -136,7 +136,10 @@ def test_validate_tool_lockfiles(
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
         ResolvePexConfig(
-            ResolvePexConstraintsFile(
+            indexes=(),
+            find_links=(),
+            manylinux=None,
+            constraints_file=ResolvePexConstraintsFile(
                 EMPTY_DIGEST,
                 "c.txt",
                 FrozenOrderedSet(
@@ -242,7 +245,10 @@ def test_validate_user_lockfiles(
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
         ResolvePexConfig(
-            ResolvePexConstraintsFile(
+            indexes=(),
+            find_links=(),
+            manylinux=None,
+            constraints_file=ResolvePexConstraintsFile(
                 EMPTY_DIGEST,
                 "c.txt",
                 FrozenOrderedSet(

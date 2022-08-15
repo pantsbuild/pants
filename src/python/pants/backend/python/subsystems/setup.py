@@ -6,7 +6,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, Iterator, List, Optional, TypeVar, cast
+from typing import Iterable, List, Optional, TypeVar, cast
 
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
@@ -733,14 +733,6 @@ class PythonSetup(Subsystem):
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
-
-    @property
-    def manylinux_pex_args(self) -> Iterator[str]:
-        if self.manylinux:
-            yield "--manylinux"
-            yield self.manylinux
-        else:
-            yield "--no-manylinux"
 
     @property
     def scratch_dir(self):

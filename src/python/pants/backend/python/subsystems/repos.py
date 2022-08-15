@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Iterator
-
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
@@ -42,13 +40,3 @@ class PythonRepos(Subsystem):
         ),
         advanced=True,
     )
-
-    @property
-    def pex_args(self) -> Iterator[str]:
-        # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
-        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
-        # case. Why set `--no-pypi`, then? We need to do this so that
-        # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
-        yield "--no-pypi"
-        yield from (f"--index={index}" for index in self.indexes)
-        yield from (f"--repo={repo}" for repo in self.repos)
