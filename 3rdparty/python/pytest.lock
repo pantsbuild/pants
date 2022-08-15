@@ -4,7 +4,7 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 3,
+//   "version": 2,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<3.10,>=3.7"
 //   ],
@@ -17,8 +17,7 @@
 //     "pytest-icdiff",
 //     "pytest-xdist<3,>=2.5",
 //     "pytest==7.0.1"
-//   ],
-//   "requirement_constraints": []
+//   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
