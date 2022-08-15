@@ -94,8 +94,11 @@ class Deploy(Goal):
 class _PublishProcessesForTargetRequest:
     target: Target
 
+
 @rule
-async def publish_process_for_target(request: _PublishProcessesForTargetRequest) -> PublishProcesses:
+async def publish_process_for_target(
+    request: _PublishProcessesForTargetRequest,
+) -> PublishProcesses:
     package_field_sets, publish_field_sets = await MultiGet(
         Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [request.target])),
         Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PublishFieldSet, [request.target])),
@@ -109,11 +112,11 @@ async def publish_process_for_target(request: _PublishProcessesForTargetRequest)
         ),
     )
 
+
 @rule_helper
 async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
     processes_per_target = await MultiGet(
-        Get(PublishProcesses, _PublishProcessesForTargetRequest(target))
-        for target in targets
+        Get(PublishProcesses, _PublishProcessesForTargetRequest(target)) for target in targets
     )
 
     return PublishProcesses(chain.from_iterable(processes_per_target))
