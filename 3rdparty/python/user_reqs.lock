@@ -4,7 +4,7 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 3,
+//   "version": 2,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<3.10,>=3.7"
 //   ],
@@ -41,8 +41,7 @@
 //     "types-toml==0.10.8",
 //     "typing-extensions==4.3.0",
 //     "uvicorn[standard]==0.17.6"
-//   ],
-//   "requirement_constraints": []
+//   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
