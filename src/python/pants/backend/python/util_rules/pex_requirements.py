@@ -324,7 +324,12 @@ class ResolvePexConfig:
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
-    """Find all configuration from `[python]` that impacts how the resolve is created."""
+    """Find all configuration from `[python]` that impacts how the resolve is created.
+
+    If `resolve_name` is None, then most per-resolve options will be ignored because there is no
+    way for users to configure them. However, some options like `[python-repos].indexes` will still
+    be loaded.
+    """
 
     resolve_name: str | None
 

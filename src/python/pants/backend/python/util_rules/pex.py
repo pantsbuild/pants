@@ -410,9 +410,9 @@ async def _setup_pex_requirements(
     elif isinstance(request.requirements.from_superset, LoadedLockfile):
         resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
     else:
-        # This implies that, currently, per-resolve options are only configurable for lockfiles. If
-        # no resolve is specified, we will still load options that apply to every resolve, like
-        # `[python-repos]`.
+        # This implies that, currently, per-resolve options are only configurable for resolves.
+        # However, if no resolve is specified, we will still load options that apply to every
+        # resolve, like `[python-repos].indexes`.
         resolve_name = None
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
