@@ -149,10 +149,10 @@ async def parse_kube_manifest(
                     softwrap(
                         f"""Unexpected output from k8s parser when parsing file {request.file.path}:
 
-                    {line}
-                    """
+                        {line}
+                        """
+                    )
                 )
-            )
 
             image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
