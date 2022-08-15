@@ -871,6 +871,8 @@ class PythonTestsXdistConcurrencyField(IntField):
 
         If `pytest-xdist` is enabled and this field is unset, Pants will attempt to derive
         the concurrency for test sources by counting the number of tests in each file.
+
+        Set this field to `0` to explicitly disable use of `pytest-xdist` for a target.
         """
     )
 

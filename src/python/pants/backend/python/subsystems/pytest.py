@@ -173,6 +173,10 @@ class PyTest(PythonToolBase):
             """
             If true, Pants will use `pytest-xdist` (https://pytest-xdist.readthedocs.io/en/latest/)
             to parallelize tests within each `python_test` target.
+
+            NOTE: Enabling `pytest-xdist` can cause high-level scoped fixtures (for example `session`)
+            to execute more than once. See the `pytest-xdist` docs for more info:
+            https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once
             """
         ),
     )

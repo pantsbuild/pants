@@ -328,6 +328,28 @@ def test_xdist_enabled_noninteractive(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
+def test_xdist_enabled_but_disabled_for_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": dedent(
+                """\
+                import os
+
+                def test_worker_id_not_set():
+                  assert "PYTEST_XDIST_WORKER" not in os.environ
+
+                def test_worker_count_not_set():
+                  assert "PYTEST_XDIST_WORKER_COUNT" not in os.environ
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_tests(xdist_concurrency=0)",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(rule_runner, tgt, extra_args=["--pytest-xdist-enabled"])
+    assert result.exit_code == 0
+
+
 def test_xdist_enabled_interactive(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
