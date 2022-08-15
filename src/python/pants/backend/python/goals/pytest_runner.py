@@ -170,7 +170,7 @@ _TEST_PATTERN = re.compile(b"def\\s+test_")
 
 
 def _count_pytest_tests(contents: DigestContents) -> int:
-    return sum([len(_TEST_PATTERN.findall(file.content)) for file in contents])
+    return sum(len(_TEST_PATTERN.findall(file.content)) for file in contents)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -335,7 +335,7 @@ async def setup_pytest_for_target(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    xdist_concurrency: int = 0
+    xdist_concurrency = 0
     if pytest.xdist_enabled and not request.is_debug:
         concurrency = request.field_set.xdist_concurrency.value
         if concurrency is None:

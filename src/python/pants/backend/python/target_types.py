@@ -862,7 +862,7 @@ class PythonTestsXdistConcurrencyField(IntField):
     alias = "xdist_concurrency"
     help = softwrap(
         """
-        Number of CPUs that should be used to run each test file belonging to this target.
+        Maximum number of CPUs to allocate to run each test file belonging to this target.
 
         Tests are spread across multiple CPUs using `pytest-xdist`
         (https://pytest-xdist.readthedocs.io/en/latest/index.html).
