@@ -23,7 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1935,12 +1935,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if isinstance(resolved_value, bool):
             # Is `process_cleanup`.
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="--process-cleanup",
-                hint="Instead, use `--keep-sandboxes`.",
-            )
-            return KeepSandboxes.never if resolved_value else KeepSandboxes.always
+            return KeepSandboxes.always if resolved_value else KeepSandboxes.on_failure
         elif isinstance(resolved_value, KeepSandboxes):
             return resolved_value
         else:
@@ -2036,6 +2031,16 @@ class GlobalOptionsFlags:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))
+
+
+@dataclass(frozen=True)
+class ProcessCleanupOption:
+    """A wrapper around the global option `process_cleanup`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool
 
 
 @dataclass(frozen=True)
