@@ -1089,7 +1089,7 @@ class BootstrapOptions:
         "--process-cleanup",
         default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
         deprecation_start_version="2.15.0.dev1",
-        removal_version="2.16.0.dev1",
+        removal_version="2.17.0.dev1",
         removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """
@@ -1989,11 +1989,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if isinstance(resolved_value, bool):
             # Is `process_cleanup`.
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="--process-cleanup",
-                hint="Instead, use `--keep-sandboxes`.",
-            )
             return KeepSandboxes.never if resolved_value else KeepSandboxes.always
         elif isinstance(resolved_value, KeepSandboxes):
             return resolved_value
@@ -2090,6 +2085,16 @@ class GlobalOptionsFlags:
                     flags.add(f"--no-{flag[2:]}")
 
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))
+
+
+@dataclass(frozen=True)
+class ProcessCleanupOption:
+    """A wrapper around the global option `process_cleanup`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool
 
 
 @dataclass(frozen=True)
