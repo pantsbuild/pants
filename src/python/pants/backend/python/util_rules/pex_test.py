@@ -263,7 +263,9 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
-    requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
+    requirements = PexRequirements(
+        ["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"], resolve_name=None
+    )
     pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
@@ -283,7 +285,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps)
+        rule_runner, requirements=PexRequirements(direct_deps, resolve_name=None)
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -298,7 +300,9 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"constraints.txt": "\n".join(constraints)})
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
-        requirements=PexRequirements(direct_deps, constraints_strings=constraints),
+        requirements=PexRequirements(
+            direct_deps, constraints_strings=constraints, resolve_name=None
+        ),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     )
     assert_direct_requirements(constrained_pex_info)
@@ -419,7 +423,7 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_data = create_pex_and_get_all_data(
         rule_runner,
-        requirements=PexRequirements(["cryptography==2.9"]),
+        requirements=PexRequirements(["cryptography==2.9"], resolve_name=None),
         platforms=platforms,
         interpreter_constraints=constraints,
         internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
@@ -483,7 +487,9 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     pex = create_pex_and_get_all_data(
         rule_runner,
         pex_type=pex_type,
-        requirements=PexRequirements(["requests==2.23.0"], constraints_strings=constraints),
+        requirements=PexRequirements(
+            ["requests==2.23.0"], constraints_strings=constraints, resolve_name=None
+        ),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     ).pex
     dists = rule_runner.request(PexResolveInfo, [pex])
@@ -631,9 +637,12 @@ def test_setup_pex_requirements() -> None:
     pip_args = [*pex_args, "--resolver-version", "pip-2020-resolver"]
 
     # Normal resolves.
-    assert_setup(PexRequirements(reqs), _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2))
     assert_setup(
-        PexRequirements(reqs, constraints_strings=["constraint"]),
+        PexRequirements(reqs, resolve_name=None),
+        _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2),
+    )
+    assert_setup(
+        PexRequirements(reqs, constraints_strings=["constraint"], resolve_name=None),
         _BuildPexRequirementsSetup(
             [constraints_digest], [*reqs, *pip_args, "--constraints", "__constraints.txt"], 2
         ),
@@ -656,7 +665,9 @@ def test_setup_pex_requirements() -> None:
 
     # Subset of Pex lockfile.
     assert_setup(
-        PexRequirements(["req1"], from_superset=create_loaded_lockfile(is_pex_lock=True)),
+        PexRequirements(
+            ["req1"], from_superset=create_loaded_lockfile(is_pex_lock=True), resolve_name="resolve"
+        ),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
         ),
@@ -666,7 +677,9 @@ def test_setup_pex_requirements() -> None:
     repository_pex_digest = rule_runner.make_snapshot_of_empty_files(["foo.pex"]).digest
     assert_setup(
         PexRequirements(
-            ["req1"], from_superset=Pex(digest=repository_pex_digest, name="foo.pex", python=None)
+            ["req1"],
+            from_superset=Pex(digest=repository_pex_digest, name="foo.pex", python=None),
+            resolve_name=None,
         ),
         _BuildPexRequirementsSetup(
             [repository_pex_digest], ["req1", "--pex-repository", "foo.pex"], 1
@@ -691,28 +704,35 @@ def test_build_pex_description() -> None:
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
-    assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(from_superset=repo_pex), description="Custom!", expected="Custom!"
-    )
-
-    assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(from_superset=repo_pex), expected="Building new.pex")
-
-    assert_description(
-        PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
+        PexRequirements(resolve_name=None), description="Custom!", expected="Custom!"
     )
     assert_description(
-        PexRequirements(["req"], from_superset=repo_pex),
+        PexRequirements(from_superset=repo_pex, resolve_name=None),
+        description="Custom!",
+        expected="Custom!",
+    )
+
+    assert_description(PexRequirements(resolve_name=None), expected="Building new.pex")
+    assert_description(
+        PexRequirements(from_superset=repo_pex, resolve_name=None), expected="Building new.pex"
+    )
+
+    assert_description(
+        PexRequirements(["req"], resolve_name=None),
+        expected="Building new.pex with 1 requirement: req",
+    )
+    assert_description(
+        PexRequirements(["req"], from_superset=repo_pex, resolve_name=None),
         expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
     assert_description(
-        PexRequirements(["req1", "req2"]),
+        PexRequirements(["req1", "req2"], resolve_name=None),
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"], from_superset=repo_pex),
+        PexRequirements(["req1", "req2"], from_superset=repo_pex, resolve_name=None),
         expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 

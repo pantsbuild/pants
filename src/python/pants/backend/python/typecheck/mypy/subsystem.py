@@ -210,7 +210,9 @@ class MyPy(PythonToolBase):
     ) -> PexRequest:
         requirements: PexRequirements | EntireLockfile
         if self.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
-            requirements = PexRequirements(self.extra_type_stubs)
+            requirements = PexRequirements(
+                self.extra_type_stubs, resolve_name=MyPyExtraTypeStubsLockfileSentinel.resolve_name
+            )
         else:
             tool_lockfile = ToolCustomLockfile(
                 file_path=self.extra_type_stubs_lockfile,

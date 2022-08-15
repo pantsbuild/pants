@@ -229,6 +229,7 @@ class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
     req_strings: FrozenOrderedSet[str]
+    resolve_name: str | None
     constraints_strings: FrozenOrderedSet[str]
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
@@ -239,35 +240,55 @@ class PexRequirements:
         self,
         req_strings: Iterable[str] = (),
         *,
+        resolve_name: str | None,
         constraints_strings: Iterable[str] = (),
         from_superset: Pex | LoadedLockfile | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
+        :param resolve_name: Used to load resolve-specific config like
+          `[python].resolves_to_indexes`. Thus, the resolve_name must be set for most PEXes to be
+          built, or else the relevant config will not be set.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
         """
         self.req_strings = FrozenOrderedSet(sorted(req_strings))
+        self.resolve_name = resolve_name
         self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
-        if isinstance(from_superset, LoadedLockfile) and not from_superset.is_pex_native:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    The lockfile {from_superset.original_lockfile} was not in PEX's
-                    native format, and so cannot be directly used as a superset.
-                    """
-                )
-            )
         self.from_superset = from_superset
+
+        if isinstance(from_superset, LoadedLockfile):
+            if not from_superset.is_pex_native:
+                raise ValueError(
+                    softwrap(
+                        f"""
+                        The lockfile {from_superset.original_lockfile} was not in PEX's
+                        native format, and so cannot be directly used as a superset.
+                        """
+                    )
+                )
+            if resolve_name != from_superset.original_lockfile.resolve_name:
+                raise ValueError(
+                    softwrap(
+                        f"""
+                        PexRequirements.resolve_name must match
+                        PexRequirements.from_superset.original_lockfile.resolve_name: {self}
+                        """
+                    )
+                )
 
     @classmethod
     def create_from_requirement_fields(
         cls,
         fields: Iterable[PythonRequirementsField],
+        *,
+        resolve_name: str | None,
         constraints_strings: Iterable[str],
     ) -> PexRequirements:
         field_requirements = {str(python_req) for field in fields for python_req in field.value}
-        return PexRequirements(field_requirements, constraints_strings=constraints_strings)
+        return PexRequirements(
+            field_requirements, constraints_strings=constraints_strings, resolve_name=resolve_name
+        )
 
     @classmethod
     def req_strings_from_requirement_fields(
@@ -275,7 +296,9 @@ class PexRequirements:
     ) -> FrozenOrderedSet[str]:
         """A convenience when you only need the raw requirement strings from fields and don't need
         to consider things like constraints or resolves."""
-        return cls.create_from_requirement_fields(fields, constraints_strings=()).req_strings
+        return cls.create_from_requirement_fields(
+            fields, resolve_name=None, constraints_strings=()
+        ).req_strings
 
     def __bool__(self) -> bool:
         return bool(self.req_strings)

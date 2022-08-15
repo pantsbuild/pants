@@ -149,7 +149,7 @@ class PexRequest(EngineAwareParameter):
         internal_only: bool,
         layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
-        requirements: PexRequirements | EntireLockfile = PexRequirements(),
+        requirements: PexRequirements | EntireLockfile = PexRequirements(resolve_name=None),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         complete_platforms=CompletePlatforms(),
@@ -404,16 +404,11 @@ class _BuildPexRequirementsSetup:
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
-    resolve_name: str | None
-    if isinstance(request.requirements, EntireLockfile):
-        resolve_name = request.requirements.lockfile.resolve_name
-    elif isinstance(request.requirements.from_superset, LoadedLockfile):
-        resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
-    else:
-        # This implies that, currently, per-resolve options are only configurable for resolves.
-        # However, if no resolve is specified, we will still load options that apply to every
-        # resolve, like `[python-repos].indexes`.
-        resolve_name = None
+    resolve_name = (
+        request.requirements.lockfile.resolve_name
+        if isinstance(request.requirements, EntireLockfile)
+        else request.requirements.resolve_name
+    )
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
     pex_lock_resolver_args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())

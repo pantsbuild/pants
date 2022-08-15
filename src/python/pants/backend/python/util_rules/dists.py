@@ -94,7 +94,7 @@ async def find_build_system(request: BuildSystemRequest, setuptools: Setuptools)
                 raise InvalidBuildConfigError(
                     f"No requires found in the [build-system] table in {file_content.path}"
                 )
-            ret = BuildSystem(PexRequirements(requires), build_backend)
+            ret = BuildSystem(PexRequirements(requires, resolve_name=None), build_backend)
     # Per PEP 517: "If the pyproject.toml file is absent, or the build-backend key is missing,
     #   the source tree is not using this specification, and tools should revert to the legacy
     #   behaviour of running setup.py."

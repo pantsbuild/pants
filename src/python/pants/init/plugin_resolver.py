@@ -56,6 +56,7 @@ async def resolve_plugins(
     requirements = PexRequirements(
         req_strings=sorted(global_options.plugins),
         constraints_strings=(str(constraint) for constraint in request.constraints),
+        resolve_name=None,
     )
     if not requirements:
         return ResolvedPluginDistributions()
