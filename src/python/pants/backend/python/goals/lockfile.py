@@ -162,13 +162,15 @@ class _PipArgsAndConstraintsSetup:
 
 
 @rule_helper
-async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
+async def _setup_pip_args_and_constraints_file(
+    resolve_name: str, *, use_pex: bool
+) -> _PipArgsAndConstraintsSetup:
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
     args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
     digests = []
 
-    if resolve_config.no_binary or resolve_config.only_binary:
+    if use_pex and (resolve_config.no_binary or resolve_config.only_binary):
         pip_args_file = "__pip_args.txt"
         args.extend(["-r", pip_args_file])
         pip_args_file_content = "\n".join(
@@ -180,7 +182,7 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
         )
         digests.append(pip_args_digest)
 
-    if resolve_config.constraints_file:
+    if use_pex and resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
 
@@ -194,7 +196,9 @@ async def generate_lockfile(
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
 ) -> GenerateLockfileResult:
-    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+    pip_args_setup = await _setup_pip_args_and_constraints_file(
+        req.resolve_name, use_pex=req.use_pex
+    )
 
     if req.use_pex:
         header_delimiter = "//"
