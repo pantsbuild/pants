@@ -113,6 +113,10 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
         argv += ["-I", f"{d}/include"]
     # TODO: Testing compilation database - clang only
     # argv += ["-MJ", "compile_commands.json", ""]
+    # Apply target compile options and defines
+
+    argv += request.field_set.compile_flags.value or []
+    argv += request.field_set.defines.value or []
     argv += ["-c", target_file, "-o", compiled_object_name]
 
     logger.warning(f"Compilation args for {target_file}: {argv}")

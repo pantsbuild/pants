@@ -18,33 +18,35 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class LinkCCBinaryRequest:
-    """Link a CC binary from object files."""
+class LinkCCObjectsRequest:
+    """Link CC objects into a library or executable."""
 
     input_digest: Digest
     output_name: str
-    # flags, options
+    link_type: str | None = None
 
 
 @dataclass(frozen=True)
-class LinkedCCBinary:
-    """A linked CC binary stored in a `Digest`."""
+class LinkedCCObjects:
+    """A linked CC library/binary stored in a `Digest`."""
 
     digest: Digest
 
 
-@rule(desc="Create an executable from object files")
-async def link_cc_binary(request: LinkCCBinaryRequest) -> LinkedCCBinary:
+@rule(desc="Create a library or executable from object files")
+async def link_cc_objects(request: LinkCCObjectsRequest) -> LinkedCCObjects:
 
     # Get object files in digest
     snapshot = await Get(Snapshot, Digest, request.input_digest)
 
     # TODO: Determine language from files or passed in
-    toolchain = await Get(CCToolchain, CCToolchainRequest(language="c++"))
+    toolchain = await Get(CCToolchain, CCToolchainRequest(language="c"))
 
     argv = list(toolchain.link_argv) + ["-o", request.output_name, *snapshot.files]
+    if request.link_type:
+        argv += [f"-{str(request.link_type)}"]
 
-    logger.debug(f"Linker args for {request.output_name}: {argv}")
+    logger.error(f"Linker args for {request.output_name}: {argv}")
     link_result = await Get(
         FallibleProcessResult,
         Process(
@@ -58,7 +60,7 @@ async def link_cc_binary(request: LinkCCBinaryRequest) -> LinkedCCBinary:
     )
     logger.warning(link_result.stderr)
 
-    return LinkedCCBinary(link_result.output_digest)
+    return LinkedCCObjects(link_result.output_digest)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

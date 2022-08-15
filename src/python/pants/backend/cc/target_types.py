@@ -13,10 +13,13 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
+    StringField,
+    StringSequenceField,
     Target,
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.util.strutil import softwrap
 
 # Using the extensions referenced in C++ Core Guidelines FAQ
 # https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
@@ -49,6 +52,8 @@ class CCFieldSet(FieldSet):
     required_fields = (CCSourceField,)
 
     sources: CCSourceField
+    compile_flags: CCCompileFlagsField
+    defines: CCDefinesField
 
 
 @dataclass(frozen=True)
@@ -63,10 +68,32 @@ class CCGeneratorFieldSet(FieldSet):
 # -----------------------------------------------------------------------------------------------
 
 
+class CCCompileFlagsField(StringSequenceField):
+    alias = "compile_flags"
+    help = softwrap(
+        """
+        Flags passed to the compiler.
+        These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
+        """
+    )
+
+
+class CCDefinesField(StringSequenceField):
+    alias = "defines"
+    help = softwrap(
+        """
+        A list of strings to define in the preprocessor. Will be prefixed by -D at the command line.
+        These defines are merged with the toolchain-level defines, with target-level definitions taking precedence.
+        """
+    )
+
+
 class CCSourceTarget(Target):
     alias = "cc_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        CCCompileFlagsField,
+        CCDefinesField,
         CCDependenciesField,
         CCSourceField,
     )
@@ -88,7 +115,11 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = CCSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (CCDependenciesField,)
+    moved_fields = (
+        CCCompileFlagsField,
+        CCDefinesField,
+        CCDependenciesField,
+    )
     help = "Generate a `cc_source` target for each file in the `sources` field."
 
 
@@ -97,57 +128,46 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-# class CCCompileOptionsField(StringSequenceField):
-#     alias = "compile_options"
-#     help = softwrap(
-#         """
-#         Flags passed to the compiler.
-#         These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
-#         """
-#     )
+class CCLinkTypeField(StringField):
+    alias = "link_type"
+    default = "shared"
+    valid_choices = ("shared", "static")
+    help = "How are libraries linked"
 
 
-# class CCDefinesField(StringSequenceField):
-#     alias = "defines"
-#     help = softwrap(
-#         """
-#         A list of strings to define in the preprocessor. Will be prefixed by -D at the command line.
-#         These defines are merged with the toolchain-level defines, with target-level definitions taking precedence.
-#         """
-#     )
+class CCLinkFlagsField(StringSequenceField):
+    alias = "link_flags"
+    help = "TODO"
 
 
-# class CCHeadersField(StringSequenceField):
-#     alias = "headers"
-#     help = softwrap(
-#         """
-#         Public headers which are made available to dependent targets.
-#         """
-#     )
+class CCHeadersField(Dependencies):
+    alias = "headers"
+    help = softwrap(
+        """
+        Public headers which are made available to dependent targets.
+        """
+    )
 
-# class CCLibraryTarget(Target):
-#     alias = "cc_library"
-#     core_fields = (
-#         *COMMON_TARGET_FIELDS,
-#         CCCompileOptionsField,
-#         CCDefinesField,
-#         CCDependenciesField,
-#         CCHeadersField,
-#     )
-#     help = softwrap(
-#         """
-#         TODO
-#         """
-#     )
+
+class CCLibraryTarget(Target):
+    alias = "cc_library"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CCDependenciesField,
+        CCHeadersField,
+        # CCLinkFlagsField,
+        CCLinkTypeField,
+        OutputPathField,
+    )
+    help = "TODO"
 
 
 class CCBinaryTarget(Target):
     alias = "cc_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        # CCCompileOptionsField,
-        # CCDefinesField,
         CCDependenciesField,
+        # CCLinkFlagsField,
         OutputPathField,
     )
     help = "TODO"
