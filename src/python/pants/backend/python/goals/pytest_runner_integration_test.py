@@ -267,7 +267,11 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--pytest-version=pytest>=4.6.6,<4.7", "--pytest-lockfile=<none>"]
+    extra_args = [
+        "--pytest-version=pytest>=4.6.6,<4.7",
+        "--pytest-extra-requirements=[]",
+        "--pytest-lockfile=<none>",
+    ]
 
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
