@@ -17,7 +17,6 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
@@ -403,19 +402,29 @@ class _BuildPexRequirementsSetup:
 
 @rule_helper
 async def _setup_pex_requirements(
-    request: PexRequest, python_repos: PythonRepos, python_setup: PythonSetup
+    request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
-    pex_lock_resolver_args = list(python_repos.pex_args)
-    pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
+    resolve_name: str | None
+    if isinstance(request.requirements, EntireLockfile):
+        resolve_name = request.requirements.lockfile.resolve_name
+    elif isinstance(request.requirements.from_superset, LoadedLockfile):
+        resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
+    else:
+        # This implies that, currently, per-resolve options are only configurable for lockfiles. If
+        # no resolve is specified, we will still load options that apply to every resolve, like
+        # `[python-repos]`.
+        resolve_name = None
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+
+    pex_lock_resolver_args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
+    pip_resolver_args = [
+        *resolve_config.indexes_and_find_links_and_manylinux_pex_args(),
+        "--resolver-version",
+        "pip-2020-resolver",
+    ]
 
     if isinstance(request.requirements, EntireLockfile):
-        lockfile, resolve_config = await MultiGet(
-            Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)),
-            Get(
-                ResolvePexConfig,
-                ResolvePexConfigRequest(request.requirements.lockfile.resolve_name),
-            ),
-        )
+        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
         argv = (
             ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
             if lockfile.is_pex_native
@@ -454,10 +463,6 @@ async def _setup_pex_requirements(
         loaded_lockfile = request.requirements.from_superset
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
-        resolve_config = await Get(
-            ResolvePexConfig,
-            ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
-        )
         if not request.requirements.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
 
@@ -503,7 +508,6 @@ async def _setup_pex_requirements(
 async def build_pex(
     request: PexRequest,
     python_setup: PythonSetup,
-    python_repos: PythonRepos,
     platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
 ) -> BuildPexResult:
@@ -512,7 +516,6 @@ async def build_pex(
         "--output-file",
         request.output_filename,
         "--no-emit-warnings",
-        *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
 
@@ -535,7 +538,7 @@ async def build_pex(
     )
 
     # Include any additional arguments and input digests required by the requirements.
-    requirements_setup = await _setup_pex_requirements(request, python_repos, python_setup)
+    requirements_setup = await _setup_pex_requirements(request, python_setup)
     argv.extend(requirements_setup.argv)
 
     merged_digest = await Get(

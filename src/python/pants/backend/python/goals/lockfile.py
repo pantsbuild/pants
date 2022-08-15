@@ -156,18 +156,17 @@ def maybe_warn_python_repos(
 
 @dataclass(frozen=True)
 class _PipArgsAndConstraintsSetup:
+    resolve_config: ResolvePexConfig
     args: tuple[str, ...]
     digest: Digest
-    constraints: FrozenOrderedSet[PipRequirement]
-    only_binary: tuple[str, ...]
-    no_binary: tuple[str, ...]
 
 
 @rule_helper
 async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
-    args = []
-    digests = []
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+
+    args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
+    digests = []
 
     if resolve_config.no_binary or resolve_config.only_binary:
         pip_args_file = "__pip_args.txt"
@@ -181,21 +180,12 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
         )
         digests.append(pip_args_digest)
 
-    constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
-    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
     if resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
-        constraints = resolve_config.constraints_file.constraints
 
     input_digest = await Get(Digest, MergeDigests(digests))
-    return _PipArgsAndConstraintsSetup(
-        tuple(args),
-        input_digest,
-        constraints,
-        only_binary=resolve_config.only_binary,
-        no_binary=resolve_config.no_binary,
-    )
+    return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
@@ -203,8 +193,6 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-    python_repos: PythonRepos,
-    python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
     only_binary: tuple[str, ...] = ()
@@ -212,9 +200,13 @@ async def generate_lockfile(
 
     if req.use_pex:
         pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
-        requirement_constraints = pip_args_setup.constraints
-        only_binary = pip_args_setup.only_binary
-        no_binary = pip_args_setup.no_binary
+        requirement_constraints = (
+            pip_args_setup.resolve_config.constraints_file.constraints
+            if pip_args_setup.resolve_config.constraints_file
+            else FrozenOrderedSet()
+        )
+        only_binary = pip_args_setup.resolve_config.only_binary
+        no_binary = pip_args_setup.resolve_config.no_binary
 
         header_delimiter = "//"
         result = await Get(
@@ -245,8 +237,6 @@ async def generate_lockfile(
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     *pip_args_setup.args,
-                    *python_repos.pex_args,
-                    *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
                     *req.requirements,
                 ),

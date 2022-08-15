@@ -14,7 +14,6 @@ from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
@@ -599,11 +598,7 @@ def test_setup_pex_requirements() -> None:
         )
         result = run_rule_with_mocks(
             _setup_pex_requirements,
-            rule_args=[
-                request,
-                create_subsystem(PythonRepos, indexes=[], repos=[]),
-                create_subsystem(PythonSetup),
-            ],
+            rule_args=[request, create_subsystem(PythonSetup)],
             mock_gets=[
                 MockGet(
                     LoadedLockfile,
@@ -614,6 +609,9 @@ def test_setup_pex_requirements() -> None:
                     ResolvePexConfig,
                     ResolvePexConfigRequest,
                     lambda _: ResolvePexConfig(
+                        indexes=("custom-index",),
+                        find_links=("custom-find-links",),
+                        manylinux=None,
                         constraints_file=None,
                         only_binary=(),
                         no_binary=(),
@@ -624,8 +622,13 @@ def test_setup_pex_requirements() -> None:
         )
         assert result == expected
 
-    pip_args = ["--no-pypi", "--resolver-version", "pip-2020-resolver"]
-    pex_args = ["--no-pypi"]
+    pex_args = [
+        "--no-pypi",
+        "--index=custom-index",
+        "--find-links=custom-find-links",
+        "--no-manylinux",
+    ]
+    pip_args = [*pex_args, "--resolver-version", "pip-2020-resolver"]
 
     # Normal resolves.
     assert_setup(PexRequirements(reqs), _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2))
