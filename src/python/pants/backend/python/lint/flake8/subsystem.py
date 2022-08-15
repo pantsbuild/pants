@@ -46,6 +46,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    FileListOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -95,6 +96,14 @@ class Flake8(PythonToolBase):
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
             """
+        ),
+    )
+    extra_files = FileListOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """Paths to extra files to include in the sandbox. This can be useful for Flake8 plugins,
+            like including config files for the `flake8-bandit` plugin."""
         ),
     )
     config_discovery = BoolOption(

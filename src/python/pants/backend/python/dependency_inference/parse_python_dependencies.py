@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import PythonSourceField
@@ -16,6 +15,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.resources import read_resource
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class ParserScript:
 
 @rule
 async def parser_script() -> ParserScript:
-    script = pkgutil.get_data(__name__, "scripts/dependency_parser.py")
+    script = read_resource(__name__, "scripts/dependency_parser_py")
     assert script is not None
     return ParserScript(
         await Get(Digest, CreateDigest([FileContent("__parse_python_dependencies.py", script)]))
