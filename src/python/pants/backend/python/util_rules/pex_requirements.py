@@ -298,6 +298,8 @@ class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
     constraints_file: ResolvePexConstraintsFile | None
+    only_binary: tuple[str, ...]
+    no_binary: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -318,6 +320,17 @@ async def determine_resolve_pex_config(
         sentinel.resolve_name
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
+    )
+
+    no_binary = (
+        python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
+        or []
+    )
+    only_binary = (
+        python_setup.resolves_to_only_binary(all_python_tool_resolve_names).get(
+            request.resolve_name
+        )
+        or []
     )
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -360,7 +373,11 @@ async def determine_resolve_pex_config(
             _constraints_digest, _constraints_file_path, FrozenOrderedSet(constraints)
         )
 
-    return ResolvePexConfig(constraints_file=constraints_file)
+    return ResolvePexConfig(
+        constraints_file=constraints_file,
+        no_binary=tuple(no_binary),
+        only_binary=tuple(only_binary),
+    )
 
 
 def should_validate_metadata(
@@ -379,7 +396,7 @@ def validate_metadata(
     lockfile: Lockfile | LockfileContent,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
-    constraints_file: ResolvePexConstraintsFile | None,
+    resolve_config: ResolvePexConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
@@ -391,7 +408,13 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
-        requirement_constraints=constraints_file.constraints if constraints_file else set(),
+        requirement_constraints=(
+            resolve_config.constraints_file.constraints
+            if resolve_config.constraints_file
+            else set()
+        ),
+        only_binary=resolve_config.only_binary,
+        no_binary=resolve_config.no_binary,
     )
     if validation:
         return
@@ -402,7 +425,9 @@ def validate_metadata(
         lockfile=lockfile,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
-        maybe_constraints_file_path=(constraints_file.path if constraints_file else None),
+        maybe_constraints_file_path=(
+            resolve_config.constraints_file.path if resolve_config.constraints_file else None
+        ),
     )
     is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
     msg_iter = (
@@ -416,13 +441,32 @@ def validate_metadata(
     logger.warning("%s", msg)
 
 
-def _stale_constraints_file_error(file_path: str) -> str:
-    return softwrap(
-        f"""
-        - The constraints file at {file_path} has changed from when the lockfile was generated.
-        (Constraints files are set via the option `[python].resolves_to_constraints_file`)
-        """
-    )
+def _common_failure_reasons(
+    failure_reasons: set[InvalidPythonLockfileReason], maybe_constraints_file_path: str | None
+) -> Iterator[str]:
+    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in failure_reasons:
+        assert maybe_constraints_file_path is not None
+        yield softwrap(
+            f"""
+            - The constraints file at {maybe_constraints_file_path} has changed from when the
+            lockfile was generated. (Constraints files are set via the option
+            `[python].resolves_to_constraints_file`)
+            """
+        )
+    if InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `only_binary` arguments have changed from when the lockfile was generated.
+            (`only_binary` is set via the option `[python].resolves_to_only_binary`)
+            """
+        )
+    if InvalidPythonLockfileReason.NO_BINARY_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `no_binary` arguments have changed from when the lockfile was generated.
+            (`no_binary` is set via the option `[python].resolves_to_no_binary`)
+            """
+        )
 
 
 def _invalid_tool_lockfile_error(
@@ -506,9 +550,7 @@ def _invalid_tool_lockfile_error(
         )
         yield "\n\n"
 
-    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
-        assert maybe_constraints_file_path is not None
-        yield _stale_constraints_file_error(maybe_constraints_file_path)
+    yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield softwrap(
         f"""
@@ -586,9 +628,7 @@ def _invalid_user_lockfile_error(
             """
         ) + "\n\n"
 
-    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
-        assert maybe_constraints_file_path is not None
-        yield _stale_constraints_file_error(maybe_constraints_file_path)
+    yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(

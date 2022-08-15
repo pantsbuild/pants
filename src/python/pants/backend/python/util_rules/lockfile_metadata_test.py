@@ -33,6 +33,8 @@ def test_metadata_header_round_trip() -> None:
         ),
         requirements=reqset("ansicolors==0.1.0"),
         requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -74,7 +76,9 @@ dave==3.1.4 \\
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints([">=3.7"]),
         requirements=reqset("ansicolors==0.1.0"),
-        requirement_constraints=set(),
+        requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     result = metadata.add_header_to_lockfile(
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
@@ -158,6 +162,8 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 interpreter_universe=INTERPRETER_UNIVERSE,
                 user_requirements=set(),
                 requirement_constraints=set(),
+                only_binary=set(),
+                no_binary=set(),
             )
         )
         == matches
@@ -231,7 +237,11 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
     for m in [
         PythonLockfileMetadataV2(InterpreterConstraints(lock_ics), reqset(*lock_reqs)),
         PythonLockfileMetadataV3(
-            InterpreterConstraints(lock_ics), reqset(*lock_reqs), requirement_constraints=set()
+            InterpreterConstraints(lock_ics),
+            reqset(*lock_reqs),
+            requirement_constraints=set(),
+            only_binary=set(),
+            no_binary=set(),
         ),
     ]:
         result = m.is_valid_for(
@@ -241,14 +251,21 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             interpreter_universe=INTERPRETER_UNIVERSE,
             user_requirements=reqset(*user_reqs),
             requirement_constraints=set(),
+            only_binary=set(),
+            no_binary=set(),
         )
         assert result.failure_reasons == set(expected)
 
 
 @pytest.mark.parametrize("is_tool", [True, False])
-def test_is_valid_for_requirement_constraints(is_tool: bool) -> None:
+def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
     result = PythonLockfileMetadataV3(
-        InterpreterConstraints([]), reqset(), requirement_constraints={PipRequirement.parse("c1")}
+        InterpreterConstraints([]),
+        reqset(),
+        # Everything below is new to v3+.
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     ).is_valid_for(
         is_tool=is_tool,
         expected_invalidation_digest="",
@@ -256,5 +273,11 @@ def test_is_valid_for_requirement_constraints(is_tool: bool) -> None:
         interpreter_universe=INTERPRETER_UNIVERSE,
         user_requirements=reqset(),
         requirement_constraints={PipRequirement.parse("c2")},
+        only_binary={"not-bdist"},
+        no_binary={"not-sdist"},
     )
-    assert result.failure_reasons == {InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH}
+    assert result.failure_reasons == {
+        InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
+        InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH,
+        InvalidPythonLockfileReason.NO_BINARY_MISMATCH,
+    }

@@ -430,7 +430,7 @@ async def _setup_pex_requirements(
                 lockfile.original_lockfile,
                 request.requirements.complete_req_strings,
                 python_setup,
-                resolve_config.constraints_file,
+                resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -468,7 +468,7 @@ async def _setup_pex_requirements(
                 loaded_lockfile.original_lockfile,
                 request.requirements.req_strings,
                 python_setup,
-                resolve_config.constraints_file,
+                resolve_config,
             )
 
         return _BuildPexRequirementsSetup(

@@ -13,6 +13,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
+    ResolvePexConfig,
     ResolvePexConstraintsFile,
     ToolCustomLockfile,
     ToolDefaultLockfile,
@@ -31,6 +32,8 @@ METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
     {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
     requirement_constraints={PipRequirement.parse("abc")},
+    only_binary={"bdist"},
+    no_binary={"sdist"},
 )
 
 
@@ -80,13 +83,16 @@ def test_invalid_lockfile_behavior_option() -> None:
 
 
 @pytest.mark.parametrize(
-    "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,uses_source_plugins,uses_project_ic",
+    "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,"
+    + "invalid_only_binary,invalid_no_binary,uses_source_plugins,uses_project_ic",
     [
         (
             is_default_lock,
             invalid_reqs,
             invalid_interpreter_constraints,
             invalid_constraints_file,
+            invalid_only_binary,
+            invalid_no_binary,
             source_plugins,
             project_ics,
         )
@@ -94,6 +100,8 @@ def test_invalid_lockfile_behavior_option() -> None:
         for invalid_reqs in (True, False)
         for invalid_interpreter_constraints in (True, False)
         for invalid_constraints_file in (True, False)
+        for invalid_only_binary in (True, False)
+        for invalid_no_binary in (True, False)
         for source_plugins in (True, False)
         for project_ics in (True, False)
         if (invalid_reqs or invalid_interpreter_constraints or invalid_constraints_file)
@@ -104,6 +112,8 @@ def test_validate_tool_lockfiles(
     invalid_reqs: bool,
     invalid_interpreter_constraints: bool,
     invalid_constraints_file: bool,
+    invalid_only_binary: bool,
+    invalid_no_binary: bool,
     uses_source_plugins: bool,
     uses_project_ic: bool,
     caplog,
@@ -125,10 +135,16 @@ def test_validate_tool_lockfiles(
         requirements,
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
-        constraints_file=ResolvePexConstraintsFile(
-            EMPTY_DIGEST,
-            "c.txt",
-            FrozenOrderedSet({PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}),
+        ResolvePexConfig(
+            ResolvePexConstraintsFile(
+                EMPTY_DIGEST,
+                "c.txt",
+                FrozenOrderedSet(
+                    {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
+                ),
+            ),
+            no_binary=("not-sdist" if invalid_no_binary else "sdist",),
+            only_binary=("not-bdist" if invalid_only_binary else "bdist",),
         ),
     )
 
@@ -157,6 +173,8 @@ def test_validate_tool_lockfiles(
     )
 
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
+    contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
+    contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
 
     contains(
         "To generate a custom lockfile based on your current configuration", if_=is_default_lock
@@ -167,19 +185,35 @@ def test_validate_tool_lockfiles(
 
 
 @pytest.mark.parametrize(
-    "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file",
+    "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,invalid_no_binary",
     [
-        (invalid_reqs, invalid_interpreter_constraints, invalid_constraints_file)
+        (
+            invalid_reqs,
+            invalid_interpreter_constraints,
+            invalid_constraints_file,
+            invalid_only_binary,
+            invalid_no_binary,
+        )
         for invalid_reqs in (True, False)
         for invalid_interpreter_constraints in (True, False)
         for invalid_constraints_file in (True, False)
-        if (invalid_reqs or invalid_interpreter_constraints or invalid_constraints_file)
+        for invalid_only_binary in (True, False)
+        for invalid_no_binary in (True, False)
+        if (
+            invalid_reqs
+            or invalid_interpreter_constraints
+            or invalid_constraints_file
+            or invalid_only_binary
+            or invalid_no_binary
+        )
     ],
 )
 def test_validate_user_lockfiles(
     invalid_reqs: bool,
     invalid_interpreter_constraints: bool,
     invalid_constraints_file: bool,
+    invalid_only_binary: bool,
+    invalid_no_binary: bool,
     caplog,
 ) -> None:
     runtime_interpreter_constraints = (
@@ -207,10 +241,16 @@ def test_validate_user_lockfiles(
         lockfile,
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
-        constraints_file=ResolvePexConstraintsFile(
-            EMPTY_DIGEST,
-            "c.txt",
-            FrozenOrderedSet({PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}),
+        ResolvePexConfig(
+            ResolvePexConstraintsFile(
+                EMPTY_DIGEST,
+                "c.txt",
+                FrozenOrderedSet(
+                    {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
+                ),
+            ),
+            no_binary=("not-sdist" if invalid_no_binary else "sdist",),
+            only_binary=("not-bdist" if invalid_only_binary else "bdist",),
         ),
     )
 
@@ -226,6 +266,8 @@ def test_validate_user_lockfiles(
     contains("The targets use interpreter constraints", if_=invalid_interpreter_constraints)
 
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
+    contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
+    contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
 
     contains("./pants generate-lockfiles --resolve=a`")
 

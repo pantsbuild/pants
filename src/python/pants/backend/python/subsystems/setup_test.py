@@ -39,3 +39,38 @@ def test_resolves_to_constraints_file() -> None:
     }
     with pytest.raises(UnrecognizedResolveNamesError):
         create({"fake": "c.txt"})
+
+
+def test_resolves_to_no_binary_and_only_binary() -> None:
+    def create(
+        resolves_to_projects: dict[str, list[str]], deprecated_options: list[str] | None = None
+    ) -> dict[str, list[str]]:
+        subsystem = create_subsystem(
+            PythonSetup,
+            resolves={"a": "a.lock"},
+            resolves_to_no_binary=resolves_to_projects,
+            resolves_to_only_binary=resolves_to_projects,
+            only_binary=deprecated_options or [],
+            no_binary=deprecated_options or [],
+        )
+        only_binary = subsystem.resolves_to_only_binary(
+            all_python_tool_resolve_names=("tool1", "tool2")
+        )
+        no_binary = subsystem.resolves_to_no_binary(
+            all_python_tool_resolve_names=("tool1", "tool2")
+        )
+        assert only_binary == no_binary
+        return only_binary
+
+    assert create({"a": ["p1"], "tool1": ["p2"]}) == {"a": ["p1"], "tool1": ["p2"]}
+    assert create({"__default__": ["p1"], "tool2": ["override"]}) == {
+        "a": ["p1"],
+        "tool1": ["p1"],
+        "tool2": ["override"],
+    }
+    with pytest.raises(UnrecognizedResolveNamesError):
+        create({"fake": []})
+
+    assert create({}, deprecated_options=["p1"]) == {"a": ["p1"], "tool1": ["p1"], "tool2": ["p1"]}
+    with pytest.raises(ValueError):
+        create({"a": ["p1"]}, deprecated_options=["p2"])
