@@ -7,6 +7,7 @@ import logging
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Any
 
 from pants.backend.helm.utils.yaml import YamlPath
 from pants.backend.python.goals import lockfile
@@ -17,14 +18,14 @@ from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +100,26 @@ class ParseKubeManifestRequest(EngineAwareParameter):
     def debug_hint(self) -> str | None:
         return self.file.path
 
+    def metadata(self) -> dict[str, Any] | None:
+        return {"file": self.file}
+
 
 @dataclass(frozen=True)
-class ParsedKubeManifest:
+class ParsedKubeManifest(EngineAwareReturnType):
     filename: str
     found_image_refs: tuple[tuple[int, YamlPath, str], ...]
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.DEBUG
+
+    def message(self) -> str | None:
+        return f"Found {pluralize(len(self.found_image_refs), 'image reference')} in file {self.filename}"
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "filename": self.filename,
+            "found_image_refs": self.found_image_refs,
+        }
 
 
 @rule(desc="Parse Kubernetes resource manifest")
@@ -150,7 +166,6 @@ async def parse_kube_manifest(
             softwrap(
                 f"""
                 Could not parse Kubernetes manifests in file: {request.file.path}.
-
                 {parser_error}
                 """
             )

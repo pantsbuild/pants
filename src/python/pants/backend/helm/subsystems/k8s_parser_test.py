@@ -40,7 +40,8 @@ def test_parser_can_run(rule_runner: RuleRunner) -> None:
     file_entries = rule_runner.request(DigestEntries, [file_digest])
 
     parsed_manifest = rule_runner.request(
-        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
+        ParsedKubeManifest,
+        [ParseKubeManifestRequest(file=cast(FileEntry, file_entries[0]))],
     )
 
     expected_image_refs = [
@@ -70,7 +71,8 @@ def test_parser_returns_no_image_refs(rule_runner: RuleRunner) -> None:
     file_entries = rule_runner.request(DigestEntries, [file_digest])
 
     parsed_manifest = rule_runner.request(
-        ParsedKubeManifest, [ParseKubeManifestRequest(cast(FileEntry, file_entries[0]))]
+        ParsedKubeManifest,
+        [ParseKubeManifestRequest(file=cast(FileEntry, file_entries[0]))],
     )
 
     assert len(parsed_manifest.found_image_refs) == 0
