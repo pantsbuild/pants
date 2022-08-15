@@ -615,6 +615,8 @@ def test_setup_pex_requirements() -> None:
                     ResolvePexConfigRequest,
                     lambda _: ResolvePexConfig(
                         constraints_file=None,
+                        only_binary=(),
+                        no_binary=(),
                     ),
                 ),
                 MockGet(Digest, CreateDigest, lambda _: constraints_digest),
@@ -746,6 +748,8 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         valid_for_interpreter_constraints=InterpreterConstraints(),
         requirements=set(),
         requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

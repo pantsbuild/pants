@@ -146,6 +146,8 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
         valid_for_interpreter_constraints=InterpreterConstraints(["==2.7.*"]),
         requirements=set(),
         requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
     )
 
     def assert_ics(

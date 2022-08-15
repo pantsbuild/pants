@@ -83,8 +83,8 @@ def test_invalid_lockfile_behavior_option() -> None:
 
 
 @pytest.mark.parametrize(
-    "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file," +
-    "invalid_only_binary,invalid_no_binary,uses_source_plugins,uses_project_ic",
+    "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,"
+    + "invalid_only_binary,invalid_no_binary,uses_source_plugins,uses_project_ic",
     [
         (
             is_default_lock,
@@ -144,7 +144,7 @@ def test_validate_tool_lockfiles(
                 ),
             ),
             no_binary=("not-sdist" if invalid_no_binary else "sdist",),
-            only_binary=("not-bdist" if invalid_only_binary else "bdist",)
+            only_binary=("not-bdist" if invalid_only_binary else "bdist",),
         ),
     )
 
@@ -187,13 +187,25 @@ def test_validate_tool_lockfiles(
 @pytest.mark.parametrize(
     "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,invalid_no_binary",
     [
-        (invalid_reqs, invalid_interpreter_constraints, invalid_constraints_file, invalid_only_binary, invalid_no_binary)
+        (
+            invalid_reqs,
+            invalid_interpreter_constraints,
+            invalid_constraints_file,
+            invalid_only_binary,
+            invalid_no_binary,
+        )
         for invalid_reqs in (True, False)
         for invalid_interpreter_constraints in (True, False)
         for invalid_constraints_file in (True, False)
         for invalid_only_binary in (True, False)
         for invalid_no_binary in (True, False)
-        if (invalid_reqs or invalid_interpreter_constraints or invalid_constraints_file or invalid_only_binary or invalid_no_binary)
+        if (
+            invalid_reqs
+            or invalid_interpreter_constraints
+            or invalid_constraints_file
+            or invalid_only_binary
+            or invalid_no_binary
+        )
     ],
 )
 def test_validate_user_lockfiles(

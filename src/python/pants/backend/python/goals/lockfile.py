@@ -159,8 +159,8 @@ class _PipArgsAndConstraintsSetup:
     args: tuple[str, ...]
     digest: Digest
     constraints: FrozenOrderedSet[PipRequirement]
-    only_binary: set[str]
-    no_binary: set[str]
+    only_binary: tuple[str, ...]
+    no_binary: tuple[str, ...]
 
 
 @rule_helper
@@ -207,8 +207,8 @@ async def generate_lockfile(
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
-    only_binary = set()
-    no_binary = set()
+    only_binary: tuple[str, ...] = ()
+    no_binary: tuple[str, ...] = ()
 
     if req.use_pex:
         pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
@@ -318,8 +318,8 @@ async def generate_lockfile(
         valid_for_interpreter_constraints=req.interpreter_constraints,
         requirements={PipRequirement.parse(i) for i in req.requirements},
         requirement_constraints=set(requirement_constraints),
-        only_binary=only_binary,
-        no_binary=no_binary,
+        only_binary=set(only_binary),
+        no_binary=set(no_binary),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
