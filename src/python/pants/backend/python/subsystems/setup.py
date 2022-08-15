@@ -6,7 +6,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, Iterator, Optional, TypeVar, cast
+from typing import Iterable, Iterator, List, Optional, TypeVar, cast
 
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
@@ -243,7 +243,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_no_binary = DictOption[list[str]](
+    _resolves_to_no_binary = DictOption[List[str]](
         help=softwrap(
             f"""
             When generating a resolve's lockfile, do not use binary packages (i.e. wheels) for
@@ -269,7 +269,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_only_binary = DictOption[list[str]](
+    _resolves_to_only_binary = DictOption[List[str]](
         help=softwrap(
             f"""
             When generating a resolve's lockfile, do not use source packages (i.e. sdists) for
