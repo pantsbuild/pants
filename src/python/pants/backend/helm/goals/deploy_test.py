@@ -4,13 +4,18 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.helm.goals.deploy import DeployHelmDeploymentFieldSet
 from pants.backend.helm.goals.deploy import rules as helm_deploy_rules
-from pants.backend.helm.target_types import HelmChartTarget, HelmDeploymentTarget
+from pants.backend.helm.target_types import (
+    HelmArtifactTarget,
+    HelmChartTarget,
+    HelmDeploymentTarget,
+)
 from pants.backend.helm.testutil import HELM_CHART_FILE
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.deploy import DeployProcess
@@ -22,7 +27,7 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
+        target_types=[HelmArtifactTarget, HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
         rules=[
             *helm_deploy_rules(),
             QueryRule(HelmBinary, ()),
@@ -30,6 +35,17 @@ def rule_runner() -> RuleRunner:
         ],
     )
     return rule_runner
+
+
+def _run_deployment(
+    rule_runner: RuleRunner, spec_path: str, target_name: str, *, args: Iterable[str] | None = None
+) -> DeployProcess:
+    rule_runner.set_options(args or (), env_inherit=PYTHON_BOOTSTRAP_ENV)
+
+    target = rule_runner.get_target(Address(spec_path, target_name=target_name))
+    field_set = DeployHelmDeploymentFieldSet.create(target)
+
+    return rule_runner.request(DeployProcess, [field_set])
 
 
 def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
@@ -80,19 +96,17 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
 
     source_root_patterns = ["/src/*"]
     deploy_args = ["--kubeconfig", "./kubeconfig"]
-    rule_runner.set_options(
-        [
+    deploy_process = _run_deployment(
+        rule_runner,
+        "src/deployment",
+        "foo",
+        args=[
             f"--source-root-patterns={repr(source_root_patterns)}",
             f"--helm-args={repr(deploy_args)}",
         ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
-    target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
-    field_set = DeployHelmDeploymentFieldSet.create(target)
-
     helm = rule_runner.request(HelmBinary, [])
-    deploy_process = rule_runner.request(DeployProcess, [field_set])
 
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
@@ -145,18 +159,46 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
 
     source_root_patterns = ["/src/*"]
     deploy_args = ["--force", "--debug", "--kubeconfig=./kubeconfig", "--namespace", "foo"]
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-            f"--helm-args={repr(deploy_args)}",
-        ],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
-
-    target = rule_runner.get_target(Address("src/deployment", target_name="bar"))
-    field_set = DeployHelmDeploymentFieldSet.create(target)
 
     with pytest.raises(
         ExecutionError, match="The following command line arguments are not valid: --namespace foo."
     ):
-        rule_runner.request(DeployProcess, [field_set])
+        _run_deployment(
+            rule_runner,
+            "src/deployment",
+            "bar",
+            args=[
+                f"--source-root-patterns={repr(source_root_patterns)}",
+                f"--helm-args={repr(deploy_args)}",
+            ],
+        )
+
+
+def test_can_deploy_3rd_party_chart(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/helm/BUILD": dedent(
+                """\
+                helm_artifact(
+                    name="prometheus-stack",
+                    repository="https://prometheus-community.github.io/helm-charts",
+                    artifact="kube-prometheus-stack",
+                    version="^27.2.0"
+                )
+                """
+            ),
+            "BUILD": dedent(
+                """\
+              helm_deployment(
+                name="deploy_3rd_party",
+                dependencies=["//3rdparty/helm:prometheus-stack"],
+              )
+              """
+            ),
+        }
+    )
+
+    deploy_process = _run_deployment(rule_runner, "", "deploy_3rd_party")
+
+    assert deploy_process.process
+    assert len(deploy_process.publish_dependencies) == 0

@@ -159,8 +159,10 @@ async def inject_deployment_dependencies(
             matches,
             request.field_set.address,
             context=softwrap(
-                f"The Helm deployment {request.field_set.address} declares "
-                f"{imager_ref} as Docker image reference"
+                f"""
+                The Helm deployment {request.field_set.address} declares
+                {imager_ref} as Docker image reference
+                """
             ),
             import_reference="manifest",
         )
