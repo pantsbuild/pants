@@ -32,6 +32,9 @@ def test_metadata_header_round_trip() -> None:
             ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
         ),
         requirements=reqset("ansicolors==0.1.0"),
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("constraint")},
         only_binary={"bdist"},
         no_binary={"sdist"},
@@ -57,12 +60,28 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "version": 2,
+#   "version": 3,
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
 #   ],
 #   "generated_with_requirements": [
 #     "ansicolors==0.1.0"
+#   ],
+#   "indexes": [
+#     "index"
+#   ],
+#   "find_links": [
+#     "find-links"
+#   ],
+#   "manylinux": null,
+#   "requirement_constraints": [
+#     "constraint"
+#   ],
+#   "only_binary": [
+#     "bdist"
+#   ],
+#   "no_binary": [
+#     "sdist"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -76,6 +95,9 @@ dave==3.1.4 \\
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints([">=3.7"]),
         requirements=reqset("ansicolors==0.1.0"),
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux=None,
         requirement_constraints={PipRequirement.parse("constraint")},
         only_binary={"bdist"},
         no_binary={"sdist"},
@@ -161,6 +183,9 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 user_interpreter_constraints=InterpreterConstraints(user_ic),
                 interpreter_universe=INTERPRETER_UNIVERSE,
                 user_requirements=set(),
+                indexes=set(),
+                find_links=set(),
+                manylinux=None,
                 requirement_constraints=set(),
                 only_binary=set(),
                 no_binary=set(),
@@ -239,6 +264,9 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
         PythonLockfileMetadataV3(
             InterpreterConstraints(lock_ics),
             reqset(*lock_reqs),
+            indexes=set(),
+            find_links=set(),
+            manylinux=None,
             requirement_constraints=set(),
             only_binary=set(),
             no_binary=set(),
@@ -250,6 +278,9 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             user_interpreter_constraints=InterpreterConstraints(user_ics),
             interpreter_universe=INTERPRETER_UNIVERSE,
             user_requirements=reqset(*user_reqs),
+            indexes=set(),
+            find_links=set(),
+            manylinux=None,
             requirement_constraints=set(),
             only_binary=set(),
             no_binary=set(),
@@ -263,6 +294,9 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         InterpreterConstraints([]),
         reqset(),
         # Everything below is new to v3+.
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux=None,
         requirement_constraints={PipRequirement.parse("c1")},
         only_binary={"bdist"},
         no_binary={"sdist"},
@@ -272,6 +306,9 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         user_interpreter_constraints=InterpreterConstraints([]),
         interpreter_universe=INTERPRETER_UNIVERSE,
         user_requirements=reqset(),
+        indexes={"different-index"},
+        find_links={"different-find-links"},
+        manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("c2")},
         only_binary={"not-bdist"},
         no_binary={"not-sdist"},
@@ -280,4 +317,7 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
         InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH,
         InvalidPythonLockfileReason.NO_BINARY_MISMATCH,
+        InvalidPythonLockfileReason.INDEXES_MISMATCH,
+        InvalidPythonLockfileReason.FIND_LINKS_MISMATCH,
+        InvalidPythonLockfileReason.MANYLINUX_MISMATCH,
     }
