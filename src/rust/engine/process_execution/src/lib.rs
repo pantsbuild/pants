@@ -81,7 +81,7 @@ pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ProcessError {
   /// A Digest was not present in either of the local or remote Stores.
   MissingDigest(String, Digest),
@@ -755,7 +755,7 @@ impl From<ProcessResultSource> for &'static str {
   }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum CacheContentBehavior {
   Fetch,

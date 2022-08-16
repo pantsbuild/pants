@@ -102,7 +102,7 @@ impl Default for LocalOptions {
   }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum StoreError {
   /// A Digest was not present in either of the local or remote Stores.
   MissingDigest(String, Digest),
