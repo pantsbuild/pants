@@ -148,14 +148,21 @@ class FmtTargetsRequest(StyleRequest[_FS]):
 
 
 @dataclass(frozen=True)
-class _LanguageFmtRequest:
+class _FmtTargetBatchRequest:
+    """Format all the targets in the given batch.
+
+    NOTE: Several requests can be made in parallel (via `MultiGet`) iff the target batches are
+        non-overlapping. Within the request, the FmtTargetsRequests will be issued sequentially
+        with the result of each run fed into the next run. To maximize parallel performance, the
+        targets in a batch should share a FieldSet.
+    """
+
     request_types: tuple[type[FmtTargetsRequest], ...]
     targets: Targets
 
 
 @dataclass(frozen=True)
-class _LanguageFmtResults:
-
+class _FmtTargetBatchResult:
     results: tuple[FmtResult, ...]
     input: Digest
     output: Digest
@@ -212,8 +219,8 @@ async def fmt(
     # Spawn sequential formatting per unique sequence of FmtTargetsRequests.
     per_language_results = await MultiGet(
         Get(
-            _LanguageFmtResults,
-            _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
+            _FmtTargetBatchResult,
+            _FmtTargetBatchRequest(fmt_requests, Targets(target_batch)),
         )
         for fmt_requests, targets in targets_by_fmt_request_order.items()
         for target_batch in partition_sequentially(
@@ -272,7 +279,7 @@ async def fmt(
 
 
 @rule
-async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFmtResults:
+async def fmt_language(language_fmt_request: _FmtTargetBatchRequest) -> _FmtTargetBatchResult:
     original_sources = await Get(
         SourceFiles,
         SourceFilesRequest(target[SourcesField] for target in language_fmt_request.targets),
@@ -295,7 +302,7 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
         results.append(result)
         if not result.skipped:
             prior_formatter_result = result.output
-    return _LanguageFmtResults(
+    return _FmtTargetBatchResult(
         tuple(results),
         input=original_sources.snapshot.digest,
         output=prior_formatter_result.digest,
