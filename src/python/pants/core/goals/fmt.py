@@ -35,16 +35,8 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import (
-    Get,
-    MultiGet,
-    collect_rules,
-    goal_rule,
-    rule,
-    rule_helper,
-    rule_helper,
-)
-from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Target, Targets
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -54,7 +46,6 @@ from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
 _FS = TypeVar("_FS", bound=FieldSet)
-_T = TypeVar("_T")
 _T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)

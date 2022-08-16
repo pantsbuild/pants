@@ -49,7 +49,7 @@ class FortranFieldSet(FieldSet):
     sources: FortranSource
 
 
-class FortranFmtRequest(FmtTargetsTargetsRequest):
+class FortranFmtRequest(FmtTargetsRequest):
     field_set_type = FortranFieldSet
     name = "FortranConditionallyDidChange"
 
@@ -80,7 +80,7 @@ class SmalltalkFieldSet(FieldSet):
     source: SmalltalkSource
 
 
-class SmalltalkNoopRequest(FmtTargetsTargetsRequest):
+class SmalltalkNoopRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
     name = "SmalltalkDidNotChange"
 
@@ -97,7 +97,7 @@ async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
     )
 
 
-class SmalltalkSkipRequest(FmtTargetsTargetsRequest):
+class SmalltalkSkipRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
     name = "SmalltalkSkipped"
 
