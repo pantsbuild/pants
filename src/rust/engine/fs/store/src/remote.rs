@@ -226,11 +226,26 @@ impl ByteStore {
     let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
     let batch_api_allowed_by_server_config =
       max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
-    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-      self.store_bytes_source_batch(digest, bytes).await
-    } else {
-      self.store_bytes_source_stream(digest, bytes).await
-    }
+
+    in_workunit!(
+      "store_bytes",
+      Level::Trace,
+      desc = Some(format!("Storing {digest:?}")),
+      |workunit| async move {
+        let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+          self.store_bytes_source_batch(digest, bytes).await
+        } else {
+          self.store_bytes_source_stream(digest, bytes).await
+        };
+
+        if result.is_ok() {
+          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
+        }
+
+        result
+      }
+    )
+    .await
   }
 
   async fn store_bytes_source_batch<ByteSource>(
@@ -275,7 +290,6 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_desc = format!("Storing bytes at: {resource_name}");
     let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
@@ -300,7 +314,7 @@ impl ByteStore {
     });
 
     // NB: We must box the future to avoid a stack overflow.
-    let result_future = Box::pin(async move {
+    Box::pin(async move {
       let response = client
         .write(Request::new(stream))
         .await
@@ -315,20 +329,7 @@ impl ByteStore {
           digest, len, response.committed_size
         )))
       }
-    });
-
-    in_workunit!(
-      "store_bytes",
-      Level::Trace,
-      desc = Some(workunit_desc),
-      |workunit| async move {
-        let result = result_future.await;
-        if result.is_ok() {
-          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
-        }
-        result
-      },
-    )
+    })
     .await
   }
 
