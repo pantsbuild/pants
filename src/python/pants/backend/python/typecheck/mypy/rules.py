@@ -322,7 +322,9 @@ async def mypy_typecheck_partition(
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
-        "MYPY_FORCE_COLOR": "1" if global_options.colors else "0",
+        # always emit colors to improve cache hit rates, the results are post-processed to match the
+        # global setting
+        "MYPY_FORCE_COLOR": "1",
         "MYPY_FORCE_TERMINAL_WIDTH": str(shutil.get_terminal_size().columns),
     }
 
@@ -342,7 +344,10 @@ async def mypy_typecheck_partition(
     result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
-        result, partition_description=partition.description(), report=report
+        result,
+        partition_description=partition.description(),
+        report=report,
+        strip_formatting=not global_options.colors,
     )
 
 
