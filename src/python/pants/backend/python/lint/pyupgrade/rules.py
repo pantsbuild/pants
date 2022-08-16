@@ -9,7 +9,7 @@ from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
@@ -31,7 +31,7 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(FmtRequest):
+class PyUpgradeRequest(FmtTargetsRequest):
     field_set_type = PyUpgradeFieldSet
     name = PyUpgrade.options_scope
 
@@ -61,6 +61,6 @@ async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtR
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, PyUpgradeRequest),
+        UnionRule(FmtTargetsRequest, PyUpgradeRequest),
         *pex.rules(),
     ]

@@ -8,7 +8,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
 )
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.system_binaries import (
     BinaryShims,
@@ -39,7 +39,7 @@ class BufFieldSet(FieldSet):
         return tgt.get(SkipBufFormatField).value
 
 
-class BufFormatRequest(FmtRequest):
+class BufFormatRequest(FmtTargetsRequest):
     field_set_type = BufFieldSet
     name = "buf-format"
 
@@ -97,5 +97,5 @@ async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtRes
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, BufFormatRequest),
+        UnionRule(FmtTargetsRequest, BufFormatRequest),
     ]

@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, TypeVar
+from typing import Callable, Iterable, Iterator, TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -22,8 +22,8 @@ from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Targets
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -33,6 +33,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
 _FS = TypeVar("_FS", bound=FieldSet)
+_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: FmtRequest,
+        request: FmtTargetsRequest,
         process_result: ProcessResult | FallibleProcessResult,
         output: Snapshot,
         *,
@@ -139,7 +140,7 @@ class FmtResult(EngineAwareReturnType):
 @union
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FmtRequest(StyleRequest[_FS]):
+class FmtTargetsRequest(StyleRequest[_FS]):
     snapshot: Snapshot
 
     def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
@@ -148,14 +149,21 @@ class FmtRequest(StyleRequest[_FS]):
 
 
 @dataclass(frozen=True)
-class _LanguageFmtRequest:
-    request_types: tuple[type[FmtRequest], ...]
+class _FmtTargetBatchRequest:
+    """Format all the targets in the given batch.
+
+    NOTE: Several requests can be made in parallel (via `MultiGet`) iff the target batches are
+        non-overlapping. Within the request, the FmtTargetsRequests will be issued sequentially
+        with the result of each run fed into the next run. To maximize parallel performance, the
+        targets in a batch should share a FieldSet.
+    """
+
+    request_types: tuple[type[FmtTargetsRequest], ...]
     targets: Targets
 
 
 @dataclass(frozen=True)
-class _LanguageFmtResults:
-
+class _FmtBatchResult:
     results: tuple[FmtResult, ...]
     input: Digest
     output: Digest
@@ -171,7 +179,7 @@ class FmtSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtRequest in union_membership
+        return FmtTargetsRequest in union_membership
 
     only = StrListOption(
         help=only_option_help("fmt", "formatter", "isort", "shfmt"),
@@ -187,56 +195,53 @@ class Fmt(Goal):
     subsystem_cls = FmtSubsystem
 
 
-@goal_rule
-async def fmt(
-    console: Console,
-    targets: FilteredTargets,
+def _batch(
+    fmt_subsystem: FmtSubsystem, iterable: Iterable[_T], key: Callable[[_T], str]
+) -> Iterator[list[_T]]:
+    partitions = partition_sequentially(
+        iterable,
+        key=key,
+        size_target=fmt_subsystem.batch_size,
+        size_max=4 * fmt_subsystem.batch_size,
+    )
+    for partition in partitions:
+        yield partition
+
+
+def _batch_targets(
     fmt_subsystem: FmtSubsystem,
-    workspace: Workspace,
-    union_membership: UnionMembership,
-) -> Fmt:
-    request_types = union_membership[FmtRequest]
-    specified_names = determine_specified_tool_names("fmt", fmt_subsystem.only, request_types)
+    all_request_types: Iterable[type[FmtTargetsRequest]],
+    targets: Iterable[Target],
+) -> dict[Targets, tuple[type[FmtTargetsRequest], ...]]:
+    """Groups targets by the relevant Request types, then batches them.
 
-    # Group targets by the sequence of FmtRequests that apply to them.
-    targets_by_fmt_request_order = defaultdict(list)
+    Returns a mapping from batch -> Request types.
+    """
+    formatters_to_run = determine_specified_tool_names("fmt", fmt_subsystem.only, all_request_types)
+    targets_by_request_order = defaultdict(list)
+
     for target in targets:
-        fmt_requests = []
-        for fmt_request in request_types:
-            valid_name = fmt_request.name in specified_names
-            if valid_name and fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
-                fmt_requests.append(fmt_request)
-        if fmt_requests:
-            targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
+        request_types = []
+        for request_type in all_request_types:
+            valid_name = request_type.name in formatters_to_run
+            if valid_name and request_type.field_set_type.is_applicable(target):
+                request_types.append(request_type)
+        if request_types:
+            targets_by_request_order[tuple(request_types)].append(target)
 
-    # Spawn sequential formatting per unique sequence of FmtRequests.
-    per_language_results = await MultiGet(
-        Get(
-            _LanguageFmtResults,
-            _LanguageFmtRequest(fmt_requests, Targets(target_batch)),
-        )
-        for fmt_requests, targets in targets_by_fmt_request_order.items()
-        for target_batch in partition_sequentially(
-            targets,
-            key=lambda t: t.address.spec,
-            size_target=fmt_subsystem.batch_size,
-            size_max=4 * fmt_subsystem.batch_size,
-        )
-    )
+    target_batches_by_fmt_request_order = {
+        Targets(target_batch): request_types
+        for request_types, targets in targets_by_request_order.items()
+        for target_batch in _batch(fmt_subsystem, targets, key=lambda t: t.address.spec)
+    }
 
-    individual_results = list(
-        itertools.chain.from_iterable(
-            language_result.results for language_result in per_language_results
-        )
-    )
+    return target_batches_by_fmt_request_order
 
-    if not individual_results:
-        return Fmt(exit_code=0)
 
+@rule_helper
+async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtBatchResult]):
     changed_digests = tuple(
-        language_result.output
-        for language_result in per_language_results
-        if language_result.did_change
+        batched_result.output for batched_result in batched_results if batched_result.did_change
     )
     if changed_digests:
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
@@ -245,14 +250,19 @@ async def fmt(
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
         workspace.write_digest(merged_formatted_digest)
 
-    if individual_results:
+
+def _print_results(
+    console: Console,
+    results: Iterable[FmtResult],
+):
+    if results:
         console.print_stderr("")
 
     # We group all results for the same formatter so that we can give one final status in the
     # summary. This is only relevant if there were multiple results because of
     # `--per-file-caching`.
     formatter_to_results = defaultdict(set)
-    for result in individual_results:
+    for result in results:
         formatter_to_results[result.formatter_name].add(result)
 
     for formatter, results in sorted(formatter_to_results.items()):
@@ -266,39 +276,74 @@ async def fmt(
             status = "made no changes"
         console.print_stderr(f"{sigil} {formatter} {status}.")
 
+
+@goal_rule
+async def fmt(
+    console: Console,
+    targets: FilteredTargets,
+    fmt_subsystem: FmtSubsystem,
+    workspace: Workspace,
+    union_membership: UnionMembership,
+) -> Fmt:
+    targets_to_request_types = _batch_targets(
+        fmt_subsystem,
+        union_membership[FmtTargetsRequest],
+        targets,
+    )
+
+    target_batch_results = await MultiGet(
+        Get(
+            _FmtBatchResult,
+            _FmtTargetBatchRequest(fmt_request_types, target_batch),
+        )
+        for target_batch, fmt_request_types in targets_to_request_types.items()
+    )
+
+    individual_results = list(
+        itertools.chain.from_iterable(result.results for result in target_batch_results)
+    )
+
+    if not individual_results:
+        return Fmt(exit_code=0)
+
+    await _write_files(workspace, target_batch_results)
+    _print_results(console, individual_results)
+
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
 
 
 @rule
-async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFmtResults:
+async def fmt_target_batch(
+    request: _FmtTargetBatchRequest,
+) -> _FmtBatchResult:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[SourcesField] for target in language_fmt_request.targets),
+        SourceFilesRequest(target[SourcesField] for target in request.targets),
     )
-    prior_formatter_result = original_sources.snapshot
+    prior_snapshot = original_sources.snapshot
 
     results = []
-    for fmt_request_type in language_fmt_request.request_types:
-        request = fmt_request_type(
+    for fmt_targets_request_type in request.request_types:
+        fmt_targets_request = fmt_targets_request_type(
             (
-                fmt_request_type.field_set_type.create(target)
-                for target in language_fmt_request.targets
-                if fmt_request_type.field_set_type.is_applicable(target)
+                fmt_targets_request_type.field_set_type.create(target)
+                for target in request.targets
+                if fmt_targets_request_type.field_set_type.is_applicable(target)
             ),
-            snapshot=prior_formatter_result,
+            snapshot=prior_snapshot,
         )
-        if not request.field_sets:
+        if not fmt_targets_request.field_sets:
             continue
-        result = await Get(FmtResult, FmtRequest, request)
+        result = await Get(FmtResult, FmtTargetsRequest, fmt_targets_request)
         results.append(result)
         if not result.skipped:
-            prior_formatter_result = result.output
-    return _LanguageFmtResults(
+            prior_snapshot = result.output
+    return _FmtBatchResult(
         tuple(results),
         input=original_sources.snapshot.digest,
-        output=prior_formatter_result.digest,
+        output=prior_snapshot.digest,
     )
 
 
