@@ -3,4 +3,4 @@
 
 python_sources()
 
-python_tests(name="tests", overrides={"deploy_test.py": {"timeout": 120}})
+python_tests(name="tests", overrides={"deploy_test.py": {"timeout": 180}})
