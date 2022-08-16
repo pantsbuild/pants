@@ -38,6 +38,7 @@ from pants.engine.target import (
     NoApplicableTargetsBehavior,
     SourcesField,
     SpecialCasedDependencies,
+    StringSequenceField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -439,6 +440,15 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     alias = "timeout"
     required = False
     valid_numbers = ValidNumbers.positive_only
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each test file belonging to this target.
+
+        If unset, will default to `[test].timeout_default`; if that option is also unset,
+        then the test will never time out. Will never exceed `[test].timeout_maximum`. Only
+        applies if the option `--test-timeouts` is set to true (the default).
+        """
+    )
 
     def calculate_from_global_options(self, test: TestSubsystem) -> Optional[int]:
         if not test.timeouts:
@@ -452,6 +462,20 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
         if test.timeout_maximum is not None:
             return min(result, test.timeout_maximum)
         return result
+
+
+class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
+    alias = "extra_env_vars"
+    help = softwrap(
+        """
+         Additional environment variables to include in test processes.
+
+         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+         This will be merged with and override values from `[test].extra_env_vars`.
+        """
+    )
 
 
 @rule_helper

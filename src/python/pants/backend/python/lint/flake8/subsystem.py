@@ -8,7 +8,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -43,6 +46,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    FileListOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -92,6 +96,14 @@ class Flake8(PythonToolBase):
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
             """
+        ),
+    )
+    extra_files = FileListOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """Paths to extra files to include in the sandbox. This can be useful for Flake8 plugins,
+            like including config files for the `flake8-bandit` plugin."""
         ),
     )
     config_discovery = BoolOption(
@@ -217,10 +229,9 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     )
 
     return Flake8FirstPartyPlugins(
-        requirement_strings=PexRequirements.create_from_requirement_fields(
+        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
             requirements_fields,
-            constraints_strings=(),
-        ).req_strings,
+        ),
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
     )
@@ -269,7 +280,7 @@ async def _flake8_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
+class Flake8LockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Flake8.options_scope
 
 

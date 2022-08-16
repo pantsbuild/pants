@@ -82,5 +82,8 @@ class PipRequirement:
             return False
         return self._req == other._req
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._req})"
+
     def __str__(self):
         return str(self._req)

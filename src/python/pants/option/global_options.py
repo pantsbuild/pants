@@ -1158,7 +1158,7 @@ class BootstrapOptions:
     process_cleanup = BoolOption(
         default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
         deprecation_start_version="2.15.0.dev1",
-        removal_version="2.16.0.dev1",
+        removal_version="2.17.0.dev1",
         removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """
@@ -1195,8 +1195,8 @@ class BootstrapOptions:
             fetching it.
 
             The `defer` behavior, on the other hand, will neither fetch nor validate the cache
-            content before calling a cache hit a hit. This "defers" actually consuming the cache
-            entry until a consumer consumes it.
+            content before calling a cache hit a hit. This "defers" actually fetching the cache
+            entry until Pants needs it (which may be never).
 
             The `defer` mode is the most network efficient (because it will completely skip network
             requests in many cases), followed by the `validate` mode (since it can still skip
@@ -1935,7 +1935,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if isinstance(resolved_value, bool):
             # Is `process_cleanup`.
-            return KeepSandboxes.always if resolved_value else KeepSandboxes.on_failure
+            return KeepSandboxes.never if resolved_value else KeepSandboxes.always
         elif isinstance(resolved_value, KeepSandboxes):
             return resolved_value
         else:

@@ -11,6 +11,7 @@ from typing import Iterable
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtifact
 from pants.backend.helm.target_types import HelmArtifactFieldSet
+from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -137,4 +138,4 @@ async def fetch_helm_artifacts(request: FetchHelmArfifactsRequest) -> FetchedHel
 
 
 def rules():
-    return [*collect_rules(), *artifacts.rules()]
+    return [*collect_rules(), *artifacts.rules(), *tool.rules()]

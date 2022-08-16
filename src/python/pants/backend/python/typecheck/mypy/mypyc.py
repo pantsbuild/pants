@@ -15,7 +15,6 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
@@ -70,15 +69,9 @@ async def get_mypyc_build_environment(
         ),
     )
     extra_type_stubs_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="extra_type_stubs.pex",
-            internal_only=True,
-            requirements=PexRequirements(mypy.extra_type_stubs),
-            interpreter_constraints=request.interpreter_constraints,
-        ),
+        Pex, PexRequest, mypy.extra_type_stubs_pex_request(request.interpreter_constraints)
     )
-    (mypy_pex, requirements_pex, extra_type_stubs_pex) = await MultiGet(
+    mypy_pex, requirements_pex, extra_type_stubs_pex = await MultiGet(
         mypy_pex_get, requirements_pex_get, extra_type_stubs_pex_get
     )
     return DistBuildEnvironment(

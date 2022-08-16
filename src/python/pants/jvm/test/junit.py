@@ -11,6 +11,8 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
+    TestExtraEnv,
+    TestExtraEnvVarsField,
     TestFieldSet,
     TestResult,
     TestSubsystem,
@@ -18,6 +20,7 @@ from pants.core.goals.test import (
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
     FallibleProcessResult,
@@ -33,7 +36,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -57,9 +60,10 @@ class JunitTestFieldSet(TestFieldSet):
     timeout: JunitTestTimeoutField
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
+    extra_env_vars: TestExtraEnvVarsField
 
 
-class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
+class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JUnit.options_scope
 
 
@@ -81,6 +85,7 @@ async def setup_junit_for_target(
     jvm: JvmSubsystem,
     junit: JUnit,
     test_subsystem: TestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestSetup:
 
     jdk, transitive_tgts = await MultiGet(
@@ -124,6 +129,10 @@ async def setup_junit_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
+    field_set_extra_env = await Get(
+        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+    )
+
     process = JvmProcess(
         jdk=jdk,
         classpath_entries=[
@@ -140,6 +149,7 @@ async def setup_junit_for_target(
             *junit.args,
         ],
         input_digest=input_digest,
+        extra_env={**test_extra_env.env, **field_set_extra_env},
         extra_jvm_options=junit.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),

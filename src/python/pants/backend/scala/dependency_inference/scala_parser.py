@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
@@ -32,13 +31,14 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.resources import read_resource
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ _PARSER_SCALA_VERSION = "2.13.8"
 _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
 
 
-class ScalaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "scala-parser"
 
 
@@ -316,7 +316,7 @@ async def resolve_fallible_result_to_analysis(
 async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
-    parser_source_content = pkgutil.get_data(
+    parser_source_content = read_resource(
         "pants.backend.scala.dependency_inference", "ScalaParser.scala"
     )
     if not parser_source_content:

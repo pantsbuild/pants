@@ -6,7 +6,10 @@ from __future__ import annotations
 import itertools
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
@@ -51,7 +54,7 @@ class IPython(PythonToolBase):
     )
 
 
-class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
+class IPythonLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = IPython.options_scope
 
 

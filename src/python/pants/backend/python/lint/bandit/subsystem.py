@@ -8,7 +8,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -100,7 +103,7 @@ async def _bandit_interpreter_constraints(python_setup: PythonSetup) -> Interpre
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
-class BanditLockfileSentinel(GenerateToolLockfileSentinel):
+class BanditLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Bandit.options_scope
 
 

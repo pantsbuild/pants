@@ -299,9 +299,7 @@ class Parser:
             if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
                 type_arg = nkwargs.get("type", str)
                 member_type = nkwargs.get("member_type", str)
-                default_val = self.to_value_type(
-                    nkwargs.get("default"), type_arg, member_type, dest
-                )
+                default_val = self.to_value_type(nkwargs.get("default"), type_arg, member_type)
                 if isinstance(default_val, (ListValueComponent, DictValueComponent)):
                     default_val = default_val.val
                 nkwargs["default"] = RankedValue(Rank.HARDCODED, default_val)
@@ -422,7 +420,7 @@ class Parser:
             if isinstance(default_value, str) and type_arg != str:
                 # attempt to parse default value, for correctness..
                 # custom function types may implement their own validation
-                default_value = self.to_value_type(default_value, type_arg, member_type, "")
+                default_value = self.to_value_type(default_value, type_arg, member_type)
                 if hasattr(default_value, "val"):
                     default_value = default_value.val
 
@@ -502,7 +500,7 @@ class Parser:
             raise ParseError(str(error))
 
     @classmethod
-    def to_value_type(cls, val_str, type_arg, member_type, dest):
+    def to_value_type(cls, val_str, type_arg, member_type):
         """Convert a string to a value of the option's type."""
         if val_str is None:
             return None
@@ -550,7 +548,7 @@ class Parser:
         member_type = kwargs.get("member_type", str)
 
         def to_value_type(val_str):
-            return self.to_value_type(val_str, type_arg, member_type, dest)
+            return self.to_value_type(val_str, type_arg, member_type)
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.

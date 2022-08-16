@@ -15,8 +15,10 @@ from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     AsyncFieldMixin,
     BoolField,
     Dependencies,
@@ -26,6 +28,7 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    Targets,
 )
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
@@ -369,3 +372,18 @@ class DockerImageTarget(Target):
 
         """
     )
+
+
+class AllDockerImageTargets(Targets):
+    pass
+
+
+@rule
+def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
+    return AllDockerImageTargets(
+        [tgt for tgt in all_targets if tgt.has_field(DockerImageSourceField)]
+    )
+
+
+def rules():
+    return collect_rules()

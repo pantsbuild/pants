@@ -5,6 +5,7 @@ from pants.backend.codegen import export_codegen_goal
 from pants.backend.docker.goals.tailor import rules as tailor_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import rules as target_types_rules
 
 
 def rules():
@@ -12,6 +13,7 @@ def rules():
         *docker_rules(),
         *export_codegen_goal.rules(),
         *tailor_rules(),
+        *target_types_rules(),
     )
 
 
