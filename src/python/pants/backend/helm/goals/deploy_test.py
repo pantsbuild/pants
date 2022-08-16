@@ -108,6 +108,17 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
 
     helm = rule_runner.request(HelmBinary, [])
 
+    expected_value_files_order = [
+        "common.yaml",
+        "bar.yaml",
+        "foo.yaml",
+        "bar-override.yaml",
+        "subdir/bar.yaml",
+        "subdir/foo.yaml",
+        "subdir/foo-override.yaml",
+        "subdir/last.yaml",
+    ]
+
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
         helm.path,
@@ -124,7 +135,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--values",
-        "common.yaml,bar.yaml,foo.yaml,bar-override.yaml,subdir/bar.yaml,subdir/foo.yaml,subdir/foo-override.yaml,subdir/last.yaml",
+        ",".join([f"__values/{filename}" for filename in expected_value_files_order]),
         "--set",
         "key=foo",
         "--set",

@@ -123,8 +123,8 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
-    assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
-    assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+    assert "charts/chart1" in helm_chart.snapshot.dirs
+    assert "charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
     assert len(helm_chart.info.dependencies) == 1
     assert helm_chart.info.dependencies[0].name == "chart1"
     assert helm_chart.info.dependencies[0].alias == "foo"
@@ -197,10 +197,10 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
     assert helm_chart.info == expected_metadata
-    assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
-    assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
-    assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
-    assert "chart2/charts/cert-manager/Chart.yaml" in helm_chart.snapshot.files
+    assert "charts/chart1" in helm_chart.snapshot.dirs
+    assert "charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+    assert "charts/cert-manager" in helm_chart.snapshot.dirs
+    assert "charts/cert-manager/Chart.yaml" in helm_chart.snapshot.files
 
 
 def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleRunner) -> None:
@@ -269,13 +269,39 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
             ParseHelmChartMetadataDigest(
                 helm_chart.snapshot.digest,
                 description_of_origin="test_chart_metadata_is_updated_with_explicit_dependencies",
-                prefix=helm_chart.path,
             )
         ],
     )
 
     assert helm_chart.info == expected_metadata
     assert new_metadata == expected_metadata
+
+
+def test_wrong_source_roots_results_in_error(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/chart/BUILD": "helm_chart()",
+            "src/chart/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: chart
+                version: 0.1.0
+                """
+            ),
+            "src/chart1/values.yaml": HELM_VALUES_FILE,
+        }
+    )
+
+    source_root_patterns = ("/src",)
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+        ]
+    )
+
+    target = rule_runner.get_target(Address("src/chart", target_name="chart"))
+    with pytest.raises(ExecutionError):
+        rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
 
 def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:

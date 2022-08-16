@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
@@ -14,6 +13,8 @@ import yaml
 from pants.backend.helm.target_types import HelmChartMetaSourceField
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -24,7 +25,6 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
@@ -205,29 +205,10 @@ class HelmChartMetadata:
 HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
 
 
-def _chart_metadata_subset(
-    digest: Digest, *, description_of_origin: str, prefix: str | None = None
-) -> DigestSubset:
-    def prefixed_filename(filename: str) -> str:
-        if not prefix:
-            return filename
-        return os.path.join(prefix, filename)
-
-    glob_exprs = [prefixed_filename(filename) for filename in HELM_CHART_METADATA_FILENAMES]
-    globs = PathGlobs(
-        glob_exprs,
-        glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        conjunction=GlobExpansionConjunction.any_match,
-        description_of_origin=description_of_origin,
-    )
-    return DigestSubset(digest, globs)
-
-
 @dataclass(frozen=True)
 class ParseHelmChartMetadataDigest:
     digest: Digest
     description_of_origin: str
-    prefix: str | None = None
 
 
 @rule
@@ -236,11 +217,14 @@ async def parse_chart_metadata_from_digest(
 ) -> HelmChartMetadata:
     subset = await Get(
         Digest,
-        DigestSubset,
-        _chart_metadata_subset(
+        DigestSubset(
             request.digest,
-            description_of_origin=request.description_of_origin,
-            prefix=request.prefix,
+            PathGlobs(
+                HELM_CHART_METADATA_FILENAMES,
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.any_match,
+                description_of_origin=request.description_of_origin,
+            ),
         ),
     )
 
@@ -261,15 +245,17 @@ async def parse_chart_metadata_from_digest(
 @rule
 async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> HelmChartMetadata:
     source_files = await Get(
-        HydratedSources,
-        HydrateSourcesRequest(
-            field, for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
+        StrippedSourceFiles,
+        SourceFilesRequest(
+            [field], for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
         ),
     )
+
     return await Get(
         HelmChartMetadata,
         ParseHelmChartMetadataDigest(
-            source_files.snapshot.digest, description_of_origin=field.address.spec, prefix="**"
+            source_files.snapshot.digest,
+            description_of_origin=f"the `helm_chart` {field.address.spec}",
         ),
     )
 

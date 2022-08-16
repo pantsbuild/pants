@@ -113,7 +113,7 @@ def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
     )
 
     render_process = rule_runner.request(InteractiveProcess, [render_request])
-    assert "a.yaml,b.yaml" in render_process.process.argv
+    assert "__values/a.yaml,__values/b.yaml" in render_process.process.argv
 
 
 def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
@@ -136,7 +136,7 @@ def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
     )
 
     render_process = rule_runner.request(InteractiveProcess, [render_request])
-    assert "b.yaml,a.yaml" in render_process.process.argv
+    assert "__values/b.yaml,__values/a.yaml" in render_process.process.argv
 
 
 def test_renders_files(rule_runner: RuleRunner) -> None:
