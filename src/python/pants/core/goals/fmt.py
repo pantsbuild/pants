@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, TypeVar
+from typing import Callable, Iterable, Iterator, TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -33,6 +33,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
 _FS = TypeVar("_FS", bound=FieldSet)
+_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,16 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
+    def batch(iterable: Iterable[_T], key: Callable[[_T], str]) -> Iterator[list[_T]]:
+        partitions = partition_sequentially(
+            iterable,
+            key=key,
+            size_target=fmt_subsystem.batch_size,
+            size_max=4 * fmt_subsystem.batch_size,
+        )
+        for partition in partitions:
+            yield partition
+
     request_types = union_membership[FmtTargetsRequest]
     specified_names = determine_specified_tool_names("fmt", fmt_subsystem.only, request_types)
 
@@ -223,12 +234,7 @@ async def fmt(
             _FmtTargetBatchRequest(fmt_requests, Targets(target_batch)),
         )
         for fmt_requests, targets in targets_by_fmt_request_order.items()
-        for target_batch in partition_sequentially(
-            targets,
-            key=lambda t: t.address.spec,
-            size_target=fmt_subsystem.batch_size,
-            size_max=4 * fmt_subsystem.batch_size,
-        )
+        for target_batch in batch(targets, key=lambda t: t.address.spec)
     )
 
     individual_results = list(
