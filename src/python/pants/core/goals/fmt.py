@@ -163,7 +163,7 @@ class _FmtTargetBatchRequest:
 
 
 @dataclass(frozen=True)
-class _FmtTargetBatchResult:
+class _FmtBatchResult:
     results: tuple[FmtResult, ...]
     input: Digest
     output: Digest
@@ -239,7 +239,7 @@ def _batch_targets(
 
 
 @rule_helper
-async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtTargetBatchResult]):
+async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtBatchResult]):
     changed_digests = tuple(
         batched_result.output for batched_result in batched_results if batched_result.did_change
     )
@@ -293,7 +293,7 @@ async def fmt(
 
     target_batch_results = await MultiGet(
         Get(
-            _FmtTargetBatchResult,
+            _FmtBatchResult,
             _FmtTargetBatchRequest(fmt_request_types, target_batch),
         )
         for target_batch, fmt_request_types in targets_to_request_types.items()
@@ -317,7 +317,7 @@ async def fmt(
 @rule
 async def fmt_target_batch(
     request: _FmtTargetBatchRequest,
-) -> _FmtTargetBatchResult:
+) -> _FmtBatchResult:
     original_sources = await Get(
         SourceFiles,
         SourceFilesRequest(target[SourcesField] for target in request.targets),
@@ -340,7 +340,7 @@ async def fmt_target_batch(
         results.append(result)
         if not result.skipped:
             prior_snapshot = result.output
-    return _FmtTargetBatchResult(
+    return _FmtBatchResult(
         tuple(results),
         input=original_sources.snapshot.digest,
         output=prior_snapshot.digest,
