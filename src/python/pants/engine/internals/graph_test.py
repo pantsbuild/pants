@@ -708,9 +708,21 @@ def owners_rule_runner() -> RuleRunner:
 
 
 def assert_owners(
-    rule_runner: RuleRunner, requested: Iterable[str], *, expected: Set[Address]
+    rule_runner: RuleRunner,
+    requested: Iterable[str],
+    *,
+    expected: Set[Address],
+    match_if_owning_build_file_included_in_sources: bool = False,
 ) -> None:
-    result = rule_runner.request(Owners, [OwnersRequest(tuple(requested))])
+    result = rule_runner.request(
+        Owners,
+        [
+            OwnersRequest(
+                tuple(requested),
+                match_if_owning_build_file_included_in_sources=match_if_owning_build_file_included_in_sources,
+            )
+        ],
+    )
     assert set(result) == expected
 
 
@@ -823,6 +835,13 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
     assert_owners(
         owners_rule_runner,
         ["demo/BUILD"],
+        match_if_owning_build_file_included_in_sources=False,
+        expected=set(),
+    )
+    assert_owners(
+        owners_rule_runner,
+        ["demo/BUILD"],
+        match_if_owning_build_file_included_in_sources=True,
         expected={
             Address("demo", target_name="f1"),
             Address("demo", target_name="f2_first"),
