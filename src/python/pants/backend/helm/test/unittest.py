@@ -19,7 +19,7 @@ from pants.backend.helm.target_types import (
     HelmUnitTestTimeoutField,
 )
 from pants.backend.helm.util_rules import tool
-from pants.backend.helm.util_rules.chart import AddDigestToChart, HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
@@ -32,7 +32,7 @@ from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import RemovePrefix, Snapshot
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -104,10 +104,14 @@ async def run_helm_unittest(
         ),
     )
 
-    chart_with_tests = await Get(HelmChart, AddDigestToChart(chart, source_files.snapshot.digest))
-
     reports_dir = "__reports_dir"
     reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
+
+    merged_digests = await Get(
+        Digest,
+        MergeDigests([chart.snapshot.digest, source_files.snapshot.digest]),
+    )
+    input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = (
@@ -130,7 +134,7 @@ async def run_helm_unittest(
                 chart.name,
             ],
             description=f"Running Helm unittest suite {field_set.address}",
-            extra_immutable_input_digests=chart_with_tests.immutable_input_digests,
+            input_digest=input_digest,
             cache_scope=cache_scope,
             timeout_seconds=field_set.timeout.calculate_from_global_options(test_subsystem),
             output_directories=(reports_dir,),
