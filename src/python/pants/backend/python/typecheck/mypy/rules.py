@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-import shutil
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent
@@ -325,7 +324,11 @@ async def mypy_typecheck_partition(
         # always emit colors to improve cache hit rates, the results are post-processed to match the
         # global setting
         "MYPY_FORCE_COLOR": "1",
-        "MYPY_FORCE_TERMINAL_WIDTH": str(shutil.get_terminal_size().columns),
+        # Similarly, force a fixed terminal width. This is effectively infinite, disabling mypy's
+        # builtin truncation and line wrapping. Terminals do an acceptable job of soft-wrapping
+        # diagnostic text and source code is typically already hard-wrapped to a limited width.
+        # (Unique random number to make it easier to search for the source of this setting.)
+        "MYPY_FORCE_TERMINAL_WIDTH": "642092230765939",
     }
 
     process = await Get(
