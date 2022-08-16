@@ -229,6 +229,20 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     return HelmChart(address=request.field_set.address, info=chart_info, snapshot=chart_snapshot)
 
 
+@dataclass(frozen=True)
+class AddDigestToChart:
+    chart: HelmChart
+    digest: Digest
+
+
+@rule
+async def add_digest_to_chart(request: AddDigestToChart) -> HelmChart:
+    merged_snapshot = await Get(
+        Snapshot, MergeDigests([request.chart.snapshot.digest, request.digest])
+    )
+    return dataclasses.replace(request.chart, snapshot=merged_snapshot)
+
+
 class MissingHelmDeploymentChartError(ValueError):
     def __init__(self, address: Address) -> None:
         super().__init__(
