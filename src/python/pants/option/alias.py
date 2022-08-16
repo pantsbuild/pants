@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from itertools import chain
 from typing import Generator
 
+from pants.base.deprecated import warn_or_error
 from pants.option.errors import OptionsError
-from pants.option.option_types import DictOption
+from pants.option.option_types import BoolOption, DictOption
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
@@ -57,6 +58,42 @@ class CliOptions(Subsystem):
             """
         ),
     )
+    _build_files_expand_to_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            f"""
+            If true, then BUILD files used in CLI arguments will expand to all the
+            targets they define. For example, `{bin_name()} fmt project/BUILD` will format all
+            the targets defined in the BUILD file, not only the file `project/BUILD`.
+
+            (We believe the more intuitive behavior is to set this option to `false`, which
+            will become the default in Pants 2.15.)
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def build_files_expand_to_targets(self) -> bool:
+        if self.options.is_default("build_files_expand_to_targets"):
+            warn_or_error(
+                "2.15.0.dev0",
+                "`[cli].build_files_expand_to_targets` defaulting to true",
+                softwrap(
+                    f"""
+                    Currently, by default, BUILD files used in CLI arguments will expand to all the
+                    targets they define. For example, `{bin_name()} fmt project/BUILD` will format all
+                    the targets defined in the BUILD file, not only the file `project/BUILD`. In
+                    Pants 2.15, the default will change to no longer expand.
+
+                    To silence this warning, set the option
+                    `build_files_expand_to_targets` in the `[cli]` section of
+                    `pants.toml` to either `true` or `false`. Generally, we recommend setting to
+                    `false` for more intuitive behavior.
+                    """
+                ),
+            )
+        return self._build_files_expand_to_targets
 
 
 @dataclass(frozen=True)
