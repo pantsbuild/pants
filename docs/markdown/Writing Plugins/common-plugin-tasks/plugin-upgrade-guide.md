@@ -11,6 +11,13 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 
 See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x.md> for the changelog.
 
+### `FmtRequest` -> `FmtTargetsRequest`
+
+In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt`
+request types. Therefore `FmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
+
+This change also matches `lint`, which uses `LintTargetsRequest`.
+
 ### Optional Option flag name
 
 Pants 2.14 adds support for deducing the flag name from the attribute name when declaring `XOption`s.
@@ -125,7 +132,7 @@ You can also now specify multiple globs, e.g. `req.path_globs("*.py", "*.pyi")`.
 
 ### Banned short option names like `-x`
 
-You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option. 
+You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option.
 
 (These changes allowed us to introduce ignore specs, like `./pants list :: -ignore_me::`.)
 
