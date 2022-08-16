@@ -368,6 +368,7 @@ async def determine_resolve_pex_config(
     union_membership: UnionMembership,
 ) -> ResolvePexConfig:
     if request.resolve_name is None:
+        # TODO(EA): If the resolve is missing, you cannot yet use the per-resolve options.
         return ResolvePexConfig(
             indexes=python_repos.indexes,
             find_links=python_repos.repos,
@@ -383,15 +384,20 @@ async def determine_resolve_pex_config(
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
 
-    no_binary = (
-        python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
-        or []
+    indexes = python_setup.resolves_to_indexes(
+        all_python_tool_resolve_names, python_repos.indexes
+    ).get(request.resolve_name, [])
+    find_links = python_setup.resolves_to_find_links(
+        all_python_tool_resolve_names, python_repos.repos
+    ).get(request.resolve_name, [])
+    manylinux = python_setup.resolves_to_manylinux(all_python_tool_resolve_names).get(
+        request.resolve_name, None
     )
-    only_binary = (
-        python_setup.resolves_to_only_binary(all_python_tool_resolve_names).get(
-            request.resolve_name
-        )
-        or []
+    no_binary = python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(
+        request.resolve_name, []
+    )
+    only_binary = python_setup.resolves_to_only_binary(all_python_tool_resolve_names).get(
+        request.resolve_name, []
     )
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -435,9 +441,9 @@ async def determine_resolve_pex_config(
         )
 
     return ResolvePexConfig(
-        indexes=python_repos.indexes,
-        find_links=python_repos.repos,
-        manylinux=python_setup.manylinux,
+        indexes=tuple(indexes),
+        find_links=tuple(find_links),
+        manylinux=manylinux,
         constraints_file=constraints_file,
         no_binary=tuple(no_binary),
         only_binary=tuple(only_binary),

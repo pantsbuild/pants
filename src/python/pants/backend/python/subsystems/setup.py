@@ -6,8 +6,9 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, List, Optional, TypeVar, cast
+from typing import Iterable, List, TypeVar
 
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
@@ -214,6 +215,68 @@ class PythonSetup(Subsystem):
             constraints for tool lockfiles, change `[tool].interpreter_constraints`, e.g.
             `[black].interpreter_constraints`; if the tool does not have that option, it determines
             its interpreter constraints from your user code.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_indexes = DictOption[List[str]](
+        help=softwrap(
+            f"""
+            Which package indexes to use for a particular resolve, such as using the default PyPI.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to lists of index URLs. For example,
+            `{{'data-science': ['{PythonRepos.pypi_index}']}}`. Each index URL should point to a
+            repository compliant with PEP 503.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            Warning: If a resolve is not set in the dictionary, it will not use any index; unless
+            you are using `[python].resolves_to_find_links`, this means that no dependencies will
+            be able to be installed for that resolve! So, we recommend setting
+            {RESOLVE_OPTION_KEY__DEFAULT}, or keeping Pants's default value.
+            """
+        ),
+        default={RESOLVE_OPTION_KEY__DEFAULT: [PythonRepos.pypi_index]},
+        advanced=True,
+    )
+    _resolves_to_find_links = DictOption[List[str]](
+        help=softwrap(
+            f"""
+            Which `--find-links` URLs and paths to use for a particular resolve, if any.
+
+            As explained at
+            https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-f, you can use URLs or
+            local file paths with flat lists of archives, such as sdist and wheel files.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to lists of `--find-links` URLs and paths. For example,
+            `{{'data-science': ['https://your/repo/here']}}`. If a
+            resolve is not set in the dictionary, it will not use `--find-links`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_manylinux = DictOption[str](
+        help=softwrap(
+            f"""
+            Whether to allow resolution of manylinux wheels when resolving requirements for
+            foreign Linux platforms for a particular resolve.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to a string, either 'no' to disallow or a manylinux platform
+            upper bound like 'manylinux2010'. For example,
+            `{{'data-science': 'manylinux2010', 'web-app': 'no'}}`. If a
+            resolve is not set in the dictionary, manylinux will be disabled, i.e. the same as
+            explicitly setting it to `no`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves. Usually, it's helpful to enable manylinux by default by setting
+            `{RESOLVE_OPTION_KEY__DEFAULT}`, or keeping Pants's default value.
             """
         ),
         advanced=True,
@@ -661,6 +724,94 @@ class PythonSetup(Subsystem):
         return {resolve: option_value.get(resolve, default_val) for resolve in all_valid_resolves}
 
     @memoized_method
+    def resolves_to_indexes(
+        self,
+        all_python_tool_resolve_names: tuple[str, ...],
+        python_repos_indexes_opt: tuple[str, ...],
+    ) -> dict[str, list[str]]:
+        if python_repos_indexes_opt != (PythonRepos.pypi_index,):
+            if not self.options.is_default("resolves_to_indexes"):
+                raise ValueError(
+                    softwrap(
+                        """
+                        Conflicting options used. You used the new, preferred
+                        `[python].resolves_to_indexes`, but also used the deprecated
+                        `[python-repos].indexes`.
+
+                        Please use only one of these (preferably `[python].resolves_to_indexes`).
+                        """
+                    )
+                )
+            return {
+                resolve: list(python_repos_indexes_opt)
+                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+            }
+        return self._resolves_to_option_helper(
+            self._resolves_to_indexes,
+            "resolves_to_indexes",
+            all_python_tool_resolve_names,
+        )
+
+    @memoized_method
+    def resolves_to_find_links(
+        self,
+        all_python_tool_resolve_names: tuple[str, ...],
+        python_repos_repos_opt: tuple[str, ...],
+    ) -> dict[str, list[str]]:
+        if python_repos_repos_opt:
+            if self._resolves_to_find_links:
+                raise ValueError(
+                    softwrap(
+                        """
+                        Conflicting options used. You used the new, preferred
+                        `[python].resolves_to_find_links`, but also used the deprecated
+                        `[python-repos].repos`.
+
+                        Please use only one of these (preferably `[python].resolves_to_find_links`).
+                        """
+                    )
+                )
+            return {
+                resolve: list(python_repos_repos_opt)
+                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+            }
+        return self._resolves_to_option_helper(
+            self._resolves_to_find_links,
+            "resolves_to_find_links",
+            all_python_tool_resolve_names,
+        )
+
+    @memoized_method
+    def resolves_to_manylinux(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, str | None]:
+        if not self.options.is_default("resolver_manylinux"):
+            if not self.options.is_default("resolves_to_manylinux"):
+                raise ValueError(
+                    softwrap(
+                        """
+                        Conflicting options used. You used the new, preferred
+                        `[python].resolves_to_manylinux`, but also used the deprecated
+                        `[python].resolver_manylinux`.
+
+                        Please use only one of these (preferably `[python].resolves_to_manylinux`).
+                        """
+                    )
+                )
+            return {
+                resolve: self.manylinux
+                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+            }
+        return {
+            k: self._normalize_manylinux_arg(v)
+            for k, v in self._resolves_to_option_helper(
+                self._resolves_to_manylinux,
+                "resolves_to_manylinux",
+                all_python_tool_resolve_names,
+            ).items()
+        }
+
+    @memoized_method
     def resolves_to_constraints_file(
         self, all_python_tool_resolve_names: tuple[str, ...]
     ) -> dict[str, str]:
@@ -727,12 +878,15 @@ class PythonSetup(Subsystem):
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
 
+    @staticmethod
+    def _normalize_manylinux_arg(v: str | None) -> str | None:
+        if v is None or v.lower() in ("false", "no", "none"):
+            return None
+        return v
+
     @property
     def manylinux(self) -> str | None:
-        manylinux = cast(Optional[str], self.resolver_manylinux)
-        if manylinux is None or manylinux.lower() in ("false", "no", "none"):
-            return None
-        return manylinux
+        return self._normalize_manylinux_arg(self.resolver_manylinux)
 
     @property
     def scratch_dir(self):
