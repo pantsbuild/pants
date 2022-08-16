@@ -162,6 +162,30 @@ class DockerImageTargetStageField(StringField):
 
 
 class DockerImageDependenciesField(Dependencies):
+    alias = "dependencies"
+    help = softwrap(
+        f"""
+        Addresses to other targets that this target depends on,
+        e.g. ['helloworld/subdir:lib', 'helloworld/main.py:lib'].
+
+        It can only depend on loose files belonging to `file` / `files` targets,
+        and on artifacts packaged from a variety of targets, such as `pex_binary`,
+        `python_distribution`, `archive`, or any other target that can be built via the package goal.
+
+        This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
+        `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
+        result.
+
+        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir` to find all addresses defined in that directory.
+
+        If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
+        `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
+        `./` for the file path, e.g. `./main.py:tgt`; for all other generated targets,
+        use `:tgt#generated_name`.
+        """
+    )
     supports_transitive_excludes = True
 
 
