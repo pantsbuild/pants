@@ -47,7 +47,11 @@ Pants has a core group of [_Maintainers_](doc:maintainers): trusted people with 
 
 Anyone who has made a few contributions of any kind, and has an ongoing interest in the Pants project, may be nominated by a Maintainer to become a _Contributor_. 
 
-Contributors may be granted extra permissions, such as the ability to assign issues, but these stop short of full Maintainer permissions. Contributors do not have any new obligations—for example, you are _not_ expected to make a certain number of changes. However, contributors are expected to respect their extra permissions. Contributors will be eligible to receive more attention and mentorship in activities like code review. Contributors with a continuing track record of contribution may be nominated to become Maintainers.
+Contributors may be granted extra permissions, such as the ability to assign issues and to fully participate in monthly contributor meetings. These permissions stop short of full Maintainer permissions, such as not yet getting write access to the repository.
+
+Contributors do not have any new obligations. For example, you are _not_ expected to make a certain number of changes. However, contributors are expected to respect their extra permissions.
+
+Contributors will be eligible to receive more attention and mentorship in activities like code review. Contributors with a continuing track record of contribution may be nominated to become Maintainers.
 
 ### Maintainers Emeritus
 
