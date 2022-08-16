@@ -52,7 +52,15 @@ function determine_python() {
     echo "${PY}"
     return 0
   fi
-  for version in '3.7' '3.8' '3.9'; do
+
+  local candidate_versions
+  if is_macos_arm; then
+    candidate_versions=('3.9')
+  else
+    candidate_versions=('3.7' '3.8' '3.9')
+  fi
+
+  for version in "${candidate_versions[@]}"; do
     local interpreter_path
     interpreter_path="$(command -v "python${version}")"
     if [[ -z "${interpreter_path}" ]]; then
