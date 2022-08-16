@@ -11,7 +11,7 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE, PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
@@ -312,7 +312,7 @@ class _PexRequirementsRequest:
     """
 
     addresses: Addresses
-    resolve_name: str | None
+    resolve_name: str
 
 
 @rule
@@ -400,7 +400,10 @@ async def _determine_requirements_for_pex_from_targets(
             )
     else:
         requirements = await Get(
-            PexRequirements, _PexRequirementsRequest(request.addresses, resolve_name=None)
+            PexRequirements,
+            _PexRequirementsRequest(
+                request.addresses, resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE
+            ),
         )
 
     should_return_entire_lockfile = (
@@ -671,7 +674,7 @@ async def _setup_constraints_repository_pex(
         requirements=PexRequirements(
             all_constraints,
             constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
-            resolve_name=None,
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         # Monolithic PEXes like the repository PEX should always use the Packed layout.
         layout=PexLayout.PACKED,

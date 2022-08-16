@@ -9,7 +9,8 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.lint.black.subsystem import rules as black_rules
+from pants.backend.python.lint.yapf.subsystem import rules as yapf_rules
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
@@ -218,7 +219,7 @@ def black_rule_runner() -> RuleRunner:
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Black),
+            *black_rules(),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         ),
@@ -291,7 +292,7 @@ def run_yapf(
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Yapf),
+            *yapf_rules(),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         ),

@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
-from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
+from pants.backend.python.subsystems.setup import (
+    RESOLVE_OPTION_KEY__DEFAULT,
+    InvalidLockfileBehavior,
+    PythonSetup,
+)
 from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
@@ -349,15 +353,19 @@ class ResolvePexConfig:
 class ResolvePexConfigRequest(EngineAwareParameter):
     """Find all configuration from `[python]` that impacts how the resolve is created.
 
-    If `resolve_name` is None, then most per-resolve options will be ignored because there is no way
-    for users to configure them. However, some options like `[python-repos].indexes` will still be
-    loaded.
+    If `resolve_name` is None, per-resolve options will be ignored because there is no way for users
+    to configure them, including what indexes and `--find-links` to use to download dependencies.
+    Thus, usually `resolve_name` should be set.
     """
 
     resolve_name: str | None
 
     def debug_hint(self) -> str:
         return self.resolve_name or "<no resolve>"
+
+
+class NoIndexesConfiguredException(Exception):
+    pass
 
 
 @rule
@@ -368,11 +376,10 @@ async def determine_resolve_pex_config(
     union_membership: UnionMembership,
 ) -> ResolvePexConfig:
     if request.resolve_name is None:
-        # TODO(EA): If the resolve is missing, you cannot yet use the per-resolve options.
         return ResolvePexConfig(
-            indexes=python_repos.indexes,
-            find_links=python_repos.repos,
-            manylinux=python_setup.manylinux,
+            indexes=(),
+            find_links=(),
+            manylinux=None,
             constraints_file=None,
             no_binary=(),
             only_binary=(),
@@ -383,13 +390,49 @@ async def determine_resolve_pex_config(
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
+    if request.resolve_name not in python_setup.all_resolve_names(
+        all_python_tool_resolve_names, include_special_cased_resolves_without_lockfiles=True
+    ):
+        # Note that we don't expect everyday users to be able to trigger this assertion: they can
+        # only define new resolve names via `[python].resolves`. This check is for plugin authors
+        # and pantsbuild/pants.
+        raise AssertionError(
+            softwrap(
+                f"""
+                Resolve name `{request.resolve_name}` not recognized.
+
+                If this resolve corresponds to a tool, make sure it there is a rule that goes from
+                a subclass of `GeneratePythonToolLockfileSentinel` to
+                `GenerateToolLockfileSentinel`. If you're only encountering the failure in tests,
+                you will need to register the rules for generating that tool's lockfile in your
+                tests.
+
+                If you encountered this error in production code, please open a bug at
+                https://github.com/pantsbuild/pants/issues/new/choose.
+                """
+            )
+        )
 
     indexes = python_setup.resolves_to_indexes(
-        all_python_tool_resolve_names, python_repos.indexes
+        all_python_tool_resolve_names,
+        python_repos.indexes,
+        python_repos_indexes_explicitly_set=not python_repos.options.is_default("indexes"),
     ).get(request.resolve_name, [])
     find_links = python_setup.resolves_to_find_links(
         all_python_tool_resolve_names, python_repos.repos
     ).get(request.resolve_name, [])
+    if not indexes and not find_links:
+        raise NoIndexesConfiguredException(
+            softwrap(
+                f"""
+                No package indexes or `--find-links` configured for the resolve
+                `{request.resolve_name}`, which means that dependencies cannot be installed. Please
+                set `[python].resolves_to_indexes` and/or `[python].resolves_to_find_links` for the
+                key `{request.resolve_name}` or the key `{RESOLVE_OPTION_KEY__DEFAULT}`.
+                """
+            )
+        )
+
     manylinux = python_setup.resolves_to_manylinux(all_python_tool_resolve_names).get(
         request.resolve_name, None
     )
@@ -546,21 +589,24 @@ def _common_failure_reasons(
         yield softwrap(
             """
             - The `indexes` arguments have changed from when the lockfile was generated.
-            (Indexes are set via the option `[python-repos].indexes`
+            (Indexes are set via the options `[python].resolves_to_indexes` and deprecated
+            `[python-repos].indexes`)
             """
         )
     if InvalidPythonLockfileReason.FIND_LINKS_MISMATCH in failure_reasons:
         yield softwrap(
             """
             - The `find_links` arguments have changed from when the lockfile was generated.
-            (Find links is set via the option `[python-repos].repos`
+            (Find links is set via the options `[python].resolves_to_find_links` and deprecated
+            `[python-repos].repos`)
             """
         )
     if InvalidPythonLockfileReason.MANYLINUX_MISMATCH in failure_reasons:
         yield softwrap(
             """
             - The `manylinux` argument has changed from when the lockfile was generated.
-            (manylinux is set via the option `[python].resolver_manylinux`
+            (manylinux is set via the option `[python].resolves_to_manylinux` and deprecated
+            `[python-repos].resolver_manylinux`)
             """
         )
 

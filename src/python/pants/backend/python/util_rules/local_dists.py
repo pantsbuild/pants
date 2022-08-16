@@ -184,6 +184,9 @@ async def build_local_dists(
         Pex,
         PexRequest(
             output_filename="local_dists.pex",
+            # NB: It is safe to set resolve_name to None - which effectively disables `--index`
+            # and `--find-links` - because building this PEX will not make network calls thanks to
+            # `--intransitive` and having the wheels available in the input digest.
             requirements=PexRequirements(wheels, resolve_name=None),
             interpreter_constraints=request.interpreter_constraints,
             additional_inputs=wheels_digest,

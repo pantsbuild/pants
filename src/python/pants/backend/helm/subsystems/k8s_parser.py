@@ -17,6 +17,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
@@ -50,7 +51,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class HelmKubeParserLockfileSentinel(GenerateToolLockfileSentinel):
+class HelmKubeParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = HelmKubeParserSubsystem.options_scope
 
 

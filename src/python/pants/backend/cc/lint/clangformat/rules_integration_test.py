@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.cc.lint.clangformat import skip_field
+from pants.backend.cc.lint.clangformat import skip_field, subsystem
 from pants.backend.cc.lint.clangformat.rules import ClangFormatFmtFieldSet, ClangFormatRequest
 from pants.backend.cc.lint.clangformat.rules import rules as clangformat_rules
 from pants.backend.cc.target_types import CCSourcesGeneratorTarget
@@ -30,6 +30,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
+            *subsystem.rules(),
             QueryRule(FmtResult, (ClangFormatRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],

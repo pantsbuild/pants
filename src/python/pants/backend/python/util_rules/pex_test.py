@@ -14,7 +14,7 @@ from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE, PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -264,7 +264,8 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     requirements = PexRequirements(
-        ["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"], resolve_name=None
+        ["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"],
+        resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
     )
     pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
@@ -285,7 +286,8 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     # Unconstrained, we should always pick the top of the range (requests 2.23.0) since the top of
     # the range is a transitive closure over universal wheels.
     direct_pex_info = create_pex_and_get_pex_info(
-        rule_runner, requirements=PexRequirements(direct_deps, resolve_name=None)
+        rule_runner,
+        requirements=PexRequirements(direct_deps, resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE),
     )
     assert_direct_requirements(direct_pex_info)
     assert "requests-2.23.0-py2.py3-none-any.whl" in set(direct_pex_info["distributions"].keys())
@@ -301,7 +303,9 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     constrained_pex_info = create_pex_and_get_pex_info(
         rule_runner,
         requirements=PexRequirements(
-            direct_deps, constraints_strings=constraints, resolve_name=None
+            direct_deps,
+            constraints_strings=constraints,
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     )
@@ -385,7 +389,7 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
         lock = Lockfile(
             path,
             file_path_description_of_origin="foo",
-            resolve_name="a",
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         )
         create_pex_and_get_pex_info(
             rule_runner,
@@ -423,7 +427,9 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_data = create_pex_and_get_all_data(
         rule_runner,
-        requirements=PexRequirements(["cryptography==2.9"], resolve_name=None),
+        requirements=PexRequirements(
+            ["cryptography==2.9"], resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE
+        ),
         platforms=platforms,
         interpreter_constraints=constraints,
         internal_only=False,  # Internal only PEXes do not support (foreign) platforms.
@@ -488,7 +494,9 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         rule_runner,
         pex_type=pex_type,
         requirements=PexRequirements(
-            ["requests==2.23.0"], constraints_strings=constraints, resolve_name=None
+            ["requests==2.23.0"],
+            constraints_strings=constraints,
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         additional_pants_args=("--python-requirement-constraints=constraints.txt",),
     ).pex
@@ -577,7 +585,9 @@ def test_setup_pex_requirements() -> None:
     lockfile_path = "foo.lock"
     lockfile_digest = rule_runner.make_snapshot_of_empty_files([lockfile_path]).digest
     lockfile_obj = Lockfile(
-        lockfile_path, file_path_description_of_origin="foo", resolve_name="resolve"
+        lockfile_path,
+        file_path_description_of_origin="foo",
+        resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
     )
 
     def create_loaded_lockfile(is_pex_lock: bool) -> LoadedLockfile:
@@ -638,11 +648,15 @@ def test_setup_pex_requirements() -> None:
 
     # Normal resolves.
     assert_setup(
-        PexRequirements(reqs, resolve_name=None),
+        PexRequirements(reqs, resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE),
         _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2),
     )
     assert_setup(
-        PexRequirements(reqs, constraints_strings=["constraint"], resolve_name=None),
+        PexRequirements(
+            reqs,
+            constraints_strings=["constraint"],
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
+        ),
         _BuildPexRequirementsSetup(
             [constraints_digest], [*reqs, *pip_args, "--constraints", "__constraints.txt"], 2
         ),
@@ -666,7 +680,9 @@ def test_setup_pex_requirements() -> None:
     # Subset of Pex lockfile.
     assert_setup(
         PexRequirements(
-            ["req1"], from_superset=create_loaded_lockfile(is_pex_lock=True), resolve_name="resolve"
+            ["req1"],
+            from_superset=create_loaded_lockfile(is_pex_lock=True),
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
@@ -679,7 +695,7 @@ def test_setup_pex_requirements() -> None:
         PexRequirements(
             ["req1"],
             from_superset=Pex(digest=repository_pex_digest, name="foo.pex", python=None),
-            resolve_name=None,
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
         ),
         _BuildPexRequirementsSetup(
             [repository_pex_digest], ["req1", "--pex-repository", "foo.pex"], 1
@@ -782,7 +798,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     lockfile = Lockfile(
         "lock.txt",
         file_path_description_of_origin="a test",
-        resolve_name="a",
+        resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(
@@ -791,7 +807,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
 
     lockfile_content = LockfileContent(
         FileContent("lock.txt", lock_content),
-        resolve_name="a",
+        resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(

@@ -668,6 +668,9 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
         return self  # type: ignore[return-value]
 
 
+PLUGINS_RESOLVE_KEY = "global-plugins-option"
+
+
 class BootstrapOptions:
     """The set of options necessary to create a Scheduler.
 
@@ -695,11 +698,16 @@ class BootstrapOptions:
     plugins = StrListOption(
         advanced=True,
         help=softwrap(
-            """
+            f"""
             Allow backends to be loaded from these plugins (usually released through PyPI).
+
             The default backends for each plugin will be loaded automatically. Other backends
             in a plugin can be loaded by listing them in `backend_packages` in the
             `[GLOBAL]` scope.
+
+            Note that installing these plugins is impacted by the options
+            `[python].resolves_to_indexes`, `[python].resolves_to_find_links`, and
+            `[python].resolves_to_manylinux` with the special key {PLUGINS_RESOLVE_KEY}.
             """
         ),
     )

@@ -10,6 +10,7 @@ from typing import Iterable, List, TypeVar
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.option.global_options import PLUGINS_RESOLVE_KEY
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -40,6 +41,8 @@ class LockfileGenerator(enum.Enum):
 
 
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
+RESOLVE_OPTION_KEY__NO_USER_RESOLVE = "no-user-resolve"
+RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND = "pep-517-build-backend"
 
 _T = TypeVar("_T")
 
@@ -279,6 +282,7 @@ class PythonSetup(Subsystem):
             `{RESOLVE_OPTION_KEY__DEFAULT}`, or keeping Pants's default value.
             """
         ),
+        default={RESOLVE_OPTION_KEY__DEFAULT: "manylinux2014"},
         advanced=True,
     )
     _resolves_to_constraints_file = DictOption[str](
@@ -701,13 +705,36 @@ class PythonSetup(Subsystem):
             )
         return result
 
+    @memoized_method
+    def all_resolve_names(
+        self,
+        all_python_tool_resolve_names: tuple[str, ...],
+        *,
+        include_special_cased_resolves_without_lockfiles: bool,
+    ) -> set[str]:
+        result = {*self.resolves, *all_python_tool_resolve_names}
+        if include_special_cased_resolves_without_lockfiles:
+            result.update(
+                {
+                    RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
+                    RESOLVE_OPTION_KEY__PEP_517_BUILD_BACKEND,
+                    PLUGINS_RESOLVE_KEY,
+                }
+            )
+        return result
+
     def _resolves_to_option_helper(
         self,
         option_value: dict[str, _T],
         option_name: str,
         all_python_tool_resolve_names: tuple[str, ...],
+        *,
+        include_special_cased_resolves_without_lockfiles: bool,
     ) -> dict[str, _T]:
-        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
+        all_valid_resolves = self.all_resolve_names(
+            all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=include_special_cased_resolves_without_lockfiles,
+        )
         unrecognized_resolves = set(option_value.keys()) - {
             RESOLVE_OPTION_KEY__DEFAULT,
             *all_valid_resolves,
@@ -728,8 +755,10 @@ class PythonSetup(Subsystem):
         self,
         all_python_tool_resolve_names: tuple[str, ...],
         python_repos_indexes_opt: tuple[str, ...],
+        *,
+        python_repos_indexes_explicitly_set: bool,
     ) -> dict[str, list[str]]:
-        if python_repos_indexes_opt != (PythonRepos.pypi_index,):
+        if python_repos_indexes_explicitly_set:
             if not self.options.is_default("resolves_to_indexes"):
                 raise ValueError(
                     softwrap(
@@ -744,12 +773,16 @@ class PythonSetup(Subsystem):
                 )
             return {
                 resolve: list(python_repos_indexes_opt)
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+                for resolve in self.all_resolve_names(
+                    all_python_tool_resolve_names,
+                    include_special_cased_resolves_without_lockfiles=True,
+                )
             }
         return self._resolves_to_option_helper(
             self._resolves_to_indexes,
             "resolves_to_indexes",
             all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=True,
         )
 
     @memoized_method
@@ -773,12 +806,16 @@ class PythonSetup(Subsystem):
                 )
             return {
                 resolve: list(python_repos_repos_opt)
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+                for resolve in self.all_resolve_names(
+                    all_python_tool_resolve_names,
+                    include_special_cased_resolves_without_lockfiles=True,
+                )
             }
         return self._resolves_to_option_helper(
             self._resolves_to_find_links,
             "resolves_to_find_links",
             all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=True,
         )
 
     @memoized_method
@@ -800,7 +837,10 @@ class PythonSetup(Subsystem):
                 )
             return {
                 resolve: self.manylinux
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+                for resolve in self.all_resolve_names(
+                    all_python_tool_resolve_names,
+                    include_special_cased_resolves_without_lockfiles=True,
+                )
             }
         return {
             k: self._normalize_manylinux_arg(v)
@@ -808,6 +848,7 @@ class PythonSetup(Subsystem):
                 self._resolves_to_manylinux,
                 "resolves_to_manylinux",
                 all_python_tool_resolve_names,
+                include_special_cased_resolves_without_lockfiles=True,
             ).items()
         }
 
@@ -819,6 +860,7 @@ class PythonSetup(Subsystem):
             self._resolves_to_constraints_file,
             "resolves_to_constraints_file",
             all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=False,
         )
 
     @memoized_method
@@ -840,12 +882,16 @@ class PythonSetup(Subsystem):
                 )
             return {
                 resolve: list(self.no_binary)
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+                for resolve in self.all_resolve_names(
+                    all_python_tool_resolve_names,
+                    include_special_cased_resolves_without_lockfiles=False,
+                )
             }
         return self._resolves_to_option_helper(
             self._resolves_to_no_binary,
             "resolves_to_no_binary",
             all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=False,
         )
 
     @memoized_method
@@ -867,12 +913,16 @@ class PythonSetup(Subsystem):
                 )
             return {
                 resolve: list(self.only_binary)
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+                for resolve in self.all_resolve_names(
+                    all_python_tool_resolve_names,
+                    include_special_cased_resolves_without_lockfiles=False,
+                )
             }
         return self._resolves_to_option_helper(
             self._resolves_to_only_binary,
             "resolves_to_only_binary",
             all_python_tool_resolve_names,
+            include_special_cased_resolves_without_lockfiles=False,
         )
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:

@@ -16,6 +16,7 @@ import pytest
 from pex.interpreter import PythonInterpreter
 from pkg_resources import Distribution, Requirement, WorkingSet
 
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
@@ -65,7 +66,10 @@ def _create_pex(
     request = PexRequest(
         output_filename="setup-py-runner.pex",
         internal_only=True,
-        requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"], resolve_name=None),
+        requirements=PexRequirements(
+            ["setuptools==44.0.0", "wheel==0.34.2"],
+            resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE,
+        ),
         interpreter_constraints=interpreter_constraints,
     )
     return rule_runner.request(Pex, [request])

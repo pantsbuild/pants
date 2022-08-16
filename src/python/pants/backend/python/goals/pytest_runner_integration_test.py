@@ -16,10 +16,10 @@ from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems import debugpy, setuptools
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.pytest import rules as pytest_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
@@ -66,7 +66,8 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *setup_py.rules(),
-            *setuptools_rules(),
+            *setuptools.rules(),
+            *debugpy.rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
             QueryRule(TestDebugAdapterRequest, (PythonTestFieldSet,)),

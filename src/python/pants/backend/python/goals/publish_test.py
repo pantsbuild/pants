@@ -14,6 +14,7 @@ from pants.backend.python.goals.publish import (
     rules,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems import twine
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *config_files_rules(),
             *pex_from_targets.rules(),
             *rules(),
+            *twine.rules(),
             QueryRule(PublishProcesses, [PublishPythonPackageRequest]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],

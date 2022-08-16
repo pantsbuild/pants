@@ -11,6 +11,7 @@ from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Mapping
 
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__NO_USER_RESOLVE
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -130,7 +131,8 @@ def create_pex_and_get_all_data(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | EntireLockfile = PexRequirements(resolve_name=None),
+    requirements: PexRequirements
+    | EntireLockfile = PexRequirements(resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
@@ -172,7 +174,8 @@ def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | EntireLockfile = PexRequirements(resolve_name=None),
+    requirements: PexRequirements
+    | EntireLockfile = PexRequirements(resolve_name=RESOLVE_OPTION_KEY__NO_USER_RESOLVE),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
