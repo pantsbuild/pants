@@ -48,7 +48,7 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: FmtRequest,
+        request: FmtTargetsRequest,
         process_result: ProcessResult | FallibleProcessResult,
         output: Snapshot,
         *,
@@ -139,7 +139,7 @@ class FmtResult(EngineAwareReturnType):
 @union
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FmtRequest(StyleRequest[_FS]):
+class FmtTargetsRequest(StyleRequest[_FS]):
     snapshot: Snapshot
 
     def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
@@ -149,7 +149,7 @@ class FmtRequest(StyleRequest[_FS]):
 
 @dataclass(frozen=True)
 class _LanguageFmtRequest:
-    request_types: tuple[type[FmtRequest], ...]
+    request_types: tuple[type[FmtTargetsRequest], ...]
     targets: Targets
 
 
@@ -171,7 +171,7 @@ class FmtSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtRequest in union_membership
+        return FmtTargetsRequest in union_membership
 
     only = StrListOption(
         help=only_option_help("fmt", "formatter", "isort", "shfmt"),
@@ -195,10 +195,10 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
-    request_types = union_membership[FmtRequest]
+    request_types = union_membership[FmtTargetsRequest]
     specified_names = determine_specified_tool_names("fmt", fmt_subsystem.only, request_types)
 
-    # Group targets by the sequence of FmtRequests that apply to them.
+    # Group targets by the sequence of FmtTargetsRequests that apply to them.
     targets_by_fmt_request_order = defaultdict(list)
     for target in targets:
         fmt_requests = []
@@ -209,7 +209,7 @@ async def fmt(
         if fmt_requests:
             targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
 
-    # Spawn sequential formatting per unique sequence of FmtRequests.
+    # Spawn sequential formatting per unique sequence of FmtTargetsRequests.
     per_language_results = await MultiGet(
         Get(
             _LanguageFmtResults,
@@ -291,7 +291,7 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
         )
         if not request.field_sets:
             continue
-        result = await Get(FmtResult, FmtRequest, request)
+        result = await Get(FmtResult, FmtTargetsRequest, request)
         results.append(result)
         if not result.skipped:
             prior_formatter_result = result.output

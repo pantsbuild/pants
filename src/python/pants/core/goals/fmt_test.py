@@ -9,7 +9,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Type
 
-from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
+from pants.core.goals.fmt import Fmt, FmtResult, FmtTargetsRequest
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
 from pants.engine.fs import (
@@ -46,7 +46,7 @@ class FortranFieldSet(FieldSet):
     sources: FortranSource
 
 
-class FortranFmtRequest(FmtRequest):
+class FortranFmtRequest(FmtTargetsRequest):
     field_set_type = FortranFieldSet
     name = "FortranConditionallyDidChange"
 
@@ -77,7 +77,7 @@ class SmalltalkFieldSet(FieldSet):
     source: SmalltalkSource
 
 
-class SmalltalkNoopRequest(FmtRequest):
+class SmalltalkNoopRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
     name = "SmalltalkDidNotChange"
 
@@ -94,7 +94,7 @@ async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
     )
 
 
-class SmalltalkSkipRequest(FmtRequest):
+class SmalltalkSkipRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
     name = "SmalltalkSkipped"
 
@@ -107,14 +107,14 @@ def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
 
 def fmt_rule_runner(
     target_types: List[Type[Target]],
-    fmt_request_types: List[Type[FmtRequest]],
+    fmt_request_types: List[Type[FmtTargetsRequest]],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
             *collect_rules(),
             *source_files.rules(),
             *fmt_rules(),
-            *(UnionRule(FmtRequest, frt) for frt in fmt_request_types),
+            *(UnionRule(FmtTargetsRequest, frt) for frt in fmt_request_types),
         ],
         target_types=target_types,
     )

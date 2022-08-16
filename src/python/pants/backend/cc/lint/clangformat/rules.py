@@ -10,7 +10,7 @@ from typing import Iterable
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.cc.target_types import CCSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
@@ -30,7 +30,7 @@ class ClangFormatFmtFieldSet(FieldSet):
     sources: CCSourceField
 
 
-class ClangFormatRequest(FmtRequest):
+class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
     name = ClangFormat.options_scope
 
@@ -88,5 +88,5 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        UnionRule(FmtRequest, ClangFormatRequest),
+        UnionRule(FmtTargetsRequest, ClangFormatRequest),
     )
