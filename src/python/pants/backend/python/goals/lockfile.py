@@ -302,6 +302,9 @@ async def generate_lockfile(
         valid_for_interpreter_constraints=req.interpreter_constraints,
         # TODO(#12314) Improve error message on `Requirement.parse`
         requirements={PipRequirement.parse(i) for i in req.requirements},
+        indexes=set(pip_args_setup.resolve_config.indexes),
+        find_links=set(pip_args_setup.resolve_config.find_links),
+        manylinux=pip_args_setup.resolve_config.manylinux,
         requirement_constraints=(
             set(pip_args_setup.resolve_config.constraints_file.constraints)
             if pip_args_setup.resolve_config.constraints_file

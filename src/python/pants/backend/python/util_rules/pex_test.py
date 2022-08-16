@@ -753,6 +753,9 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         requirement_constraints=set(),
         only_binary=set(),
         no_binary=set(),
+        indexes=set(),
+        find_links=set(),
+        manylinux=None,
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

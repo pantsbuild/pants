@@ -31,6 +31,9 @@ from pants.util.ordered_set import FrozenOrderedSet
 METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
     {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
+    indexes={"index"},
+    find_links={"find-links"},
+    manylinux=None,
     requirement_constraints={PipRequirement.parse("abc")},
     only_binary={"bdist"},
     no_binary={"sdist"},
@@ -136,8 +139,8 @@ def test_validate_tool_lockfiles(
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
         ResolvePexConfig(
-            indexes=(),
-            find_links=(),
+            indexes=("index",),
+            find_links=("find-links",),
             manylinux=None,
             constraints_file=ResolvePexConstraintsFile(
                 EMPTY_DIGEST,
@@ -188,7 +191,10 @@ def test_validate_tool_lockfiles(
 
 
 @pytest.mark.parametrize(
-    "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,invalid_no_binary",
+    (
+        "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,"
+        + "invalid_no_binary,invalid_indexes,invalid_find_links,invalid_manylinux"
+    ),
     [
         (
             invalid_reqs,
@@ -196,18 +202,27 @@ def test_validate_tool_lockfiles(
             invalid_constraints_file,
             invalid_only_binary,
             invalid_no_binary,
+            invalid_indexes,
+            invalid_find_links,
+            invalid_manylinux,
         )
         for invalid_reqs in (True, False)
         for invalid_interpreter_constraints in (True, False)
         for invalid_constraints_file in (True, False)
         for invalid_only_binary in (True, False)
         for invalid_no_binary in (True, False)
+        for invalid_indexes in (True, False)
+        for invalid_find_links in (True, False)
+        for invalid_manylinux in (True, False)
         if (
             invalid_reqs
             or invalid_interpreter_constraints
             or invalid_constraints_file
             or invalid_only_binary
             or invalid_no_binary
+            or invalid_indexes
+            or invalid_find_links
+            or invalid_manylinux
         )
     ],
 )
@@ -217,6 +232,9 @@ def test_validate_user_lockfiles(
     invalid_constraints_file: bool,
     invalid_only_binary: bool,
     invalid_no_binary: bool,
+    invalid_indexes: bool,
+    invalid_find_links: bool,
+    invalid_manylinux: bool,
     caplog,
 ) -> None:
     runtime_interpreter_constraints = (
@@ -245,9 +263,9 @@ def test_validate_user_lockfiles(
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
         ResolvePexConfig(
-            indexes=(),
-            find_links=(),
-            manylinux=None,
+            indexes=("bad-index" if invalid_indexes else "index",),
+            find_links=("bad-find-links" if invalid_find_links else "find-links",),
+            manylinux="not-manylinux" if invalid_manylinux else None,
             constraints_file=ResolvePexConstraintsFile(
                 EMPTY_DIGEST,
                 "c.txt",
@@ -274,6 +292,9 @@ def test_validate_user_lockfiles(
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
     contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
     contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
+    contains("The `indexes` arguments have changed", if_=invalid_indexes)
+    contains("The `find_links` arguments have changed", if_=invalid_find_links)
+    contains("The `manylinux` argument has changed", if_=invalid_manylinux)
 
     contains("./pants generate-lockfiles --resolve=a`")
 
