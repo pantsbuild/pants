@@ -66,7 +66,7 @@ pub enum OperationOrStatus {
   Status(StatusProto),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecutionError {
   Fatal(ProcessError),
   // Digests are Files and Directories which have been reported to be missing remotely (unlike

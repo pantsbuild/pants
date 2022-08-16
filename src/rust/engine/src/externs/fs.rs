@@ -51,7 +51,7 @@ pub fn possible_store_missing_digest(e: store::StoreError) -> PyErr {
 }
 
 #[pyclass(name = "Digest")]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyDigest(pub DirectoryDigest);
 
 impl fmt::Display for PyDigest {
@@ -108,7 +108,7 @@ impl PyDigest {
 }
 
 #[pyclass(name = "FileDigest")]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PyFileDigest(pub Digest);
 
 #[pymethods]
@@ -257,7 +257,7 @@ impl PySnapshot {
 }
 
 #[pyclass(name = "MergeDigests")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 
 #[pymethods]
@@ -298,7 +298,7 @@ impl PyMergeDigests {
 }
 
 #[pyclass(name = "AddPrefix")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyAddPrefix {
   pub digest: DirectoryDigest,
   pub prefix: PathBuf,
@@ -339,7 +339,7 @@ impl PyAddPrefix {
 }
 
 #[pyclass(name = "RemovePrefix")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyRemovePrefix {
   pub digest: DirectoryDigest,
   pub prefix: PathBuf,
