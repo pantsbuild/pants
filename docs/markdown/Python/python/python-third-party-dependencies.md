@@ -478,28 +478,54 @@ Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl
 ### Custom repositories
 
 There are two mechanisms for setting up custom Python distribution repositories:
+PEP-503 compatible indexes like PyPI, and pip `--find-links` URLs and paths.
+
+Both options allow you to configure per-resolve, meaning that the resolves for your user code from
+`[python].resolves` and all Python tools like Black and Pytest can have different configuration.
+Often, you can simply set the key `__default__` to apply the same value to every resolve; then, you
+can override specific resolves, if necessary. For example:
+
+```toml pants.toml
+[python.resolves_to_indexes]
+__default__ = ["https://pypi.org/simple"]
+data-science = ["https://custom-cheeseshop.net/simple"]
+pytest = []
+
+[python.resolves_to_find_links]
+pytest = ["https://your/repo/here"]
+```
+
+If you are not yet using `[python].resolves`, use the special key `no-user-resolve` to configure
+your user requirements, or set the key `__default__`. 
 
 #### Simple repositories as defined by PEP 503
 
-If your custom repo is of this type, i.e., "private PyPI", aka "cheese shop", use the option `indexes` in the `[python-repos]` scope.
+If your custom repo is of this type, i.e., "private PyPI", aka "cheese shop", use the option
+`[python].resolves_to_indexes`.
 
 ```toml pants.toml
-[python-repos]
-indexes.add = ["https://custom-cheeseshop.net/simple"]
+[python.resolves_to_indexes]
+__default__ = ["https://pypi.org/simple"]
+data-science = ["https://custom-cheeseshop.net/simple"]
 ```
 
-To exclusively use your custom index—i.e. to not use PyPI—use `indexes = [..]` instead of `indexes.add = [..]`.
+Usually, you will want to set `__default__`, possibly to the value `["https://pypi.org/simple"]`.
+If a particular resolve does not have either indexes or find_links configured, Pants will error
+because it would not be able to install anything; so, setting `__default__` makes sure that
+everything can be installed.
 
 #### A Pip findlinks repository
 
-If your custom repo is of this type, use the option `repos` in the `[python-repos]` scope.
+If your custom repo is of this type, use the option `[python.resolves_to_find_links]`.
 
 ```toml
-[python-repos]
-repos = ["https://your/repo/here"]
+[python.resolves_to_find_links]
+__default__ = []
+data-science = ["https://your/repo/here"]
 ```
 
-Indexes are assumed to have a nested structure (like <http://pypi.org/simple>), whereas repos are flat lists of packages.
+Indexes are assumed to have a nested structure (like <http://pypi.org/simple>), whereas findlinks
+are flat lists of packages.
 
 #### Authenticating to custom repos
 
@@ -511,8 +537,8 @@ to load the values via environment variables. This avoids checking in sensitive 
 version control.
 
 ```toml pants.toml
-[python-repos]
-indexes.add = ["http://%(env.INDEX_USERNAME)s:%(INDEX_PASSWORD)s@my.custom.repo/index"]
+[python.resolves_to_indexes]
+__default__ = ["http://%(env.INDEX_USERNAME)s:%(INDEX_PASSWORD)s@my.custom.repo/index"]
 ```
 
 Alternatively, you can hardcode the value in a private (not checked-in)
@@ -520,9 +546,57 @@ Alternatively, you can hardcode the value in a private (not checked-in)
 the user:
 
 ```toml .pants.rc
-[python-repos]
-indexes.add = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
+[python.resolves_to_indexes]
+__default__ = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
 ```
+
+### Constraints files
+
+Sometimes, transitive dependencies of one of your third-party requirements can cause trouble.
+[Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) 
+allow you to pin these transitive dependencies to certain versions, overriding the version that
+pip/Pex would normally choose.
+
+Constraints files are configured per-resolve, meaning that the resolves for your user code from
+`[python].resolves` and all Python tools like Black and Pytest can have different configuration.
+Use the option `[python].resolves_to_constraints_file` to map resolve names to paths to
+pip-compatible constraints files. For example:
+
+```toml pants.toml
+[python.resolves_to_constraints_file]
+data-science = "3rdparty/python/data_science_constraints.txt"
+pytest = "3rdparty/python/pytest_constraints.txt"
+```
+```text 3rdparty/python/data_science_constraints.txt
+requests==22.1.0
+urrllib3==4.2
+```
+
+You can also set the key `__default__` to apply the same constraints file to every resolve by
+default, although this is not always useful because resolves often to need different constraints.
+
+### `only_binary` and `no_binary`
+
+You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for
+certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for
+certain requirements.
+
+`only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user
+code from `[python].resolves` and all Python tools like Black and Pytest can have different
+configuration. Use the options `[python].resolves_to_only_binary` and 
+`[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
+For example:
+
+```toml pants.toml
+[python.resolves_to_only_binary]
+data-science = ["numpy"]
+
+[python.resolves_to_no_binary]
+pytest = ["pytest-xdist"]
+mypy_extra_type_stubs = ["django-stubs"]
+```
+
+You can also set the key `__default__` to apply the same value to every resolve by default.
 
 Tip: use `./pants export` to create a virtual environment for IDEs
 ------------------------------------------------------------------

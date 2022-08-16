@@ -94,8 +94,6 @@ def _generate(
             """
         )
     )
-    print(pex_header)
-    print(content)
     assert content.startswith(pex_header)
     return strip_prefix(content, pex_header)
 

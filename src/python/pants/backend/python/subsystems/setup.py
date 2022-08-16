@@ -552,9 +552,11 @@ class PythonSetup(Subsystem):
         removal_hint=softwrap(
             f"""
             Use `[python].resolves_to_no_binary`, which allows you to set `--no-binary` on a
-            per-resolve basis for more flexibility. To keep this option's behavior, set
-            `[python].resolves_to_no_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
-            value you used on this option.
+            per-resolve basis for more flexibility. That is, you can configure differently how
+            individual Python tools like Pytest and resolves from `[python].resolves` are installed.
+
+            To keep this option's behavior, set `[python].resolves_to_no_binary` with the key
+            `{RESOLVE_OPTION_KEY__DEFAULT}` and the value you used on this option.
             """
         ),
     )
@@ -577,9 +579,11 @@ class PythonSetup(Subsystem):
         removal_hint=softwrap(
             f"""
             Use `[python].resolves_to_only_binary`, which allows you to set `--only-binary` on a
-            per-resolve basis for more flexibility. To keep this option's behavior, set
-            `[python].resolves_to_only_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
-            value you used on this option.
+            per-resolve basis for more flexibility. That is, you can configure differently how
+            individual Python tools like Pytest and resolves from `[python].resolves` are installed.
+
+            To keep this option's behavior, set `[python].resolves_to_only_binary` with the key
+            `{RESOLVE_OPTION_KEY__DEFAULT}` and the value you used on this option.
             """
         ),
     )
@@ -593,6 +597,17 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            Use `[python].resolves_to_manylinux`, which allows you to set `manylinux` on a
+            per-resolve basis for more flexibility.That is, you can configure differently how
+            individual Python tools like Pytest and resolves from `[python].resolves` are installed.
+
+            To keep this option's behavior, set `[python].resolves_to_manylinux` with the key
+            `{RESOLVE_OPTION_KEY__DEFAULT}` and the value you used on this option.
+            """
+        ),
     )
 
     tailor_source_targets = BoolOption(
