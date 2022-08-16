@@ -23,7 +23,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Targets
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -195,6 +195,49 @@ class Fmt(Goal):
     subsystem_cls = FmtSubsystem
 
 
+def _batch(
+    fmt_subsystem: FmtSubsystem, iterable: Iterable[_T], key: Callable[[_T], str]
+) -> Iterator[list[_T]]:
+    partitions = partition_sequentially(
+        iterable,
+        key=key,
+        size_target=fmt_subsystem.batch_size,
+        size_max=4 * fmt_subsystem.batch_size,
+    )
+    for partition in partitions:
+        yield partition
+
+
+def _batch_targets(
+    fmt_subsystem: FmtSubsystem,
+    all_request_types: Iterable[type[FmtTargetsRequest]],
+    targets: Iterable[Target],
+) -> dict[Targets, tuple[type[FmtTargetsRequest], ...]]:
+    """Groups targets by the relevant Request types, then batches them.
+
+    Returns a mapping from batch -> Request types.
+    """
+    formatters_to_run = determine_specified_tool_names("fmt", fmt_subsystem.only, all_request_types)
+    targets_by_request_order = defaultdict(list)
+
+    for target in targets:
+        request_types = []
+        for request_type in all_request_types:
+            valid_name = request_type.name in formatters_to_run
+            if valid_name and request_type.field_set_type.is_applicable(target):
+                request_types.append(request_type)
+        if request_types:
+            targets_by_request_order[tuple(request_types)].append(target)
+
+    target_batches_by_fmt_request_order = {
+        Targets(target_batch): request_types
+        for request_types, targets in targets_by_request_order.items()
+        for target_batch in _batch(fmt_subsystem, targets, key=lambda t: t.address.spec)
+    }
+
+    return target_batches_by_fmt_request_order
+
+
 @goal_rule
 async def fmt(
     console: Console,
@@ -203,54 +246,28 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
-    def batch(iterable: Iterable[_T], key: Callable[[_T], str]) -> Iterator[list[_T]]:
-        partitions = partition_sequentially(
-            iterable,
-            key=key,
-            size_target=fmt_subsystem.batch_size,
-            size_max=4 * fmt_subsystem.batch_size,
-        )
-        for partition in partitions:
-            yield partition
+    targets_to_request_types = _batch_targets(
+        fmt_subsystem,
+        union_membership[FmtTargetsRequest],
+        targets,
+    )
 
-    request_types = union_membership[FmtTargetsRequest]
-    specified_names = determine_specified_tool_names("fmt", fmt_subsystem.only, request_types)
-
-    # Group targets by the sequence of FmtTargetsRequests that apply to them.
-    targets_by_fmt_request_order = defaultdict(list)
-    for target in targets:
-        fmt_requests = []
-        for fmt_request in request_types:
-            valid_name = fmt_request.name in specified_names
-            if valid_name and fmt_request.field_set_type.is_applicable(target):  # type: ignore[misc]
-                fmt_requests.append(fmt_request)
-        if fmt_requests:
-            targets_by_fmt_request_order[tuple(fmt_requests)].append(target)
-
-    # Spawn sequential formatting per unique sequence of FmtTargetsRequests.
-    per_language_results = await MultiGet(
+    target_batch_results = await MultiGet(
         Get(
             _FmtTargetBatchResult,
-            _FmtTargetBatchRequest(fmt_requests, Targets(target_batch)),
+            _FmtTargetBatchRequest(fmt_request_types, target_batch),
         )
-        for fmt_requests, targets in targets_by_fmt_request_order.items()
-        for target_batch in batch(targets, key=lambda t: t.address.spec)
+        for target_batch, fmt_request_types in targets_to_request_types.items()
     )
 
     individual_results = list(
-        itertools.chain.from_iterable(
-            language_result.results for language_result in per_language_results
-        )
+        itertools.chain.from_iterable(result.results for result in target_batch_results)
     )
 
     if not individual_results:
         return Fmt(exit_code=0)
 
-    changed_digests = tuple(
-        language_result.output
-        for language_result in per_language_results
-        if language_result.did_change
-    )
+    changed_digests = tuple(result.output for result in target_batch_results if result.did_change)
     if changed_digests:
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practice, this should never
@@ -285,33 +302,35 @@ async def fmt(
 
 
 @rule
-async def fmt_language(language_fmt_request: _FmtTargetBatchRequest) -> _FmtTargetBatchResult:
+async def fmt_target_batch(
+    request: _FmtTargetBatchRequest,
+) -> _FmtTargetBatchResult:
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(target[SourcesField] for target in language_fmt_request.targets),
+        SourceFilesRequest(target[SourcesField] for target in request.targets),
     )
-    prior_formatter_result = original_sources.snapshot
+    prior_snapshot = original_sources.snapshot
 
     results = []
-    for fmt_request_type in language_fmt_request.request_types:
-        request = fmt_request_type(
+    for fmt_targets_request_type in request.request_types:
+        fmt_targets_request = fmt_targets_request_type(
             (
-                fmt_request_type.field_set_type.create(target)
-                for target in language_fmt_request.targets
-                if fmt_request_type.field_set_type.is_applicable(target)
+                fmt_targets_request_type.field_set_type.create(target)
+                for target in request.targets
+                if fmt_targets_request_type.field_set_type.is_applicable(target)
             ),
-            snapshot=prior_formatter_result,
+            snapshot=prior_snapshot,
         )
-        if not request.field_sets:
+        if not fmt_targets_request.field_sets:
             continue
-        result = await Get(FmtResult, FmtTargetsRequest, request)
+        result = await Get(FmtResult, FmtTargetsRequest, fmt_targets_request)
         results.append(result)
         if not result.skipped:
-            prior_formatter_result = result.output
+            prior_snapshot = result.output
     return _FmtTargetBatchResult(
         tuple(results),
         input=original_sources.snapshot.digest,
-        output=prior_formatter_result.digest,
+        output=prior_snapshot.digest,
     )
 
 
