@@ -3,13 +3,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import List, Type
 
-from pants.core.goals.fmt import Fmt, FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import Fmt, FmtBuildFilesRequest, FmtResult, FmtTargetsRequest
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
 from pants.engine.fs import (
@@ -17,6 +19,7 @@ from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
     Snapshot,
 )
@@ -100,21 +103,56 @@ class SmalltalkSkipRequest(FmtTargetsRequest):
 
 
 @rule
-def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
+async def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
     assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult.skip(formatter_name=request.name)
 
 
+class BrickyBuildFileFormatter(FmtBuildFilesRequest):
+    """Ensures all non-comment lines only consist of the word 'brick'."""
+
+    name = "BrickyBobby"
+
+
+@rule
+async def fmt_with_bricky(request: BrickyBuildFileFormatter) -> FmtResult:
+    def brickify(contents: bytes) -> bytes:
+        content_str = contents.decode("ascii")
+        new_lines = []
+        for line in content_str.splitlines(keepends=True):
+            if not line.startswith("#"):
+                line = re.sub(r"[a-zA-Z_]+", "brick", line)
+            new_lines.append(line)
+        return "".join(new_lines).encode()
+
+    digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
+    new_contents = [
+        dataclasses.replace(file_content, content=brickify(file_content.content))
+        for file_content in digest_contents
+    ]
+    output_snapshot = await Get(Snapshot, CreateDigest(new_contents))
+
+    return FmtResult(
+        input=request.snapshot,
+        output=output_snapshot,
+        stdout="",
+        stderr="",
+        formatter_name=request.name,
+    )
+
+
 def fmt_rule_runner(
     target_types: List[Type[Target]],
-    fmt_request_types: List[Type[FmtTargetsRequest]],
+    fmt_targets_request_types: List[Type[FmtTargetsRequest]] = [],
+    fmt_build_files_request_types: List[Type[FmtBuildFilesRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
             *collect_rules(),
             *source_files.rules(),
             *fmt_rules(),
-            *(UnionRule(FmtTargetsRequest, frt) for frt in fmt_request_types),
+            *(UnionRule(FmtTargetsRequest, ftr) for ftr in fmt_targets_request_types),
+            *(UnionRule(FmtBuildFilesRequest, fbfr) for fbfr in fmt_build_files_request_types),
         ],
         target_types=target_types,
     )
@@ -132,15 +170,7 @@ def run_fmt(
     return result.stderr
 
 
-def test_summary() -> None:
-    rule_runner = fmt_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
-        # NB: Keep SmalltalkSkipRequest before SmalltalkNoopRequest so it runs first. This helps test
-        # a bug where a formatter run after a skipped formatter was receiving an empty snapshot.
-        # See https://github.com/pantsbuild/pants/issues/15406
-        fmt_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
-    )
-
+def write_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -158,11 +188,25 @@ def test_summary() -> None:
         },
     )
 
-    stderr = run_fmt(rule_runner, target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"])
+
+def test_summary() -> None:
+    rule_runner = fmt_rule_runner(
+        target_types=[FortranTarget, SmalltalkTarget],
+        # NB: Keep SmalltalkSkipRequest before SmalltalkNoopRequest so it runs first. This helps test
+        # a bug where a formatter run after a skipped formatter was receiving an empty snapshot.
+        # See https://github.com/pantsbuild/pants/issues/15406
+        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
+        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+    )
+
+    write_files(rule_runner)
+
+    stderr = run_fmt(rule_runner, target_specs=["//::"])
 
     assert stderr == dedent(
         """\
 
+        + BrickyBobby made changes.
         + FortranConditionallyDidChange made changes.
         ✓ SmalltalkDidNotChange made no changes.
         """
@@ -170,14 +214,34 @@ def test_summary() -> None:
 
     fortran_file = Path(rule_runner.build_root, FORTRAN_FILE.path)
     smalltalk_file = Path(rule_runner.build_root, SMALLTALK_FILE.path)
+    build_file = Path(rule_runner.build_root, "BUILD")
     assert fortran_file.is_file()
     assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
     assert smalltalk_file.is_file()
     assert smalltalk_file.read_text() == SMALLTALK_FILE.content.decode()
+    assert build_file.is_file()
+    assert build_file.read_text() == dedent(
+        """\
+        brick(brick='brick1', brick="brick1.brick98")
+        brick(brick='brick', brick="brick.brick98")
+        brick(brick='brick1', brick="brick1.brick")
+        brick(brick='brick2', brick="brick.brick")
+        """
+    )
+
+
+def test_only() -> None:
+    rule_runner = fmt_rule_runner(
+        target_types=[FortranTarget, SmalltalkTarget],
+        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
+        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+    )
+
+    write_files(rule_runner)
 
     stderr = run_fmt(
         rule_runner,
-        target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"],
+        target_specs=["//::"],
         only=[SmalltalkNoopRequest.name],
     )
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
