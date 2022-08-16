@@ -22,7 +22,7 @@ from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
@@ -238,6 +238,45 @@ def _batch_targets(
     return target_batches_by_fmt_request_order
 
 
+@rule_helper
+async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtTargetBatchResult]):
+    changed_digests = tuple(
+        batched_result.output for batched_result in batched_results if batched_result.did_change
+    )
+    if changed_digests:
+        # NB: this will fail if there are any conflicting changes, which we want to happen rather
+        # than silently having one result override the other. In practice, this should never
+        # happen due to us grouping each language's formatters into a single digest.
+        merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
+        workspace.write_digest(merged_formatted_digest)
+
+
+def _print_results(
+    console: Console,
+    results: Iterable[FmtResult],
+):
+    if results:
+        console.print_stderr("")
+
+    # We group all results for the same formatter so that we can give one final status in the
+    # summary. This is only relevant if there were multiple results because of
+    # `--per-file-caching`.
+    formatter_to_results = defaultdict(set)
+    for result in results:
+        formatter_to_results[result.formatter_name].add(result)
+
+    for formatter, results in sorted(formatter_to_results.items()):
+        if any(result.did_change for result in results):
+            sigil = console.sigil_succeeded_with_edits()
+            status = "made changes"
+        elif all(result.skipped for result in results):
+            continue
+        else:
+            sigil = console.sigil_succeeded()
+            status = "made no changes"
+        console.print_stderr(f"{sigil} {formatter} {status}.")
+
+
 @goal_rule
 async def fmt(
     console: Console,
@@ -267,34 +306,8 @@ async def fmt(
     if not individual_results:
         return Fmt(exit_code=0)
 
-    changed_digests = tuple(result.output for result in target_batch_results if result.did_change)
-    if changed_digests:
-        # NB: this will fail if there are any conflicting changes, which we want to happen rather
-        # than silently having one result override the other. In practice, this should never
-        # happen due to us grouping each language's formatters into a single digest.
-        merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
-        workspace.write_digest(merged_formatted_digest)
-
-    if individual_results:
-        console.print_stderr("")
-
-    # We group all results for the same formatter so that we can give one final status in the
-    # summary. This is only relevant if there were multiple results because of
-    # `--per-file-caching`.
-    formatter_to_results = defaultdict(set)
-    for result in individual_results:
-        formatter_to_results[result.formatter_name].add(result)
-
-    for formatter, results in sorted(formatter_to_results.items()):
-        if any(result.did_change for result in results):
-            sigil = console.sigil_succeeded_with_edits()
-            status = "made changes"
-        elif all(result.skipped for result in results):
-            continue
-        else:
-            sigil = console.sigil_succeeded()
-            status = "made no changes"
-        console.print_stderr(f"{sigil} {formatter} {status}.")
+    await _write_files(workspace, target_batch_results)
+    _print_results(console, individual_results)
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
