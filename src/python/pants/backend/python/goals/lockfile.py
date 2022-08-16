@@ -378,7 +378,7 @@ async def setup_user_lockfile_requests(
     )
 
 
-class PoetryLockfileSentinel(GenerateToolLockfileSentinel):
+class PoetryLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PoetrySubsystem.options_scope
 
 

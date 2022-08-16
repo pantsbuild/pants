@@ -250,7 +250,6 @@ def test_multiple_resolves() -> None:
             # Override interpreter constraints for 'b', but use default for 'a'.
             "--python-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
             "--python-enable-resolves",
-            "--python-lockfile-generator=pex",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
