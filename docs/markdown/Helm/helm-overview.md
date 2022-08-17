@@ -25,7 +25,7 @@ backend_packages = [
 ]
 ```
 
-In the case in which you may have more than one chart in the same repository, the Helm backend is capable of auto-detecting the root folder of your Helm charts taking the chart definition file `Chart.yaml` as the reference for that root. Nonetheless, it is recommended that you configure your Pants' source roots in a way that Pants recognises each of your chart folders as a source root. In the following example `foo` and `bar` are Helm charts, so we give Pants a source root pattern to consider `src/helm/foo` and `src/helm/bar` as source roots.
+In the case in which you may have more than one chart in the same repository, the Helm backend is capable of auto-detecting the root folder of your Helm charts taking the chart definition file `Chart.yaml` as the reference for that root. Nonetheless, it is recommended that you configure your Pants' source roots in a way that Pants recognises each of your chart folders as a source root. In the following example `foo` and `bar` are Helm charts, so we tell Pants to use a marker filename to identify the source roots of those charts.
 
 ```yaml src/helm/foo/Chart.yaml
 apiVersion: v2
@@ -41,11 +41,7 @@ version: 0.1.0
 ```
 ```toml pants.toml
 [source]
-root_patterns = [
-  ...
-  "src/helm/*",
-  ...
-]
+marker_filenames = ["Chart.yaml"]
 ```
 
 You can verify this by running the `./pants roots` command and and checking that the folders `src/helm/foo` and `src/helm/bar` are listed.
