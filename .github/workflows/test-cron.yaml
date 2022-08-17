@@ -282,7 +282,7 @@ jobs:
         python-version:
         - '3.8'
         - '3.9'
-    timeout-minutes: 40
+    timeout-minutes: 60
   check_labels:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
