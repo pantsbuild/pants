@@ -300,8 +300,13 @@ async def generate_lockfile(
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=req.interpreter_constraints,
-        # TODO(#12314) Improve error message on `Requirement.parse`
-        requirements={PipRequirement.parse(i) for i in req.requirements},
+        requirements={
+            PipRequirement.parse(
+                i,
+                description_of_origin=f"the lockfile {req.lockfile_dest} for the resolve {req.resolve_name}",
+            )
+            for i in req.requirements
+        },
         indexes=set(pip_args_setup.resolve_config.indexes),
         find_links=set(pip_args_setup.resolve_config.find_links),
         manylinux=pip_args_setup.resolve_config.manylinux,

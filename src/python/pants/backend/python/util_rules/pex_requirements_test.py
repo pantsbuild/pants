@@ -35,8 +35,8 @@ METADATA = PythonLockfileMetadataV3(
     find_links={"find-links"},
     manylinux=None,
     requirement_constraints={PipRequirement.parse("abc")},
-    only_binary={"bdist"},
-    no_binary={"sdist"},
+    only_binary={PipRequirement.parse("bdist")},
+    no_binary={PipRequirement.parse("sdist")},
 )
 
 
@@ -149,8 +149,12 @@ def test_validate_tool_lockfiles(
                     {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
                 ),
             ),
-            no_binary=("not-sdist" if invalid_no_binary else "sdist",),
-            only_binary=("not-bdist" if invalid_only_binary else "bdist",),
+            no_binary=FrozenOrderedSet(
+                [PipRequirement.parse("not-sdist" if invalid_no_binary else "sdist")]
+            ),
+            only_binary=FrozenOrderedSet(
+                [PipRequirement.parse("not-bdist" if invalid_only_binary else "bdist")]
+            ),
         ),
     )
 
@@ -273,8 +277,12 @@ def test_validate_user_lockfiles(
                     {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
                 ),
             ),
-            no_binary=("not-sdist" if invalid_no_binary else "sdist",),
-            only_binary=("not-bdist" if invalid_only_binary else "bdist",),
+            no_binary=FrozenOrderedSet(
+                [PipRequirement.parse("not-sdist" if invalid_no_binary else "sdist")]
+            ),
+            only_binary=FrozenOrderedSet(
+                [PipRequirement.parse("not-bdist" if invalid_only_binary else "bdist")]
+            ),
         ),
     )
 
