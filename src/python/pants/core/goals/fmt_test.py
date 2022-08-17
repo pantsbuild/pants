@@ -205,7 +205,7 @@ def test_summary() -> None:
 
     write_files(rule_runner)
 
-    stderr = run_fmt(rule_runner, target_specs=["//::"])
+    stderr = run_fmt(rule_runner, target_specs=["::"])
 
     assert stderr == dedent(
         """\
@@ -261,31 +261,31 @@ def test_build_spec_matching() -> None:
             assert Path(rule_runner.build_root, path).read_text() == original_contents
 
     rule_runner.write_files(build_files)
-    run_fmt(rule_runner, target_specs=["//::"])
+    run_fmt(rule_runner, target_specs=["::"])
     assert_only_changed(*build_files)
 
     rule_runner.write_files(build_files)
-    run_fmt(rule_runner, target_specs=["//dirA:"])
+    run_fmt(rule_runner, target_specs=["dirA:"])
     assert_only_changed("dirA/BUILD")
 
     rule_runner.write_files(build_files)
-    run_fmt(rule_runner, target_specs=["//dirA::"])
+    run_fmt(rule_runner, target_specs=["dirA::"])
     assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants")
 
     rule_runner.write_files(build_files)
-    run_fmt(rule_runner, target_specs=["//dirA::", "//dirB/BUILD"])
+    run_fmt(rule_runner, target_specs=["dirA::", "dirB/BUILD"])
     assert_only_changed(
         "dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants", "dirB/BUILD"
     )
 
     rule_runner.write_files(build_files)
-    run_fmt(rule_runner, target_specs=["//dirA::", "!//dirA/subdirX:"])
+    run_fmt(rule_runner, target_specs=["dirA::", "!dirA/subdirX:"])
     assert_only_changed("dirA/BUILD", "dirA/subdirY/BUILD.pants")
 
     rule_runner.write_files(build_files)
     run_fmt(
         rule_runner,
-        target_specs=["//::", "!//dirB::"],
+        target_specs=["::", "!dirB::"],
         extra_args=["--build-ignore=dirA/**"],
     )
     assert_only_changed("BUILD", "dirC/BUILD")
@@ -295,7 +295,7 @@ def test_build_spec_matching() -> None:
     rule_runner.write_files(build_files)
     run_fmt(
         rule_runner,
-        target_specs=["//::"],
+        target_specs=["::"],
         extra_args=["--build-patterns=PANTS"],
     )
     assert_only_changed(*build_files)
@@ -312,7 +312,7 @@ def test_only() -> None:
 
     stderr = run_fmt(
         rule_runner,
-        target_specs=["//::"],
+        target_specs=["::"],
         only=[SmalltalkNoopRequest.name],
     )
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
