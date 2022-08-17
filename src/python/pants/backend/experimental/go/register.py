@@ -16,6 +16,8 @@ from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
     build_pkg_target,
+    coverage,
+    coverage_output,
     first_party_pkg,
     go_bootstrap,
     go_mod,
@@ -25,7 +27,7 @@ from pants.backend.go.util_rules import (
     pkg_analyzer,
     sdk,
     tests_analysis,
-    third_party_pkg, coverage, coverage_output,
+    third_party_pkg,
 )
 
 

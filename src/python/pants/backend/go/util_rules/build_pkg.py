@@ -7,6 +7,7 @@ import hashlib
 import os.path
 from dataclasses import dataclass
 
+from pants.backend.go.util_rules import coverage
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
@@ -471,4 +472,7 @@ async def compute_compile_action_id(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *coverage.rules(),
+    )
