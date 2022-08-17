@@ -43,7 +43,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -362,8 +362,8 @@ class TailorSubsystem(GoalSubsystem):
     def validate_build_file_name(self, build_file_patterns: tuple[str, ...]) -> None:
         """Check that the specified BUILD file name works with the repository's BUILD file
         patterns."""
-        filespec = Filespec(includes=list(build_file_patterns))
-        if not bool(matches_filespec(filespec, paths=[self.build_file_name])):
+        filespec_matcher = FilespecMatcher(build_file_patterns, ())
+        if not bool(filespec_matcher.matches([self.build_file_name])):
             raise ValueError(
                 f"The option `[{self.options_scope}].build_file_name` is set to "
                 f"`{self.build_file_name}`, which is not compatible with "
@@ -375,13 +375,14 @@ class TailorSubsystem(GoalSubsystem):
     def filter_by_ignores(
         self, putative_targets: Iterable[PutativeTarget], build_file_ignores: tuple[str, ...]
     ) -> Iterator[PutativeTarget]:
-        ignore_paths_filespec = Filespec(includes=[*self.ignore_paths, *build_file_ignores])
+        ignore_paths_filespec_matcher = FilespecMatcher(
+            (*self.ignore_paths, *build_file_ignores), ()
+        )
         for ptgt in putative_targets:
             is_ignored_file = bool(
-                matches_filespec(
-                    ignore_paths_filespec,
-                    paths=[os.path.join(ptgt.path, self.build_file_name)],
-                )
+                ignore_paths_filespec_matcher.matches(
+                    [os.path.join(ptgt.path, self.build_file_name)]
+                ),
             )
             if is_ignored_file:
                 continue

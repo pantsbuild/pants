@@ -328,14 +328,15 @@ impl PreparedPathGlobs {
 }
 
 /// Allows checking in-memory if paths match the patterns.
+#[derive(Debug)]
 pub struct FilespecMatcher {
   includes: Vec<Pattern>,
   excludes: Arc<GitignoreStyleExcludes>,
 }
 
 impl FilespecMatcher {
-  pub fn new(include_globs: Vec<String>, exclude_globs: Vec<String>) -> Result<Self, String> {
-    let includes = include_globs
+  pub fn new(includes: Vec<String>, excludes: Vec<String>) -> Result<Self, String> {
+    let includes = includes
       .iter()
       .map(|glob| {
         PathGlob::normalize_pattern(glob).and_then(|components| {
@@ -345,7 +346,7 @@ impl FilespecMatcher {
         })
       })
       .collect::<Result<Vec<_>, String>>()?;
-    let excludes = GitignoreStyleExcludes::create(exclude_globs)?;
+    let excludes = GitignoreStyleExcludes::create(excludes)?;
     Ok(Self { includes, excludes })
   }
 
@@ -362,6 +363,14 @@ impl FilespecMatcher {
       .iter()
       .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS));
     matches_includes && !self.excludes.is_ignored_path(path, false)
+  }
+
+  pub fn include_globs(&self) -> &[Pattern] {
+    self.includes.as_slice()
+  }
+
+  pub fn exclude_globs(&self) -> &[String] {
+    self.excludes.patterns.as_slice()
   }
 }
 

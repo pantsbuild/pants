@@ -28,12 +28,12 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyMergeDigests>()?;
   m.add_class::<PyAddPrefix>()?;
   m.add_class::<PyRemovePrefix>()?;
+  m.add_class::<PyFilespecMatcher>()?;
 
   m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
   m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
-  m.add_function(wrap_pyfunction!(match_paths_against_patterns, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   Ok(())
 }
@@ -415,23 +415,62 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
   }
 }
 
-#[pyfunction]
-fn match_paths_against_patterns(
-  include_globs: Vec<String>,
-  exclude_globs: Vec<String>,
-  paths: Vec<String>,
-  py: Python,
-) -> PyResult<Vec<String>> {
-  py.allow_threads(|| {
-    let filespec_matcher =
-      FilespecMatcher::new(include_globs, exclude_globs).map_err(PyValueError::new_err)?;
-    Ok(
-      paths
-        .into_iter()
-        .filter(|p| filespec_matcher.matches(Path::new(p)))
-        .collect(),
-    )
-  })
+// -----------------------------------------------------------------------------
+// FilespecMatcher
+// -----------------------------------------------------------------------------
+
+#[pyclass(name = "FilespecMatcher")]
+#[derive(Debug)]
+pub struct PyFilespecMatcher(FilespecMatcher);
+
+#[pymethods]
+impl PyFilespecMatcher {
+  #[new]
+  fn __new__(includes: Vec<String>, excludes: Vec<String>) -> PyResult<Self> {
+    let matcher = FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err)?;
+    Ok(Self(matcher))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.include_globs().hash(&mut s);
+    self.0.exclude_globs().hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let includes = self
+      .0
+      .include_globs()
+      .iter()
+      .map(|pattern| format!("{pattern}"))
+      .join(", ");
+    let excludes = self.0.exclude_globs().join(", ");
+    format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
+  }
+
+  fn __richcmp__(&self, other: &PyFilespecMatcher, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0.include_globs() == other.0.include_globs()
+        && self.0.exclude_globs() == other.0.exclude_globs())
+      .into_py(py),
+      CompareOp::Ne => (self.0.include_globs() != other.0.include_globs()
+        || self.0.exclude_globs() != other.0.exclude_globs())
+      .into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
+    py.allow_threads(|| {
+      Ok(
+        paths
+          .into_iter()
+          .filter(|p| self.0.matches(Path::new(p)))
+          .collect(),
+      )
+    })
+  }
 }
 
 // -----------------------------------------------------------------------------
