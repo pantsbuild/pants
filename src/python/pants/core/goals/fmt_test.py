@@ -7,9 +7,9 @@ import dataclasses
 import logging
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import List, Type
+from typing import Iterable, List, Type
 
 from pants.core.goals.fmt import Fmt, FmtBuildFilesRequest, FmtResult, FmtTargetsRequest
 from pants.core.goals.fmt import rules as fmt_rules
@@ -159,11 +159,15 @@ def fmt_rule_runner(
 
 
 def run_fmt(
-    rule_runner: RuleRunner, *, target_specs: List[str], only: list[str] | None = None
+    rule_runner: RuleRunner,
+    *,
+    target_specs: List[str],
+    only: list[str] | None = None,
+    extra_args: Iterable[str] = (),
 ) -> str:
     result = rule_runner.run_goal_rule(
         Fmt,
-        args=[f"--only={repr(only or [])}", *target_specs],
+        args=[f"--only={repr(only or [])}", *target_specs, *extra_args],
     )
     assert result.exit_code == 0
     assert not result.stdout
@@ -228,6 +232,73 @@ def test_summary() -> None:
         brick(brick='brick2', brick="brick.brick")
         """
     )
+
+
+def test_build_spec_matching() -> None:
+    rule_runner = fmt_rule_runner(
+        target_types=[],
+        fmt_targets_request_types=[],
+        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+    )
+    original_contents = "build_file_dir"  # just choose something built-in that'll be replaced
+
+    # Added type to workaround https://github.com/python/typing/issues/445
+    build_files: dict[str | PurePath, str] = {
+        "BUILD": original_contents,
+        "dirA/BUILD": original_contents,
+        "dirA/subdirX/BUILD": original_contents,
+        "dirA/subdirY/BUILD.pants": original_contents,
+        "dirB/BUILD": original_contents,
+        "dirC/BUILD": original_contents,
+    }
+
+    def assert_only_changed(*paths):
+        all_paths = set(build_files.keys())
+        for path in paths:
+            assert Path(rule_runner.build_root, path).read_text() != original_contents
+            all_paths.remove(path)
+        for path in all_paths:
+            assert Path(rule_runner.build_root, path).read_text() == original_contents
+
+    rule_runner.write_files(build_files)
+    run_fmt(rule_runner, target_specs=["//::"])
+    assert_only_changed(*build_files)
+
+    rule_runner.write_files(build_files)
+    run_fmt(rule_runner, target_specs=["//dirA:"])
+    assert_only_changed("dirA/BUILD")
+
+    rule_runner.write_files(build_files)
+    run_fmt(rule_runner, target_specs=["//dirA::"])
+    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants")
+
+    rule_runner.write_files(build_files)
+    run_fmt(rule_runner, target_specs=["//dirA::", "//dirB/BUILD"])
+    assert_only_changed(
+        "dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants", "dirB/BUILD"
+    )
+
+    rule_runner.write_files(build_files)
+    run_fmt(rule_runner, target_specs=["//dirA::", "!//dirA/subdirX:"])
+    assert_only_changed("dirA/BUILD", "dirA/subdirY/BUILD.pants")
+
+    rule_runner.write_files(build_files)
+    run_fmt(
+        rule_runner,
+        target_specs=["//::", "!//dirB::"],
+        extra_args=["--build-ignore=dirA/**"],
+    )
+    assert_only_changed("BUILD", "dirC/BUILD")
+
+    # Keep this near the end, as it modified build_files
+    build_files.update({"funnyname/PANTS": original_contents})
+    rule_runner.write_files(build_files)
+    run_fmt(
+        rule_runner,
+        target_specs=["//::"],
+        extra_args=["--build-patterns=PANTS"],
+    )
+    assert_only_changed(*build_files)
 
 
 def test_only() -> None:

@@ -25,7 +25,6 @@ from pants.engine.fs import (
     Digest,
     MergeDigests,
     PathGlobs,
-    Paths,
     Snapshot,
     SnapshotDiff,
     SpecsPaths,
@@ -39,6 +38,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, ru
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
+from pants.source.filespec import matches_filespec
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -229,6 +229,10 @@ def _get_request_types(
     fmt_target_request_types = union_membership.get(FmtTargetsRequest)
     fmt_build_files_request_types = union_membership.get(FmtBuildFilesRequest)
 
+    # NOTE: Unlike lint.py, we don't check for ambiguous names between target formatters and BUILD
+    # formatters, since BUILD files are Python and we re-use Python formatters for BUILD files
+    # (like `black`).
+
     formatters_to_run = determine_specified_tool_names(
         "fmt",
         fmt_subsystem.only,
@@ -237,10 +241,14 @@ def _get_request_types(
     )
 
     filtered_fmt_target_request_types = tuple(
-        rtype for rtype in fmt_target_request_types if rtype.name in formatters_to_run
+        request_type
+        for request_type in fmt_target_request_types
+        if request_type.name in formatters_to_run
     )
     filtered_fmt_build_files_request_types = tuple(
-        rtype for rtype in fmt_build_files_request_types if rtype.name in formatters_to_run
+        request_type
+        for request_type in fmt_build_files_request_types
+        if request_type.name in formatters_to_run
     )
 
     return filtered_fmt_target_request_types, filtered_fmt_build_files_request_types
@@ -345,25 +353,18 @@ async def fmt(
         Specs,
         specs if fmt_target_request_types else Specs.empty(),
     )
-    _get_all_build_file_paths = Get(
-        Paths,
-        PathGlobs(
-            globs=(
-                *(os.path.join("**", p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
-            if fmt_build_files_request_types
-            else ()
-        ),
-    )
     _get_specs_paths = Get(
         SpecsPaths, Specs, specs if fmt_build_files_request_types else Specs.empty()
     )
-    targets, all_build_file_paths, specs_paths = await MultiGet(
-        _get_targets, _get_all_build_file_paths, _get_specs_paths
+
+    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+    specified_build_files = matches_filespec(
+        {
+            "includes": [os.path.join("**", p) for p in build_file_options.patterns],
+            "excludes": list(build_file_options.ignores),
+        },
+        paths=specs_paths.files,
     )
-    specified_paths = set(specs_paths.files)
-    specified_build_files = tuple(fp for fp in all_build_file_paths.files if fp in specified_paths)
 
     targets_to_request_types = _batch_targets(
         fmt_target_request_types,
