@@ -63,8 +63,6 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
-build_file_cli_args_expand_to_their_targets = false
-
 unmatched_build_file_globs = "error"
 
 # TODO: May cause tests which experience missing digests to hang. If you experience an

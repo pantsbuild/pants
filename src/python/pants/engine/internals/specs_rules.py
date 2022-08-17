@@ -55,11 +55,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import (
-    BuildFileCliArgsExpandToTheirTargetsOption,
-    GlobalOptions,
-    UseDeprecatedPexBinaryRunSemanticsOption,
-)
+from pants.option.global_options import GlobalOptions, UseDeprecatedPexBinaryRunSemanticsOption
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -201,34 +197,8 @@ async def addresses_from_raw_specs_without_file_owners(
 
 
 @rule
-def extract_(global_options: GlobalOptions) -> BuildFileCliArgsExpandToTheirTargetsOption:
-    if global_options.options.is_default("build_file_cli_args_expand_to_their_targets"):
-        warn_or_error(
-            "2.15.0.dev0",
-            "`[GLOBAL].build_file_cli_args_expand_to_their_targets` defaulting to true",
-            softwrap(
-                f"""
-                Currently, by default, BUILD files used in CLI arguments will expand to all the
-                targets they define. For example, `{bin_name()} fmt project/BUILD` will format all
-                the targets defined in the BUILD file, not only the file `project/BUILD`. In
-                Pants 2.15, the default will change to no longer expand.
-
-                To silence this warning, set the option
-                `build_file_cli_args_expand_to_their_targets` in the `[GLOBAL]` section of
-                `pants.toml` to either `true` or `false`. Generally, we recommend setting to
-                `false` for more intuitive behavior.
-                """
-            ),
-        )
-    return BuildFileCliArgsExpandToTheirTargetsOption(
-        global_options.build_file_cli_args_expand_to_their_targets
-    )
-
-
-@rule
 async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners,
-    build_file_cli_args_expand_to_their_targets: BuildFileCliArgsExpandToTheirTargetsOption,
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
@@ -240,9 +210,8 @@ async def addresses_from_raw_specs_with_only_file_owners(
         OwnersRequest(
             all_files,
             filter_by_global_options=specs.filter_by_global_options,
-            match_if_owning_build_file_included_in_sources=(
-                build_file_cli_args_expand_to_their_targets.val
-            ),
+            # Specifying a BUILD file should not expand to all the targets it defines.
+            match_if_owning_build_file_included_in_sources=False,
         ),
     )
     return Addresses(sorted(owners))

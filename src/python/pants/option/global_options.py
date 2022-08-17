@@ -1630,19 +1630,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
         advanced=True,
     )
-    build_file_cli_args_expand_to_their_targets = BoolOption(
-        default=True,
-        help=softwrap(
-            f"""
-            If true, then BUILD files used in CLI arguments will expand to all the
-            targets they define. For example, `{bin_name()} fmt project/BUILD` will format all
-            the targets defined in the BUILD file, not only the file `project/BUILD`.
-
-            (We believe the more intuitive behavior is to set this option to `false`, which
-            will become the default in Pants 2.15.)
-            """
-        ),
-    )
 
     build_patterns = StrListOption(
         default=["BUILD", "BUILD.*"],
@@ -2069,16 +2056,6 @@ class NamedCachesDirOption:
 @dataclass(frozen=True)
 class UseDeprecatedPexBinaryRunSemanticsOption:
     """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
-
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
-    """
-
-    val: bool
-
-
-@dataclass(frozen=True)
-class BuildFileCliArgsExpandToTheirTargetsOption:
-    """A wrapper around the global option `build_file_cli_args_expand_to_their_targets`.
 
     Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
     """
