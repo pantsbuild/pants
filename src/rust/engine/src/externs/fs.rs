@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-  DirectoryDigest, GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching,
+  DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
   EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -33,7 +33,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
-  m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
+  m.add_function(wrap_pyfunction!(match_paths_against_patterns, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   Ok(())
 }
@@ -385,17 +385,6 @@ impl PyRemovePrefix {
 
 struct PyPathGlobs(PathGlobs);
 
-impl PyPathGlobs {
-  fn parse(self) -> PyResult<PreparedPathGlobs> {
-    self.0.clone().parse().map_err(|e| {
-      PyValueError::new_err(format!(
-        "Failed to parse PathGlobs: {:?}\n\nError: {}",
-        self.0, e
-      ))
-    })
-  }
-}
-
 impl<'source> FromPyObject<'source> for PyPathGlobs {
   fn extract(obj: &'source PyAny) -> PyResult<Self> {
     let globs: Vec<String> = obj.getattr("globs")?.extract()?;
@@ -427,17 +416,19 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
 }
 
 #[pyfunction]
-fn match_path_globs(
-  py_path_globs: PyPathGlobs,
+fn match_paths_against_patterns(
+  include_globs: Vec<String>,
+  exclude_globs: Vec<String>,
   paths: Vec<String>,
   py: Python,
 ) -> PyResult<Vec<String>> {
   py.allow_threads(|| {
-    let path_globs = py_path_globs.parse()?;
+    let filespec_matcher =
+      FilespecMatcher::new(include_globs, exclude_globs).map_err(PyValueError::new_err)?;
     Ok(
       paths
         .into_iter()
-        .filter(|p| path_globs.matches(Path::new(p)))
+        .filter(|p| filespec_matcher.matches(Path::new(p)))
         .collect(),
     )
   })

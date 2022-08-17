@@ -7,7 +7,6 @@ from typing import Iterable
 
 from typing_extensions import TypedDict
 
-from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
 
 
@@ -30,7 +29,7 @@ def matches_filespec(spec: Filespec, *, paths: Iterable[str]) -> tuple[str, ...]
     include_patterns = spec["includes"]
     exclude_patterns = [f"!{e}" for e in spec.get("excludes", [])]
     return tuple(
-        native_engine.match_path_globs(
-            PathGlobs((*include_patterns, *exclude_patterns)), tuple(paths)
+        native_engine.match_paths_against_patterns(
+            include_globs=include_patterns, exclude_globs=exclude_patterns, paths=tuple(paths)
         )
     )

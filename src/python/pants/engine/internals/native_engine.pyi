@@ -8,7 +8,6 @@ from typing import Any, Generic, Iterable, Sequence, TextIO, Tuple, TypeVar, ove
 
 from typing_extensions import Protocol
 
-from pants.engine.fs import PathGlobs
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcessResult
@@ -154,10 +153,9 @@ EMPTY_FILE_DIGEST: FileDigest
 EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
-
-# TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't
-#  cast to `tuple()` when not necessary.
-def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
+def match_paths_against_patterns(
+    *, include_globs: Sequence[str], exclude_globs: Sequence[str], paths: tuple[str, ...]
+) -> list[str]: ...
 
 # ------------------------------------------------------------------------------
 # Workunits
