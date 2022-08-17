@@ -11,7 +11,7 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterable, List, Type
 
-from pants.core.goals.fmt import Fmt, FmtBuildFilesRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import Fmt, FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
 from pants.engine.fs import (
@@ -108,7 +108,7 @@ async def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
     return FmtResult.skip(formatter_name=request.name)
 
 
-class BrickyBuildFileFormatter(FmtBuildFilesRequest):
+class BrickyBuildFileFormatter(_FmtBuildFilesRequest):
     """Ensures all non-comment lines only consist of the word 'brick'."""
 
     name = "BrickyBobby"
@@ -144,7 +144,7 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter) -> FmtResult:
 def fmt_rule_runner(
     target_types: List[Type[Target]],
     fmt_targets_request_types: List[Type[FmtTargetsRequest]] = [],
-    fmt_build_files_request_types: List[Type[FmtBuildFilesRequest]] = [],
+    fmt_build_files_request_types: List[Type[_FmtBuildFilesRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
@@ -152,7 +152,7 @@ def fmt_rule_runner(
             *source_files.rules(),
             *fmt_rules(),
             *(UnionRule(FmtTargetsRequest, ftr) for ftr in fmt_targets_request_types),
-            *(UnionRule(FmtBuildFilesRequest, fbfr) for fbfr in fmt_build_files_request_types),
+            *(UnionRule(_FmtBuildFilesRequest, fbfr) for fbfr in fmt_build_files_request_types),
         ],
         target_types=target_types,
     )

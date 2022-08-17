@@ -62,7 +62,7 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: FmtTargetsRequest | FmtBuildFilesRequest,
+        request: FmtTargetsRequest | _FmtBuildFilesRequest,
         process_result: ProcessResult | FallibleProcessResult,
         output: Snapshot,
         *,
@@ -163,7 +163,9 @@ class FmtTargetsRequest(StyleRequest[_FS]):
 
 @union
 @dataclass(frozen=True)
-class FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
+# Prefixed with `_` because we arne't sure if this union will stick long-term, or be subsumed when
+# we implement https://github.com/pantsbuild/pants/issues/16480.
+class _FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
     name: ClassVar[str]
 
     snapshot: Snapshot
@@ -185,7 +187,7 @@ class _FmtTargetBatchRequest:
 
 @dataclass(frozen=True)
 class _FmtBuildFilesBatchRequest:
-    request_types: tuple[type[FmtBuildFilesRequest], ...]
+    request_types: tuple[type[_FmtBuildFilesRequest], ...]
     paths: tuple[str, ...]
 
 
@@ -225,9 +227,9 @@ class Fmt(Goal):
 def _get_request_types(
     fmt_subsystem: FmtSubsystem,
     union_membership: UnionMembership,
-) -> tuple[tuple[type[FmtTargetsRequest], ...], tuple[type[FmtBuildFilesRequest], ...]]:
+) -> tuple[tuple[type[FmtTargetsRequest], ...], tuple[type[_FmtBuildFilesRequest], ...]]:
     fmt_target_request_types = union_membership.get(FmtTargetsRequest)
-    fmt_build_files_request_types = union_membership.get(FmtBuildFilesRequest)
+    fmt_build_files_request_types = union_membership.get(_FmtBuildFilesRequest)
 
     # NOTE: Unlike lint.py, we don't check for ambiguous names between target formatters and BUILD
     # formatters, since BUILD files are Python and we re-use Python formatters for BUILD files
@@ -419,7 +421,7 @@ async def fmt_build_files(
         fmt_build_files_request = fmt_build_files_request_type(
             snapshot=prior_snapshot,
         )
-        result = await Get(FmtResult, FmtBuildFilesRequest, fmt_build_files_request)
+        result = await Get(FmtResult, _FmtBuildFilesRequest, fmt_build_files_request)
         results.append(result)
         prior_snapshot = result.output
     return _FmtBatchResult(
