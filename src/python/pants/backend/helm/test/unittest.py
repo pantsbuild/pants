@@ -10,6 +10,7 @@ from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
 from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
+    HelmChartMetaSourceField,
     HelmChartTarget,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
@@ -20,6 +21,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.sources import HelmChartSourceRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
@@ -29,8 +31,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.target_types import ResourceSourceField
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
@@ -43,6 +44,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.source.source_root import SourceRoot
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -85,10 +87,12 @@ async def run_helm_unittest(
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 
-    chart, source_files = await MultiGet(
-        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0])),
+    chart_target = chart_targets[0]
+    chart, chart_root, test_files = await MultiGet(
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
+        Get(SourceRoot, HelmChartSourceRootRequest(chart_target[HelmChartMetaSourceField])),
         Get(
-            StrippedSourceFiles,
+            SourceFiles,
             SourceFilesRequest(
                 sources_fields=[
                     field_set.source,
@@ -104,12 +108,16 @@ async def run_helm_unittest(
         ),
     )
 
+    stripped_test_files = await Get(
+        Digest, RemovePrefix(test_files.snapshot.digest, chart_root.path)
+    )
+
     reports_dir = "__reports_dir"
     reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
 
     merged_digests = await Get(
         Digest,
-        MergeDigests([chart.snapshot.digest, source_files.snapshot.digest]),
+        MergeDigests([chart.snapshot.digest, stripped_test_files]),
     )
     input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
