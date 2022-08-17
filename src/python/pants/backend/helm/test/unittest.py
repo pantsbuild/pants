@@ -46,6 +46,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.source.source_root import SourceRoot
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
