@@ -400,7 +400,7 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_target_help(self, target_alias: str) -> None:
+    def _print_target_help(self, target_alias: str, _: bool) -> None:
         self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
