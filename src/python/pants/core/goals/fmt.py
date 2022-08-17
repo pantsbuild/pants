@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
+from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, Iterable, Iterator, TypeVar
+from typing import Callable, ClassVar, Iterable, Iterator, TypeVar
 
+from pants.base.specs import Specs
 from pants.core.goals.style_request import (
     StyleRequest,
     determine_specified_tool_names,
@@ -17,15 +20,25 @@ from pants.core.goals.style_request import (
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Workspace
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.fs import (
+    Digest,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+    SnapshotDiff,
+    SpecsPaths,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
+from pants.source.filespec import matches_filespec
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -49,7 +62,7 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: FmtTargetsRequest,
+        request: FmtTargetsRequest | _FmtBuildFilesRequest,
         process_result: ProcessResult | FallibleProcessResult,
         output: Snapshot,
         *,
@@ -148,6 +161,16 @@ class FmtTargetsRequest(StyleRequest[_FS]):
         super().__init__(field_sets)
 
 
+@union
+@dataclass(frozen=True)
+# Prefixed with `_` because we aren't sure if this union will stick long-term, or be subsumed when
+# we implement https://github.com/pantsbuild/pants/issues/16480.
+class _FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
+    name: ClassVar[str]
+
+    snapshot: Snapshot
+
+
 @dataclass(frozen=True)
 class _FmtTargetBatchRequest:
     """Format all the targets in the given batch.
@@ -160,6 +183,12 @@ class _FmtTargetBatchRequest:
 
     request_types: tuple[type[FmtTargetsRequest], ...]
     targets: Targets
+
+
+@dataclass(frozen=True)
+class _FmtBuildFilesBatchRequest:
+    request_types: tuple[type[_FmtBuildFilesRequest], ...]
+    paths: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -195,44 +224,75 @@ class Fmt(Goal):
     subsystem_cls = FmtSubsystem
 
 
+def _get_request_types(
+    fmt_subsystem: FmtSubsystem,
+    union_membership: UnionMembership,
+) -> tuple[tuple[type[FmtTargetsRequest], ...], tuple[type[_FmtBuildFilesRequest], ...]]:
+    fmt_target_request_types = union_membership.get(FmtTargetsRequest)
+    fmt_build_files_request_types = union_membership.get(_FmtBuildFilesRequest)
+
+    # NOTE: Unlike lint.py, we don't check for ambiguous names between target formatters and BUILD
+    # formatters, since BUILD files are Python and we re-use Python formatters for BUILD files
+    # (like `black`).
+
+    formatters_to_run = determine_specified_tool_names(
+        "fmt",
+        fmt_subsystem.only,
+        fmt_target_request_types,
+        extra_valid_names=(fbfrt.name for fbfrt in fmt_build_files_request_types),
+    )
+
+    filtered_fmt_target_request_types = tuple(
+        request_type
+        for request_type in fmt_target_request_types
+        if request_type.name in formatters_to_run
+    )
+    filtered_fmt_build_files_request_types = tuple(
+        request_type
+        for request_type in fmt_build_files_request_types
+        if request_type.name in formatters_to_run
+    )
+
+    return filtered_fmt_target_request_types, filtered_fmt_build_files_request_types
+
+
 def _batch(
-    fmt_subsystem: FmtSubsystem, iterable: Iterable[_T], key: Callable[[_T], str]
+    iterable: Iterable[_T], batch_size: int, key: Callable[[_T], str] = lambda x: str(x)
 ) -> Iterator[list[_T]]:
     partitions = partition_sequentially(
         iterable,
         key=key,
-        size_target=fmt_subsystem.batch_size,
-        size_max=4 * fmt_subsystem.batch_size,
+        size_target=batch_size,
+        size_max=4 * batch_size,
     )
     for partition in partitions:
         yield partition
 
 
 def _batch_targets(
-    fmt_subsystem: FmtSubsystem,
-    all_request_types: Iterable[type[FmtTargetsRequest]],
+    request_types: Iterable[type[FmtTargetsRequest]],
     targets: Iterable[Target],
+    batch_size: int,
 ) -> dict[Targets, tuple[type[FmtTargetsRequest], ...]]:
     """Groups targets by the relevant Request types, then batches them.
 
     Returns a mapping from batch -> Request types.
     """
-    formatters_to_run = determine_specified_tool_names("fmt", fmt_subsystem.only, all_request_types)
+
     targets_by_request_order = defaultdict(list)
 
     for target in targets:
-        request_types = []
-        for request_type in all_request_types:
-            valid_name = request_type.name in formatters_to_run
-            if valid_name and request_type.field_set_type.is_applicable(target):
-                request_types.append(request_type)
-        if request_types:
-            targets_by_request_order[tuple(request_types)].append(target)
+        applicable_request_types = []
+        for request_type in request_types:
+            if request_type.field_set_type.is_applicable(target):
+                applicable_request_types.append(request_type)
+        if applicable_request_types:
+            targets_by_request_order[tuple(applicable_request_types)].append(target)
 
     target_batches_by_fmt_request_order = {
-        Targets(target_batch): request_types
-        for request_types, targets in targets_by_request_order.items()
-        for target_batch in _batch(fmt_subsystem, targets, key=lambda t: t.address.spec)
+        Targets(target_batch): applicable_request_types
+        for applicable_request_types, targets in targets_by_request_order.items()
+        for target_batch in _batch(targets, batch_size, key=lambda t: t.address.spec)
     }
 
     return target_batches_by_fmt_request_order
@@ -280,23 +340,58 @@ def _print_results(
 @goal_rule
 async def fmt(
     console: Console,
-    targets: FilteredTargets,
+    specs: Specs,
     fmt_subsystem: FmtSubsystem,
+    build_file_options: BuildFileOptions,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
+    fmt_target_request_types, fmt_build_files_request_types = _get_request_types(
+        fmt_subsystem, union_membership
+    )
+
+    _get_targets = Get(
+        FilteredTargets,
+        Specs,
+        specs if fmt_target_request_types else Specs.empty(),
+    )
+    _get_specs_paths = Get(
+        SpecsPaths, Specs, specs if fmt_build_files_request_types else Specs.empty()
+    )
+
+    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+    specified_build_files = matches_filespec(
+        {
+            "includes": [os.path.join("**", p) for p in build_file_options.patterns],
+            "excludes": list(build_file_options.ignores),
+        },
+        paths=specs_paths.files,
+    )
+
     targets_to_request_types = _batch_targets(
-        fmt_subsystem,
-        union_membership[FmtTargetsRequest],
+        fmt_target_request_types,
         targets,
+        fmt_subsystem.batch_size,
     )
 
     target_batch_results = await MultiGet(
-        Get(
-            _FmtBatchResult,
-            _FmtTargetBatchRequest(fmt_request_types, target_batch),
-        )
-        for target_batch, fmt_request_types in targets_to_request_types.items()
+        *(
+            Get(
+                _FmtBatchResult,
+                _FmtTargetBatchRequest(fmt_request_types, target_batch),
+            )
+            for target_batch, fmt_request_types in targets_to_request_types.items()
+        ),
+        *(
+            Get(
+                _FmtBatchResult,
+                _FmtBuildFilesBatchRequest(fmt_build_files_request_types, tuple(paths_batch)),
+            )
+            for paths_batch in _batch(
+                specified_build_files,
+                fmt_subsystem.batch_size,
+            )
+        ),
     )
 
     individual_results = list(
@@ -312,6 +407,28 @@ async def fmt(
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
+
+
+@rule
+async def fmt_build_files(
+    request: _FmtBuildFilesBatchRequest,
+) -> _FmtBatchResult:
+    original_snapshot = await Get(Snapshot, PathGlobs(request.paths))
+    prior_snapshot = original_snapshot
+
+    results = []
+    for fmt_build_files_request_type in request.request_types:
+        fmt_build_files_request = fmt_build_files_request_type(
+            snapshot=prior_snapshot,
+        )
+        result = await Get(FmtResult, _FmtBuildFilesRequest, fmt_build_files_request)
+        results.append(result)
+        prior_snapshot = result.output
+    return _FmtBatchResult(
+        tuple(results),
+        input=original_snapshot.digest,
+        output=prior_snapshot.digest,
+    )
 
 
 @rule
