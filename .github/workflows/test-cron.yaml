@@ -349,9 +349,7 @@ jobs:
 
         '
     - name: Lint
-      run: './pants update-build-files --check ::
-
-        ./pants lint check ''**''
+      run: './pants lint check ''**''
 
         '
     - continue-on-error: true

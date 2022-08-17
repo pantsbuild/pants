@@ -767,7 +767,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     {
                         "name": "Lint",
                         "run": (
-                            "./pants update-build-files --check ::\n"
                             # Note: we use `**` rather than `::` because regex-lint.
                             "./pants lint check '**'\n"
                         ),
