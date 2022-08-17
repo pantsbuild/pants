@@ -11,7 +11,7 @@ from pants.util.logging import LogLevel
 
 
 class YapfRequest(_FmtBuildFilesRequest):
-    name = "black"
+    name = "yapf"
 
 
 @rule(desc="Format with Yapf", level=LogLevel.DEBUG)
