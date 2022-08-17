@@ -349,7 +349,7 @@ jobs:
 
         '
     - name: Lint
-      run: './pants lint check ''**''
+      run: './pants lint check ::
 
         '
     - continue-on-error: true

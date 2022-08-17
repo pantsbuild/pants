@@ -766,10 +766,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     setup_toolchain_auth(),
                     {
                         "name": "Lint",
-                        "run": (
-                            # Note: we use `**` rather than `::` because regex-lint.
-                            "./pants lint check '**'\n"
-                        ),
+                        "run": "./pants lint check ::\n",
                     },
                     linux_x86_64_helper.upload_log_artifacts(name="lint"),
                 ],

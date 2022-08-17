@@ -14,6 +14,8 @@ target(
     name="plugins",
     dependencies=[
         "src/python/pants/backend/awslambda/python",
+        "src/python/pants/backend/build_files/fmt/black",
+        "src/python/pants/backend/build_files/fmt/yapf",
         "src/python/pants/backend/codegen/protobuf/lint/buf",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/codegen/thrift/apache/python",
