@@ -63,6 +63,8 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
+build_file_cli_args_expand_to_their_targets = false
+
 unmatched_build_file_globs = "error"
 
 # TODO: May cause tests which experience missing digests to hang. If you experience an
@@ -74,8 +76,6 @@ cache_content_behavior = "validate"
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
-[cli]
-build_files_expand_to_targets = false
 
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependees=transitive"

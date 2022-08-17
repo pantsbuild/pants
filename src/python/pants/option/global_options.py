@@ -2074,3 +2074,13 @@ class UseDeprecatedPexBinaryRunSemanticsOption:
     """
 
     val: bool
+
+
+@dataclass(frozen=True)
+class BuildFileCliArgsExpandToTheirTargetsOption:
+    """A wrapper around the global option `build_file_cli_args_expand_to_their_targets`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool

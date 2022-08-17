@@ -64,7 +64,7 @@ def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
         PyConstraintsGoal,
         env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": "['>=3.6']"},
         args=args,
-        global_args=["--no-python-infer-imports", "--cli-build-files-expand-to-targets"],
+        global_args=["--no-python-infer-imports"],
     )
 
 
@@ -72,6 +72,7 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files({"f.txt": "", "BUILD": "file(name='tgt', source='f.txt')"})
     result = run_goal(rule_runner, ["f.txt"])
     assert result.exit_code == 0
+    print(caplog.records)
     assert len(caplog.records) == 1
     assert (
         softwrap(
