@@ -54,6 +54,8 @@ async def find_changed_owners(
             # need to first find their dependees, and only then should we filter. See
             # https://github.com/pantsbuild/pants/issues/15544
             filter_by_global_options=no_dependees,
+            # Changing a BUILD file might impact the targets it defines.
+            match_if_owning_build_file_included_in_sources=True,
         ),
     )
     if no_dependees:
