@@ -17,15 +17,8 @@ from colors import green, red
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_requirements import (
-    EntireLockfile,
-    LoadedLockfile,
-    LoadedLockfileRequest,
-)
 from pants.base.specs import Specs
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
@@ -45,7 +38,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
@@ -300,36 +293,6 @@ async def update_build_files(
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
 
 
-@rule_helper
-async def _find_python_interpreter_constraints_from_lockfile(
-    subsystem: PythonToolBase,
-) -> InterpreterConstraints:
-    """If a lockfile is used, will try to find the interpreter constraints used to generate the
-    lock.
-
-    This allows us to work around https://github.com/pantsbuild/pants/issues/14912.
-    """
-    # If the tool's interpreter constraints are explicitly set, or it is not using a lockfile at
-    # all, then we should use the tool's interpreter constraints option.
-    if not subsystem.options.is_default("interpreter_constraints") or not subsystem.uses_lockfile:
-        return subsystem.interpreter_constraints
-
-    # If using Pants's default lockfile, we can simply use the tool's default interpreter
-    # constraints, which we trust were used to generate Pants's default tool lockfile.
-    if not subsystem.uses_custom_lockfile:
-        return InterpreterConstraints(subsystem.default_interpreter_constraints)
-
-    # Else, try to load the metadata block from the lockfile.
-    requirements = subsystem.pex_requirements()
-    assert isinstance(requirements, EntireLockfile)
-    lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(requirements.lockfile))
-    return (
-        lockfile.metadata.valid_for_interpreter_constraints
-        if lockfile.metadata
-        else subsystem.interpreter_constraints
-    )
-
-
 # ------------------------------------------------------------------------------------------
 # Yapf formatter fixer
 # ------------------------------------------------------------------------------------------
@@ -343,7 +306,7 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_ics = await _find_python_interpreter_constraints_from_lockfile(yapf)
+    yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
     yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request(interpreter_constraints=yapf_ics))
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
@@ -397,7 +360,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_ics = await _find_python_interpreter_constraints_from_lockfile(black)
+    black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
     black_pex_get = Get(
         VenvPex, PexRequest, black.to_pex_request(interpreter_constraints=black_ics)
     )
