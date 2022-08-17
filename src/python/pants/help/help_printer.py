@@ -75,7 +75,7 @@ class HelpPrinter(MaybeColor):
             return 1
 
     def _print_alternatives(self, match: str, all_things: Iterable[str]) -> None:
-        did_you_mean = list(difflib.get_close_matches(match, all_things))
+        did_you_mean = difflib.get_close_matches(match, all_things)
 
         if did_you_mean:
             formatted_matches = self._format_did_you_mean_matches(did_you_mean)
@@ -85,7 +85,7 @@ class HelpPrinter(MaybeColor):
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
         print(f"\n{title}\n")
 
-    def _print_table(self, table: Dict[str, Optional[str]], indent: int = 0) -> None:
+    def _print_table(self, table: Dict[str, Optional[str]]) -> None:
         longest_key = max(len(key) for key, value in table.items() if value is not None)
         for key, value in table.items():
             if value is None:
@@ -118,8 +118,9 @@ class HelpPrinter(MaybeColor):
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
         }
 
+    @staticmethod
     def _disambiguate_things(
-        self, things: Iterable[str], all_things: Iterable[str]
+        things: Iterable[str], all_things: Iterable[str]
     ) -> Tuple[Set[str], Set[str]]:
         """Returns two sets of strings, one with disambiguated things and the second with
         unresolvable things."""
@@ -327,13 +328,13 @@ class HelpPrinter(MaybeColor):
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
-            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(50))
+            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(41))
             print(f"  {cmd}  {desc}")
 
         print(f"\nPants {pants_version()}")
         print("\nUsage:\n")
         print_cmd(
-            "[option ...] [goal ...] [file/target ...]",
+            "[options] [goals] [files/targets]",
             "Attempt the specified goals on the specified files/targets.",
         )
         print_cmd("help", "Display this usage message.")
@@ -345,7 +346,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd(
-            "help [target_type/goal/subsystem/api_type/rule]",
+            "help [name]",
             "Help for a target type, goal, subsystem, plugin API type or rule.",
         )
         print_cmd(
@@ -399,7 +400,7 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_target_help(self, target_alias: str, show_advanced: bool) -> None:
+    def _print_target_help(self, target_alias: str, _: bool) -> None:
         self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
