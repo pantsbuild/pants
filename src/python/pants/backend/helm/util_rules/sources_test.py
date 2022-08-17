@@ -27,6 +27,7 @@ from pants.build_graph.address import Address
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
+from pants.source.source_root import SourceRoot
 from pants.testutil.rule_runner import RuleRunner
 
 

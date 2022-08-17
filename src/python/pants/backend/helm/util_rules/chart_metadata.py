@@ -27,6 +27,8 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.source.source_root import SourceRoot
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
