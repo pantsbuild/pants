@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 import pytest
@@ -872,3 +873,33 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
     assert determine_python_files(["f.json"]) == ()
+
+
+def test_colors_and_formatting(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+        class incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890:
+            pass
+
+        x = incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890()
+        x.incredibly_long_attribute_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890
+        """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    result = run_mypy(rule_runner, [tgt], extra_args=["--colors=true", "--mypy-args=--pretty"])
+
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    # all one line
+    assert re.search(
+        "error:.*incredibly_long_type_name.*incredibly_long_attribute_name", result[0].stdout
+    )
+    # at least one escape sequence that sets text color (red)
+    assert "\033[31m" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
