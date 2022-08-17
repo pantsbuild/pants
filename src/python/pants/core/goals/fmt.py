@@ -163,7 +163,7 @@ class FmtTargetsRequest(StyleRequest[_FS]):
 
 @union
 @dataclass(frozen=True)
-# Prefixed with `_` because we arne't sure if this union will stick long-term, or be subsumed when
+# Prefixed with `_` because we aren't sure if this union will stick long-term, or be subsumed when
 # we implement https://github.com/pantsbuild/pants/issues/16480.
 class _FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
     name: ClassVar[str]
