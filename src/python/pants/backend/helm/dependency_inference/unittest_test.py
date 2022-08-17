@@ -92,9 +92,6 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_roots = ["src/*"]
-    rule_runner.set_options([f"--source-roots-patterns={repr(source_roots)}"])
-
     chart1_tgt = rule_runner.get_target(Address("src/chart1", target_name="chart1"))
     chart1_unittest_tgt = rule_runner.get_target(Address("src/chart1/tests", target_name="tests"))
 

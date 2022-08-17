@@ -117,9 +117,6 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
@@ -168,13 +165,6 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
                 """
             ),
         }
-    )
-
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
     )
 
     expected_metadata = HelmChartMetadata(
@@ -239,13 +229,6 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
     expected_metadata = HelmChartMetadata(
         name="chart2",
         api_version="v2",
@@ -302,9 +285,6 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     first_party_target = rule_runner.get_target(Address("src/deploy", target_name="first_party"))
     third_party_target = rule_runner.get_target(Address("src/deploy", target_name="3rd_party"))
 
@@ -348,9 +328,6 @@ def test_fail_when_more_than_one_chart_is_found_for_a_deployment(rule_runner: Ru
             ),
         }
     )
-
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
 
     target = rule_runner.get_target(Address("src/quxx"))
     field_set = HelmDeploymentFieldSet.create(target)

@@ -36,12 +36,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, (InferHelmChartDependenciesRequest,)),
         ],
     )
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
     return rule_runner
 
 

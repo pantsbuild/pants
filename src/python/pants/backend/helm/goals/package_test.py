@@ -48,8 +48,6 @@ def rule_runner() -> RuleRunner:
 
 
 def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_version: str) -> None:
-    rule_runner.set_options(["--source-root-patterns=['src/*']"])
-
     target = rule_runner.get_target(Address(f"src/{chart_name}", target_name=chart_name))
     field_set = HelmPackageFieldSet.create(target)
 
