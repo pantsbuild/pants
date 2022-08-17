@@ -277,33 +277,6 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
     assert new_metadata == expected_metadata
 
 
-def test_wrong_source_roots_results_in_error(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/chart/BUILD": "helm_chart()",
-            "src/chart/Chart.yaml": dedent(
-                """\
-                apiVersion: v2
-                name: chart
-                version: 0.1.0
-                """
-            ),
-            "src/chart1/values.yaml": HELM_VALUES_FILE,
-        }
-    )
-
-    source_root_patterns = ("/src",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
-    target = rule_runner.get_target(Address("src/chart", target_name="chart"))
-    with pytest.raises(ExecutionError):
-        rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
-
-
 def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

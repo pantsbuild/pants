@@ -19,6 +19,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.testutil import HELM_CHART_FILE
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.deploy import DeployProcess
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -30,6 +31,7 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmArtifactTarget, HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
         rules=[
             *helm_deploy_rules(),
+            *stripped_source_files.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(DeployProcess, (DeployHelmDeploymentFieldSet,)),
         ],

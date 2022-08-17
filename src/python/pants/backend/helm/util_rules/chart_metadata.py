@@ -11,10 +11,10 @@ from typing import Any, cast
 import yaml
 
 from pants.backend.helm.target_types import HelmChartMetaSourceField
+from pants.backend.helm.util_rules.sources import HelmChartSourceRootRequest
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -24,7 +24,11 @@ from pants.engine.fs import (
     GlobExpansionConjunction,
     PathGlobs,
 )
+from pants.engine.internals.native_engine import RemovePrefix
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.source.source_root import SourceRoot
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
@@ -206,9 +210,17 @@ HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
 
 
 @dataclass(frozen=True)
-class ParseHelmChartMetadataDigest:
+class ParseHelmChartMetadataDigest(EngineAwareParameter):
+    """Request to parse the Helm chart definition file (i.e. `Chart.yaml`) from the given digest.
+
+    The definition file is expected to be at the root of the digest.
+    """
+
     digest: Digest
     description_of_origin: str
+
+    def debug_hint(self) -> str | None:
+        return self.description_of_origin
 
 
 @rule
@@ -244,17 +256,24 @@ async def parse_chart_metadata_from_digest(
 
 @rule
 async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> HelmChartMetadata:
-    source_files = await Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            [field], for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
+    source_root, source_files = await MultiGet(
+        Get(SourceRoot, HelmChartSourceRootRequest(field)),
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                field, for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
+            ),
         ),
+    )
+
+    metadata_digest = await Get(
+        Digest, RemovePrefix(source_files.snapshot.digest, source_root.path)
     )
 
     return await Get(
         HelmChartMetadata,
         ParseHelmChartMetadataDigest(
-            source_files.snapshot.digest,
+            metadata_digest,
             description_of_origin=f"the `helm_chart` {field.address.spec}",
         ),
     )
