@@ -24,8 +24,7 @@ You do not need to land every upgrade into your organization—often, you will w
 First, see if Pants can automatically fix any safe deprecations for you:
 
 ```bash
-# You may want to use `--no-fmt` if your BUILD files are
-# not already formatted by Black.
+# You may want to use `--no-fmt` if your BUILD files are already formatted.
 ❯ ./pants update-build-files --no-fmt ::
 ```
 
