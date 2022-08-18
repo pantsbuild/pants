@@ -9,7 +9,7 @@ from pants.backend.python.goals.run_helper import (
     _create_python_source_run_request,
 )
 from pants.backend.python.subsystems.debugpy import DebugPy
-from pants.backend.python.target_types import PexBinaryDefaults
+from pants.backend.python.target_types import PexBinaryDefaults, PexLayout
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
@@ -31,7 +31,7 @@ async def create_pex_binary_run_request(
         built_pex = await Get(BuiltPackage, PexBinaryFieldSet, field_set)
         relpath = built_pex.artifacts[0].relpath
         assert relpath is not None
-        if field_set.layout.value != "zipapp":
+        if field_set.layout.value != PexLayout.ZIPAPP.value:
             relpath = os.path.join(relpath, "__main__.py")
 
         return RunRequest(

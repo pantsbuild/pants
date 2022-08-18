@@ -122,7 +122,7 @@ def test_entry_point(
 @pytest.mark.parametrize("include_tools", [True, False])
 @use_deprecated_semantics_args
 def test_execution_mode_and_include_tools(
-    execution_mode: PexExecutionMode,
+    execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
     use_deprecated_semantics_args: tuple[str, ...],
 ):
@@ -132,17 +132,18 @@ def test_execution_mode_and_include_tools(
         include_tools=include_tools,
     )
 
-    result = run("--", "info", PEX_TOOLS="1")
-    assert result.exit_code == 0
-    pex_info = json.loads(result.stdout)
-    assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
-    assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
-        "venv_bin_path"
-    ]
-    if use_deprecated_semantics_args:
-        assert not pex_info["strip_pex_env"]
-    else:
-        assert pex_info["strip_pex_env"]
+    if include_tools:
+        result = run("--", "info", PEX_TOOLS="1")
+        assert result.exit_code == 0, result.stderr
+        pex_info = json.loads(result.stdout)
+        assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
+        assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
+            "venv_bin_path"
+        ]
+        if use_deprecated_semantics_args:
+            assert not pex_info["strip_pex_env"]
+        else:
+            assert pex_info["strip_pex_env"]
 
 
 @pytest.mark.parametrize("layout", PexLayout)
