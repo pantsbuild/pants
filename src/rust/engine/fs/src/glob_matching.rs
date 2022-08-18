@@ -355,7 +355,9 @@ impl FilespecMatcher {
   ///
   /// NB: This implementation is independent from GlobMatchingImplementation::expand, and must be
   /// kept in sync via unit tests (in particular: the python filespec_test.py) in order to allow for
-  /// owners detection of deleted files (see #6790 and #5636 for more info).
+  /// owners detection of deleted files (see #6790 and #5636 for more info). The lazy filesystem
+  /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
+  /// via MemFS).
   ///
   pub fn matches(&self, path: &Path) -> bool {
     let matches_includes = self

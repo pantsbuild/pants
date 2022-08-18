@@ -426,8 +426,11 @@ pub struct PyFilespecMatcher(FilespecMatcher);
 #[pymethods]
 impl PyFilespecMatcher {
   #[new]
-  fn __new__(includes: Vec<String>, excludes: Vec<String>) -> PyResult<Self> {
-    let matcher = FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err)?;
+  fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
+    // Parsing the globs has shown up in benchmarks
+    // (https://github.com/pantsbuild/pants/issues/16122), so we use py.allow_threads().
+    let matcher =
+      py.allow_threads(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
     Ok(Self(matcher))
   }
 
@@ -443,7 +446,7 @@ impl PyFilespecMatcher {
       .0
       .include_globs()
       .iter()
-      .map(|pattern| format!("{pattern}"))
+      .map(|pattern| pattern.to_string())
       .join(", ");
     let excludes = self.0.exclude_globs().join(", ");
     format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
