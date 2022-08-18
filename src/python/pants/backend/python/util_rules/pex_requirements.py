@@ -302,8 +302,8 @@ class ResolvePexConfig:
     find_links: tuple[str, ...]
     manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
-    only_binary: tuple[str, ...]
-    no_binary: tuple[str, ...]
+    only_binary: FrozenOrderedSet[PipRequirement]
+    no_binary: FrozenOrderedSet[PipRequirement]
 
     def indexes_and_find_links_and_manylinux_pex_args(self) -> Iterator[str]:
         # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
@@ -350,8 +350,8 @@ async def determine_resolve_pex_config(
             find_links=python_repos.repos,
             manylinux=python_setup.manylinux,
             constraints_file=None,
-            no_binary=(),
-            only_binary=(),
+            no_binary=FrozenOrderedSet(),
+            only_binary=FrozenOrderedSet(),
         )
 
     all_python_tool_resolve_names = tuple(
@@ -416,8 +416,8 @@ async def determine_resolve_pex_config(
         find_links=python_repos.repos,
         manylinux=python_setup.manylinux,
         constraints_file=constraints_file,
-        no_binary=tuple(no_binary),
-        only_binary=tuple(only_binary),
+        no_binary=FrozenOrderedSet(no_binary),
+        only_binary=FrozenOrderedSet(only_binary),
     )
 
 
