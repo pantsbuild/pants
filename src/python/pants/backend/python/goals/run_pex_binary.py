@@ -31,6 +31,9 @@ async def create_pex_binary_run_request(
         built_pex = await Get(BuiltPackage, PexBinaryFieldSet, field_set)
         relpath = built_pex.artifacts[0].relpath
         assert relpath is not None
+        if field_set.layout.value != "zipapp":
+            relpath = os.path.join(relpath, "__main__.py")
+
         return RunRequest(
             digest=built_pex.digest,
             args=[os.path.join("{chroot}", relpath)],
