@@ -50,9 +50,7 @@ class PyUpgradeLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_pyupgrade_lockfile(
     _: PyUpgradeLockfileSentinel, pyupgrade: PyUpgrade, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        pyupgrade, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(pyupgrade, python_setup=python_setup)
 
 
 class PyUpgradeExportSentinel(ExportPythonToolSentinel):

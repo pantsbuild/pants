@@ -120,15 +120,13 @@ async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not bandit.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            bandit, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(bandit, python_setup=python_setup)
 
     constraints = await _bandit_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         bandit,
         constraints,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        python_setup=python_setup,
     )
 
 

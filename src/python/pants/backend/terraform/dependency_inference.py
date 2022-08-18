@@ -63,9 +63,7 @@ def setup_lockfile_request(
     hcl2_parser: TerraformHcl2Parser,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        hcl2_parser, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(hcl2_parser, python_setup=python_setup)
 
 
 @dataclass(frozen=True)

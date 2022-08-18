@@ -111,7 +111,7 @@ class YapfLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_yapf_lockfile(
     _: YapfLockfileSentinel, yapf: Yapf, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(yapf, use_pex=python_setup.generate_lockfiles_with_pex)
+    return GeneratePythonLockfile.from_tool(yapf, python_setup=python_setup)
 
 
 class YapfExportSentinel(ExportPythonToolSentinel):

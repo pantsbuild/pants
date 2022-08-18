@@ -65,9 +65,7 @@ def setup_lockfile_request(
     dockerfile_parser: DockerfileParser,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        dockerfile_parser, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(dockerfile_parser, python_setup=python_setup)
 
 
 @dataclass(frozen=True)

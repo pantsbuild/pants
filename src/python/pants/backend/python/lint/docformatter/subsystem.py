@@ -47,9 +47,7 @@ class DocformatterLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_lockfile_request(
     _: DocformatterLockfileSentinel, docformatter: Docformatter, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        docformatter, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(docformatter, python_setup=python_setup)
 
 
 class DocformatterExportSentinel(ExportPythonToolSentinel):

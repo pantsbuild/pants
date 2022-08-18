@@ -72,7 +72,7 @@ class GeneratePythonLockfile(GenerateLockfile):
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
         *,
-        use_pex: bool,
+        python_setup: PythonSetup,
         extra_requirements: Iterable[str] = (),
     ) -> GeneratePythonLockfile:
         """Create a request for a dedicated lockfile for the tool.
@@ -81,6 +81,7 @@ class GeneratePythonLockfile(GenerateLockfile):
         rather than the option `--interpreter-constraints`, you must pass the arg
         `interpreter_constraints`.
         """
+        use_pex = python_setup.generate_lockfiles_with_pex
         if not subsystem.uses_custom_lockfile:
             return cls(
                 requirements=FrozenOrderedSet(),
@@ -394,9 +395,7 @@ async def setup_poetry_lockfile(
     # No matter what venv (Python) Poetry lives in, it can still create locks for projects with
     # a disjoint set of Pythons as implied by the project's `python` requirement; so we need not
     # account for user resolve ICs.
-    return GeneratePythonLockfile.from_tool(
-        poetry_subsystem, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(poetry_subsystem, python_setup=python_setup)
 
 
 def rules():

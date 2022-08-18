@@ -382,16 +382,14 @@ async def setup_mypy_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not mypy.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            mypy, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(mypy, python_setup=python_setup)
 
     constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return GeneratePythonLockfile.from_tool(
         mypy,
         constraints,
         extra_requirements=first_party_plugins.requirement_strings,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        python_setup=python_setup,
     )
 
 

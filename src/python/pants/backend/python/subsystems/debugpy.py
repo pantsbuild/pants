@@ -91,9 +91,7 @@ class DebugPyLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_debugpy_lockfile(
     _: DebugPyLockfileSentinel, debugpy: DebugPy, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        debugpy, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(debugpy, python_setup=python_setup)
 
 
 def rules():

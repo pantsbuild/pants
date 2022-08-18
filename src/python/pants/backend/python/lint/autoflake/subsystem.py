@@ -54,9 +54,7 @@ class AutoflakeLockfileSentinel(GeneratePythonToolLockfileSentinel):
 async def setup_autoflake_lockfile(
     _: AutoflakeLockfileSentinel, autoflake: Autoflake, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        autoflake, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(autoflake, python_setup=python_setup)
 
 
 class AutoflakeExportSentinel(ExportPythonToolSentinel):

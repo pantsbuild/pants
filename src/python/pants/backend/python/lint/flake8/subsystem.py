@@ -300,16 +300,14 @@ async def setup_flake8_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not flake8.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            flake8, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(flake8, python_setup=python_setup)
 
     constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return GeneratePythonLockfile.from_tool(
         flake8,
         constraints,
         extra_requirements=first_party_plugins.requirement_strings,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        python_setup=python_setup,
     )
 
 
