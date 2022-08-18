@@ -7,8 +7,10 @@ from typing import Iterable
 
 from typing_extensions import TypedDict
 
-from pants.engine.fs import PathGlobs
-from pants.engine.internals import native_engine
+from pants.base.deprecated import deprecated
+from pants.engine.internals.native_engine import (
+    FilespecMatcher as FilespecMatcher,  # explicit re-export
+)
 
 
 class _IncludesDict(TypedDict, total=True):
@@ -26,11 +28,7 @@ class Filespec(_IncludesDict, total=False):
     excludes: list[str]
 
 
+@deprecated("2.15.0.dev0", "Use `FilespecMatcher().matches()` instead", start_version="2.14.0.dev5")
 def matches_filespec(spec: Filespec, *, paths: Iterable[str]) -> tuple[str, ...]:
-    include_patterns = spec["includes"]
-    exclude_patterns = [f"!{e}" for e in spec.get("excludes", [])]
-    return tuple(
-        native_engine.match_path_globs(
-            PathGlobs((*include_patterns, *exclude_patterns)), tuple(paths)
-        )
-    )
+    matcher = FilespecMatcher(spec["includes"], spec.get("excludes", []))
+    return tuple(matcher.matches(tuple(paths)))

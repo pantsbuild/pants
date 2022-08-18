@@ -39,7 +39,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -53,13 +53,13 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
-    test_utils_filespec = Filespec(includes=list(PythonTestUtilsGeneratingSourcesField.default))
+    tests_filespec_matcher = FilespecMatcher(PythonTestsGeneratingSourcesField.default, ())
+    test_utils_filespec_matcher = FilespecMatcher(PythonTestUtilsGeneratingSourcesField.default, ())
 
     path_to_file_name = {path: os.path.basename(path) for path in paths}
-    test_file_names = set(matches_filespec(tests_filespec, paths=path_to_file_name.values()))
+    test_file_names = set(tests_filespec_matcher.matches(list(path_to_file_name.values())))
     test_util_file_names = set(
-        matches_filespec(test_utils_filespec, paths=path_to_file_name.values())
+        test_utils_filespec_matcher.matches(list(path_to_file_name.values()))
     )
 
     test_files = {
