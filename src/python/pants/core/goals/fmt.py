@@ -9,7 +9,7 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterable, Iterator, TypeVar
+from typing import Callable, ClassVar, Iterable, Iterator, TypeVar, cast
 
 from pants.base.specs import Specs
 from pants.core.goals.style_request import (
@@ -374,7 +374,7 @@ async def fmt(
         fmt_subsystem.batch_size,
     )
 
-    target_batch_results = await MultiGet(
+    all_requests = [
         *(
             Get(
                 _FmtBatchResult,
@@ -392,6 +392,9 @@ async def fmt(
                 fmt_subsystem.batch_size,
             )
         ),
+    ]
+    target_batch_results = cast(
+        "tuple[_FmtBatchResult, ...]", await MultiGet(all_requests)  # type: ignore[arg-type]
     )
 
     individual_results = list(
