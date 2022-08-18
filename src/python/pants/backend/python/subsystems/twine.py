@@ -118,7 +118,7 @@ class TwineLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_twine_lockfile(
     _: TwineLockfileSentinel, twine: TwineSubsystem, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(twine, use_pex=python_setup.generate_lockfiles_with_pex)
+    return GeneratePythonLockfile.from_tool(twine, python_setup=python_setup)
 
 
 def rules():

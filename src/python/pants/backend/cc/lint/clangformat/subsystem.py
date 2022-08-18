@@ -73,9 +73,7 @@ class ClangFormatLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_clangformat_lockfile(
     _: ClangFormatLockfileSentinel, clangformat: ClangFormat, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        clangformat, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(clangformat, python_setup=python_setup)
 
 
 class ClangFormatExportSentinel(ExportPythonToolSentinel):

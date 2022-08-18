@@ -237,9 +237,7 @@ class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_coverage_lockfile(
     _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        coverage, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(coverage, python_setup=python_setup)
 
 
 @dataclass(frozen=True)

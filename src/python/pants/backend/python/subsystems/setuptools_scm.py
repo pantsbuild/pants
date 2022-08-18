@@ -41,9 +41,7 @@ class SetuptoolsSCMLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_setuptools_scm_lockfile(
     _: SetuptoolsSCMLockfileSentinel, setuptools_scm: SetuptoolsSCM, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        setuptools_scm, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(setuptools_scm, python_setup=python_setup)
 
 
 def rules():

@@ -274,15 +274,13 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            pytest, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(pytest, python_setup=python_setup)
 
     constraints = await _pytest_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         pytest,
         constraints,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        python_setup=python_setup,
     )
 
 

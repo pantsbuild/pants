@@ -39,9 +39,7 @@ class LambdexLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_lambdex_lockfile(
     _: LambdexLockfileSentinel, lambdex: Lambdex, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        lambdex, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(lambdex, python_setup=python_setup)
 
 
 def rules():

@@ -61,9 +61,7 @@ def setup_k8s_parser_lockfile_request(
     post_renderer: HelmKubeParserSubsystem,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        post_renderer, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(post_renderer, python_setup=python_setup)
 
 
 @dataclass(frozen=True)

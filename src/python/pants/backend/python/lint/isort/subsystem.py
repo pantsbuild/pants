@@ -113,7 +113,7 @@ class IsortLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_isort_lockfile(
     _: IsortLockfileSentinel, isort: Isort, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(isort, use_pex=python_setup.generate_lockfiles_with_pex)
+    return GeneratePythonLockfile.from_tool(isort, python_setup=python_setup)
 
 
 class IsortExportSentinel(ExportPythonToolSentinel):

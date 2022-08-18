@@ -49,9 +49,7 @@ class PyoxidizerLockfileSentinel(GeneratePythonToolLockfileSentinel):
 def setup_lockfile_request(
     _: PyoxidizerLockfileSentinel, pyoxidizer: PyOxidizer, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        pyoxidizer, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(pyoxidizer, python_setup=python_setup)
 
 
 def rules():
