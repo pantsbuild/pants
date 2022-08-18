@@ -207,7 +207,12 @@ async def addresses_from_raw_specs_with_only_file_owners(
     all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
     owners = await Get(
         Owners,
-        OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
+        OwnersRequest(
+            all_files,
+            filter_by_global_options=specs.filter_by_global_options,
+            # Specifying a BUILD file should not expand to all the targets it defines.
+            match_if_owning_build_file_included_in_sources=False,
+        ),
     )
     return Addresses(sorted(owners))
 

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.style_request import (
     StyleRequest,
     determine_specified_tool_names,
@@ -268,7 +268,9 @@ async def lint(
     lint_target_request_types = cast(
         "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
-    fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
+    fmt_target_request_types = cast(
+        "Iterable[type[FmtTargetsRequest]]", union_membership.get(FmtTargetsRequest)
+    )
     file_request_types = cast(
         "Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest]
     )
@@ -326,7 +328,7 @@ async def lint(
         request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
     )
 
-    fmt_requests: Iterable[FmtRequest] = ()
+    fmt_requests: Iterable[FmtTargetsRequest] = ()
     if not lint_subsystem.skip_formatters:
         batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
         all_fmt_source_batches = await MultiGet(
@@ -360,7 +362,7 @@ async def lint(
 
     all_requests = [
         *(Get(LintResults, LintTargetsRequest, request) for request in lint_target_requests),
-        *(Get(FmtResult, FmtRequest, request) for request in fmt_requests),
+        *(Get(FmtResult, FmtTargetsRequest, request) for request in fmt_requests),
         *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
     ]
     all_batch_results = cast(

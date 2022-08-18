@@ -11,7 +11,7 @@ from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
@@ -34,7 +34,7 @@ class GofmtFieldSet(FieldSet):
         return tgt.get(SkipGofmtField).value
 
 
-class GofmtRequest(FmtRequest):
+class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
     name = GofmtSubsystem.options_scope
 
@@ -66,5 +66,5 @@ def rules():
     return [
         *collect_rules(),
         *goroot.rules(),
-        UnionRule(FmtRequest, GofmtRequest),
+        UnionRule(FmtTargetsRequest, GofmtRequest),
     ]

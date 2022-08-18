@@ -9,6 +9,7 @@ import os
 from typing import Iterable, List, TypeVar
 
 from pants.backend.python.subsystems.repos import PythonRepos
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.global_options import PLUGINS_RESOLVE_KEY
 from pants.option.option_types import (
@@ -881,7 +882,7 @@ class PythonSetup(Subsystem):
     @memoized_method
     def resolves_to_no_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PipRequirement]]:
         if self.no_binary:
             if self._resolves_to_no_binary:
                 raise ValueError(
@@ -895,24 +896,39 @@ class PythonSetup(Subsystem):
                         """
                     )
                 )
+            no_binary_opt = [
+                PipRequirement.parse(v, description_of_origin="the option `[python].no_binary`")
+                for v in self.no_binary
+            ]
             return {
-                resolve: list(self.no_binary)
+                resolve: no_binary_opt
                 for resolve in self.all_resolve_names(
                     all_python_tool_resolve_names,
                     include_special_cased_resolves_without_lockfiles=False,
                 )
             }
-        return self._resolves_to_option_helper(
+        return {
+            resolve: [
+                PipRequirement.parse(
+                    v,
+                    description_of_origin=(
+                        f"the option `[python].resolves_to_no_binary` for the resolve {resolve}"
+                    ),
+                )
+                for v in vals
+            ]
+            for resolve, vals in self._resolves_to_option_helper(
             self._resolves_to_no_binary,
             "resolves_to_no_binary",
             all_python_tool_resolve_names,
             include_special_cased_resolves_without_lockfiles=False,
-        )
+        ).items()
+        }
 
     @memoized_method
     def resolves_to_only_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PipRequirement]]:
         if self.only_binary:
             if self._resolves_to_only_binary:
                 raise ValueError(
@@ -926,19 +942,34 @@ class PythonSetup(Subsystem):
                         """
                     )
                 )
+            only_binary_opt = [
+                PipRequirement.parse(v, description_of_origin="the option `[python].only_binary`")
+                for v in self.only_binary
+            ]
             return {
-                resolve: list(self.only_binary)
+                resolve: only_binary_opt
                 for resolve in self.all_resolve_names(
                     all_python_tool_resolve_names,
                     include_special_cased_resolves_without_lockfiles=False,
                 )
             }
-        return self._resolves_to_option_helper(
+        return {
+            resolve: [
+                PipRequirement.parse(
+                    v,
+                    description_of_origin=(
+                        f"the option `[python].resolves_to_only_binary` for the resolve {resolve}"
+                    ),
+                )
+                for v in vals
+            ]
+            for resolve, vals in self._resolves_to_option_helper(
             self._resolves_to_only_binary,
             "resolves_to_only_binary",
             all_python_tool_resolve_names,
             include_special_cased_resolves_without_lockfiles=False,
-        )
+        ).items()
+        }
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")

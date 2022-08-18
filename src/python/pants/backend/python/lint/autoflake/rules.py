@@ -8,7 +8,7 @@ from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
@@ -30,7 +30,7 @@ class AutoflakeFieldSet(FieldSet):
         return tgt.get(SkipAutoflakeField).value
 
 
-class AutoflakeRequest(FmtRequest):
+class AutoflakeRequest(FmtTargetsRequest):
     field_set_type = AutoflakeFieldSet
     name = Autoflake.options_scope
 
@@ -63,6 +63,6 @@ async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtR
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, AutoflakeRequest),
+        UnionRule(FmtTargetsRequest, AutoflakeRequest),
         *pex.rules(),
     ]

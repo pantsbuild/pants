@@ -553,14 +553,16 @@ __default__ = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
 ### Constraints files
 
 Sometimes, transitive dependencies of one of your third-party requirements can cause trouble.
+For example, sometimes requirements do not pin their dependencies well enough, and a newer
+version of its transitive dependency is released that breaks the requirement.
 [Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) 
-allow you to pin these transitive dependencies to certain versions, overriding the version that
+allow you to pin transitive dependencies to certain versions, overriding the version that
 pip/Pex would normally choose.
 
 Constraints files are configured per-resolve, meaning that the resolves for your user code from
-`[python].resolves` and all Python tools like Black and Pytest can have different configuration.
-Use the option `[python].resolves_to_constraints_file` to map resolve names to paths to
-pip-compatible constraints files. For example:
+`[python].resolves` and each Python tool, such as Black and Pytest, can have different
+configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to
+paths to pip-compatible constraints files. For example:
 
 ```toml pants.toml
 [python.resolves_to_constraints_file]
@@ -573,7 +575,7 @@ urrllib3==4.2
 ```
 
 You can also set the key `__default__` to apply the same constraints file to every resolve by
-default, although this is not always useful because resolves often to need different constraints.
+default, although this is not always useful because resolves often need different constraints.
 
 ### `only_binary` and `no_binary`
 
@@ -582,7 +584,7 @@ certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists 
 certain requirements.
 
 `only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user
-code from `[python].resolves` and all Python tools like Black and Pytest can have different
+code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different
 configuration. Use the options `[python].resolves_to_only_binary` and 
 `[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
 For example:

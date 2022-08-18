@@ -903,49 +903,6 @@ def publish() -> None:
     prompt_to_generate_docs()
 
 
-def publish_apple_silicon() -> None:
-    banner("Building and publishing an Apple Silicon wheel")
-    if os.environ.get("USE_PY39") != "true":
-        die("Must set `USE_PY39=true` when building for Apple Silicon.")
-    if os.environ.get("MODE") == "debug":
-        die("Must build Rust in release mode, not debug. Please run `unset MODE`.")
-    check_clean_git_branch()
-    check_pgp()
-    check_roles()
-
-    dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    if dest_dir.exists():
-        shutil.rmtree(dest_dir)
-    subprocess.run(
-        [
-            "./pants",
-            "--concurrent",
-            f"--pants-distdir={dest_dir}",
-            "package",
-            PANTS_PKG.target,
-        ],
-        check=True,
-    )
-    expected_whl = (
-        dest_dir
-        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
-    )
-    if not expected_whl.exists():
-        die(
-            softwrap(
-                f"""
-                Failed to find {expected_whl}. Are you running from the correct platform and
-                macOS version?
-                """
-            )
-        )
-
-    create_twine_venv()
-    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
-    upload_wheels_via_twine()
-    banner("Successfully released Apple Silicon wheel to PyPI")
-
-
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
     git_status = (
@@ -1251,7 +1208,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
-    subparsers.add_parser("publish-apple-silicon")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -1268,8 +1224,6 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
-    if args.command == "publish-apple-silicon":
-        publish_apple_silicon()
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":

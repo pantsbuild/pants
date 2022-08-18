@@ -288,7 +288,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:

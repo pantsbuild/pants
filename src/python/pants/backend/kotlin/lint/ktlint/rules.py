@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -36,7 +36,7 @@ class KtlintFieldSet(FieldSet):
         return tgt.get(SkipKtlintField).value
 
 
-class KtlintRequest(FmtRequest):
+class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
     name = KtlintSubsystem.options_scope
 
@@ -95,6 +95,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        UnionRule(FmtRequest, KtlintRequest),
+        UnionRule(FmtTargetsRequest, KtlintRequest),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]

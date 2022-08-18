@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.testutil.option_util import create_subsystem
@@ -44,7 +45,7 @@ def test_resolves_to_constraints_file() -> None:
 def test_resolves_to_no_binary_and_only_binary() -> None:
     def create(
         resolves_to_projects: dict[str, list[str]], deprecated_options: list[str] | None = None
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PipRequirement]]:
         subsystem = create_subsystem(
             PythonSetup,
             resolves={"a": "a.lock"},
@@ -62,15 +63,23 @@ def test_resolves_to_no_binary_and_only_binary() -> None:
         assert only_binary == no_binary
         return only_binary
 
-    assert create({"a": ["p1"], "tool1": ["p2"]}) == {"a": ["p1"], "tool1": ["p2"]}
+    p1_req = PipRequirement.parse("p1")
+    assert create({"a": ["p1"], "tool1": ["p2"]}) == {
+        "a": [p1_req],
+        "tool1": [PipRequirement.parse("p2")],
+    }
     assert create({"__default__": ["p1"], "tool2": ["override"]}) == {
-        "a": ["p1"],
-        "tool1": ["p1"],
-        "tool2": ["override"],
+        "a": [p1_req],
+        "tool1": [p1_req],
+        "tool2": [PipRequirement.parse("override")],
     }
     with pytest.raises(UnrecognizedResolveNamesError):
         create({"fake": []})
 
-    assert create({}, deprecated_options=["p1"]) == {"a": ["p1"], "tool1": ["p1"], "tool2": ["p1"]}
+    assert create({}, deprecated_options=["p1"]) == {
+        "a": [p1_req],
+        "tool1": [p1_req],
+        "tool2": [p1_req],
+    }
     with pytest.raises(ValueError):
         create({"a": ["p1"]}, deprecated_options=["p2"])

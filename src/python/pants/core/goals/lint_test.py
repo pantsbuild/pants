@@ -12,7 +12,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Type
 import pytest
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
     Lint,
@@ -127,7 +127,7 @@ class MockFilesRequest(LintFilesRequest):
         return LintResults([LintResult(0, "", "")], linter_name=self.name)
 
 
-class MockFmtRequest(FmtRequest):
+class MockFmtRequest(FmtTargetsRequest):
     field_set_type = MockLinterFieldSet
 
 
@@ -162,7 +162,7 @@ def run_lint_rule(
     rule_runner: RuleRunner,
     *,
     lint_request_types: Sequence[Type[LintTargetsRequest]],
-    fmt_request_types: Sequence[Type[FmtRequest]] = (),
+    fmt_request_types: Sequence[Type[FmtTargetsRequest]] = (),
     targets: list[Target],
     run_files_linter: bool = False,
     batch_size: int = 128,
@@ -173,7 +173,7 @@ def run_lint_rule(
         {
             LintTargetsRequest: lint_request_types,
             LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
-            FmtRequest: fmt_request_types,
+            FmtTargetsRequest: fmt_request_types,
         }
     )
     lint_subsystem = create_goal_subsystem(
@@ -211,7 +211,7 @@ def run_lint_rule(
                 ),
                 MockGet(
                     output_type=FmtResult,
-                    input_type=FmtRequest,
+                    input_type=FmtTargetsRequest,
                     mock=lambda mock_request: mock_request.fmt_result,
                 ),
                 MockGet(

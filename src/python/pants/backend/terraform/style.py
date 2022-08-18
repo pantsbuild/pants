@@ -11,7 +11,7 @@ from typing import Iterable
 from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest
-from pants.core.goals.fmt import FmtRequest
+from pants.core.goals.fmt import FmtTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -24,10 +24,10 @@ from pants.util.strutil import pluralize
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class StyleSetupRequest:
-    request: FmtRequest | CheckRequest
+    request: FmtTargetsRequest | CheckRequest
     args: tuple[str, ...]
 
-    def __init__(self, request: FmtRequest | CheckRequest, args: Iterable[str]):
+    def __init__(self, request: FmtTargetsRequest | CheckRequest, args: Iterable[str]):
         self.request = request
         self.args = tuple(args)
 
@@ -50,7 +50,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
 
     source_files_snapshot = (
         setup_request.request.snapshot
-        if isinstance(setup_request.request, FmtRequest)
+        if isinstance(setup_request.request, FmtTargetsRequest)
         else await Get(
             Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set)
         )
