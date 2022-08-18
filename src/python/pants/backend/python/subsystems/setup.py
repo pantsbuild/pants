@@ -617,6 +617,15 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    add_headers_to_lockfile = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Should headers that describe how to regenerate the lock file be added to the lock file
+            """
+        ),
+        advanced=True,
+    )
 
     @property
     def generate_lockfiles_with_pex(self) -> bool:

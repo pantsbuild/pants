@@ -65,6 +65,7 @@ class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
     use_pex: bool
+    with_headers: bool
 
     @classmethod
     def from_tool(
@@ -89,6 +90,7 @@ class GeneratePythonLockfile(GenerateLockfile):
                 resolve_name=subsystem.options_scope,
                 lockfile_dest=subsystem.lockfile,
                 use_pex=use_pex,
+                with_headers=python_setup.add_headers_to_lockfile,
             )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
@@ -100,6 +102,7 @@ class GeneratePythonLockfile(GenerateLockfile):
             resolve_name=subsystem.options_scope,
             lockfile_dest=subsystem.lockfile,
             use_pex=use_pex,
+            with_headers=python_setup.add_headers_to_lockfile,
         )
 
     @property
@@ -321,16 +324,19 @@ async def generate_lockfile(
         only_binary=set(pip_args_setup.resolve_config.only_binary),
         no_binary=set(pip_args_setup.resolve_config.no_binary),
     )
-    lockfile_with_header = metadata.add_header_to_lockfile(
-        initial_lockfile_digest_contents[0].content,
-        regenerate_command=(
-            generate_lockfiles_subsystem.custom_command
-            or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
-        ),
-        delimeter=header_delimiter,
-    )
+    if req.with_headers:
+        final_lockfile = metadata.add_header_to_lockfile(
+            initial_lockfile_digest_contents[0].content,
+            regenerate_command=(
+                generate_lockfiles_subsystem.custom_command
+                or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
+            ),
+            delimeter=header_delimiter,
+        )
+    else:
+        final_lockfile = initial_lockfile_digest_contents[0].content
     final_lockfile_digest = await Get(
-        Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
+        Digest, CreateDigest([FileContent(req.lockfile_dest, final_lockfile)])
     )
     return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
 
@@ -381,6 +387,7 @@ async def setup_user_lockfile_requests(
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
             use_pex=python_setup.generate_lockfiles_with_pex,
+            with_headers=python_setup.add_headers_to_lockfile,
         )
         for resolve in requested
     )

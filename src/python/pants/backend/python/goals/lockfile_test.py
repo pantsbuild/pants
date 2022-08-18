@@ -57,6 +57,7 @@ def _generate(
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 use_pex=use_pex,
+                with_headers=True,
             )
         ],
     )
@@ -265,6 +266,7 @@ def test_multiple_resolves() -> None:
             resolve_name="a",
             lockfile_dest="a.lock",
             use_pex=True,
+            with_headers=True,
         ),
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["b"]),
@@ -272,5 +274,6 @@ def test_multiple_resolves() -> None:
             resolve_name="b",
             lockfile_dest="b.lock",
             use_pex=True,
+            with_headers=True,
         ),
     }

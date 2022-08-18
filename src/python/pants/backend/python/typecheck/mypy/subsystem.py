@@ -411,6 +411,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
             resolve_name=request.resolve_name,
             lockfile_dest=mypy.extra_type_stubs_lockfile,
             use_pex=use_pex,
+            with_headers=python_setup.add_headers_to_lockfile,
         )
 
     # While MyPy will run in partitions, we need a set of constraints that works with every
@@ -437,6 +438,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
         resolve_name=request.resolve_name,
         lockfile_dest=mypy.extra_type_stubs_lockfile,
         use_pex=use_pex,
+        with_headers=python_setup.add_headers_to_lockfile,
     )
 
 
