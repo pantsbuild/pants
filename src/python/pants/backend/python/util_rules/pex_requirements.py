@@ -449,8 +449,6 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
-        indexes=resolve_config.indexes,
-        find_links=resolve_config.find_links,
         manylinux=resolve_config.manylinux,
         requirement_constraints=(
             resolve_config.constraints_file.constraints
@@ -511,20 +509,6 @@ def _common_failure_reasons(
             - The `no_binary` arguments have changed from when the lockfile was generated.
             (`no_binary` is set via the options `[python].resolves_to_no_binary` and deprecated
             `[python].no_binary`)
-            """
-        )
-    if InvalidPythonLockfileReason.INDEXES_MISMATCH in failure_reasons:
-        yield softwrap(
-            """
-            - The `indexes` arguments have changed from when the lockfile was generated.
-            (Indexes are set via the option `[python-repos].indexes`
-            """
-        )
-    if InvalidPythonLockfileReason.FIND_LINKS_MISMATCH in failure_reasons:
-        yield softwrap(
-            """
-            - The `find_links` arguments have changed from when the lockfile was generated.
-            (Find links is set via the option `[python-repos].repos`
             """
         )
     if InvalidPythonLockfileReason.MANYLINUX_MISMATCH in failure_reasons:
