@@ -19,8 +19,7 @@ from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeployme
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -181,6 +180,7 @@ async def _sort_value_file_names_for_evaluation(
     """Sorts the list of files in `value_files_snapshot` alphabetically but grouping them in the
     order in which they have been given in the `sources_field` field glob patterns."""
 
+    base_path = address.spec_path
     result: list[str] = []
 
     if not sources_field.value:
@@ -189,7 +189,12 @@ async def _sort_value_file_names_for_evaluation(
     else:
         # Break the list of filenames in subsets that follow the order given in the `sources` field
         subset_snapshots = await MultiGet(
-            Get(Snapshot, DigestSubset(value_files_snapshot.digest, PathGlobs([glob_pattern])))
+            Get(
+                Snapshot,
+                DigestSubset(
+                    value_files_snapshot.digest, PathGlobs([os.path.join(base_path, glob_pattern)])
+                ),
+            )
             for glob_pattern in sources_field.globs
         )
         sources_subsets = [set(snapshot.files) for snapshot in subset_snapshots]
@@ -231,7 +236,7 @@ async def setup_render_helm_deployment_process(
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(
-            StrippedSourceFiles,
+            SourceFiles,
             SourceFilesRequest(
                 sources_fields=[request.field_set.sources],
                 for_sources_types=[HelmDeploymentSourcesField],

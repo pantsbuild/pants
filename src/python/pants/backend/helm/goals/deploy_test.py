@@ -96,14 +96,12 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ["/src/*"]
     deploy_args = ["--kubeconfig", "./kubeconfig"]
     deploy_process = _run_deployment(
         rule_runner,
         "src/deployment",
         "foo",
         args=[
-            f"--source-root-patterns={repr(source_root_patterns)}",
             f"--helm-args={repr(deploy_args)}",
         ],
     )
@@ -137,7 +135,9 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--values",
-        ",".join([f"__values/{filename}" for filename in expected_value_files_order]),
+        ",".join(
+            [f"__values/src/deployment/{filename}" for filename in expected_value_files_order]
+        ),
         "--set",
         "key=foo",
         "--set",

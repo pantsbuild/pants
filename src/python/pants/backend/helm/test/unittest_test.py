@@ -17,7 +17,7 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart
 from pants.core.goals.test import TestResult
-from pants.core.util_rules import external_tool, stripped_source_files
+from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.source.source_root import rules as source_root_rules
@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *chart.rules(),
             *unittest_rules(),
-            *stripped_source_files.rules(),
+            *source_files.rules(),
             *source_root_rules(),
             *target_types_rules(),
             QueryRule(TestResult, (HelmUnitTestFieldSet,)),

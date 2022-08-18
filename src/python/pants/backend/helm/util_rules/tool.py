@@ -215,7 +215,7 @@ class HelmPlugin(EngineAwareReturnType):
         return self.info.version
 
     def level(self) -> LogLevel | None:
-        return LogLevel.INFO
+        return LogLevel.DEBUG
 
     def message(self) -> str | None:
         return f"Materialized Helm plugin {self.name} with version {self.version} for {self.platform} platform."
