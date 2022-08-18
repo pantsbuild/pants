@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import logging
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent
@@ -48,6 +49,8 @@ from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, shell_quote
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -350,6 +353,7 @@ async def mypy_typecheck_partition(
     process = dataclasses.replace(process, argv=("__mypy_runner.sh",))
     result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
+    logger.info(f">>> --colors={global_options.colors}")
     return CheckResult.from_fallible_process_result(
         result,
         partition_description=partition.description(),

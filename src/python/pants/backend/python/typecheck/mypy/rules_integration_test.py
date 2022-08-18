@@ -45,7 +45,7 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, logging
 
 
 @pytest.fixture
@@ -568,6 +568,7 @@ def test_run_only_on_specified_files(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner, tgt)
 
 
+@logging
 def test_type_stubs(rule_runner: RuleRunner) -> None:
     """Test that first-party type stubs work for both first-party and third-party code."""
     rule_runner.write_files(
