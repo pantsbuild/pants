@@ -7,8 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
-import colors
-
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -48,13 +46,10 @@ class CheckResult:
         *,
         partition_description: str | None = None,
         strip_chroot_path: bool = False,
-        strip_formatting: bool = False,
         report: Digest = EMPTY_DIGEST,
     ) -> CheckResult:
         def prep_output(s: bytes) -> str:
-            chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
-            return formatting
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
         return CheckResult(
             exit_code=process_result.exit_code,
