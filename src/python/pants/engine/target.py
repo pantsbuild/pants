@@ -51,7 +51,7 @@ from pants.engine.fs import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
@@ -2063,7 +2063,7 @@ class SourcesField(AsyncFieldMixin, Field):
             ),
         )
 
-    @property
+    @memoized_property
     def filespec(self) -> Filespec:
         """The original globs, returned in the Filespec dict format.
 
@@ -2080,6 +2080,12 @@ class SourcesField(AsyncFieldMixin, Field):
         if excludes:
             result["excludes"] = excludes
         return result
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 class MultipleSourcesField(SourcesField, StringSequenceField):
@@ -2399,6 +2405,12 @@ class SecondaryOwnerMixin(ABC):
         field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
         the build root.
         """
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 def targets_with_sources_types(

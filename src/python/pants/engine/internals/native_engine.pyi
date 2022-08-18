@@ -8,7 +8,6 @@ from typing import Any, Generic, Iterable, Sequence, TextIO, Tuple, TypeVar, ove
 
 from typing_extensions import Protocol
 
-from pants.engine.fs import PathGlobs
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcessResult
@@ -149,15 +148,18 @@ class RemovePrefix:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
+class FilespecMatcher:
+    def __init__(self, includes: Sequence[str], excludes: Sequence[str]) -> None: ...
+    def __eq__(self, other: FilespecMatcher | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    def matches(self, paths: Sequence[str]) -> list[str]: ...
+
 EMPTY_DIGEST: Digest
 EMPTY_FILE_DIGEST: FileDigest
 EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
-
-# TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't
-#  cast to `tuple()` when not necessary.
-def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
 
 # ------------------------------------------------------------------------------
 # Workunits
