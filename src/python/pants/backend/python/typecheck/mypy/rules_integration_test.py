@@ -441,7 +441,7 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    result = run_mypy(rule_runner, [tgt])
+    result = run_mypy(rule_runner, [tgt], extra_args=["--no-colors"])
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
@@ -595,7 +595,12 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))
     result = run_mypy(
-        rule_runner, [tgt], extra_args=["--source-root-patterns=['mypy_stubs', 'src/py']"]
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--source-root-patterns=['mypy_stubs', 'src/py']",
+            "--no-colors",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -772,7 +777,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        extra_args=["--python-protobuf-mypy-plugin"],
+        extra_args=["--python-protobuf-mypy-plugin", "--no-colors"],
     )
     assert len(result) == 1
     assert 'Argument "name" to "Person" has incompatible type "int"' in result[0].stdout
