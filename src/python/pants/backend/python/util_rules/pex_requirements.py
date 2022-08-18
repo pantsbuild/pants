@@ -304,8 +304,14 @@ class ResolvePexConfig:
     constraints_file: ResolvePexConstraintsFile | None
     only_binary: FrozenOrderedSet[PipRequirement]
     no_binary: FrozenOrderedSet[PipRequirement]
+    path_mappings: tuple[str, ...]
 
-    def indexes_and_find_links_and_manylinux_pex_args(self) -> Iterator[str]:
+    def pex_args(self) -> Iterator[str]:
+        """Arguments for Pex for indexes/--find-links, manylinux, and path mappings.
+
+        Does not include arguments for constraints files, --only-binary, and --no-binary, which must
+        be set up independently.
+        """
         # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
         # case. Why set `--no-pypi`, then? We need to do this so that
@@ -320,6 +326,8 @@ class ResolvePexConfig:
             yield self.manylinux
         else:
             yield "--no-manylinux"
+
+        yield from (f"--path-mapping={v}" for v in self.path_mappings)
 
 
 @dataclass(frozen=True)
@@ -352,6 +360,7 @@ async def determine_resolve_pex_config(
             constraints_file=None,
             no_binary=FrozenOrderedSet(),
             only_binary=FrozenOrderedSet(),
+            path_mappings=(),
         )
 
     all_python_tool_resolve_names = tuple(
@@ -360,6 +369,12 @@ async def determine_resolve_pex_config(
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
 
+    path_mappings = (
+        python_setup.resolves_to_path_mappings(all_python_tool_resolve_names).get(
+            request.resolve_name
+        )
+        or []
+    )
     no_binary = (
         python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
         or []
@@ -418,6 +433,7 @@ async def determine_resolve_pex_config(
         constraints_file=constraints_file,
         no_binary=FrozenOrderedSet(no_binary),
         only_binary=FrozenOrderedSet(only_binary),
+        path_mappings=tuple(path_mappings),
     )
 
 

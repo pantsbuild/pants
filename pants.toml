@@ -128,6 +128,7 @@ enable_resolves = true
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
+#experiment = "experiment2.lock"
 helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
 helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 

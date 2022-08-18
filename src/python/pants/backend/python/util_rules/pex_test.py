@@ -616,6 +616,7 @@ def test_setup_pex_requirements() -> None:
                         constraints_file=None,
                         only_binary=FrozenOrderedSet(),
                         no_binary=FrozenOrderedSet(),
+                        path_mappings=(),
                     ),
                 ),
                 MockGet(Digest, CreateDigest, lambda _: constraints_digest),

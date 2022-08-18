@@ -422,7 +422,7 @@ setuptools
 mongomock
 ```
 
-### Version control and local requirements
+### Version control requirements
 
 You can install requirements from version control using two styles:
 
@@ -434,18 +434,6 @@ You can install requirements from version control using two styles:
   - `Django@ git+https://github.com/django/django.git`
   - `Django@ git+https://github.com/django/django.git@stable/2.1.x`
   - `Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8`
-
-You can also install from local files using [PEP 440 direct references](https://www.python.org/dev/peps/pep-0440/#direct-references). You must use an absolute path to the file, and you should ensure that the file exists on your machine.
-
-```
-Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl
-```
-
-> 🚧 Local file requirements do not yet work with lockfiles
-> 
-> Pex lockfiles will soon support local file requirements.
-> 
-> In the meantime, the workaround is to host the files in a private repository / index and load it with `[python-repos]`.
 
 > 📘 Version control via SSH
 > 
@@ -500,7 +488,8 @@ option, you can either use:
 
 * a URL to an HTML file with links to wheel and/or sdist files, or
 * a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
-  sdist files.
+  sdist files. See the section
+on local requirements below.
 
 ```toml
 [python-repos]
@@ -533,6 +522,87 @@ the user:
 indexes.add = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
 ```
 
+### Local requirements
+
+There are two ways to specify local requirements from the filesystem:
+
+* [PEP 440 direct references](https://www.python.org/dev/peps/pep-0440/#direct-references)
+
+```python 3rdparty/python
+python_requirement(
+    name="django",
+    # Use an absolute path to a .whl or sdist file.
+    requirements=["Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl"],
+)
+
+# Reminder: we could also put this requirement string in requirements.txt and use the
+# `python_requirements` target generator.
+```
+
+* The option `[python-repos].find_links`
+
+```toml pants.toml
+[python-repos]
+# Use an absolute path to a directory containing `.whl` and/or sdist files.
+find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
+```
+```shell
+❯ ls /Users/pantsbuild/prebuilt_wheels
+ansicolors-1.1.8-py2.py3-none-any.whl
+django-3.1.1-py3-none-any.whl
+```
+```python 3rdparty/BUILD
+# Use normal requirement strings, i.e. without file paths.
+python_requirement(name="ansicolors", requirements=["ansicolors==1.1.8"])
+python_requirement(name="django", requirements=["django>=3.1,<3.2"])
+
+# Reminder: we could also put these requirement strings in requirements.txt and use the
+# `python_requirements` target generator
+```
+
+Unlike PEP 440 direct references, `[python-repos].find_links` allows you to use multiple artifacts
+for the same project name. For example, you can include multiple `.whl` and sdist files for the same
+project in the directory; if `[python-repos].indexes` is still set, then Pex/pip may use
+artifacts both from indexes like PyPI and from your local `--find-links`.
+
+Both approaches require using absolute paths, and the files must exist on your machine. This is
+usually fine when locally iterating and debugging. This approach also works well if your entire
+team can use the same fixed location. Otherwise, see the below section.
+
+#### Working around absolute paths
+
+If you need to share the lockfile on different machines, and you cannot use the same
+absolute path, then you can use the option
+`[python].resolves_to_path_mappings`. This allows you to substitute a portion of the absolute path
+with a logical name, which can be set to a different value than your teammates. For example, the
+path `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become
+`file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what
+`WHEELS_DIR` should be on their machine.
+
+This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles
+like Pytest and Black.
+
+When initially generating the lockfile, still set the absolute paths using either
+PEP 440 direct reference requirements or `[python-repos].find_links`. TODO: We
+recommend setting these options in a [`.pants.rc` file](doc:options#pantsrc-file) because your
+teammates will set different values.
+
+```toml .pants.rc
+[python-repos]
+# Still set this to an absolute path to a directory containing `.whl` and/or sdist files.
+find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
+
+[python.resolves_to_path_mappings]
+__default__ = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
+```
+
+Then, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`.
+You should see the `path_mappings` key set in the lockfile's JSON. 
+
+Finally, every teammate must also set up a `.pants.rc` file similar to the one above. That is,
+they must set `[python].resolves_to_path_mappings`, using the same logical name like `WHEELS_DIR`,
+but with the path for their machine. If you are using `[python-repos].find_links`, then they must set
+this to the absolute path on their machine.
 
 ### Constraints files
 

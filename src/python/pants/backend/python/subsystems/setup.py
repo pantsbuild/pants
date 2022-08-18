@@ -296,6 +296,31 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    _resolves_to_path_mappings = DictOption[List[str]](
+        help=softwrap(
+            f"""
+            For lockfiles with local requirements, ...
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to lists of mappings. Each mapping is a string with in the form
+            `NAME|PATH`, with the logical name and the absolute path. For example,
+            `{{'data-science': ['LOCAL_WHEELS|/User/pantsbuild/wheels']}}`.
+            If a resolve is not set in the dictionary, it will have no path mappings.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            Often, this setting will be different for each user because paths may differ on their
+            machine. If the value is different, we recommend setting this option via a `.pants.rc`
+            file ({doc_url('options#pantsrc-file')} or the environment variable
+            `PANTS_PYTHON_RESOLVES_TO_PATH_MAPPINGS`.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
+        advanced=True,
+    )
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -668,6 +693,16 @@ class PythonSetup(Subsystem):
         return self._resolves_to_option_helper(
             self._resolves_to_constraints_file,
             "resolves_to_constraints_file",
+            all_python_tool_resolve_names,
+        )
+
+    @memoized_method
+    def resolves_to_path_mappings(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, list[str]]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_path_mappings,
+            "resolves_to_path_mappings",
             all_python_tool_resolve_names,
         )
 
