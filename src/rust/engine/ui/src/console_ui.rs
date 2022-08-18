@@ -347,6 +347,9 @@ impl Instance {
             Some(label) => pbar.set_message(label),
             None => pbar.set_message(""),
           }
+          // TODO: See https://github.com/console-rs/indicatif/pull/417#issuecomment-1202773191
+          // Can be removed once we upgrade past `0.17.0`.
+          pbar.tick();
         }
       }
       Instance::Prodash(prodash) => {
