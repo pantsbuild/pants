@@ -22,7 +22,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import Rule, SubsystemRule, rule
 from pants.engine.target import Dependencies, FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
@@ -90,7 +90,7 @@ class MetalintTool(PythonToolBase):
 @functools.lru_cache()  # functools.cache is python 3.8, and doesn't have a maxsize
 def make_export_rules(
     python_tool: Type[MetalintTool],
-) -> Tuple[Type[ExportPythonToolSentinel], Callable]:
+) -> Tuple[UnionRule, Rule]:
     class MetalintExportSentinel(ExportPythonToolSentinel):
         ...
 
@@ -105,13 +105,13 @@ def make_export_rules(
             pex_request=tool_.to_pex_request(),
         )
 
-    return MetalintExportSentinel, metalint_export
+    return UnionRule(ExportPythonToolSentinel, MetalintExportSentinel), metalint_export
 
 
 @functools.lru_cache()
 def make_lockfile_rules(
     python_tool: Type[MetalintTool],
-) -> Tuple[Type[GenerateToolLockfileSentinel], Callable]:
+) -> Tuple[UnionRule, Rule]:
     class MetalintGenerateToolLockfileSentinel(GenerateToolLockfileSentinel):
         resolve_name = python_tool.options_scope
 
@@ -125,7 +125,10 @@ def make_lockfile_rules(
             tool, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    return MetalintGenerateToolLockfileSentinel, metalint_lockfile
+    return (
+        UnionRule(GenerateToolLockfileSentinel, MetalintGenerateToolLockfileSentinel),
+        metalint_lockfile,
+    )
 
 
 @dataclass(frozen=True)
@@ -133,10 +136,10 @@ class Metalint:
     tool: Type[PythonToolBase]
     fs: Type[FieldSet]
     lint_req: Type[LintTargetsRequest]
-    export_sentinel: Type[ExportPythonToolSentinel]
-    export_rule: Callable
-    lockfile_sentinel: Type[GenerateToolLockfileSentinel]
-    lockfile_rule: Callable
+    export_sentinel: UnionRule
+    export_rule: Rule
+    lockfile_sentinel: UnionRule
+    lockfile_rule: Rule
     run_rule: Callable
 
     def rules(self):
@@ -144,9 +147,9 @@ class Metalint:
             SubsystemRule(self.tool),
             UnionRule(LintTargetsRequest, self.lint_req),
             self.export_rule,
-            UnionRule(ExportPythonToolSentinel, self.export_sentinel),
+            self.export_sentinel,
             self.lockfile_rule,
-            UnionRule(GenerateToolLockfileSentinel, self.lockfile_sentinel),
+            self.lockfile_sentinel,
             self.run_rule,
         ]
 
