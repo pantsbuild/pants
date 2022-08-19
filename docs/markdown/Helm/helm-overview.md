@@ -40,8 +40,6 @@ name: bar
 version: 0.1.0
 ```
 
-You can verify this by running the `./pants roots` command and and checking that the folders `src/helm/foo` and `src/helm/bar` are listed.
-
 Adding `helm_chart` targets
 ---------------------------
 
