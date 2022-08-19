@@ -309,8 +309,6 @@ async def generate_lockfile(
             )
             for i in req.requirements
         },
-        indexes=set(pip_args_setup.resolve_config.indexes),
-        find_links=set(pip_args_setup.resolve_config.find_links),
         manylinux=pip_args_setup.resolve_config.manylinux,
         requirement_constraints=(
             set(pip_args_setup.resolve_config.constraints_file.constraints)

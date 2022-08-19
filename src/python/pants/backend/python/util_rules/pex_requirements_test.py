@@ -31,8 +31,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
     {PipRequirement.parse("ansicolors"), PipRequirement.parse("requests")},
-    indexes={"index"},
-    find_links={"find-links"},
     manylinux=None,
     requirement_constraints={PipRequirement.parse("abc")},
     only_binary={PipRequirement.parse("bdist")},
@@ -197,7 +195,7 @@ def test_validate_tool_lockfiles(
 @pytest.mark.parametrize(
     (
         "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,"
-        + "invalid_no_binary,invalid_indexes,invalid_find_links,invalid_manylinux"
+        + "invalid_no_binary,invalid_manylinux"
     ),
     [
         (
@@ -206,8 +204,6 @@ def test_validate_tool_lockfiles(
             invalid_constraints_file,
             invalid_only_binary,
             invalid_no_binary,
-            invalid_indexes,
-            invalid_find_links,
             invalid_manylinux,
         )
         for invalid_reqs in (True, False)
@@ -215,8 +211,6 @@ def test_validate_tool_lockfiles(
         for invalid_constraints_file in (True, False)
         for invalid_only_binary in (True, False)
         for invalid_no_binary in (True, False)
-        for invalid_indexes in (True, False)
-        for invalid_find_links in (True, False)
         for invalid_manylinux in (True, False)
         if (
             invalid_reqs
@@ -224,8 +218,6 @@ def test_validate_tool_lockfiles(
             or invalid_constraints_file
             or invalid_only_binary
             or invalid_no_binary
-            or invalid_indexes
-            or invalid_find_links
             or invalid_manylinux
         )
     ],
@@ -236,8 +228,6 @@ def test_validate_user_lockfiles(
     invalid_constraints_file: bool,
     invalid_only_binary: bool,
     invalid_no_binary: bool,
-    invalid_indexes: bool,
-    invalid_find_links: bool,
     invalid_manylinux: bool,
     caplog,
 ) -> None:
@@ -267,8 +257,8 @@ def test_validate_user_lockfiles(
         req_strings,
         create_python_setup(InvalidLockfileBehavior.warn),
         ResolvePexConfig(
-            indexes=("bad-index" if invalid_indexes else "index",),
-            find_links=("bad-find-links" if invalid_find_links else "find-links",),
+            indexes=(),
+            find_links=(),
             manylinux="not-manylinux" if invalid_manylinux else None,
             constraints_file=ResolvePexConstraintsFile(
                 EMPTY_DIGEST,
@@ -300,8 +290,6 @@ def test_validate_user_lockfiles(
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
     contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
     contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
-    contains("The `indexes` arguments have changed", if_=invalid_indexes)
-    contains("The `find_links` arguments have changed", if_=invalid_find_links)
     contains("The `manylinux` argument has changed", if_=invalid_manylinux)
 
     contains("./pants generate-lockfiles --resolve=a`")

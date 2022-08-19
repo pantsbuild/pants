@@ -148,8 +148,6 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
         requirement_constraints=set(),
         only_binary=set(),
         no_binary=set(),
-        indexes=set(),
-        find_links=set(),
         manylinux=None,
     )
 
