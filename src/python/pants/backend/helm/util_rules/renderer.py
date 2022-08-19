@@ -363,6 +363,7 @@ async def setup_render_helm_deployment_process(
         extra_immutable_input_digests=immutable_input_digests,
         extra_append_only_caches=append_only_caches,
         description=request.description,
+        level=LogLevel.DEBUG if request.cmd == HelmDeploymentCmd.RENDER else LogLevel.INFO,
         input_digest=merged_digests,
         output_directories=output_directories,
         cache_scope=process_cache,
