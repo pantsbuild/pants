@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 from collections import defaultdict
 from typing import Mapping, Sequence, TypeVar
 
@@ -10,7 +11,14 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.rules import Get, rule_helper
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
+from pants.engine.target import (
+    AllTargets,
+    AllTargetsRequest,
+    CoarsenedTarget,
+    CoarsenedTargets,
+    CoarsenedTargetsRequest,
+    FieldSet,
+)
 from pants.util.ordered_set import OrderedSet
 
 ResolveName = str
@@ -58,3 +66,29 @@ async def _by_interpreter_constraints_and_resolve(
         root_cts.add(ct)
 
     return resolve_and_interpreter_constraints_to_coarsened_targets
+
+
+@rule_helper
+async def _find_all_unique_interpreter_constraints(
+    python_setup: PythonSetup, field_set_type: type[FieldSet]
+) -> InterpreterConstraints:
+    """Find all unique interpreter constraints used by given field set.
+
+    This will find the constraints for each individual matching field set, and then OR across all
+    unique constraints. Usually, Pants partitions when necessary so that conflicting interpreter
+    constraints can be handled gracefully. But in some cases, like the `generate-lockfiles` goal,
+    we need to combine those targets into a single value. This ORs, so that if you have a
+    ==2.7 partition and ==3.6 partition, for example, we return ==2.7 OR ==3.6.
+
+    Returns the global interpreter constraints if no relevant targets were matched.
+    """
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    unique_constraints = {
+        InterpreterConstraints.create_from_targets([tgt], python_setup)
+        for tgt in all_tgts
+        if field_set_type.is_applicable(tgt)
+    }
+    constraints = InterpreterConstraints(
+        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+    )
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
