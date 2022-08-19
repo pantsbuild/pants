@@ -347,7 +347,7 @@ async def determine_resolve_pex_config(
     if request.resolve_name is None:
         return ResolvePexConfig(
             indexes=python_repos.indexes,
-            find_links=python_repos.repos,
+            find_links=python_repos.find_links,
             manylinux=python_setup.manylinux,
             constraints_file=None,
             no_binary=FrozenOrderedSet(),
@@ -413,7 +413,7 @@ async def determine_resolve_pex_config(
 
     return ResolvePexConfig(
         indexes=python_repos.indexes,
-        find_links=python_repos.repos,
+        find_links=python_repos.find_links,
         manylinux=python_setup.manylinux,
         constraints_file=constraints_file,
         no_binary=FrozenOrderedSet(no_binary),
@@ -515,7 +515,7 @@ def _common_failure_reasons(
         yield softwrap(
             """
             - The `manylinux` argument has changed from when the lockfile was generated.
-            (manylinux is set via the option `[python].resolver_manylinux`
+            (manylinux is set via the option `[python].resolver_manylinux`)
             """
         )
 
