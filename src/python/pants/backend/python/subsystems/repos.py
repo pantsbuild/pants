@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pants.base.deprecated import resolve_conflicting_options
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -60,11 +62,14 @@ class PythonRepos(Subsystem):
 
     @property
     def find_links(self) -> tuple[str, ...]:
-        return resolve_conflicting_options(
-            old_option="repos",
-            new_option="find_links",
-            old_scope=self.options_scope,
-            new_scope=self.options_scope,
-            old_container=self.options,
-            new_container=self.options,
+        return cast(
+            tuple[str, ...],
+            resolve_conflicting_options(
+                old_option="repos",
+                new_option="find_links",
+                old_scope=self.options_scope,
+                new_scope=self.options_scope,
+                old_container=self.options,
+                new_container=self.options,
+            ),
         )
