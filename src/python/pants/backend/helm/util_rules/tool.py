@@ -27,14 +27,17 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
+    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     DigestSubset,
     Directory,
     FileDigest,
+    MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, MergeDigests, Snapshot
 from pants.engine.platform import Platform
@@ -433,8 +436,11 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
 
 
 @rule
-def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
-    env = {**helm_binary.env, **request.extra_env}
+async def helm_process(
+    request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
+) -> Process:
+    global_extra_env = await Get(Environment, EnvironmentRequest(helm_subsytem.extra_env_vars))
+    env = {**global_extra_env, **helm_binary.env, **request.extra_env}
 
     immutable_input_digests = {
         **helm_binary.immutable_input_digests,
