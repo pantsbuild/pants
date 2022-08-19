@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Iterable
 
 import pytest
 
@@ -22,7 +22,7 @@ from pants.backend.helm.testutil import (
 from pants.backend.helm.util_rules import chart, sources
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import config_files, stripped_source_files
+from pants.core.util_rules import config_files, source_files
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.engine.target import Target
 from pants.source.source_root import rules as source_root_rules
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *chart.rules(),
             *helm_lint_rules(),
-            *stripped_source_files.rules(),
+            *source_files.rules(),
             *source_root_rules(),
             *sources.rules(),
             *target_types_rules(),
@@ -52,14 +52,11 @@ def run_helm_lint(
     rule_runner: RuleRunner,
     targets: list[Target],
     *,
-    source_root_patterns: Sequence[str] = ("/",),
     extra_options: Iterable[str] = [],
 ) -> tuple[LintResult, ...]:
     field_sets = [HelmLintFieldSet.create(tgt) for tgt in targets]
 
-    opts = [f"--source-root-patterns={repr(source_root_patterns)}"]
-    opts.extend(extra_options)
-    rule_runner.set_options(opts)
+    rule_runner.set_options(extra_options)
 
     lint_results = rule_runner.request(LintResults, [HelmLintRequest(field_sets)])
     return lint_results.results
@@ -172,13 +169,13 @@ def test_one_lint_result_per_chart(rule_runner: RuleRunner) -> None:
             "src/chart2/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
-    source_root_patterns = ("src/*",)
 
     chart1_target = rule_runner.get_target(Address("src/chart1", target_name="chart1"))
     chart2_target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
 
     lint_results = run_helm_lint(
-        rule_runner, [chart1_target, chart2_target], source_root_patterns=source_root_patterns
+        rule_runner,
+        [chart1_target, chart2_target],
     )
     assert len(lint_results) == 2
     assert lint_results[0].exit_code == 0
@@ -198,10 +195,9 @@ def test_skip_lint(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("src/*",)
-
     chart_target = rule_runner.get_target(Address("src/chart", target_name="chart"))
     lint_results = run_helm_lint(
-        rule_runner, [chart_target], source_root_patterns=source_root_patterns
+        rule_runner,
+        [chart_target],
     )
     assert len(lint_results) == 0

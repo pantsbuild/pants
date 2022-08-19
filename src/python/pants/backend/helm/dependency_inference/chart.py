@@ -17,6 +17,7 @@ from pants.backend.helm.target_types import (
     HelmChartTarget,
 )
 from pants.backend.helm.target_types import rules as helm_target_types_rules
+from pants.backend.helm.util_rules import chart_metadata
 from pants.backend.helm.util_rules.chart_metadata import HelmChartDependency, HelmChartMetadata
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
@@ -162,5 +163,6 @@ def rules():
         *collect_rules(),
         *artifacts.rules(),
         *helm_target_types_rules(),
+        *chart_metadata.rules(),
         UnionRule(InferDependenciesRequest, InferHelmChartDependenciesRequest),
     ]

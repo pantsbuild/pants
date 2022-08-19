@@ -25,7 +25,7 @@ from pants.util.strutil import bullet_list
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         target_types=[HelmArtifactTarget, HelmChartTarget],
         rules=[
             *artifacts.rules(),
@@ -36,13 +36,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, (InferHelmChartDependenciesRequest,)),
         ],
     )
+    return rule_runner
 
 
 def test_build_first_party_mapping(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/BUILD": "helm_chart(name='foo')",
-            "src/Chart.yaml": dedent(
+            "src/foo/BUILD": "helm_chart(name='foo')",
+            "src/foo/Chart.yaml": dedent(
                 """\
                 apiVersion: v2
                 name: chart-name
@@ -52,7 +53,7 @@ def test_build_first_party_mapping(rule_runner: RuleRunner) -> None:
         }
     )
 
-    tgt = rule_runner.get_target(Address("src", target_name="foo"))
+    tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     mapping = rule_runner.request(FirstPartyHelmChartMapping, [])
     assert mapping["chart-name"] == tgt.address
 
@@ -135,13 +136,6 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
@@ -184,9 +178,6 @@ def test_disambiguate_chart_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
@@ -214,9 +205,6 @@ def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -
             ),
         }
     )
-
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
 
     tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
 
