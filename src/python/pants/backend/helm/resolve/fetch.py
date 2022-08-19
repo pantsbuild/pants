@@ -70,6 +70,12 @@ class FetchHelmArtifactRequest(EngineAwareParameter):
     def debug_hint(self) -> str | None:
         return f"{self.field_set.address} from {self.description_of_origin}"
 
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "address": self.field_set.address.spec,
+            "description_of_origin": self.description_of_origin,
+        }
+
 
 @dataclass(frozen=True)
 class FetchedHelmArtifact(EngineAwareReturnType):
@@ -92,12 +98,7 @@ class FetchedHelmArtifact(EngineAwareReturnType):
         )
 
     def metadata(self) -> dict[str, Any] | None:
-        return {
-            "name": self.artifact.name,
-            "version": self.artifact.version,
-            "address": self.artifact.address,
-            "url": self.artifact.chart_url,
-        }
+        return {"artifact": self.artifact}
 
     def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         return {"snapshot": self.snapshot}

@@ -85,7 +85,10 @@ class HelmChart(EngineAwareReturnType):
         return msg
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"name": self.info.name, "address": self.address}
+        meta: dict[str, Any] = {"name": self.info.name, "address": self.address.spec}
+        if self.artifact:
+            meta["artifact"] = self.artifact
+        return meta
 
     def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         return {"snapshot": self.snapshot}
@@ -103,6 +106,9 @@ class HelmChartRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return self.field_set.address.spec
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {"address": self.field_set.address.spec}
 
 
 @rule(desc="Compile third parth Helm chart", level=LogLevel.DEBUG)
