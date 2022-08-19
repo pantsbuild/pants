@@ -29,7 +29,7 @@ from pants.engine.target import (
 
 
 @dataclass(frozen=True)
-class HelmChartSourceRootRequest(EngineAwareParameter):
+class HelmChartRootRequest(EngineAwareParameter):
     source: HelmChartMetaSourceField
 
     def debug_hint(self) -> str | None:
@@ -37,12 +37,12 @@ class HelmChartSourceRootRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class HelmChartSourceRoot:
+class HelmChartRoot:
     path: str
 
 
 @rule(desc="Detect Helm chart source root")
-async def find_chart_source_root(request: HelmChartSourceRootRequest) -> HelmChartSourceRoot:
+async def find_chart_source_root(request: HelmChartRootRequest) -> HelmChartRoot:
     source = await Get(
         HydratedSources,
         HydrateSourcesRequest(
@@ -51,7 +51,7 @@ async def find_chart_source_root(request: HelmChartSourceRootRequest) -> HelmCha
     )
     assert len(source.snapshot.files) == 1
 
-    return HelmChartSourceRoot(os.path.dirname(source.snapshot.files[0]))
+    return HelmChartRoot(os.path.dirname(source.snapshot.files[0]))
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ class HelmChartSourceFiles:
 
 @rule_helper
 async def _strip_chart_source_root(
-    source_files: SourceFiles, chart_root: HelmChartSourceRoot
+    source_files: SourceFiles, chart_root: HelmChartRoot
 ) -> Snapshot:
     if not source_files.snapshot.files:
         return source_files.snapshot
@@ -155,7 +155,7 @@ async def _strip_chart_source_root(
 @rule
 async def get_helm_source_files(request: HelmChartSourceFilesRequest) -> HelmChartSourceFiles:
     chart_root, dependencies = await MultiGet(
-        Get(HelmChartSourceRoot, HelmChartSourceRootRequest(request.field_set.chart)),
+        Get(HelmChartRoot, HelmChartRootRequest(request.field_set.chart)),
         Get(Targets, DependenciesRequest(request.field_set.dependencies)),
     )
 
