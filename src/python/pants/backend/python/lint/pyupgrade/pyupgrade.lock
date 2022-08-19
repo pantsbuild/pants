@@ -4,13 +4,17 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 2,
+//   "version": 3,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
 //     "pyupgrade<2.35,>=2.33.0"
-//   ]
+//   ],
+//   "manylinux": "manylinux2014",
+//   "requirement_constraints": [],
+//   "only_binary": [],
+//   "no_binary": []
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -66,7 +70,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.96",
+  "pex_version": "2.1.103",
   "prefer_older_binary": false,
   "requirements": [
     "pyupgrade<2.35,>=2.33.0"

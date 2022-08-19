@@ -33,9 +33,9 @@ Linter/formatter support is implemented in separate [backends](doc:enabling-back
 | `pants.backend.python.lint.flake8`                 | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
 | `pants.backend.python.lint.isort`                  | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
 | `pants.backend.python.lint.pylint`                 | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
+| `pants.backend.python.lint.pyupgrade` | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
 | `pants.backend.python.lint.yapf`                   | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
 | `pants.backend.experimental.python.lint.autoflake` | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
-| `pants.backend.experimental.python.lint.pyupgrade` | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
 
 To enable, add the appropriate backends in `pants.toml`:
 

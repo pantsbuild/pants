@@ -77,7 +77,7 @@ repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependees=transitive"
-run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
+run-pyupgrade = "--backend-packages=pants.backend.python.lint.pyupgrade fmt"
 
 
 [source]

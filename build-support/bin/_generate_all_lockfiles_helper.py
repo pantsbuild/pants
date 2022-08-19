@@ -114,7 +114,7 @@ AllTools = (
     DefaultTool.python(MyPy, source_plugins=True),
     DefaultTool.python(PoetrySubsystem),
     DefaultTool.python(PyTest),
-    DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
+    DefaultTool.python(PyUpgrade, backend="pants.backend.python.lint.pyupgrade"),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
     DefaultTool.python(PyOxidizer),
