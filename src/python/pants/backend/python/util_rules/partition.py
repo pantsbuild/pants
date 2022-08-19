@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
-from typing import Mapping, Sequence, TypeVar
+from typing import Iterable, Mapping, Sequence, TypeVar
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.rules import Get, rule_helper
 from pants.engine.target import (
@@ -70,7 +70,10 @@ async def _by_interpreter_constraints_and_resolve(
 
 @rule_helper
 async def _find_all_unique_interpreter_constraints(
-    python_setup: PythonSetup, field_set_type: type[FieldSet]
+    python_setup: PythonSetup,
+    field_set_type: type[FieldSet],
+    *,
+    extra_constraints_per_tgt: Iterable[InterpreterConstraintsField] = (),
 ) -> InterpreterConstraints:
     """Find all unique interpreter constraints used by given field set.
 
@@ -84,10 +87,19 @@ async def _find_all_unique_interpreter_constraints(
     """
     all_tgts = await Get(AllTargets, AllTargetsRequest())
     unique_constraints = {
-        InterpreterConstraints.create_from_targets([tgt], python_setup)
+        InterpreterConstraints.create_from_compatibility_fields(
+            [tgt[InterpreterConstraintsField], *extra_constraints_per_tgt], python_setup
+        )
         for tgt in all_tgts
-        if field_set_type.is_applicable(tgt)
+        if tgt.has_field(InterpreterConstraintsField) and field_set_type.is_applicable(tgt)
     }
+    if not unique_constraints and extra_constraints_per_tgt:
+        unique_constraints.add(
+            InterpreterConstraints.create_from_compatibility_fields(
+                extra_constraints_per_tgt,
+                python_setup,
+            )
+        )
     constraints = InterpreterConstraints(
         itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
     )
