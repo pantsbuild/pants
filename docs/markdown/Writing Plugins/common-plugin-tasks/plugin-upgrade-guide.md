@@ -65,6 +65,15 @@ your tool.
 However, keep the `UnionRule` the same, i.e. with the first argument still
 `GenerateToolLockfileSentinel`.
 
+### `matches_filespec()` replaced by `FilespecMatcher`
+
+Instead, use `FilespecMatcher(includes=[], excludes=[]).matches(paths: Sequence[str])` from
+`pants.source.filespec`.
+
+The functionality is the same, but can have better performance because we don't need to parse the
+same globs each time `.matches()` is called. When possible, reuse the same `FilespecMatcher` object
+to get these performance benefits.
+
 2.13
 ----
 

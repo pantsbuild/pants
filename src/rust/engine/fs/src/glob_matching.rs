@@ -279,25 +279,9 @@ pub struct PreparedPathGlobs {
   pub(crate) exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
   conjunction: GlobExpansionConjunction,
-  patterns: Vec<glob::Pattern>,
 }
 
 impl PreparedPathGlobs {
-  fn parse_patterns_from_include(
-    include: &[PathGlobIncludeEntry],
-  ) -> Result<Vec<glob::Pattern>, String> {
-    include
-      .iter()
-      .map(|pattern| {
-        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
-          let normalized_pattern: PathBuf = components.into_iter().collect();
-          Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
-        })
-      })
-      .collect::<Result<Vec<_>, String>>()
-  }
-
   pub fn create(
     globs: Vec<String>,
     strict_match_behavior: StrictGlobMatching,
@@ -315,14 +299,12 @@ impl PreparedPathGlobs {
     }
     let include = PathGlob::spread_filespecs(include_globs)?;
     let exclude = GitignoreStyleExcludes::create(exclude_globs)?;
-    let patterns = PreparedPathGlobs::parse_patterns_from_include(&include)?;
 
     Ok(PreparedPathGlobs {
       include,
       exclude,
       strict_match_behavior,
       conjunction,
-      patterns,
     })
   }
 
@@ -335,32 +317,62 @@ impl PreparedPathGlobs {
       })
       .collect();
 
-    let patterns = PreparedPathGlobs::parse_patterns_from_include(include.as_slice())?;
     Ok(PreparedPathGlobs {
       include,
       // An empty exclude becomes EMPTY_IGNORE.
       exclude: GitignoreStyleExcludes::create(vec![])?,
       strict_match_behavior: StrictGlobMatching::Ignore,
       conjunction: GlobExpansionConjunction::AllMatch,
-      patterns,
     })
+  }
+}
+
+/// Allows checking in-memory if paths match the patterns.
+#[derive(Debug)]
+pub struct FilespecMatcher {
+  includes: Vec<Pattern>,
+  excludes: Arc<GitignoreStyleExcludes>,
+}
+
+impl FilespecMatcher {
+  pub fn new(includes: Vec<String>, excludes: Vec<String>) -> Result<Self, String> {
+    let includes = includes
+      .iter()
+      .map(|glob| {
+        PathGlob::normalize_pattern(glob).and_then(|components| {
+          let normalized_pattern: PathBuf = components.into_iter().collect();
+          Pattern::new(normalized_pattern.to_str().unwrap())
+            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", glob, e))
+        })
+      })
+      .collect::<Result<Vec<_>, String>>()?;
+    let excludes = GitignoreStyleExcludes::create(excludes)?;
+    Ok(Self { includes, excludes })
   }
 
   ///
-  /// Matches these PreparedPathGlobs against the given paths.
+  /// Matches the patterns against the given paths.
   ///
   /// NB: This implementation is independent from GlobMatchingImplementation::expand, and must be
-  /// kept in sync via unit tests (in particular: the python FilespecTest) in order to allow for
+  /// kept in sync via unit tests (in particular: the python filespec_test.py) in order to allow for
   /// owners detection of deleted files (see #6790 and #5636 for more info). The lazy filesystem
   /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
   /// via MemFS).
   ///
   pub fn matches(&self, path: &Path) -> bool {
-    self
-      .patterns
+    let matches_includes = self
+      .includes
       .iter()
-      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS))
-      && !self.exclude.is_ignored_path(path, false)
+      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS));
+    matches_includes && !self.excludes.is_ignored_path(path, false)
+  }
+
+  pub fn include_globs(&self) -> &[Pattern] {
+    self.includes.as_slice()
+  }
+
+  pub fn exclude_globs(&self) -> &[String] {
+    self.excludes.patterns.as_slice()
   }
 }
 
