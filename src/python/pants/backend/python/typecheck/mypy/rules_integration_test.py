@@ -900,4 +900,6 @@ def test_colors_and_formatting(rule_runner: RuleRunner) -> None:
     assert re.search(
         "error:.*incredibly_long_type_name.*incredibly_long_attribute_name", result[0].stdout
     )
+    # at least one escape sequence that sets text color (red)
+    assert "\033[31m" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
