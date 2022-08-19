@@ -11,7 +11,7 @@ from typing import Any, cast
 import yaml
 
 from pants.backend.helm.target_types import HelmChartMetaSourceField
-from pants.backend.helm.util_rules.sources import HelmChartSourceRootRequest
+from pants.backend.helm.util_rules.sources import HelmChartSourceRoot, HelmChartSourceRootRequest
 from pants.backend.helm.utils.yaml import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter
@@ -28,7 +28,6 @@ from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
-from pants.source.source_root import SourceRoot
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list
 
@@ -256,8 +255,8 @@ async def parse_chart_metadata_from_digest(
 
 @rule
 async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> HelmChartMetadata:
-    source_root, source_files = await MultiGet(
-        Get(SourceRoot, HelmChartSourceRootRequest(field)),
+    chart_root, source_files = await MultiGet(
+        Get(HelmChartSourceRoot, HelmChartSourceRootRequest(field)),
         Get(
             HydratedSources,
             HydrateSourcesRequest(
@@ -266,9 +265,7 @@ async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> He
         ),
     )
 
-    metadata_digest = await Get(
-        Digest, RemovePrefix(source_files.snapshot.digest, source_root.path)
-    )
+    metadata_digest = await Get(Digest, RemovePrefix(source_files.snapshot.digest, chart_root.path))
 
     return await Get(
         HelmChartMetadata,

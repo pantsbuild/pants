@@ -20,13 +20,13 @@ from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import (
     HelmChartSourceFiles,
     HelmChartSourceFilesRequest,
+    HelmChartSourceRoot,
     HelmChartSourceRootRequest,
 )
 from pants.build_graph.address import Address
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
-from pants.source.source_root import SourceRoot
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, ResourcesGeneratorTarget, FilesGeneratorTarget],
         rules=[
             *sources.rules(),
-            QueryRule(SourceRoot, (HelmChartSourceRootRequest,)),
+            QueryRule(HelmChartSourceRoot, (HelmChartSourceRootRequest,)),
             QueryRule(HelmChartSourceFiles, (HelmChartSourceFilesRequest,)),
         ],
     )
@@ -53,7 +53,9 @@ def test_auto_detect_chart_source_root(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/main/helm/chart"))
     field_set = HelmChartFieldSet.create(tgt)
 
-    source_root = rule_runner.request(SourceRoot, [HelmChartSourceRootRequest(field_set.chart)])
+    source_root = rule_runner.request(
+        HelmChartSourceRoot, [HelmChartSourceRootRequest(field_set.chart)]
+    )
     assert source_root.path == "src/main/helm/chart"
 
 
@@ -71,7 +73,7 @@ def test_can_not_auto_detect_source_root(rule_runner: RuleRunner) -> None:
         ExecutionError,
         match="The 'chart' field in target src:src must have 1 file, but it had 0 files",
     ):
-        rule_runner.request(SourceRoot, [HelmChartSourceRootRequest(field_set.chart)])
+        rule_runner.request(HelmChartSourceRoot, [HelmChartSourceRootRequest(field_set.chart)])
 
 
 def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:

@@ -26,7 +26,6 @@ from pants.engine.target import (
     Target,
     Targets,
 )
-from pants.source.source_root import SourceRoot
 
 
 @dataclass(frozen=True)
@@ -37,8 +36,13 @@ class HelmChartSourceRootRequest(EngineAwareParameter):
         return self.source.address.spec
 
 
+@dataclass(frozen=True)
+class HelmChartSourceRoot:
+    path: str
+
+
 @rule(desc="Detect Helm chart source root")
-async def find_chart_source_root(request: HelmChartSourceRootRequest) -> SourceRoot:
+async def find_chart_source_root(request: HelmChartSourceRootRequest) -> HelmChartSourceRoot:
     source = await Get(
         HydratedSources,
         HydrateSourcesRequest(
@@ -47,7 +51,7 @@ async def find_chart_source_root(request: HelmChartSourceRootRequest) -> SourceR
     )
     assert len(source.snapshot.files) == 1
 
-    return SourceRoot(os.path.dirname(source.snapshot.files[0]))
+    return HelmChartSourceRoot(os.path.dirname(source.snapshot.files[0]))
 
 
 @dataclass(frozen=True)
@@ -118,7 +122,9 @@ class HelmChartSourceFiles:
 
 
 @rule_helper
-async def _strip_chart_source_root(source_files: SourceFiles, source_root: SourceRoot) -> Snapshot:
+async def _strip_chart_source_root(
+    source_files: SourceFiles, chart_root: HelmChartSourceRoot
+) -> Snapshot:
     if not source_files.snapshot.files:
         return source_files.snapshot
 
@@ -131,7 +137,7 @@ async def _strip_chart_source_root(source_files: SourceFiles, source_root: Sourc
         rooted_files_snapshot = source_files.snapshot
 
     resulting_snapshot = await Get(
-        Snapshot, RemovePrefix(rooted_files_snapshot.digest, source_root.path)
+        Snapshot, RemovePrefix(rooted_files_snapshot.digest, chart_root.path)
     )
     if source_files.unrooted_files:
         # Add unrooted files back in
@@ -148,8 +154,8 @@ async def _strip_chart_source_root(source_files: SourceFiles, source_root: Sourc
 
 @rule
 async def get_helm_source_files(request: HelmChartSourceFilesRequest) -> HelmChartSourceFiles:
-    source_root, dependencies = await MultiGet(
-        Get(SourceRoot, HelmChartSourceRootRequest(request.field_set.chart)),
+    chart_root, dependencies = await MultiGet(
+        Get(HelmChartSourceRoot, HelmChartSourceRootRequest(request.field_set.chart)),
         Get(Targets, DependenciesRequest(request.field_set.dependencies)),
     )
 
@@ -175,8 +181,8 @@ async def get_helm_source_files(request: HelmChartSourceFilesRequest) -> HelmCha
         ),
     )
 
-    stripped_source_files = await _strip_chart_source_root(source_files, source_root)
-    stripped_original_sources = await _strip_chart_source_root(original_sources, source_root)
+    stripped_source_files = await _strip_chart_source_root(source_files, chart_root)
+    stripped_original_sources = await _strip_chart_source_root(original_sources, chart_root)
 
     all_files_snapshot = await Get(
         Snapshot, MergeDigests([stripped_source_files.digest, stripped_original_sources.digest])

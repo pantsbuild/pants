@@ -21,7 +21,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.sources import HelmChartSourceRootRequest
+from pants.backend.helm.util_rules.sources import HelmChartSourceRoot, HelmChartSourceRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
@@ -44,7 +44,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRoot
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -90,7 +89,9 @@ async def run_helm_unittest(
     chart_target = chart_targets[0]
     chart, chart_root, test_files = await MultiGet(
         Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
-        Get(SourceRoot, HelmChartSourceRootRequest(chart_target[HelmChartMetaSourceField])),
+        Get(
+            HelmChartSourceRoot, HelmChartSourceRootRequest(chart_target[HelmChartMetaSourceField])
+        ),
         Get(
             SourceFiles,
             SourceFilesRequest(
