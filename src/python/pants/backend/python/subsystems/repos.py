@@ -8,6 +8,7 @@ from typing import cast
 from pants.base.deprecated import resolve_conflicting_options
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 
@@ -33,6 +34,8 @@ class PythonRepos(Subsystem):
             sdist files. Local paths must be absolute, and can either be to an HTML file with
             links or to a directory with `.whl` and/or sdist files, e.g.
             `file:///Users/pantsbuild/prebuilt_wheels`.
+
+            For local paths, you may want to use the option `[python-repos].path_mappings`.
             """
         )
     )
@@ -55,6 +58,33 @@ class PythonRepos(Subsystem):
             indexes to look for requirements.
 
             If set to an empty list, then Pex will use no indexes (meaning it will not use PyPI).
+            """
+        ),
+        advanced=True,
+    )
+
+    path_mappings = StrListOption(
+        help=softwrap(
+            f"""
+            Mappings to facilitate using local Python requirements when the absolute file paths
+            are different on different users' machines. For example, the
+            path `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could
+            become `file://${{WHEELS_DIR}}/django-3.1.1-py3-none-any.whl`, where each user can
+            configure what WHEELS_DIR points to on their machine.
+
+            Expects values in the form `NAME|PATH`. You can specify multiple entries in the list.
+
+            Typically, this setting will be different for each user because paths may differ on
+            their machine. So, we usually recommend setting this option via a `.pants.rc`
+            file ({doc_url('options#pantsrc-file')} or the environment variable
+            `PANTS_PYTHON_REPOS_PATH_MAPPINGS`.
+
+            When using `[python-repos].find_links`, you must still use a valid absolute path for
+            the current machine. See
+            {doc_url("python-third-party-dependencies#local-requirements")}.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,

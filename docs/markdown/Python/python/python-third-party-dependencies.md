@@ -573,7 +573,7 @@ team can use the same fixed location. Otherwise, see the below section.
 
 If you need to share the lockfile on different machines, and you cannot use the same
 absolute path, then you can use the option
-`[python].resolves_to_path_mappings`. This allows you to substitute a portion of the absolute path
+`[python-repos].path_mappings`. This allows you to substitute a portion of the absolute path
 with a logical name, which can be set to a different value than your teammates. For example, the
 path `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become
 `file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what
@@ -583,24 +583,22 @@ This feature only works when using Pex lockfiles via `[python].resolves` and for
 like Pytest and Black.
 
 When initially generating the lockfile, still set the absolute paths using either
-PEP 440 direct reference requirements or `[python-repos].find_links`. TODO: We
-recommend setting these options in a [`.pants.rc` file](doc:options#pantsrc-file) because your
-teammates will set different values.
+PEP 440 direct reference requirements or `[python-repos].find_links`. Then, add to 
+`[python-repos].path_mappings` a value in the form `NAME|PATH`. We recommend setting these options in a 
+[`.pants.rc` file](doc:options#pantsrc-file) because your teammates will set different values.
 
 ```toml .pants.rc
 [python-repos]
-# Still set this to an absolute path to a directory containing `.whl` and/or sdist files.
+# Still set `find_links` to an absolute path to a directory containing `.whl` and/or sdist files.
 find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
-
-[python.resolves_to_path_mappings]
-__default__ = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
+path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
 ```
 
 Then, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`.
 You should see the `path_mappings` key set in the lockfile's JSON. 
 
 Finally, every teammate must also set up a `.pants.rc` file similar to the one above. That is,
-they must set `[python].resolves_to_path_mappings`, using the same logical name like `WHEELS_DIR`,
+they must set `[python-repos].path_mappings`, using the same logical name like `WHEELS_DIR`,
 but with the path for their machine. If you are using `[python-repos].find_links`, then they must set
 this to the absolute path on their machine.
 

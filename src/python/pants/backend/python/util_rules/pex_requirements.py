@@ -360,7 +360,7 @@ async def determine_resolve_pex_config(
             constraints_file=None,
             no_binary=FrozenOrderedSet(),
             only_binary=FrozenOrderedSet(),
-            path_mappings=(),
+            path_mappings=python_repos.path_mappings,
         )
 
     all_python_tool_resolve_names = tuple(
@@ -369,12 +369,6 @@ async def determine_resolve_pex_config(
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
     )
 
-    path_mappings = (
-        python_setup.resolves_to_path_mappings(all_python_tool_resolve_names).get(
-            request.resolve_name
-        )
-        or []
-    )
     no_binary = (
         python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
         or []
@@ -433,7 +427,7 @@ async def determine_resolve_pex_config(
         constraints_file=constraints_file,
         no_binary=FrozenOrderedSet(no_binary),
         only_binary=FrozenOrderedSet(only_binary),
-        path_mappings=tuple(path_mappings),
+        path_mappings=python_repos.path_mappings,
     )
 
 
