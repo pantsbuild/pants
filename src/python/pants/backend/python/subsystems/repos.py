@@ -63,7 +63,7 @@ class PythonRepos(Subsystem):
     @property
     def find_links(self) -> tuple[str, ...]:
         return cast(
-            tuple[str, ...],
+            "tuple[str, ...]",
             resolve_conflicting_options(
                 old_option="repos",
                 new_option="find_links",
