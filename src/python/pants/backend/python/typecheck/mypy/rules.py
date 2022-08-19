@@ -319,7 +319,7 @@ async def mypy_typecheck_partition(
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
-        # Similarly, force a fixed terminal width. This is effectively infinite, disabling mypy's
+        # Force a fixed terminal width. This is effectively infinite, disabling mypy's
         # builtin truncation and line wrapping. Terminals do an acceptable job of soft-wrapping
         # diagnostic text and source code is typically already hard-wrapped to a limited width.
         # (Unique random number to make it easier to search for the source of this setting.)
