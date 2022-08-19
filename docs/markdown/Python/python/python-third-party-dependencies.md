@@ -481,7 +481,8 @@ There are two mechanisms for setting up custom Python distribution repositories:
 
 #### PEP-503 compatible indexes
 
-Use `[python-repos].indexes` to add PEP 503-compatible indexes, like PyPI.
+Use `[python-repos].indexes` to add [PEP 503-compatible](https://peps.python.org/pep-0503/)
+indexes, like PyPI.
 
 ```toml pants.toml
 [python-repos]
@@ -493,11 +494,13 @@ instead of `indexes.add = [..]`.
 
 #### pip `--find-links`
 
-Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's `--find-links`
+Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's
+[`--find-links`](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f)
 option, you can either use:
 
-* a URL to an HTML file with links to wheel and sdist files, or
-* a `file://` absolute path to a local directory with wheel and/or sdist files.
+* a URL to an HTML file with links to wheel and/or sdist files, or
+* a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
+  sdist files.
 
 ```toml
 [python-repos]

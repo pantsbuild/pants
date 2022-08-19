@@ -26,9 +26,11 @@ class PythonRepos(Subsystem):
             """
             URLs and/or file paths corresponding to pip's `--find-links` option.
 
-            Per pip's documentations, URLs should be to HTML files with links to `.whl` and/or
-            sdist files. Local paths should be absolute paths to directories with `.whl` and/or
-            sdist files, e.g. `file:///Users/pantsbuild/prebuilt_wheels`.
+            Per [pip's documentation](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f),
+            URLs should be to HTML files with links to `.whl` and/or
+            sdist files. Local paths must be absolute, and can either be to an HTML file with
+            links or to a directory with `.whl` and/or sdist files, e.g.
+            `file:///Users/pantsbuild/prebuilt_wheels`.
             """
         )
     )
@@ -47,7 +49,8 @@ class PythonRepos(Subsystem):
         default=[pypi_index],
         help=softwrap(
             """
-            URLs of PEP-503 compatible code repository indexes to look for requirements.
+            URLs of [PEP-503 compatible](https://peps.python.org/pep-0503/) code repository
+            indexes to look for requirements.
 
             If set to an empty list, then Pex will use no indexes (meaning it will not use PyPI).
             """
