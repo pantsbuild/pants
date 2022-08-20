@@ -8,9 +8,9 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
+from pants.backend.python.lint.black.rules import BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
