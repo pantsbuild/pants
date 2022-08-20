@@ -1,12 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
-
-from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -16,22 +12,9 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
-
-
-@dataclass(frozen=True)
-class BlackFieldSet(FieldSet):
-    required_fields = (PythonSourceField,)
-
-    source: PythonSourceField
-    interpreter_constraints: InterpreterConstraintsField
-
-    @classmethod
-    def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBlackField).value
 
 
 class BlackRequest(FmtTargetsRequest):

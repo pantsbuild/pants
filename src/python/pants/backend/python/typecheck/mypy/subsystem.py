@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules import partition
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -348,14 +349,8 @@ async def _mypy_interpreter_constraints(
 ) -> InterpreterConstraints:
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets([tgt], python_setup)
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
-        }
-        code_constraints = InterpreterConstraints(
-            itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+        code_constraints = await _find_all_unique_interpreter_constraints(
+            python_setup, MyPyFieldSet
         )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_versions_universe):
             constraints = code_constraints
