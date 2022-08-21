@@ -235,7 +235,7 @@ func registerCover() {
         Mode: "@COVER_MODE@",
         Counters: coverCounters,
         Blocks: coverBlocks,
-        CoveredPackages: "FILL ME IN!",
+        CoveredPackages: "",
     })
 }
 """
