@@ -16,6 +16,7 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
+from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -56,6 +57,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     address: Address
     is_main: bool = False
     for_tests: bool = False
+    coverage_config: GoCoverageConfig | None = None
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -228,6 +230,7 @@ async def setup_build_go_package_target_request(
         direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,
         embed_config=embed_config,
+        coverage_config=request.coverage_config,
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 
