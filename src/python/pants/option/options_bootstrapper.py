@@ -80,7 +80,11 @@ class OptionsBootstrapper:
 
         args = tuple(args)
         env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
-        return cls(env_tuples, args, PyOptionParser(dict(env), args))
+
+        # TODO: Restore Aliases.
+        alias = CliAlias()
+
+        return cls(env_tuples, args, alias, PyOptionParser(dict(env), args))
 
     @memoized_property
     def env(self) -> dict[str, str]:

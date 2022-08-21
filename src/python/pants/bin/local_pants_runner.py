@@ -110,7 +110,9 @@ class LocalPantsRunner:
 
         # Verify configs.
         if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+            # TODO: Restore.
+            # options.verify_configs(options_bootstrapper.config)
+            pass
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
