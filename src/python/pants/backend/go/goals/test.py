@@ -399,7 +399,7 @@ async def run_go_tests(
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
             working_directory=working_dir,
-            output_files=(*maybe_cover_output_file,),
+            output_files=maybe_cover_output_file,
             level=LogLevel.DEBUG,
         ),
     )
