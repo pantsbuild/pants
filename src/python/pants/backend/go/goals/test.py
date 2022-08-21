@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 from typing import Sequence
@@ -56,8 +55,6 @@ from pants.engine.target import Dependencies, DependenciesRequest, SourcesField,
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-_logger = logging.getLogger(__name__)
 
 # Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
 # The bool value represents whether the option is expected to take a value or not.
@@ -215,10 +212,7 @@ async def run_go_tests(
         ),
     )
 
-    _logger.info(f"testmain = {testmain}")
-
     if testmain.failed_exit_code_and_stderr is not None:
-        _logger.info("FAILURE!")
         _exit_code, _stderr = testmain.failed_exit_code_and_stderr
         return compilation_failure(_exit_code, None, _stderr)
 

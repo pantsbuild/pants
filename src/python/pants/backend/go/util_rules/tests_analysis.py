@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
@@ -16,8 +15,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-
-_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -70,7 +67,7 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
             output_files=("_testmain.go",),
         ),
     )
-    _logger.info(f"result = {result}")
+
     if result.exit_code != 0:
         return GeneratedTestMain(
             digest=EMPTY_DIGEST,
@@ -80,7 +77,6 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
         )
 
     metadata = json.loads(result.stdout.decode("utf-8"))
-    _logger.info(f"metadata = {metadata}")
     return GeneratedTestMain(
         digest=result.output_digest,
         has_tests=metadata["has_tests"],
