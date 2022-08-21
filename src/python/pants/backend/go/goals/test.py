@@ -272,11 +272,6 @@ async def run_go_tests(
         )
         main_direct_deps.append(xtest_pkg_build_request)
 
-    # Build the `main_direct_deps` when in coverage mode to obtain the "coverage variables" for those packages.
-    built_main_direct_deps = await MultiGet(
-        Get(BuiltGoPackage, BuildGoPackageRequest, build_req) for build_req in main_direct_deps
-    )
-
     # Generate coverage setup code for the test main if coverage is enabled.
     #
     # Note: Go coverage analysis is a form of codegen. It rewrites the Go source code at issue to include explicit
@@ -286,6 +281,10 @@ async def run_go_tests(
     coverage_setup_digest = EMPTY_DIGEST
     coverage_setup_files = []
     if coverage_config is not None:
+        # Build the `main_direct_deps` when in coverage mode to obtain the "coverage variables" for those packages.
+        built_main_direct_deps = await MultiGet(
+            Get(BuiltGoPackage, BuildGoPackageRequest, build_req) for build_req in main_direct_deps
+        )
         coverage_metadata = [
             pkg.coverage_metadata for pkg in built_main_direct_deps if pkg.coverage_metadata
         ]
