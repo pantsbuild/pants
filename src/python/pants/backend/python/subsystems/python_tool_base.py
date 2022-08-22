@@ -11,6 +11,8 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
+    LoadedLockfile,
+    LoadedLockfileRequest,
     PexRequirements,
     ToolCustomLockfile,
     ToolDefaultLockfile,
@@ -18,6 +20,8 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import Digest, FileContent
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import rule_helper
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -292,6 +296,39 @@ class PythonToolBase(PythonToolRequirementsBase):
             extra_requirements=extra_requirements,
             main=main or self.main,
             sources=sources,
+        )
+
+    @staticmethod
+    @rule_helper
+    async def _find_python_interpreter_constraints_from_lockfile(
+        subsystem: PythonToolBase,
+    ) -> InterpreterConstraints:
+        """If a lockfile is used, will try to find the interpreter constraints used to generate the
+        lock.
+
+        This allows us to work around https://github.com/pantsbuild/pants/issues/14912.
+        """
+        # If the tool's interpreter constraints are explicitly set, or it is not using a lockfile at
+        # all, then we should use the tool's interpreter constraints option.
+        if (
+            not subsystem.options.is_default("interpreter_constraints")
+            or not subsystem.uses_lockfile
+        ):
+            return subsystem.interpreter_constraints
+
+        # If using Pants's default lockfile, we can simply use the tool's default interpreter
+        # constraints, which we trust were used to generate Pants's default tool lockfile.
+        if not subsystem.uses_custom_lockfile:
+            return InterpreterConstraints(subsystem.default_interpreter_constraints)
+
+        # Else, try to load the metadata block from the lockfile.
+        requirements = subsystem.pex_requirements()
+        assert isinstance(requirements, EntireLockfile)
+        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(requirements.lockfile))
+        return (
+            lockfile.metadata.valid_for_interpreter_constraints
+            if lockfile.metadata
+            else subsystem.interpreter_constraints
         )
 
 

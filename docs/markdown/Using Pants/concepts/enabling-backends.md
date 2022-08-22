@@ -22,7 +22,9 @@ Available backends
 
 | Backend                                                   | What it does                                                                                       | Docs                                                              |
 | :-------------------------------------------------------- | :------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
+| `pants.backend.build_files.fmt.black`                     | Enables autoformatting `BUILD` files using `black`.                                                |                                                                   |
 | `pants.backend.build_files.fmt.buildifier`                | Enables autoformatting `BUILD` files using `buildifier`.                                           |                                                                   |
+| `pants.backend.build_files.fmt.yapf`                      | Enables autoformatting `BUILD` files using `yapf`.                                                 |                                                                   |
 | `pants.backend.awslambda.python`                          | Enables generating an AWS Lambda zip file from Python code.                                        | [AWS Lambda](doc:awslambda-python)                                |
 | `pants.backend.codegen.protobuf.lint.buf`                 | Activate the Buf formatter and linter for Protocol Buffers.                                        | [Protobuf](doc:protobuf-python)                                   |
 | `pants.backend.codegen.protobuf.python`                   | Enables generating Python from Protocol Buffers. Includes gRPC support.                            | [Protobuf and gRPC](doc:protobuf-python)                          |
