@@ -9,7 +9,7 @@ from pants.util.value_interpolation import InterpolationError, InterpolationValu
 class HelmEnvironmentInterpolationError(InterpolationError):
     @classmethod
     def attribute_error(
-        cls, value: str | HelmEnvironmentInterpolationValue, attribute: str
+        cls, value: str | InterpolationValue, attribute: str
     ) -> HelmEnvironmentInterpolationError:
         msg = f"The environment variable {attribute!r} is undefined."
         if value and isinstance(value, HelmEnvironmentInterpolationValue):

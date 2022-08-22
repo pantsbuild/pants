@@ -9,7 +9,7 @@ from pants.util.value_interpolation import InterpolationError, InterpolationValu
 class DockerBuildArgsInterpolationError(InterpolationError):
     @classmethod
     def attribute_error(
-        cls, value: str | DockerBuildArgsInterpolationValue, attribute: str
+        cls, value: str | InterpolationValue, attribute: str
     ) -> DockerBuildArgsInterpolationError:
         msg = f"The build arg {attribute!r} is undefined."
         if value and isinstance(value, DockerBuildArgsInterpolationValue):
