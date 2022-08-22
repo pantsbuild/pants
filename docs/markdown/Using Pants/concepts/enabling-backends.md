@@ -22,6 +22,8 @@ Available backends
 
 | Backend                                                   | What it does                                                                                       | Docs                                                              |
 | :-------------------------------------------------------- | :------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
+| `pants.backend.build_files.fmt.black`                     | Enables autoformatting `BUILD` files using `black`.                                                |                                                                   |
+| `pants.backend.build_files.fmt.yapf`                      | Enables autoformatting `BUILD` files using `yapf`.                                                 |                                                                   |
 | `pants.backend.awslambda.python`                          | Enables generating an AWS Lambda zip file from Python code.                                        | [AWS Lambda](doc:awslambda-python)                                |
 | `pants.backend.codegen.protobuf.lint.buf`                 | Activate the Buf formatter and linter for Protocol Buffers.                                        | [Protobuf](doc:protobuf-python)                                   |
 | `pants.backend.codegen.protobuf.python`                   | Enables generating Python from Protocol Buffers. Includes gRPC support.                            | [Protobuf and gRPC](doc:protobuf-python)                          |
@@ -38,7 +40,7 @@ Available backends
 | `pants.backend.experimental.python.lint.pyupgrade`        | Enables Pyupgrade, which upgrades to new Python syntax: <https://pypi.org/project/pyupgrade/>      | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.experimental.python.packaging.pyoxidizer`  | Enables `pyoxidizer_binary` target.                                                                | [PyOxidizer](doc:pyoxidizer)                                      |
 | `pants.backend.google_cloud_function.python`              | Enables generating a Google Cloud Function from Python code.                                       | [Google Cloud Function](doc:google-cloud-function-python)         |
-| `pants.backend.plugin_development`                         | Enables `pants_requirements` target.                                                               | [Plugins overview](doc:plugins-overview)                          |
+| `pants.backend.plugin_development`                        | Enables `pants_requirements` target.                                                               | [Plugins overview](doc:plugins-overview)                          |
 | `pants.backend.python`                                    | Core Python support.                                                                               | [Enabling Python support](doc:python-backend)                     |
 | `pants.backend.python.mixed_interpreter_constraints`      | Adds the `py-constraints` goal for insights on Python interpreter constraints.                     | [Interpreter compatibility](doc:python-interpreter-compatibility) |
 | `pants.backend.python.lint.bandit`                        | Enables Bandit, the Python security linter: <https://bandit.readthedocs.io/en/latest/>.            | [Linters and formatters](doc:python-linters-and-formatters)       |
