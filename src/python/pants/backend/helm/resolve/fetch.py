@@ -10,15 +10,10 @@ from typing import Any
 
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtifact
-from pants.backend.helm.target_types import (
-    AllHelmArtifactTargets,
-    HelmArtifactFieldSet,
-    HelmArtifactTarget,
-)
+from pants.backend.helm.target_types import HelmArtifactFieldSet, HelmArtifactTarget
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
-from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     CreateDigest,
@@ -148,25 +143,6 @@ async def fetch_helm_artifact(request: FetchHelmArtifactRequest) -> FetchedHelmA
     )
 
     return FetchedHelmArtifact(artifact=resolved_artifact, snapshot=artifact_snapshot)
-
-
-class AllFetchedHelmArtifacts(Collection[FetchedHelmArtifact]):
-    pass
-
-
-@rule
-async def fetch_all_helm_artifacts(
-    all_artifact_targets: AllHelmArtifactTargets,
-) -> AllFetchedHelmArtifacts:
-    fetched_artifacts = await MultiGet(
-        Get(
-            FetchedHelmArtifact,
-            FetchHelmArtifactRequest,
-            FetchHelmArtifactRequest.from_target(target, description_of_origin="the repository"),
-        )
-        for target in all_artifact_targets
-    )
-    return AllFetchedHelmArtifacts(fetched_artifacts)
 
 
 def rules():
