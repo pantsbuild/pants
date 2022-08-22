@@ -13,7 +13,7 @@ from pants.backend.python.lint.yapf.subsystem import rules as yapf_subsystem_rul
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files
-from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -31,12 +31,6 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
-
-
-def get_snapshot(rule_runner: RuleRunner, build_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in build_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
 
 
 def run_yapf(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -> FmtResult:
@@ -63,14 +57,14 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         rule_runner,
         extra_args=[f"--yapf-interpreter-constraints=['{interpreter_constraint}']"],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": 'python_sources(name="t")\n'})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name="t")\n'})
     assert fmt_result.did_change is False
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": 'python_sources(name = "t")\n'})
     fmt_result = run_yapf(rule_runner)
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": 'python_sources(name="t")\n'})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name="t")\n'})
     assert fmt_result.did_change is True
 
 
@@ -82,8 +76,7 @@ def test_multiple_files(rule_runner: RuleRunner) -> None:
         }
     )
     fmt_result = run_yapf(rule_runner)
-    assert fmt_result.output == get_snapshot(
-        rule_runner,
+    assert fmt_result.output == rule_runner.make_snapshot(
         {"good/BUILD": 'python_sources(name="t")\n', "bad/BUILD": 'python_sources(name="t")\n'},
     )
     assert fmt_result.did_change is True
@@ -106,7 +99,7 @@ def test_config_file(
         }
     )
     fmt_result = run_yapf(rule_runner, extra_args=extra_args)
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": 'python_sources(name = "t")\n'})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name = "t")\n'})
     assert fmt_result.did_change is False
 
 
@@ -116,5 +109,5 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
         rule_runner,
         extra_args=["--yapf-args=--style='{spaces_around_default_or_named_assign: True}'"],
     )
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": 'python_sources(name = "t")\n'})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name = "t")\n'})
     assert fmt_result.did_change is False
