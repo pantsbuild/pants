@@ -450,7 +450,7 @@ class PythonSetup(Subsystem):
         advanced=True,
         mutually_exclusive_group="lockfile",
     )
-    resolve_all_constraints = BoolOption(
+    _resolve_all_constraints = BoolOption(
         default=True,
         help=softwrap(
             """
@@ -755,15 +755,29 @@ class PythonSetup(Subsystem):
             ).items()
         }
 
-    def resolve_all_constraints_was_set_explicitly(self) -> bool:
-        return not self.options.is_default("resolve_all_constraints")
-
     @property
     def manylinux(self) -> str | None:
         manylinux = cast(Optional[str], self.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
+
+    @property
+    def resolve_all_constraints(self) -> bool:
+        if (
+            self._resolve_all_constraints
+            and not self.options.is_default("resolve_all_constraints")
+            and not self.requirement_constraints
+        ):
+            raise ValueError(
+                softwrap(
+                    """
+                    `[python].resolve_all_constraints` is enabled, so
+                    `[python].requirement_constraints` must also be set.
+                    """
+                )
+            )
+        return self._resolve_all_constraints
 
     @property
     def scratch_dir(self):
