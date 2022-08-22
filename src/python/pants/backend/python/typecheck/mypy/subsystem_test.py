@@ -194,8 +194,8 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         MyPy.default_interpreter_constraints,
     )
 
-    # If no Python targets in repo, fall back to MyPy constraints.
-    assert_lockfile_request("target()", MyPy.default_interpreter_constraints)
+    # If no Python targets in repo, fall back to global Python constraint.
+    assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.
     assert_lockfile_request(
@@ -243,7 +243,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             python_requirement(name="thirdparty", requirements=["ansicolors"])
             """
         ),
-        MyPy.default_interpreter_constraints,
+        [global_constraint],
         extra_args=["--mypy-source-plugins=project"],
         extra_expected_requirements=["ansicolors"],
     )
