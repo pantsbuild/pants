@@ -25,7 +25,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.util.logging import LogLevel
 
 
@@ -36,12 +36,12 @@ class PutativeKotlinTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    junit_filespec = Filespec(includes=list(KotlinJunitTestsGeneratorSourcesField.default))
+    junit_filespec_matcher = FilespecMatcher(KotlinJunitTestsGeneratorSourcesField.default, ())
     junit_files = {
         path
         for path in paths
         if os.path.basename(path)
-        in set(matches_filespec(junit_filespec, paths=[os.path.basename(path) for path in paths]))
+        in set(junit_filespec_matcher.matches([os.path.basename(path) for path in paths]))
     }
     sources_files = set(paths) - junit_files
     return {
