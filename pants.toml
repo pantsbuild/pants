@@ -110,6 +110,10 @@ ignore_adding_targets = [
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
+[update-build-files]
+# We use `pants.backend.build_files.fmt.black`
+fmt = false
+
 [pex]
 venv_use_symlinks = true
 

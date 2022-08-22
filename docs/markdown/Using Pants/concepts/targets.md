@@ -43,9 +43,7 @@ Each target type has different _fields_, or individual metadata values. Run `./p
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
-Use [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automate generating BUILD files.
-You can autoformat build files by opting into one of the plugins under `pants.backend.build_files.fmt` and
-running `./pants fmt **/BUILD` or `./pants fmt ::` (which formats everything).
+You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](https://www.pantsbuild.org/v2.13/docs/enabling-backends)). Then to format, run `./pants fmt '**/BUILD'` or `./pants fmt ::` (formats everything).
 
 Target addresses
 ================
