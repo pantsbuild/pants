@@ -12,8 +12,8 @@ from pants.backend.build_files.fmt.buildifier.rules import rules as buildifier_r
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import external_tool
-from pants.engine.fs import CreateDigest, FileContent, PathGlobs
-from pants.engine.internals.native_engine import Digest, Snapshot
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import Snapshot
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -63,35 +63,24 @@ def run_buildifier(rule_runner: RuleRunner) -> FmtResult:
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": GOOD_FILE})
     fmt_result = run_buildifier(rule_runner)
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": BAD_FILE})
     fmt_result = run_buildifier(rule_runner)
-    assert fmt_result.output == get_snapshot(rule_runner, {"BUILD": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": GOOD_FILE})
     assert fmt_result.did_change is True
 
 
 def test_multiple_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good/BUILD": GOOD_FILE,
-            "bad/BUILD": BAD_FILE,
-        }
-    )
+    rule_runner.write_files({"good/BUILD": GOOD_FILE, "bad/BUILD": BAD_FILE})
     fmt_result = run_buildifier(rule_runner)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good/BUILD": GOOD_FILE, "bad/BUILD": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good/BUILD": GOOD_FILE, "bad/BUILD": GOOD_FILE}
     )
     assert fmt_result.did_change is True
