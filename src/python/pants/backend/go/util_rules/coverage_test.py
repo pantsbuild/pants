@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from typing import cast
 
 import pytest
 
@@ -108,9 +109,18 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
     coverage_reports = rule_runner.request(
         CoverageReports, [GoCoverageDataCollection([coverage_data])]
     )
-    assert len(coverage_reports.reports) == 1
-    coverage_report = coverage_reports.reports[0]
-    assert isinstance(coverage_report, FilesystemCoverageReport)
-    digest_contents = rule_runner.request(DigestContents, (coverage_report.result_snapshot.digest,))
+    assert len(coverage_reports.reports) == 2
+    reports = cast(list[FilesystemCoverageReport], list(coverage_reports.reports))
+    reports.sort(key=lambda x: x.report_type)
+
+    go_report = reports[0]
+    assert isinstance(go_report, FilesystemCoverageReport)
+    digest_contents = rule_runner.request(DigestContents, (go_report.result_snapshot.digest,))
     assert len(digest_contents) == 1
     assert digest_contents[0].path == "cover.out"
+
+    html_report = reports[1]
+    assert isinstance(html_report, FilesystemCoverageReport)
+    digest_contents = rule_runner.request(DigestContents, (html_report.result_snapshot.digest,))
+    assert len(digest_contents) == 1
+    assert digest_contents[0].path == "coverage.html"

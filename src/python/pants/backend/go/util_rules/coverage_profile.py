@@ -58,7 +58,8 @@ class GoCoverageProfile:
         for block in self.blocks:
             if block.count > max_count:
                 max_count = block.count
-        divisor = math.log(max_count)
+        # Note: Python throws ValueError if max_count == 0
+        divisor = math.log(max_count) if max_count > 0 else 0
 
         index = 0
 
@@ -72,6 +73,8 @@ class GoCoverageProfile:
             if max_count <= 1:
                 new_norm = 0.8  # Profile is in "set" mode; we want a heat map. Use cov8 in the CSS.
             elif count > 0:
+                # Divide by zero avoided since divisor > 0 if max_count > 1.
+                # TODO: What if max_count == 1 so divisor == 0?
                 new_norm = math.log(count) / divisor
             if new_norm is not None:
                 b = dataclasses.replace(b, norm=new_norm)
@@ -110,7 +113,7 @@ def parse_go_coverage_profiles(
     mode_line = next(lines)
     if not mode_line.startswith("mode: "):
         raise ValueError(
-            f"Malformed Go coverage file `{description_of_origin}`: invalid cover mode specifier"
+            f"Malformed Go coverage file from {description_of_origin}: invalid cover mode specifier"
         )
 
     raw_mode = strip_prefix(mode_line, "mode: ")
@@ -122,7 +125,7 @@ def parse_go_coverage_profiles(
         parsed_profile_line = _BLOCK_REGEX.fullmatch(line)
         if not parsed_profile_line:
             raise ValueError(
-                f"Malformed Go coverage file `{description_of_origin}`: invalid profile block line"
+                f"Malformed Go coverage file from {description_of_origin}: invalid profile block line"
             )
 
         filename = parsed_profile_line.group(1)
