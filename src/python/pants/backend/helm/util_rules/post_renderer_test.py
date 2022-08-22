@@ -28,6 +28,7 @@ from pants.backend.helm.util_rules.renderer import (
 )
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule
@@ -40,6 +41,7 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
         rules=[
             *infer_deployment.rules(),
+            *source_files.rules(),
             *post_renderer.rules(),
             QueryRule(HelmPostRenderer, (HelmDeploymentPostRendererRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),

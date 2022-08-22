@@ -8,7 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartTarget
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
@@ -17,9 +17,15 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import sources
-from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
+from pants.backend.helm.util_rules.sources import (
+    HelmChartRoot,
+    HelmChartRootRequest,
+    HelmChartSourceFiles,
+    HelmChartSourceFilesRequest,
+)
 from pants.build_graph.address import Address
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -30,9 +36,42 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, ResourcesGeneratorTarget, FilesGeneratorTarget],
         rules=[
             *sources.rules(),
+            QueryRule(HelmChartRoot, (HelmChartRootRequest,)),
             QueryRule(HelmChartSourceFiles, (HelmChartSourceFilesRequest,)),
         ],
     )
+
+
+def test_auto_detect_chart_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/main/helm/chart/BUILD": "helm_chart()",
+            "src/main/helm/chart/Chart.yaml": HELM_CHART_FILE,
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/main/helm/chart"))
+    field_set = HelmChartFieldSet.create(tgt)
+
+    source_root = rule_runner.request(HelmChartRoot, [HelmChartRootRequest(field_set.chart)])
+    assert source_root.path == "src/main/helm/chart"
+
+
+def test_can_not_auto_detect_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "helm_chart()",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src"))
+    field_set = HelmChartFieldSet.create(tgt)
+
+    with pytest.raises(
+        ExecutionError,
+        match="The 'chart' field in target src:src must have 1 file, but it had 0 files",
+    ):
+        rule_runner.request(HelmChartRoot, [HelmChartRootRequest(field_set.chart)])
 
 
 def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
@@ -121,3 +160,4 @@ def test_source_templates_includes(
         assert "resource.xml" in source_files.snapshot.files
     if include_files:
         assert "file.txt" in source_files.snapshot.files
+        assert "file.txt" in source_files.unrooted_files

@@ -105,7 +105,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
+def test_setup_lockfile(rule_runner: RuleRunner) -> None:
     global_constraint = "==3.9.*"
 
     def assert_lockfile_request(

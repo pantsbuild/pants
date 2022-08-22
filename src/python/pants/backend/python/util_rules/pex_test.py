@@ -65,6 +65,7 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.dirutil import safe_rmtree
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -613,8 +614,8 @@ def test_setup_pex_requirements() -> None:
                         find_links=("custom-find-links",),
                         manylinux=None,
                         constraints_file=None,
-                        only_binary=(),
-                        no_binary=(),
+                        only_binary=FrozenOrderedSet(),
+                        no_binary=FrozenOrderedSet(),
                     ),
                 ),
                 MockGet(Digest, CreateDigest, lambda _: constraints_digest),
@@ -753,8 +754,6 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         requirement_constraints=set(),
         only_binary=set(),
         no_binary=set(),
-        indexes=set(),
-        find_links=set(),
         manylinux=None,
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})

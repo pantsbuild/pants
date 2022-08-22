@@ -479,27 +479,36 @@ Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl
 
 There are two mechanisms for setting up custom Python distribution repositories:
 
-#### Simple repositories as defined by PEP 503
+#### PEP-503 compatible indexes
 
-If your custom repo is of this type, i.e., "private PyPI", aka "cheese shop", use the option `indexes` in the `[python-repos]` scope.
+Use `[python-repos].indexes` to add [PEP 503-compatible](https://peps.python.org/pep-0503/)
+indexes, like PyPI.
 
 ```toml pants.toml
 [python-repos]
 indexes.add = ["https://custom-cheeseshop.net/simple"]
 ```
 
-To exclusively use your custom index—i.e. to not use PyPI—use `indexes = [..]` instead of `indexes.add = [..]`.
+To exclusively use your custom index, i.e. to not use the default of PyPI, use `indexes = [..]`
+instead of `indexes.add = [..]`.
 
-#### A Pip findlinks repository
+#### pip `--find-links`
 
-If your custom repo is of this type, use the option `repos` in the `[python-repos]` scope.
+Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's
+[`--find-links`](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f)
+option, you can either use:
+
+* a URL to an HTML file with links to wheel and/or sdist files, or
+* a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
+  sdist files.
 
 ```toml
 [python-repos]
-repos = ["https://your/repo/here"]
+find_links = [
+  "https://your/repo/here",
+  "file:///Users/pantsbuild/prebuilt_wheels",
+]
 ```
-
-Indexes are assumed to have a nested structure (like <http://pypi.org/simple>), whereas repos are flat lists of packages.
 
 #### Authenticating to custom repos
 

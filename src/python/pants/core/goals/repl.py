@@ -7,17 +7,15 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
-from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
@@ -97,12 +95,9 @@ class ReplRequest:
 @goal_rule
 async def run_repl(
     console: Console,
-    workspace: Workspace,
     repl_subsystem: ReplSubsystem,
     specified_targets: FilteredTargets,
-    build_root: BuildRoot,
     union_membership: UnionMembership,
-    global_options: GlobalOptions,
     complete_env: CompleteEnvironment,
 ) -> Repl:
     # TODO: When we support multiple languages, detect the default repl to use based

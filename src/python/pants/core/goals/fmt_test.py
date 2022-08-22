@@ -318,6 +318,22 @@ def test_only() -> None:
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
 
 
+def test_no_targets() -> None:
+    rule_runner = fmt_rule_runner(
+        target_types=[FortranTarget, SmalltalkTarget],
+        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
+        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+    )
+
+    write_files(rule_runner)
+
+    stderr = run_fmt(
+        rule_runner,
+        target_specs=[],
+    )
+    assert not stderr.strip()
+
+
 def test_message_lists_added_files() -> None:
     input_snapshot = Snapshot._unsafe_create(
         Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]

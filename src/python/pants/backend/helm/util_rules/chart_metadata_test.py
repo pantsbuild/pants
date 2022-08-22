@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import pytest
@@ -74,21 +73,6 @@ def test_parse_metadata_digest(rule_runner: RuleRunner, chart_contents: str) -> 
 
     assert_metadata(non_prefixed_metadata, chart_dict)
 
-    prefix = "foo"
-    prefixed_digest = rule_runner.request(
-        Digest, [CreateDigest([FileContent(os.path.join(prefix, "Chart.yml"), chart_bytes)])]
-    )
-    prefixed_metadata = rule_runner.request(
-        HelmChartMetadata,
-        [
-            ParseHelmChartMetadataDigest(
-                prefixed_digest, description_of_origin="test_parse_metadata_digest", prefix="*"
-            )
-        ],
-    )
-
-    assert_metadata(prefixed_metadata, chart_dict)
-
 
 def test_raises_error_if_more_than_one_metadata_file(rule_runner: RuleRunner) -> None:
     digest = rule_runner.request(
@@ -98,9 +82,6 @@ def test_raises_error_if_more_than_one_metadata_file(rule_runner: RuleRunner) ->
                 [
                     FileContent("Chart.yaml", HELM_CHART_FILE_V1_FULL.encode()),
                     FileContent("Chart.yml", HELM_CHART_FILE_V2_FULL.encode()),
-                    FileContent(
-                        os.path.join("foo", "Chart.yaml"), HELM_CHART_FILE_V1_FULL.encode()
-                    ),
                 ]
             )
         ],
@@ -113,7 +94,6 @@ def test_raises_error_if_more_than_one_metadata_file(rule_runner: RuleRunner) ->
                 ParseHelmChartMetadataDigest(
                     digest,
                     description_of_origin="test_raises_error_if_more_than_one_metadata_file",
-                    prefix="**",
                 )
             ],
         )

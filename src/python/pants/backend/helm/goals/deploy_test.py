@@ -19,6 +19,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.testutil import HELM_CHART_FILE
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.deploy import DeployProcess
+from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -30,6 +31,7 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmArtifactTarget, HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
         rules=[
             *helm_deploy_rules(),
+            *source_files.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(DeployProcess, (DeployHelmDeploymentFieldSet,)),
         ],
@@ -94,19 +96,28 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_root_patterns = ["/src/*"]
     deploy_args = ["--kubeconfig", "./kubeconfig"]
     deploy_process = _run_deployment(
         rule_runner,
         "src/deployment",
         "foo",
         args=[
-            f"--source-root-patterns={repr(source_root_patterns)}",
             f"--helm-args={repr(deploy_args)}",
         ],
     )
 
     helm = rule_runner.request(HelmBinary, [])
+
+    expected_value_files_order = [
+        "common.yaml",
+        "bar.yaml",
+        "foo.yaml",
+        "bar-override.yaml",
+        "subdir/bar.yaml",
+        "subdir/foo.yaml",
+        "subdir/foo-override.yaml",
+        "subdir/last.yaml",
+    ]
 
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
@@ -124,7 +135,9 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--values",
-        "common.yaml,bar.yaml,foo.yaml,bar-override.yaml,subdir/bar.yaml,subdir/foo.yaml,subdir/foo-override.yaml,subdir/last.yaml",
+        ",".join(
+            [f"__values/src/deployment/{filename}" for filename in expected_value_files_order]
+        ),
         "--set",
         "key=foo",
         "--set",

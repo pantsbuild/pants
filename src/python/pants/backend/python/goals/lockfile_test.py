@@ -14,7 +14,6 @@ from pants.backend.python.goals.lockfile import (
 )
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
 from pants.backend.python.goals.lockfile import setup_user_lockfile_requests
-from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
@@ -80,10 +79,6 @@ def _generate(
             //   "generated_with_requirements": [
             //     "ansicolors{ansicolors_version}"
             //   ],
-            //   "indexes": [
-            //     "{PythonRepos.pypi_index}"
-            //   ],
-            //   "find_links": [],
             //   "manylinux": "manylinux2014",
             """
         )

@@ -302,8 +302,8 @@ class ResolvePexConfig:
     find_links: tuple[str, ...]
     manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
-    only_binary: tuple[str, ...]
-    no_binary: tuple[str, ...]
+    only_binary: FrozenOrderedSet[PipRequirement]
+    no_binary: FrozenOrderedSet[PipRequirement]
 
     def indexes_and_find_links_and_manylinux_pex_args(self) -> Iterator[str]:
         # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
@@ -347,11 +347,11 @@ async def determine_resolve_pex_config(
     if request.resolve_name is None:
         return ResolvePexConfig(
             indexes=python_repos.indexes,
-            find_links=python_repos.repos,
+            find_links=python_repos.find_links,
             manylinux=python_setup.manylinux,
             constraints_file=None,
-            no_binary=(),
-            only_binary=(),
+            no_binary=FrozenOrderedSet(),
+            only_binary=FrozenOrderedSet(),
         )
 
     all_python_tool_resolve_names = tuple(
@@ -413,11 +413,11 @@ async def determine_resolve_pex_config(
 
     return ResolvePexConfig(
         indexes=python_repos.indexes,
-        find_links=python_repos.repos,
+        find_links=python_repos.find_links,
         manylinux=python_setup.manylinux,
         constraints_file=constraints_file,
-        no_binary=tuple(no_binary),
-        only_binary=tuple(only_binary),
+        no_binary=FrozenOrderedSet(no_binary),
+        only_binary=FrozenOrderedSet(only_binary),
     )
 
 
@@ -449,8 +449,6 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
-        indexes=resolve_config.indexes,
-        find_links=resolve_config.find_links,
         manylinux=resolve_config.manylinux,
         requirement_constraints=(
             resolve_config.constraints_file.constraints
@@ -513,25 +511,11 @@ def _common_failure_reasons(
             `[python].no_binary`)
             """
         )
-    if InvalidPythonLockfileReason.INDEXES_MISMATCH in failure_reasons:
-        yield softwrap(
-            """
-            - The `indexes` arguments have changed from when the lockfile was generated.
-            (Indexes are set via the option `[python-repos].indexes`
-            """
-        )
-    if InvalidPythonLockfileReason.FIND_LINKS_MISMATCH in failure_reasons:
-        yield softwrap(
-            """
-            - The `find_links` arguments have changed from when the lockfile was generated.
-            (Find links is set via the option `[python-repos].repos`
-            """
-        )
     if InvalidPythonLockfileReason.MANYLINUX_MISMATCH in failure_reasons:
         yield softwrap(
             """
             - The `manylinux` argument has changed from when the lockfile was generated.
-            (manylinux is set via the option `[python].resolver_manylinux`
+            (manylinux is set via the option `[python].resolver_manylinux`)
             """
         )
 

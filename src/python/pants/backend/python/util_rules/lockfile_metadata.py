@@ -24,8 +24,6 @@ class InvalidPythonLockfileReason(Enum):
     INVALIDATION_DIGEST_MISMATCH = "invalidation_digest_mismatch"
     INTERPRETER_CONSTRAINTS_MISMATCH = "interpreter_constraints_mismatch"
     REQUIREMENTS_MISMATCH = "requirements_mismatch"
-    INDEXES_MISMATCH = "indexes_mismatch"
-    FIND_LINKS_MISMATCH = "find_links_mismatch"
     MANYLINUX_MISMATCH = "manylinux_mismatch"
     CONSTRAINTS_FILE_MISMATCH = "constraints_file_mismatch"
     ONLY_BINARY_MISMATCH = "only_binary_mismatch"
@@ -44,12 +42,10 @@ class PythonLockfileMetadata(LockfileMetadata):
         *,
         valid_for_interpreter_constraints: InterpreterConstraints,
         requirements: set[PipRequirement],
-        indexes: set[str],
-        find_links: set[str],
         manylinux: str | None,
         requirement_constraints: set[PipRequirement],
-        only_binary: set[str],
-        no_binary: set[str],
+        only_binary: set[PipRequirement],
+        no_binary: set[PipRequirement],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -62,8 +58,6 @@ class PythonLockfileMetadata(LockfileMetadata):
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints,
             requirements,
-            indexes=indexes,
-            find_links=find_links,
             manylinux=manylinux,
             requirement_constraints=requirement_constraints,
             only_binary=only_binary,
@@ -87,12 +81,10 @@ class PythonLockfileMetadata(LockfileMetadata):
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
-        indexes: Iterable[str],
-        find_links: Iterable[str],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[str],
-        no_binary: Iterable[str],
+        only_binary: Iterable[PipRequirement],
+        no_binary: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -136,12 +128,10 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         interpreter_universe: Iterable[str],
         # Everything below is not used by v1.
         user_requirements: Iterable[PipRequirement],
-        indexes: Iterable[str],
-        find_links: Iterable[str],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[str],
-        no_binary: Iterable[str],
+        only_binary: Iterable[PipRequirement],
+        no_binary: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -182,7 +172,9 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         requirements = metadata(
             "generated_with_requirements",
             Set[PipRequirement],
-            lambda l: {PipRequirement.parse(i) for i in l},
+            lambda l: {
+                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
+            },
         )
         interpreter_constraints = metadata(
             "valid_for_interpreter_constraints", InterpreterConstraints, InterpreterConstraints
@@ -206,12 +198,10 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
         # Everything below is not used by V2.
-        indexes: Iterable[str],
-        find_links: Iterable[str],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[str],
-        no_binary: Iterable[str],
+        only_binary: Iterable[PipRequirement],
+        no_binary: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
 
@@ -236,12 +226,10 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     """Lockfile version that considers constraints files."""
 
-    indexes: set[str]
-    find_links: set[str]
     manylinux: str | None
     requirement_constraints: set[PipRequirement]
-    only_binary: set[str]
-    no_binary: set[str]
+    only_binary: set[PipRequirement]
+    no_binary: set[PipRequirement]
 
     @classmethod
     def _from_json_dict(
@@ -252,22 +240,32 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     ) -> PythonLockfileMetadataV3:
         v2_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
-        indexes = metadata("indexes", Set[str], lambda l: set(l))
-        find_links = metadata("find_links", Set[str], lambda l: set(l))
         manylinux = metadata("manylinux", str, lambda l: l)  # type: ignore[no-any-return]
         requirement_constraints = metadata(
             "requirement_constraints",
             Set[PipRequirement],
-            lambda l: {PipRequirement.parse(i) for i in l},
+            lambda l: {
+                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
+            },
         )
-        only_binary = metadata("only_binary", Set[str], lambda l: set(l))
-        no_binary = metadata("no_binary", Set[str], lambda l: set(l))
+        only_binary = metadata(
+            "only_binary",
+            Set[PipRequirement],
+            lambda l: {
+                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
+            },
+        )
+        no_binary = metadata(
+            "no_binary",
+            Set[PipRequirement],
+            lambda l: {
+                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
+            },
+        )
 
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,
             requirements=v2_metadata.requirements,
-            indexes=indexes,
-            find_links=find_links,
             manylinux=manylinux,
             requirement_constraints=requirement_constraints,
             only_binary=only_binary,
@@ -278,12 +276,10 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadataV3, instance)
         return {
-            "indexes": sorted(instance.indexes),
-            "find_links": sorted(instance.find_links),
             "manylinux": instance.manylinux,
             "requirement_constraints": sorted(str(i) for i in instance.requirement_constraints),
-            "only_binary": sorted(instance.only_binary),
-            "no_binary": sorted(instance.no_binary),
+            "only_binary": sorted(str(i) for i in instance.only_binary),
+            "no_binary": sorted(str(i) for i in instance.no_binary),
         }
 
     def is_valid_for(
@@ -294,12 +290,10 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
-        indexes: Iterable[str],
-        find_links: Iterable[str],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[str],
-        no_binary: Iterable[str],
+        only_binary: Iterable[PipRequirement],
+        no_binary: Iterable[PipRequirement],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -309,8 +303,6 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 user_interpreter_constraints=user_interpreter_constraints,
                 interpreter_universe=interpreter_universe,
                 user_requirements=user_requirements,
-                indexes=indexes,
-                find_links=find_links,
                 manylinux=manylinux,
                 requirement_constraints=requirement_constraints,
                 only_binary=only_binary,
@@ -319,10 +311,6 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
             .failure_reasons
         )
 
-        if self.indexes != set(indexes):
-            failure_reasons.add(InvalidPythonLockfileReason.INDEXES_MISMATCH)
-        if self.find_links != set(find_links):
-            failure_reasons.add(InvalidPythonLockfileReason.FIND_LINKS_MISMATCH)
         if self.manylinux != manylinux:
             failure_reasons.add(InvalidPythonLockfileReason.MANYLINUX_MISMATCH)
         if self.requirement_constraints != set(requirement_constraints):

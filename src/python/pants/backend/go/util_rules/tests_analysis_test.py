@@ -77,11 +77,12 @@ def test_basic_test_analysis(rule_runner: RuleRunner) -> None:
         GeneratedTestMain,
         [
             GenerateTestMainRequest(
-                input_digest,
-                FrozenOrderedSet(["foo_test.go"]),
-                FrozenOrderedSet(["bar_test.go"]),
-                "foo",
-                Address("foo"),
+                digest=input_digest,
+                test_paths=FrozenOrderedSet(["foo_test.go"]),
+                xtest_paths=FrozenOrderedSet(["bar_test.go"]),
+                import_path="foo",
+                register_cover=False,
+                address=Address("foo"),
             )
         ],
     )
@@ -122,11 +123,12 @@ def test_collect_examples(rule_runner: RuleRunner) -> None:
         GeneratedTestMain,
         [
             GenerateTestMainRequest(
-                input_digest,
-                FrozenOrderedSet(["foo_test.go"]),
-                FrozenOrderedSet(),
-                "foo",
-                Address("foo"),
+                digest=input_digest,
+                test_paths=FrozenOrderedSet(["foo_test.go"]),
+                xtest_paths=FrozenOrderedSet(),
+                import_path="foo",
+                register_cover=False,
+                address=Address("foo"),
             )
         ],
     )
@@ -167,11 +169,12 @@ def test_incorrect_signatures(rule_runner: RuleRunner) -> None:
             GeneratedTestMain,
             [
                 GenerateTestMainRequest(
-                    input_digest,
-                    FrozenOrderedSet(["foo_test.go"]),
-                    FrozenOrderedSet(),
-                    "foo",
-                    Address("foo"),
+                    digest=input_digest,
+                    test_paths=FrozenOrderedSet(["foo_test.go"]),
+                    xtest_paths=FrozenOrderedSet(),
+                    import_path="foo",
+                    register_cover=False,
+                    address=Address("foo"),
                 )
             ],
         )
@@ -202,11 +205,12 @@ def test_duplicate_test_mains_same_file(rule_runner: RuleRunner) -> None:
         GeneratedTestMain,
         [
             GenerateTestMainRequest(
-                input_digest,
-                FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
-                FrozenOrderedSet(),
-                "foo",
-                Address("foo"),
+                digest=input_digest,
+                test_paths=FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                xtest_paths=FrozenOrderedSet(),
+                import_path="foo",
+                register_cover=False,
+                address=Address("foo"),
             )
         ],
     )
@@ -242,11 +246,12 @@ def test_duplicate_test_mains_different_files(rule_runner: RuleRunner) -> None:
         GeneratedTestMain,
         [
             GenerateTestMainRequest(
-                input_digest,
-                FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
-                FrozenOrderedSet(),
-                "foo",
-                Address("foo"),
+                digest=input_digest,
+                test_paths=FrozenOrderedSet(["foo_test.go", "bar_test.go"]),
+                xtest_paths=FrozenOrderedSet(),
+                import_path="foo",
+                register_cover=False,
+                address=Address("foo"),
             )
         ],
     )

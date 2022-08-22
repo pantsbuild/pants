@@ -80,6 +80,10 @@ type Analysis struct {
 
 	// True if Go 1.18 is in use. This is not set by analyze but rather by generate based on release tags.
 	IsGo1_18 bool
+
+	// True if coverage is enabled. This is not set by `analyze` but rather by `generate` based on an
+	// environment variable set by the invoker.
+	Cover bool
 }
 
 // isTestFunc tells whether fn has the type of a testing function. arg
@@ -323,6 +327,10 @@ func init() {
 }
 
 func main() {
+{{if .Cover}}
+	registerCover()
+{{end}}
+
 {{- if .IsGo1_18 }}
 	m := testing.MainStart(testdeps.TestDeps{}, tests, benchmarks, fuzzTargets, examples)
 {{- else }}
@@ -337,7 +345,7 @@ func main() {
 }
 `
 
-func generate(analysis *Analysis) ([]byte, error) {
+func generate(analysis *Analysis, genCover bool) ([]byte, error) {
 	tmpl, err := template.New("testmain").Parse(testMainTemplate)
 	if err != nil {
 		return nil, err
@@ -350,6 +358,9 @@ func generate(analysis *Analysis) ([]byte, error) {
 			analysis.IsGo1_18 = true
 		}
 	}
+
+	// Pass through the config to generate the call to the coverage stubs.
+	analysis.Cover = genCover
 
 	var buffer bytes.Buffer
 
@@ -368,7 +379,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	testmain, err := generate(analysis)
+	genCover := os.Getenv("GENERATE_COVER") != ""
+
+	testmain, err := generate(analysis, genCover)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to generate _testmain.go: %s\n", err)
 		os.Exit(1)
