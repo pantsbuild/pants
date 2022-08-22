@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
@@ -14,6 +15,7 @@ from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -30,6 +32,7 @@ from pants.engine.target import (
     Target,
     Targets,
 )
+from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
 
@@ -372,6 +375,23 @@ class DockerImageTarget(Target):
 
         """
     )
+
+
+@union
+@dataclass(frozen=True)
+class DockerImageTagsRequest:
+    """A request to provide additional image tags."""
+
+    target: Target
+
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether to provide additional tags for this target or not."""
+        return True
+
+
+class DockerImageTags(Collection[str]):
+    """Additional image tags to apply to built Docker images."""
 
 
 class AllDockerImageTargets(Targets):

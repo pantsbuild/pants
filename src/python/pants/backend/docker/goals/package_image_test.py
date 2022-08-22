@@ -23,7 +23,11 @@ from pants.backend.docker.goals.package_image import (
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import (
+    DockerImageTags,
+    DockerImageTagsRequest,
+    DockerImageTarget,
+)
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
@@ -53,6 +57,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
@@ -76,6 +81,10 @@ def rule_runner() -> RuleRunner:
     )
 
 
+class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
+    pass
+
+
 def assert_build(
     rule_runner: RuleRunner,
     address: Address,
@@ -86,6 +95,7 @@ def assert_build(
     copy_sources: tuple[str, ...] = (),
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
+    plugin_tags: tuple[str, ...] = (),
 ) -> None:
     tgt = rule_runner.get_target(address)
 
@@ -148,6 +158,9 @@ def assert_build(
             global_options,
             DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
+            UnionMembership.from_rules(
+                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+            ),
         ],
         mock_gets=[
             MockGet(
@@ -159,6 +172,11 @@ def assert_build(
                 output_type=WrappedTarget,
                 input_type=WrappedTargetRequest,
                 mock=lambda _: WrappedTarget(tgt),
+            ),
+            MockGet(
+                output_type=DockerImageTags,
+                input_type=DockerImageTagsRequestPlugin,
+                mock=lambda _: DockerImageTags(plugin_tags),
             ),
             MockGet(
                 output_type=FallibleProcessResult,
@@ -1049,3 +1067,27 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
             field_set.image_refs(test.default_repository, registries, interpolation_context)
             == test.expect_refs
         )
+
+
+def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="plugin")'})
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--tag",
+            "plugin:latest",
+            "--tag",
+            "plugin:1.2.3",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="plugin"),
+        process_assertions=check_docker_proc,
+        plugin_tags=("1.2.3",),
+    )
