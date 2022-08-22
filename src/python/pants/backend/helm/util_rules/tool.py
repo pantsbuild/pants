@@ -440,7 +440,7 @@ async def helm_process(
     request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
 ) -> Process:
     global_extra_env = await Get(Environment, EnvironmentRequest(helm_subsytem.extra_env_vars))
-    env = {**global_extra_env, **helm_binary.env, **request.extra_env}
+    env = {**global_extra_env, **request.extra_env, **helm_binary.env}
 
     immutable_input_digests = {
         **helm_binary.immutable_input_digests,
