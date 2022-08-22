@@ -6,11 +6,11 @@ from __future__ import annotations
 from pants.util.value_interpolation import InterpolationError, InterpolationValue
 
 
-class DockerBuildArgInterpolationError(InterpolationError):
+class DockerBuildArgsInterpolationError(InterpolationError):
     @classmethod
     def attribute_error(
         cls, value: str | DockerBuildArgsInterpolationValue, attribute: str
-    ) -> DockerBuildArgInterpolationError:
+    ) -> DockerBuildArgsInterpolationError:
         msg = f"The build arg {attribute!r} is undefined."
         if value and isinstance(value, DockerBuildArgsInterpolationValue):
             msg += f' Defined build args are: {", ".join(value.keys())}.'
@@ -24,4 +24,4 @@ class DockerBuildArgInterpolationError(InterpolationError):
 class DockerBuildArgsInterpolationValue(InterpolationValue):
     """Interpolation context value with specific error handling for build args."""
 
-    _attribute_error_type = DockerBuildArgInterpolationError
+    _attribute_error_type = DockerBuildArgsInterpolationError

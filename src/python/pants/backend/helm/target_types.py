@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
-from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
 from pants.engine.rules import collect_rules, rule
@@ -471,27 +470,19 @@ class HelmDeploymentFieldSet(FieldSet):
     values: HelmDeploymentValuesField
 
     def format_values(self, interpolation_context: InterpolationContext) -> dict[str, str]:
-        def format_value(text: str) -> str | None:
+        def format_value(text: str) -> str:
             source = InterpolationContext.TextSource(
                 self.address,
                 target_alias=HelmDeploymentTarget.alias,
                 field_alias=HelmDeploymentValuesField.alias,
             )
 
-            try:
-                return interpolation_context.format(
-                    text, source=source, error_cls=HelmEnvironmentInterpolationError
-                )
-            except HelmEnvironmentInterpolationError as err:
-                logger.warning(err)
-                return None
+            return interpolation_context.format(
+                text,
+                source=source,
+            )
 
-        result = {}
-        for key, value in (self.values.value or {}).items():
-            interpolated_value = format_value(value)
-            if interpolated_value is not None:
-                result[key] = interpolated_value
-        return result
+        return {key: format_value(value) for key, value in (self.values.value or {}).items()}
 
 
 class AllHelmDeploymentTargets(Targets):

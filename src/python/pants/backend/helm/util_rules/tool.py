@@ -27,6 +27,7 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -39,7 +40,6 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, MergeDigests, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
