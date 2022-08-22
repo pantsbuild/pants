@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
