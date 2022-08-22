@@ -232,6 +232,7 @@ def create_parser() -> argparse.ArgumentParser:
 def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
+        "pants.backend.build_files.fmt.buildifier",
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.lint.buf",
         "pants.backend.codegen.protobuf.python",
