@@ -253,7 +253,7 @@ class CustomDockerImageTagsRequest(DockerImageTagsRequest):
 
 @rule
 async def custom_image_tags(request: CustomDockerImageTagsRequest) -> DockerImageTags:
-    custom_tags = ...
+    custom_tags = ["some", "tags"]
     return DockerImageTags(custom_tags)
 
 
