@@ -13,6 +13,7 @@ python_sources(
 target(
     name="plugins",
     dependencies=[
+        "src/python/pants/backend/build_files/fmt/buildifier",
         "src/python/pants/backend/awslambda/python",
         "src/python/pants/backend/build_files/fmt/black",
         "src/python/pants/backend/build_files/fmt/yapf",

@@ -233,6 +233,7 @@ def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
         "pants.backend.build_files.fmt.black",
+        "pants.backend.build_files.fmt.buildifier",
         "pants.backend.build_files.fmt.yapf",
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.lint.buf",
