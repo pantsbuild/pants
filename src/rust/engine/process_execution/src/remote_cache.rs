@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath};
-use futures::future::{self, BoxFuture, TryFutureExt};
+use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
@@ -23,12 +23,12 @@ use workunit_store::{
 
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
-#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum RemoteCacheWarningsBehavior {
   Ignore,
@@ -54,7 +54,7 @@ pub struct CommandRunner {
   platform: Platform,
   cache_read: bool,
   cache_write: bool,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
@@ -74,7 +74,7 @@ impl CommandRunner {
     cache_read: bool,
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
-    eager_fetch: bool,
+    cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
     read_timeout: Duration,
   ) -> Result<Self, String> {
@@ -106,7 +106,7 @@ impl CommandRunner {
       platform,
       cache_read,
       cache_write,
-      eager_fetch,
+      cache_content_behavior,
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
@@ -264,7 +264,7 @@ impl CommandRunner {
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
-        self.eager_fetch,
+        self.cache_content_behavior,
         self.read_timeout,
       )
       .await;
@@ -511,7 +511,7 @@ async fn check_action_cache(
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
   timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
@@ -555,29 +555,17 @@ async fn check_action_cache(
         .await
         .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
 
-        if eager_fetch {
-          // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
-          // retried.
-          let response = response.clone();
-          in_workunit!(
-            "eager_fetch_action_cache",
-            Level::Trace,
-            desc = Some("eagerly fetching after action cache hit".to_owned()),
-            |_workunit| async move {
-              future::try_join_all(vec![
-                store.ensure_local_has_file(response.stdout_digest).boxed(),
-                store.ensure_local_has_file(response.stderr_digest).boxed(),
-                store
-                  .ensure_local_has_recursive_directory(response.output_directory)
-                  .boxed(),
-              ])
-              .await
-            }
-          )
+        let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
           .await
-          .map_err(|e| Status::unavailable(format!("Output content could not be loaded: {e}")))?;
+          .map_err(|e| {
+            Status::unavailable(format!("Output content could not be validated: {e}"))
+          })?;
+
+        if cache_content_valid {
+          Ok(response)
+        } else {
+          Err(Status::not_found(""))
         }
-        Ok(response)
       })
       .await;
 

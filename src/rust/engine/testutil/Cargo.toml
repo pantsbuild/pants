@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 async-stream = "0.3"
-bytes = "1.0"
+bytes = "1.2"
 fs = { path = "../fs" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }

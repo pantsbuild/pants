@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, FileEntry, Workspace
@@ -12,7 +14,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PyExecutor, PyStubCAS
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, SubsystemRule, goal_rule, rule
-from pants.option.global_options import RemoteCacheWarningsBehavior
+from pants.option.global_options import CacheContentBehavior, RemoteCacheWarningsBehavior
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
@@ -113,7 +115,7 @@ def test_async_backtracking() -> None:
             rules=[entries_from_process, QueryRule(ProcessOutputEntries, [Process])],
             isolated_local_store=True,
             bootstrap_args=[
-                "--no-remote-cache-eager-fetch",
+                "--cache-content-behavior=defer",
                 "--no-local-cache",
                 *remote_cache_args(cas.address),
             ],
@@ -122,7 +124,7 @@ def test_async_backtracking() -> None:
             ProcessOutputEntries,
             [
                 Process(
-                    ["/bin/bash", "-c", "sleep 1; echo content > file.txt"],
+                    ["/bin/bash", "-c", "/bin/sleep 1 && echo content > file.txt"],
                     description="Create file.txt",
                     output_files=["file.txt"],
                     level=LogLevel.INFO,
@@ -144,14 +146,21 @@ def test_async_backtracking() -> None:
     assert metrics1["remote_cache_requests"] == 1
     assert metrics1["remote_cache_requests_uncached"] == 1
 
-    # Then, remove the content from the remote store and run again.
-    assert cas.remove(file_digest1)
+    # Confirm that we can hit the cache.
     file_digest2, metrics2 = run()
     assert file_digest1 == file_digest2
-    # Validate both that we hit the cache, and that we backtracked to actually run the process.
     assert metrics2["remote_cache_requests"] == 1
     assert metrics2["remote_cache_requests_cached"] == 1
-    assert metrics2["backtrack_attempts"] == 1
+    assert "backtrack_attempts" not in metrics2
+
+    # Then, remove the content from the remote store and run again.
+    assert cas.remove(file_digest1)
+    file_digest3, metrics3 = run()
+    assert file_digest1 == file_digest3
+    # Validate both that we hit the cache, and that we backtracked to actually run the process.
+    assert metrics3["remote_cache_requests"] == 1
+    assert metrics3["remote_cache_requests_cached"] == 1
+    assert metrics3["backtrack_attempts"] == 1
 
 
 class MockRunSubsystem(GoalSubsystem):
@@ -168,7 +177,7 @@ async def mock_run(workspace: Workspace, dist_dir: DistDir, mock_run: MockRunSub
     result = await Get(
         ProcessResult,
         Process(
-            ["/bin/bash", "-c", "sleep 1 ; echo content > file.txt"],
+            ["/bin/bash", "-c", "/bin/sleep 1 && echo content > file.txt"],
             description="Create file.txt",
             output_files=["file.txt"],
             level=LogLevel.INFO,
@@ -193,7 +202,7 @@ def test_sync_backtracking() -> None:
             rules=[mock_run, *distdir.rules(), SubsystemRule(MockRunSubsystem)],
             isolated_local_store=True,
             bootstrap_args=[
-                "--no-remote-cache-eager-fetch",
+                "--cache-content-behavior=defer",
                 "--no-local-cache",
                 *remote_cache_args(cas.address),
             ],
@@ -221,3 +230,53 @@ def test_sync_backtracking() -> None:
     assert metrics2["remote_cache_requests"] == 1
     assert metrics2["remote_cache_requests_cached"] == 1
     assert metrics2["backtrack_attempts"] == 1
+
+
+@pytest.mark.parametrize(
+    "cache_content_behavior", [CacheContentBehavior.validate, CacheContentBehavior.fetch]
+)
+def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
+    """Tests that --cache-content-behavior={validate,fetch} fail a lookup for missing content."""
+    executor = PyExecutor(core_threads=2, max_threads=4)
+    cas = PyStubCAS.builder().build(executor)
+
+    def run() -> dict[str, int]:
+        # Use an isolated store to ensure that the only content is in the remote/stub cache.
+        rule_runner = RuleRunner(
+            rules=[mock_run, *distdir.rules(), SubsystemRule(MockRunSubsystem)],
+            isolated_local_store=True,
+            bootstrap_args=[
+                f"--cache-content-behavior={cache_content_behavior.value}",
+                "--no-local-cache",
+                *remote_cache_args(cas.address),
+            ],
+        )
+        result = rule_runner.run_goal_rule(MockRun, args=[])
+        assert result.exit_code == 0
+
+        # Wait for any async cache writes to complete.
+        time.sleep(1)
+        return rule_runner.scheduler.get_metrics()
+
+    # Run once to populate the remote cache, and validate that there is one entry afterwards.
+    assert cas.action_cache_len() == 0
+    metrics1 = run()
+    assert cas.action_cache_len() == 1
+    assert metrics1["remote_cache_requests"] == 1
+    assert metrics1["remote_cache_requests_uncached"] == 1
+
+    # Ensure that we can hit the cache.
+    metrics2 = run()
+    assert metrics2["remote_cache_requests"] == 1
+    assert metrics2["remote_cache_requests_cached"] == 1
+    assert "backtrack_attempts" not in metrics2
+
+    # Then, remove the content from the remote store and run again.
+    assert cas.remove(
+        FileDigest("434728a410a78f56fc1b5899c3593436e61ab0c731e9072d95e96db290205e53", 8)
+    )
+    metrics3 = run()
+    # Validate that we missed the cache, and that we didn't backtrack.
+    assert metrics3["remote_cache_requests"] == 1
+    assert metrics3["remote_cache_requests_uncached"] == 1
+    assert "backtrack_attempts" not in metrics3

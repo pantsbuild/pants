@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -18,7 +18,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -36,12 +36,12 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(FmtRequest):
+class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
     name = GoogleJavaFormatSubsystem.options_scope
 
 
-class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
+class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = GoogleJavaFormatSubsystem.options_scope
 
 
@@ -111,6 +111,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        UnionRule(FmtRequest, GoogleJavaFormatRequest),
+        UnionRule(FmtTargetsRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

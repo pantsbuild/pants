@@ -57,7 +57,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -117,7 +117,8 @@ jobs:
         ./pants help subsystems
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -152,18 +153,18 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  bootstrap_pants_macos_x86_64:
+  bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
-    name: Bootstrap Pants, test Rust (macOS10-x86_64)
+    name: Bootstrap Pants, test Rust (macOS11-x86_64)
     needs:
     - check_labels
     - docs_only_check
     runs-on:
-    - macos-10.15
+    - macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -201,8 +202,8 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -212,7 +213,7 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS10-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
+        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
           }-v1
 
           '
@@ -221,7 +222,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS10-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
 
           '
     - id: get-engine-hash
@@ -233,7 +234,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS10-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
 
           '
         path: '.pants
@@ -262,16 +263,17 @@ jobs:
         ./pants help subsystems
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-macOS10-x86_64
+        name: pants-log-bootstrap-macOS11-x86_64
         path: .pants.d/pants.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS10-x86_64
+        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -286,7 +288,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:
@@ -360,7 +362,8 @@ jobs:
       if: github.event_name == 'push'
       name: Build fs_util
       run: ./build-support/bin/release.sh build-fs-util
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -373,7 +376,109 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 65
-  build_wheels_macos_arm64:
+  build_wheels_macos10_15_x86_64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
+      != 'DOCS_ONLY')
+    name: Build wheels and fs_util (macOS10-15-x86_64)
+    needs:
+    - check_labels
+    - docs_only_check
+    runs-on:
+    - macOS-10.15-X64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS10-15-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        path: '~/.rustup/toolchains/1.63.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: actions/cache@v3
+      with:
+        key: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
+          }-v1
+
+          '
+        path: '~/.cargo/registry
+
+          ~/.cargo/git
+
+          '
+        restore-keys: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+
+          '
+    - env:
+        ARCHFLAGS: -arch x86_64
+      if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
+      name: Build wheels
+      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+
+        ./build-support/bin/release.sh build-local-pex
+
+        ./build-support/bin/release.sh build-wheels
+
+        USE_PY38=true ./build-support/bin/release.sh build-wheels
+
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
+
+        ./build-support/bin/release.sh build-fs-util
+
+        '
+    - env:
+        ARCHFLAGS: -arch x86_64
+      if: github.event_name == 'push'
+      name: Build fs_util
+      run: ./build-support/bin/release.sh build-fs-util
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-wheels-macOS10-15-x86_64
+        path: .pants.d/pants.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: github.event_name == 'push'
+      name: Deploy to S3
+      run: ./build-support/bin/deploy_to_s3.py
+    timeout-minutes: 80
+  build_wheels_macos11_arm64:
     env:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -385,9 +490,7 @@ jobs:
     - check_labels
     - docs_only_check
     runs-on:
-    - self-hosted
-    - macOS11
-    - ARM64
+    - macOS-11-ARM64
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -422,7 +525,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -482,7 +585,8 @@ jobs:
         arch -arm64 ./pants help subsystems
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -515,18 +619,18 @@ jobs:
         python-version:
         - '3.9'
     timeout-minutes: 60
-  build_wheels_macos_x86_64:
+  build_wheels_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
-    name: Build wheels and fs_util (macOS10-x86_64)
+    name: Build wheels and fs_util (macOS11-x86_64)
     needs:
     - check_labels
     - docs_only_check
     runs-on:
-    - macos-10.15
+    - macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -560,8 +664,8 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.0-*
+        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -571,7 +675,7 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS10-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
+        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
           }-v1
 
           '
@@ -580,7 +684,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS10-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
 
           '
     - env:
@@ -605,11 +709,12 @@ jobs:
       if: github.event_name == 'push'
       name: Build fs_util
       run: ./build-support/bin/release.sh build-fs-util
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS10-x86_64
+        name: pants-log-wheels-macOS11-x86_64
         path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -710,12 +815,13 @@ jobs:
 
         '
     - name: Lint
-      run: './pants update-build-files --check
+      run: './pants update-build-files --check ::
 
         ./pants lint check ''**''
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -726,36 +832,57 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 30
-  merge_ok_docs_only:
-    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+  merge_ok:
+    if: always()
     name: Merge OK
     needs:
-    - docs_only_check
+    - set_merge_ok_docs_only
+    - set_merge_ok_not_docs_only
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: echo 'Merge OK'
-  merge_ok_not_docs_only:
+    - run: "merge_ok_docs_only=\"${{ needs.set_merge_ok_docs_only.outputs.merge_ok\
+        \ }}\"\nmerge_ok_not_docs_only=\"${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok\
+        \ }}\"\nif [[ \"${merge_ok_docs_only}\" == \"true\" || \"${merge_ok_not_docs_only}\"\
+        \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
+        \ \"Merge NOT OK\"\n    exit 1\nfi\n"
+  set_merge_ok_docs_only:
+    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+    name: Set Merge OK
+    needs:
+    - docs_only_check
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
+  set_merge_ok_not_docs_only:
     if: needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY'
-    name: Merge OK
+    name: Set Merge OK
     needs:
     - docs_only_check
     - bootstrap_pants_linux_x86_64
-    - bootstrap_pants_macos_x86_64
+    - bootstrap_pants_macos11_x86_64
     - build_wheels_linux_x86_64
-    - build_wheels_macos_arm64
-    - build_wheels_macos_x86_64
+    - build_wheels_macos10_15_x86_64
+    - build_wheels_macos11_arm64
+    - build_wheels_macos11_x86_64
     - check_labels
     - docs_only_check
     - lint_python
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
-    - test_python_macos_x86_64
+    - test_python_macos11_x86_64
+    outputs:
+      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: echo 'Merge OK'
+    - id: set_merge_ok
+      run: echo '::set-output name=merge_ok::true'
   test_python_linux_x86_64_0:
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
@@ -836,7 +963,8 @@ jobs:
       run: './pants test --shard=0/3 ::
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -927,7 +1055,8 @@ jobs:
       run: './pants test --shard=1/3 ::
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -1018,7 +1147,8 @@ jobs:
       run: './pants test --shard=2/3 ::
 
         '
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
@@ -1029,18 +1159,18 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_macos_x86_64:
+  test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
       != 'DOCS_ONLY')
-    name: Test Python (macOS10-x86_64)
+    name: Test Python (macOS11-x86_64)
     needs:
-    - bootstrap_pants_macos_x86_64
+    - bootstrap_pants_macos11_x86_64
     - check_labels
     - docs_only_check
     runs-on:
-    - macos-10.15
+    - macos-11
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -1085,7 +1215,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS10-x86_64
+        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1093,11 +1223,12 @@ jobs:
         '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
-    - if: always()
+    - continue-on-error: true
+      if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-macOS10-x86_64
+        name: pants-log-python-test-macOS11-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:

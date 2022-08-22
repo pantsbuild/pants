@@ -1,6 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
 import os
 from textwrap import dedent
@@ -12,11 +14,27 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 
 @pytest.mark.parametrize(
-    "run_in_sandbox",
-    [True, False],
+    "global_default_value, field_value, run_uses_sandbox",
+    [
+        # Nothing set -> True
+        (None, None, True),
+        # Field set -> use field value
+        (None, True, True),
+        (None, False, False),
+        # Global default set -> use default
+        (True, None, True),
+        (False, None, False),
+        # Both set -> use field
+        (True, True, True),
+        (True, False, False),
+        (False, True, True),
+        (False, False, False),
+    ],
 )
 def test_run_sample_script(
-    run_in_sandbox: bool,
+    global_default_value: bool | None,
+    field_value: bool | None,
+    run_uses_sandbox: bool,
 ) -> None:
     """Test that we properly run a `python_source` target.
 
@@ -45,7 +63,7 @@ def test_run_sample_script(
             f"""\
             python_sources(
                 name='lib',
-                run_goal_use_sandbox={run_in_sandbox},
+                {("run_goal_use_sandbox=" + str(field_value)) if field_value is not None else ""}
             )
             """
         ),
@@ -73,6 +91,15 @@ def test_run_sample_script(
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
+                *(
+                    (
+                        "--python-default-run-goal-use-sandbox"
+                        if global_default_value
+                        else "--no-python-default-run-goal-use-sandbox",
+                    )
+                    if global_default_value is not None
+                    else ()
+                ),
                 "run",
                 f"{tmpdir}/src_root1/project/app.py",
                 *extra_args,
@@ -82,9 +109,9 @@ def test_run_sample_script(
     result, test_repo_root = run()
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    if run_in_sandbox:
+    if run_uses_sandbox:
         assert file.endswith("src_root2/utils/strutil.py")
-        assert ".pants.d/tmp" in file
+        assert "pants-sandbox-" in file
     else:
         assert file.endswith(os.path.join(test_repo_root, "src_root2/utils/strutil.py"))
     assert result.exit_code == 23

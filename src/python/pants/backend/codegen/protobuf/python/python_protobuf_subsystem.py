@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf.python.additional_fields import ProtobufPythonResolveField
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufGrpcToggleField,
@@ -9,18 +11,15 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -76,6 +75,11 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
     default_version = "mypy-protobuf==2.10"
 
+    # Since Pants doesn't plumb --constraints, use a requirement to constrain the
+    # `Requires-Dist: protobuf (>=3.17.3)` requirement in mypy-protobuf 2.10 which now picks up
+    # protobuf 4.x which is incompatible in practice.
+    default_extra_requirements = ["protobuf<3.21"]
+
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
 
@@ -85,7 +89,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class MypyProtobufLockfileSentinel(GenerateToolLockfileSentinel):
+class MypyProtobufLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PythonProtobufMypyPlugin.options_scope
 
 
@@ -100,34 +104,40 @@ def setup_mypy_protobuf_lockfile(
     )
 
 
-class InjectPythonProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
+@dataclass(frozen=True)
+class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (
+        ProtobufDependenciesField,
+        ProtobufPythonResolveField,
+        ProtobufGrpcToggleField,
+    )
+
+    dependencies: ProtobufDependenciesField
+    python_resolve: ProtobufPythonResolveField
+    grpc_toggle: ProtobufGrpcToggleField
+
+
+class InferPythonProtobufDependencies(InferDependenciesRequest):
+    infer_from = PythonProtobufDependenciesInferenceFieldSet
 
 
 @rule
-async def inject_dependencies(
-    request: InjectPythonProtobufDependencies,
+async def infer_dependencies(
+    request: InferPythonProtobufDependencies,
     python_protobuf: PythonProtobufSubsystem,
     python_setup: PythonSetup,
     # TODO(#12946): Make this a lazy Get once possible.
     module_mapping: ThirdPartyPythonModuleMapping,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_protobuf.infer_runtime_dependency:
-        return InjectedDependencies()
+        return InferredDependencies([])
 
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    tgt = wrapped_tgt.target
-    resolve = tgt.get(PythonResolveField).normalized_value(python_setup)
+    resolve = request.field_set.python_resolve.normalized_value(python_setup)
 
     result = [
         find_python_runtime_library_or_raise_error(
             module_mapping,
-            request.dependencies_field.address,
+            request.field_set.address,
             "google.protobuf",
             resolve=resolve,
             resolves_enabled=python_setup.enable_resolves,
@@ -137,11 +147,11 @@ async def inject_dependencies(
         )
     ]
 
-    if tgt.get(ProtobufGrpcToggleField).value:
+    if request.field_set.grpc_toggle.value:
         result.append(
             find_python_runtime_library_or_raise_error(
                 module_mapping,
-                request.dependencies_field.address,
+                request.field_set.address,
                 # Note that the library is called `grpcio`, but the module is `grpc`.
                 "grpc",
                 resolve=resolve,
@@ -152,13 +162,13 @@ async def inject_dependencies(
             )
         )
 
-    return InjectedDependencies(result)
+    return InferredDependencies(result)
 
 
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonProtobufDependencies),
+        UnionRule(InferDependenciesRequest, InferPythonProtobufDependencies),
         UnionRule(GenerateToolLockfileSentinel, MypyProtobufLockfileSentinel),
     ]

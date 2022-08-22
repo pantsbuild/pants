@@ -5,7 +5,6 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cache::PersistentCache;
-use futures::{future, FutureExt};
 use log::{debug, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -17,8 +16,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultSource,
+  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -33,7 +32,8 @@ pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
   cache: PersistentCache,
   file_store: Store,
-  eager_fetch: bool,
+  cache_read: bool,
+  cache_content_behavior: CacheContentBehavior,
   metadata: ProcessMetadata,
 }
 
@@ -42,14 +42,16 @@ impl CommandRunner {
     inner: Arc<dyn crate::CommandRunner>,
     cache: PersistentCache,
     file_store: Store,
-    eager_fetch: bool,
+    cache_read: bool,
+    cache_content_behavior: CacheContentBehavior,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
       inner,
       cache,
       file_store,
-      eager_fetch,
+      cache_read,
+      cache_content_behavior,
       metadata,
     }
   }
@@ -78,63 +80,66 @@ impl crate::CommandRunner for CommandRunner {
       key_type: CacheKeyType::Process.into(),
     };
 
-    let context2 = context.clone();
-    let key2 = key.clone();
-    let cache_read_result = in_workunit!(
-      "local_cache_read",
-      Level::Trace,
-      desc = Some(format!("Local cache lookup: {}", req.description)),
-      |workunit| async move {
-        workunit.increment_counter(Metric::LocalCacheRequests, 1);
+    if self.cache_read {
+      let context2 = context.clone();
+      let key2 = key.clone();
+      let cache_read_result = in_workunit!(
+        "local_cache_read",
+        Level::Trace,
+        desc = Some(format!("Local cache lookup: {}", req.description)),
+        |workunit| async move {
+          workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-        match self.lookup(&context2, &key2).await {
-          Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
-            let lookup_elapsed = cache_lookup_start.elapsed();
-            workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
-            if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
-              let time_saved = time_saved.as_millis() as u64;
-              workunit.increment_counter(Metric::LocalCacheTotalTimeSavedMs, time_saved);
-              context2
-                .workunit_store
-                .record_observation(ObservationMetric::LocalCacheTimeSavedMs, time_saved);
+          match self.lookup(&context2, &key2).await {
+            Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
+              let lookup_elapsed = cache_lookup_start.elapsed();
+              workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
+              if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
+                let time_saved = time_saved.as_millis() as u64;
+                workunit.increment_counter(Metric::LocalCacheTotalTimeSavedMs, time_saved);
+                context2
+                  .workunit_store
+                  .record_observation(ObservationMetric::LocalCacheTimeSavedMs, time_saved);
+              }
+              // When we successfully use the cache, we change the description and increase the
+              // level (but not so much that it will be logged by default).
+              workunit.update_metadata(|initial| {
+                initial.map(|(initial, _)| {
+                  (
+                    WorkunitMetadata {
+                      desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                      ..initial
+                    },
+                    Level::Debug,
+                  )
+                })
+              });
+              Ok(result)
             }
-            // When we successfully use the cache, we change the description and increase the level
-            // (but not so much that it will be logged by default).
-            workunit.update_metadata(|initial| {
-              initial.map(|(initial, _)| {
-                (
-                  WorkunitMetadata {
-                    desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
-                    ..initial
-                  },
-                  Level::Debug,
-                )
-              })
-            });
-            Ok(result)
-          }
-          Err(err) => {
-            debug!(
-              "Error loading process execution result from local cache: {} - continuing to execute",
-              err
-            );
-            workunit.increment_counter(Metric::LocalCacheReadErrors, 1);
-            // Falling through to re-execute.
-            Err(())
-          }
-          Ok(_) => {
-            // Either we missed, or we hit for a failing result.
-            workunit.increment_counter(Metric::LocalCacheRequestsUncached, 1);
-            // Falling through to execute.
-            Err(())
+            Err(err) => {
+              debug!(
+                "Error loading process execution result from local cache: {} \
+                - continuing to execute",
+                err
+              );
+              workunit.increment_counter(Metric::LocalCacheReadErrors, 1);
+              // Falling through to re-execute.
+              Err(())
+            }
+            Ok(_) => {
+              // Either we missed, or we hit for a failing result.
+              workunit.increment_counter(Metric::LocalCacheRequestsUncached, 1);
+              // Falling through to execute.
+              Err(())
+            }
           }
         }
-      }
-    )
-    .await;
+      )
+      .await;
 
-    if let Ok(result) = cache_read_result {
-      return Ok(result);
+      if let Ok(result) = cache_read_result {
+        return Ok(result);
+      }
     }
 
     let result = self.inner.run(context.clone(), workunit, req).await?;
@@ -199,28 +204,11 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    // If eager_fetch is enabled, ensure that all digests in the result are loadable, erroring
-    // if any are not. If eager_fetch is disabled, a Digest which is discovered to be missing later
-    // on during execution will cause backtracking.
-    if self.eager_fetch {
-      let _ = future::try_join_all(vec![
-        self
-          .file_store
-          .ensure_local_has_file(result.stdout_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_file(result.stderr_digest)
-          .boxed(),
-        self
-          .file_store
-          .ensure_local_has_recursive_directory(result.output_directory.clone())
-          .boxed(),
-      ])
-      .await?;
+    if check_cache_content(&result, &self.file_store, self.cache_content_behavior).await? {
+      Ok(Some(result))
+    } else {
+      Ok(None)
     }
-
-    Ok(Some(result))
   }
 
   async fn store(

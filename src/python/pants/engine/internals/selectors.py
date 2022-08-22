@@ -5,18 +5,27 @@ from __future__ import annotations
 
 import ast
 import itertools
-from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
-from typing import Any, Generator, Generic, Iterable, Sequence, Tuple, Type, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generator,
+    Generic,
+    Iterable,
+    Sequence,
+    Tuple,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
 )
-from pants.engine.unions import is_union
 from pants.util.meta import frozen_after_init
 
 _Output = TypeVar("_Output")
@@ -117,81 +126,20 @@ class AwaitableConstraints:
         return repr(self)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
-    @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
-        ...
+# TODO: Conditional needed until Python 3.8 allows the subscripted type to be used directly.
+# see https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
+if TYPE_CHECKING:
 
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input],
-        input_arg1: _Input,
-    ) -> None:
-        ...
+    class _BasePyGeneratorResponseGet(PyGeneratorResponseGet[_Output, _Input]):
+        pass
 
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input] | _Input,
-        input_arg1: _Input | None = None,
-    ) -> None:
-        self.output_type = self._validate_output_type(output_type)
-        if input_arg1 is None:
-            self.input_type = type(input_arg0)
-            self.input = self._validate_input(input_arg0, shorthand_form=True)
-        else:
-            self.input_type = self._validate_explicit_input_type(input_arg0)
-            self.input = self._validate_input(input_arg1, shorthand_form=False)
+else:
 
-    @staticmethod
-    def _validate_output_type(output_type: Any) -> type[_Output]:
-        if not isinstance(output_type, type):
-            raise TypeError(
-                "Invalid Get. The first argument (the output type) must be a type, but given "
-                f"`{output_type}` with type {type(output_type)}."
-            )
-        return cast(Type[_Output], output_type)
+    class _BasePyGeneratorResponseGet(Generic[_Output, _Input], PyGeneratorResponseGet):
+        pass
 
-    @staticmethod
-    def _validate_explicit_input_type(input_type: Any) -> type[_Input]:
-        if not isinstance(input_type, type):
-            raise TypeError(
-                "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, "
-                f"input), the second argument must be a type, but given `{input_type}` of type "
-                f"{type(input_type)}."
-            )
-        return cast(Type[_Input], input_type)
 
-    def _validate_input(self, input_: Any, *, shorthand_form: bool) -> _Input:
-        if isinstance(input_, type):
-            if shorthand_form:
-                raise TypeError(
-                    "Invalid Get. Because you are using the shorthand form "
-                    "Get(OutputType, InputType(constructor args)), the second argument should be "
-                    f"a constructor call, rather than a type, but given {input_}."
-                )
-            else:
-                raise TypeError(
-                    "Invalid Get. Because you are using the longhand form "
-                    "Get(OutputType, InputType, input), the third argument should be "
-                    f"an object, rather than a type, but given {input_}."
-                )
-        # If the input_type is not annotated with `@union`, then we validate that the input is
-        # exactly the same type as the input_type. (Why not check unions? We don't have access to
-        # `UnionMembership` to know if it's a valid union member. The engine will check that.)
-        if not is_union(self.input_type) and type(input_) != self.input_type:
-            # We can assume we're using the longhand form because the shorthand form guarantees
-            # that the `input_type` is the same as `input`.
-            raise TypeError(
-                f"Invalid Get. The third argument `{input_}` must have the exact same type as the "
-                f"second argument, {self.input_type}, but had the type {type(input_)}."
-            )
-        return cast(_Input, input_)
-
+class Awaitable(Generic[_Output, _Input], _BasePyGeneratorResponseGet[_Output, _Input]):
     def __await__(
         self,
     ) -> Generator[Awaitable[_Output, _Input], None, _Output]:
@@ -199,7 +147,7 @@ class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
 
         The `yield`ed value `self` is interpreted by the engine within
         `native_engine_generator_send()`. This class will yield a single Get instance, which is
-        converted into `PyGeneratorResponse::Get`.
+        a subclass of `PyGeneratorResponseGet`.
 
         This is how this method is eventually called:
         - When the engine calls an `async def` method decorated with `@rule`, an instance of
@@ -703,17 +651,12 @@ def native_engine_generator_send(
 ) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
     try:
         res = func.send(arg)
-        # TODO: It isn't currently necessary to differentiate between `Get` and `Effect` here, as
-        # the static analysis of `@rule`s has already validated usage.
+        # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
+        # analysis of `@rule`s has already validated usage.
         if isinstance(res, (Get, Effect)):
-            return PyGeneratorResponseGet(res.output_type, res.input_type, res.input)
+            return res
         elif type(res) in (tuple, list):
-            return PyGeneratorResponseGetMulti(
-                tuple(
-                    PyGeneratorResponseGet(get.output_type, get.input_type, get.input)
-                    for get in res
-                )
-            )
+            return PyGeneratorResponseGetMulti(res)
         else:
             raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
     except StopIteration as e:

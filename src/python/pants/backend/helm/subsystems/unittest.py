@@ -3,7 +3,7 @@
 
 from enum import Enum
 
-from pants.backend.helm.util_rules.plugins import (
+from pants.backend.helm.util_rules.tool import (
     ExternalHelmPlugin,
     ExternalHelmPluginBinding,
     ExternalHelmPluginRequest,
@@ -11,7 +11,7 @@ from pants.backend.helm.util_rules.plugins import (
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import EnumOption
+from pants.option.option_types import BoolOption, EnumOption
 
 
 class HelmUnitTestReportFormat(Enum):
@@ -42,9 +42,15 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         "macos_x86_64": "macos-amd64",
     }
 
+    color = BoolOption(
+        "--color",
+        default=False,
+        help="Enforce printing colored output even if stdout is not a tty.",
+    )
+
     output_type = EnumOption(
         default=HelmUnitTestReportFormat.XUNIT,
-        help="Output type used for the test report",
+        help="Output type used for the test report.",
     )
 
     def generate_exe(self, _: Platform) -> str:
@@ -56,7 +62,7 @@ class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]
 
 
 @rule
-def download_plugin_request(
+def download_unittest_plugin_request(
     _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem
 ) -> ExternalHelmPluginRequest:
     return ExternalHelmPluginRequest.from_subsystem(subsystem)

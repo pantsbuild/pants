@@ -12,6 +12,7 @@ from pants.backend.helm.target_types import (
     HelmChartLintStrictField,
     HelmSkipLintField,
 )
+from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
@@ -45,7 +46,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
     logger.debug(f"Linting {pluralize(len(charts), 'chart')}...")
 
     def create_process(chart: HelmChart, field_set: HelmLintFieldSet) -> HelmProcess:
-        argv = ["lint", chart.path]
+        argv = ["lint", chart.name]
 
         strict: bool = field_set.lint_strict.value or helm_subsystem.lint_strict
         if strict:
@@ -53,8 +54,8 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
 
         return HelmProcess(
             argv,
-            input_digest=chart.snapshot.digest,
-            description=f"Linting chart: {chart.metadata.name}",
+            extra_immutable_input_digests=chart.immutable_input_digests,
+            description=f"Linting chart: {chart.info.name}",
         )
 
     process_results = await MultiGet(
@@ -67,7 +68,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
     )
     results = [
         LintResult.from_fallible_process_result(
-            process_result, partition_description=chart.metadata.name
+            process_result, partition_description=chart.info.name
         )
         for chart, process_result in zip(charts, process_results)
     ]
@@ -75,4 +76,4 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, HelmLintRequest)]
+    return [*collect_rules(), *tool.rules(), UnionRule(LintTargetsRequest, HelmLintRequest)]

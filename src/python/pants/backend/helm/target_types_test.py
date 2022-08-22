@@ -15,7 +15,7 @@ from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
 )
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
@@ -39,7 +39,7 @@ def test_generate_source_targets() -> None:
             f"{source_root}/Chart.yaml": HELM_CHART_FILE,
             f"{source_root}/values.yaml": HELM_VALUES_FILE,
             f"{source_root}/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            f"{source_root}/templates/service.yaml": K8S_SERVICE_FILE,
+            f"{source_root}/templates/service.yaml": K8S_SERVICE_TEMPLATE,
             f"{source_root}/tests/BUILD": "helm_unittest_tests(name='foo_tests')",
             f"{source_root}/tests/service_test.yaml": "",
         }

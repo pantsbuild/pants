@@ -33,7 +33,8 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
-    MACOS10_X86_64 = "macOS10-x86_64"
+    MACOS10_15_X86_64 = "macOS10-15-x86_64"
+    MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
@@ -333,17 +334,19 @@ class Helper:
         return str(self.platform.value)
 
     def runs_on(self) -> list[str]:
-        if self.platform == Platform.MACOS10_X86_64:
-            return ["macos-10.15"]
+        if self.platform == Platform.MACOS11_X86_64:
+            return ["macos-11"]
         if self.platform == Platform.MACOS11_ARM64:
-            return ["self-hosted", "macOS11", "ARM64"]
+            return ["macOS-11-ARM64"]
+        if self.platform == Platform.MACOS10_15_X86_64:
+            return ["macOS-10.15-X64"]
         if self.platform == Platform.LINUX_X86_64:
             return ["ubuntu-20.04"]
         raise ValueError(f"Unsupported platform: {self.platform_name()}")
 
     def platform_env(self):
         ret = {}
-        if self.platform == Platform.MACOS10_X86_64:
+        if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
@@ -482,6 +485,7 @@ class Helper:
             "name": "Upload pants.log",
             "uses": "actions/upload-artifact@v3",
             "if": "always()",
+            "continue-on-error": True,
             "with": {
                 "name": f"pants-log-{name.replace('/', '_')}-{self.platform_name()}",
                 "path": ".pants.d/pants.log",
@@ -592,15 +596,15 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
-def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
-    helper = Helper(Platform.MACOS10_X86_64)
+def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+    helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
-        "bootstrap_pants_macos_x86_64": {
+        "bootstrap_pants_macos11_x86_64": {
             "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
-            "timeout-minutes": 40,
+            "timeout-minutes": 60,
             "if": IS_PANTS_OWNER,
             "steps": [
                 *helper.bootstrap_pants(install_python=True),
@@ -615,10 +619,10 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_macos_x86_64": {
+        "test_python_macos11_x86_64": {
             "name": f"Test Python ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
-            "needs": "bootstrap_pants_macos_x86_64",
+            "needs": "bootstrap_pants_macos11_x86_64",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": helper.platform_env(),
             "timeout-minutes": 60,
@@ -646,7 +650,7 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     if not cron:
         jobs.update(
             {
-                "build_wheels_macos_x86_64": {
+                "build_wheels_macos11_x86_64": {
                     "name": f"Build wheels and fs_util ({helper.platform_name()})",
                     "runs-on": helper.runs_on(),
                     "timeout-minutes": 80,
@@ -670,7 +674,31 @@ def macos_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
-def macos_arm64_jobs() -> Jobs:
+def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
+    helper = Helper(Platform.MACOS10_15_X86_64)
+    return {
+        "build_wheels_macos10_15_x86_64": {
+            "name": f"Build wheels and fs_util ({helper.platform_name()})",
+            "runs-on": helper.runs_on(),
+            "timeout-minutes": 80,
+            **helper.build_wheels_common,
+            "steps": [
+                *checkout(),
+                setup_toolchain_auth(),
+                # NB: We only cache Rust, but not `native_engine.so` and the Pants
+                # virtualenv. This is because we must build both these things with
+                # multiple Python versions, whereas that caching assumes only one primary
+                # Python version (marked via matrix.strategy).
+                *helper.rust_caches(),
+                *helper.build_steps(),
+                helper.upload_log_artifacts(name="wheels"),
+                deploy_to_s3(),
+            ],
+        },
+    }
+
+
+def macos11_arm64_jobs() -> Jobs:
     helper = Helper(Platform.MACOS11_ARM64)
     # The setup-python action doesn't yet support installing ARM64 Pythons.
     # Instead we pre-install Python 3.9 on the self-hosted runner.
@@ -695,7 +723,7 @@ def macos_arm64_jobs() -> Jobs:
     )
     steps.append(deploy_to_s3())
     return {
-        "build_wheels_macos_arm64": {
+        "build_wheels_macos11_arm64": {
             "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
@@ -718,8 +746,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         },
     }
     jobs.update(**linux_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos_arm64_jobs())
+    jobs.update(**macos11_x86_64_jobs(python_versions, cron=cron))
+    if not cron:
+        jobs.update(**macos_10_15_x86_64_jobs(python_versions))
+        jobs.update(**macos11_arm64_jobs())
     jobs.update(
         {
             "lint_python": {
@@ -737,7 +767,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     {
                         "name": "Lint",
                         "run": (
-                            "./pants update-build-files --check\n"
+                            "./pants update-build-files --check ::\n"
                             # Note: we use `**` rather than `::` because regex-lint.
                             "./pants lint check '**'\n"
                         ),
@@ -870,22 +900,74 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
-# A single job we can apply branch protection to instead of having to
-# configure on multiple job names, that may change over time.
-def merge_ok(needs: list[str], docs_only: bool) -> Jobs:
-    key = "merge_ok_docs_only" if docs_only else "merge_ok_not_docs_only"
+# We have two copies of this job, one for the docs-only case and one for all other cases.
+# Each job runs conditionally (see the "if" condition below), so exactly one will run and
+# the other will be skipped.
+#
+# But - note that a job skipped due to an "if" condition, or due to a failed dependency,
+# counts as successful (!) in GitHub Actions (as opposed to jobs skipped due to branch or path
+# filtering, which count as pending).
+
+# Therefore we can't have a branch protection check directly on this job name - it will always
+# be successful. So instead we use this job to set an output that a "Merge OK" job can act on,
+# and we check for that job in branch protection.  Only a truly successful (non-skipped)
+# trigger job will actually set that output.
+def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
+    key = "set_merge_ok_docs_only" if docs_only else "set_merge_ok_not_docs_only"
     return {
         key: {
-            "name": "Merge OK",
+            "name": "Set Merge OK",
             "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
             "if": _docs_only_cond(docs_only),
-            # If in the future we have any docs-related checks, we can make both "Merge OK"
-            # jobs depend on them here (we have to do both since some changes may modify docs
+            # If in the future we have any docs-related checks, we can make both "Set Merge OK"
+            # jobs depend on them here (it has to be both since some changes may modify docs
             # as well as code, and so are not "docs only").
             "needs": ["docs_only_check"] + sorted(needs),
-            "steps": [{"run": "echo 'Merge OK'"}],
+            "outputs": {"merge_ok": "${{ steps.set_merge_ok.outputs.merge_ok }}"},
+            "steps": [
+                {
+                    "id": "set_merge_ok",
+                    "run": "echo '::set-output name=merge_ok::true'",
+                },
+            ],
         }
     }
+
+
+def merge_ok(non_docs_only_jobs: list[str]) -> Jobs:
+    jobs = {}
+    jobs.update(set_merge_ok(needs=non_docs_only_jobs, docs_only=False))
+    jobs.update(set_merge_ok(needs=[], docs_only=True))
+    jobs.update(
+        {
+            "merge_ok": {
+                "name": "Merge OK",
+                "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+                # NB: This always() condition is critical, as it ensures that this job is never
+                # skipped (if it were skipped it would be treated as vacuously successful).
+                "if": "always()",
+                "needs": ["set_merge_ok_docs_only", "set_merge_ok_not_docs_only"],
+                "steps": [
+                    {
+                        "run": dedent(
+                            """\
+                    merge_ok_docs_only="${{ needs.set_merge_ok_docs_only.outputs.merge_ok }}"
+                    merge_ok_not_docs_only="${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok }}"
+                    if [[ "${merge_ok_docs_only}" == "true" || "${merge_ok_not_docs_only}" == "true" ]]; then
+                        echo "Merge OK"
+                        exit 0
+                    else
+                        echo "Merge NOT OK"
+                        exit 1
+                    fi
+                    """
+                        )
+                    }
+                ],
+            }
+        }
+    )
+    return jobs
 
 
 def generate() -> dict[Path, str]:
@@ -904,8 +986,7 @@ def generate() -> dict[Path, str]:
         val["needs"] = needs
         if_cond = val.get("if")
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
-    pr_jobs.update(merge_ok(needs=list(pr_jobs.keys()), docs_only=False))
-    pr_jobs.update(merge_ok(needs=[], docs_only=True))
+    pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(

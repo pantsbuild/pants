@@ -4,11 +4,13 @@ slug: "advanced-target-selection"
 excerpt: "Alternative techniques to tell Pants which files/targets to run on."
 hidden: false
 createdAt: "2020-05-11T20:10:29.560Z"
-updatedAt: "2022-02-08T23:44:44.463Z"
+updatedAt: "2022-07-25T23:44:44.463Z"
 ---
-See [File arguments vs. target arguments](doc:goals#goal-arguments) for the normal techniques for telling Pants what to run on. 
+See [Goal arguments](doc:goals#goal-arguments) for the normal techniques for telling Pants what to
+run on. 
 
-See [Project introspection](doc:project-introspection) for queries that you can run and then pipe into another Pants run, such as running over certain target types.
+See [Project introspection](doc:project-introspection) for queries that you can run and then pipe
+into another Pants run, such as finding the dependencies of a target or file.
 
 Running over changed files with `--changed-since`
 -------------------------------------------------
@@ -36,10 +38,59 @@ By default, `--changed-since` will only run over files directly changed. Often, 
   test
 ```
 
+`filter` options
+----------------
+
+Use filters to operate on only targets that match the predicate, e.g. only running Python tests.
+
+Specify a predicate by using one of the below `filter` options, like `--filter-target-type`. You
+can use a comma to OR multiple values, meaning that at least one member must be matched. You
+can repeat the option multiple times to AND each filter. You can prefix the filter with
+`-` to negate the filter, meaning that the target must not be true for the filter.
+
+Some examples:
+
+```bash
+# Only `python_source` targets.
+./pants --filter-target-type=python_source list ::
+
+# `python_source` or `python_test` targets.
+./pants --filter-target-type='python_source,python_test' list ::
+
+# Any target except for `python_source` targets
+./pants --filter-target-type='-python_source' list ::
+```
+
+You can combine multiple filter options in the same run, e.g.:
+
+```bash
+./pants --filter-target-type='python_test' --filter-address-regex=^integration_tests test ::
+```
+
+### `--filter-target-type`
+
+Each value should be the name of a target type, e.g.
+`./pants --filter-target-type=python_test test ::`.
+
+Run `./pants help targets` to see what targets are registered.
+
+### `--filter-address-regex`
+
+Regex strings for the address, such as
+`./pants --filter-address-regex='^integration_tests$' test ::`.
+
+### `--filter-tag-regex`
+
+Regex strings to match against the `tags` field, such as 
+`./pants --filter-tag-regex='^skip_lint$' lint ::`.
+
+If you don't need the power of regex, use the simpler `--tag` global option explained below.
+
 Tags: annotating targets
 ------------------------
 
-Every target type has a field called `tags`, which allows you to add a sequence of strings. The strings can be whatever you'd like, such as `"integration_test"`.
+Every target type has a field called `tags`, which allows you to add a sequence of strings. The
+strings can be whatever you'd like, such as `"integration_test"`.
 
 ```python BUILD
 python_tests(
@@ -66,6 +117,8 @@ You can even combine multiple includes and excludes:
 ```bash
 ./pants --tag='+type_checked,skip_lint' --tag='-integration_test' list ::
 ```
+
+Use `--filter-tag-regex` instead for more complex queries.
 
 `--spec-files`
 --------------
@@ -101,8 +154,9 @@ To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 You can, of course, pipe multiple times:
 
 ```bash
-$ ./pants dependees helloworld/util | \
-   xargs ./pants list --filter-target-type=python_source | \
+# Run over the second-degree dependees of `utils.py`.
+❯ ./pants dependees helloworld/utils.py | \
+   xargs ./pants dependees | \
    xargs ./pants lint
 ```
 
@@ -127,10 +181,10 @@ $ ./pants dependees helloworld/util | \
 Sharding the input targets
 --------------------------
 
-You can leverage shell piping to partition the input targets into multiple shards. 
+The `test` goal natively supports sharding input targets into multiple shards. Use the option `--test-shard=k/N`, where k is a non-negative integer less than N. For example, you can split up your CI into three shards with `--shard=0/3`, `--shard=1/3`, and `--shard=2/3`.
 
-For example, to split your Python tests into 10 shards, and select shard 0:
+For other goals, you can leverage shell piping to partition the input targets into multiple shards. For example, to split your `package` run into 5 shards, and select shard 0:
 
 ```bash
-./pants list :: | xargs ./pants list --filter-target-type=python_test | awk 'NR % 10 == 0' | ./pants test
+./pants list :: | awk 'NR % 5 == 0' | xargs ./pants package
 ```

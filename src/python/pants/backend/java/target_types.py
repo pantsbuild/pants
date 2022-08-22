@@ -15,8 +15,11 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
+    JunitTestTimeoutField,
     JvmDependenciesField,
     JvmJdkField,
     JvmProvidesTypesField,
@@ -60,6 +63,8 @@ class JunitTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JavaJunitTestSourceField,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmDependenciesField,
         JvmResolveField,
         JvmProvidesTypesField,
@@ -84,6 +89,8 @@ class JunitTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmDependenciesField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -135,4 +142,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *jvm_target_types.rules(),
+    ]

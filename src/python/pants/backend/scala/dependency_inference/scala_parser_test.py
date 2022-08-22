@@ -577,3 +577,19 @@ def test_object_extends_ctor(rule_runner: RuleRunner) -> None:
         "foo.Bar",
         "foo.hello",
     ]
+
+
+def test_package_object_extends_trait(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            package object bar extends Trait {
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Trait", "foo.bar.Trait"]

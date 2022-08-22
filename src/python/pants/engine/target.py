@@ -36,11 +36,11 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import final
+from typing_extensions import Protocol, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
-from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     GlobExpansionConjunction,
@@ -51,7 +51,7 @@ from pants.engine.fs import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
@@ -264,9 +264,73 @@ class AsyncFieldMixin(Field):
         )
 
 
+@union
+@dataclass(frozen=True)
+class FieldDefaultFactoryRequest:
+    """Registers a dynamic default for a Field.
+
+    See `FieldDefaults`.
+    """
+
+    field_type: ClassVar[type[Field]]
+
+
+# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
+# a Callable.
+class FieldDefaultFactory(Protocol):
+    def __call__(self, field: Field) -> Any:
+        pass
+
+
+@dataclass(frozen=True)
+class FieldDefaultFactoryResult:
+    """A wrapper for a function which computes the default value of a Field."""
+
+    default_factory: FieldDefaultFactory
+
+
+@dataclass(frozen=True)
+class FieldDefaults:
+    """Generic Field default values. To install a default, see `FieldDefaultFactoryRequest`.
+
+    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
+    subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
+    which compute the true value of the field given a subsytem argument. Consumers need to
+    be type aware, and `@rules` cannot have dynamic requirements.
+
+    Additionally, `__defaults__` should mean that computed default Field values should become
+    more rare: i.e. `JvmResolveField` and `PythonResolveField` could potentially move to
+    hardcoded default values which users override with `__defaults__` if they'd like to change
+    the default resolve names.
+
+    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
+    (including Field registrations) to have `@rule_helper` methods, which would allow the
+    computation of an AsyncField to directly require a subsystem.
+    """
+
+    _factories: FrozenDict[type[Field], FieldDefaultFactory]
+
+    @memoized_method
+    def factory(self, field_type: type[Field]) -> FieldDefaultFactory:
+        """Looks up a Field default factory in a subclass-aware way."""
+        factory = self._factories.get(field_type, None)
+        if factory is not None:
+            return factory
+
+        for ft, factory in self._factories.items():
+            if issubclass(field_type, ft):
+                return factory
+
+        return lambda f: f.value
+
+    def value_or_default(self, field: Field) -> Any:
+        return (self.factory(type(field)))(field)
+
+
 # -----------------------------------------------------------------------------------------------
 # Core Target abstractions
 # -----------------------------------------------------------------------------------------------
+
 
 # NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
 # the precise Field returned.
@@ -2007,7 +2071,7 @@ class SourcesField(AsyncFieldMixin, Field):
             ),
         )
 
-    @property
+    @memoized_property
     def filespec(self) -> Filespec:
         """The original globs, returned in the Filespec dict format.
 
@@ -2024,6 +2088,12 @@ class SourcesField(AsyncFieldMixin, Field):
         if excludes:
             result["excludes"] = excludes
         return result
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 class MultipleSourcesField(SourcesField, StringSequenceField):
@@ -2049,6 +2119,17 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
         value = super().compute_value(raw_value, address)
+        invalid_globs = [glob for glob in (value or ()) if glob.startswith("../") or "/../" in glob]
+        if invalid_globs:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The {repr(cls.alias)} field in target {address} must not have globs with the
+                    pattern `../` because targets can only have sources in the current directory
+                    or subdirectories. It was set to: {sorted(value or ())}
+                    """
+                )
+            )
         if cls.ban_subdirectories:
             invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
             if invalid_globs:
@@ -2093,17 +2174,36 @@ class OptionalSingleSourceField(SourcesField, StringField):
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
+        if value_or_default.startswith("../") or "/../" in value_or_default:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `../`
+                    patterns because targets can only have sources in the current directory or
+                    subdirectories. It was set to {value_or_default}. Instead, use a normalized
+                    literal file path (relative to the BUILD file).
+                    """
+                )
+            )
         if "*" in value_or_default:
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not include `*` globs, "
-                f"but was set to {value_or_default}. Instead, use a literal file path (relative "
-                "to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not include `*` globs,
+                    but was set to {value_or_default}. Instead, use a literal file path (relative
+                    to the BUILD file).
+                    """
+                )
             )
         if value_or_default.startswith("!"):
             raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} should not start with `!`, which "
-                f"is usually used in the `sources` field to exclude certain files. Instead, use a "
-                "literal file path (relative to the BUILD file)."
+                softwrap(
+                    f"""\
+                    The {repr(cls.alias)} field in target {address} should not start with `!`,
+                    which is usually used in the `sources` field to exclude certain files. Instead,
+                    use a literal file path (relative to the BUILD file).
+                    """
+                )
             )
         return value_or_default
 
@@ -2296,7 +2396,7 @@ class SecondaryOwnerMixin(ABC):
     dependency inference and hydrating sources, but file arguments will still work.
 
     There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency injection rule to infer a dep on that primary
+    Typically, you will want to add a dependency inference rule to infer a dep on that primary
     owner.
 
     All associated files must live in the BUILD target's directory or a subdirectory to work
@@ -2313,6 +2413,12 @@ class SecondaryOwnerMixin(ABC):
         field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
         the build root.
         """
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 def targets_with_sources_types(
@@ -2341,8 +2447,8 @@ def targets_with_sources_types(
 class Dependencies(StringSequenceField, AsyncFieldMixin):
     """The dependencies field.
 
-    To resolve all dependencies—including the results of dependency injection and inference—use
-    either `await Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
+    To resolve all dependencies—including the results of dependency inference—use either `await
+    Get(Addresses, DependenciesRequest(tgt[Dependencies])` or `await Get(Targets,
     DependenciesRequest(tgt[Dependencies])`.
     """
 
@@ -2356,10 +2462,9 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
-        more about how addresses are formed, including for generated targets. You can also run
-        `{bin_name()} list ::` to find all addresses in your project, or
-        `{bin_name()} list dir:` to find all addresses defined in that directory.
+        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir` to find all addresses defined in that directory.
 
         If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
         `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
@@ -2401,8 +2506,8 @@ class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
     Almost always, you should use `await Get(Addresses, DependenciesRequest)` instead, which will
-    consider dependency injection and inference and apply ignores. However, this type can be
-    useful particularly within inference/injection rules to see if a user already explicitly
+    consider dependency inference and apply ignores. However, this type can be
+    useful particularly within inference rules to see if a user already explicitly
     provided a dependency.
 
     Resolve using `await Get(ExplicitlyProvidedDependencies, DependenciesRequest)`.
@@ -2509,78 +2614,32 @@ class ExplicitlyProvidedDependencies:
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
 
-@union
-@dataclass(frozen=True)
-class InjectDependenciesRequest(EngineAwareParameter, ABC):
-    """A request to inject dependencies, in addition to those explicitly provided.
-
-    To set up a new injection, subclass this class. Set the class property `inject_for` to the
-    type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
-    cause the class, and any subclass, to have the injection. Register this subclass with
-    `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
-
-    Then, create a rule that takes the subclass as a parameter and returns `InjectedDependencies`.
-
-    For example:
-
-        class FortranDependencies(Dependencies):
-            pass
-
-        class InjectFortranDependencies(InjectDependenciesRequest):
-            inject_for = FortranDependencies
-
-        @rule
-        async def inject_fortran_dependencies(
-            request: InjectFortranDependencies
-        ) -> InjectedDependencies:
-            addresses = await Get(
-                Addresses, UnparsedAddressInputs(["//:injected"], owning_address=None)
-            )
-            return InjectedDependencies(addresses)
-
-        def rules():
-            return [
-                *collect_rules(),
-                UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
-            ]
-    """
-
-    dependencies_field: Dependencies
-    inject_for: ClassVar[Type[Dependencies]]
-
-    def debug_hint(self) -> str:
-        return self.dependencies_field.address.spec
-
-
-class InjectedDependencies(DeduplicatedCollection[Address]):
-    sort_input = True
-
-
-SF = TypeVar("SF", bound="SourcesField")
+FS = TypeVar("FS", bound="FieldSet")
 
 
 @union
 @dataclass(frozen=True)
-class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
+class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
     To set up a new inference implementation, subclass this class. Set the class property
-    `infer_from` to the type of `SourcesField` you are able to infer from, such as
-    `FortranSources`. This will cause the class, and any subclass, to use your inference
-    implementation. Note that there cannot be more than one implementation for a particular
-    `SourcesField` class. Register this subclass with
-    `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
+    `infer_from` to the FieldSet subclass you are able to infer from. This will cause the FieldSet
+    class, and any subclass, to use your inference implementation.
+
+    Note that there cannot be more than one implementation for a particular `FieldSet` class.
+
+    Register this subclass with `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
 
     Then, create a rule that takes the subclass as a parameter and returns `InferredDependencies`.
 
     For example:
 
         class InferFortranDependencies(InferDependenciesRequest):
-            from_sources = FortranSources
+            infer_from = FortranDependenciesInferenceFieldSet
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources_field))
+            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources))
             ...
             return InferredDependencies(...)
 
@@ -2591,30 +2650,26 @@ class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
             ]
     """
 
-    sources_field: SF
-    infer_from: ClassVar[Type[SourcesField]]
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
 
-    def debug_hint(self) -> str:
-        return self.sources_field.address.spec
+    field_set: FS
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class InferredDependencies:
-    dependencies: FrozenOrderedSet[Address]
+    include: FrozenOrderedSet[Address]
+    exclude: FrozenOrderedSet[Address]
 
-    def __init__(self, dependencies: Iterable[Address]) -> None:
+    def __init__(
+        self,
+        include: Iterable[Address],
+        *,
+        exclude: Iterable[Address] = (),
+    ) -> None:
         """The result of inferring dependencies."""
-        self.dependencies = FrozenOrderedSet(sorted(dependencies))
-
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
-
-    def __iter__(self) -> Iterator[Address]:
-        return iter(self.dependencies)
-
-
-FS = TypeVar("FS", bound="FieldSet")
+        self.include = FrozenOrderedSet(sorted(include))
+        self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
 @union

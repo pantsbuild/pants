@@ -11,12 +11,10 @@ Active Maintainers
 * Daniel Wagner-Hall
 * Eric Arellano
 * Henry Fuller
-* Ity Kaul
-* Patrick Lawson
 * John Sirois
 * Joshua Cannon
 * Kris Wilson
-* Nora Howard
+* Patrick Lawson
 * Stu Hood
 * Tom Dyas
 * Yi Cheng
@@ -25,7 +23,9 @@ Emeritus
 ========
 
 * Andy Reitz
+* Borja Lorente
 * Chris Heisterkamp
+* Chris Livingston
 * David Taylor
 * David Turner
 * Dorothy Ordogh
@@ -33,9 +33,11 @@ Emeritus
 * Fedor Korotkov
 * Garrett Malmquist
 * Greg Shuflin
+* Ity Kaul
 * Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen
+* Nora Howard
 * Peiyu Wang
 * Pierre Chevalier
 * Tejal Desai

@@ -9,13 +9,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, FileDigest, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import ProcessCleanupOption
+from pants.engine.rules import collect_rules, rule
+from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -216,7 +216,7 @@ class ProcessExecutionFailure(Exception):
         stderr: bytes,
         process_description: str,
         *,
-        process_cleanup: bool,
+        keep_sandboxes: KeepSandboxes,
     ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
@@ -239,9 +239,9 @@ class ProcessExecutionFailure(Exception):
             "stderr:",
             try_decode(stderr),
         ]
-        if process_cleanup:
+        if keep_sandboxes == KeepSandboxes.never:
             err_strings.append(
-                "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
+                "\n\nUse `--keep-sandboxes=on_failure` to preserve the process chroot for inspection."
             )
         super().__init__("\n".join(err_strings))
 
@@ -255,7 +255,7 @@ def get_multi_platform_request_description(req: Process) -> ProductDescription:
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
 ) -> ProcessResult:
     """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
@@ -274,7 +274,7 @@ def fallible_to_exec_result_or_raise(
         fallible_result.stdout,
         fallible_result.stderr,
         description.value,
-        process_cleanup=process_cleanup.val,
+        keep_sandboxes=keep_sandboxes,
     )
 
 
@@ -286,13 +286,13 @@ class InteractiveProcessResult:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class InteractiveProcess(SideEffecting):
-    argv: tuple[str, ...]
-    env: FrozenDict[str, str]
-    input_digest: Digest
+    # NB: Although InteractiveProcess supports only some of the features of Process, we construct an
+    # underlying Process instance to improve code reuse.
+    process: Process
     run_in_workspace: bool
     forward_signals_to_process: bool
     restartable: bool
-    append_only_caches: FrozenDict[str, str]
+    keep_sandboxes: KeepSandboxes
 
     def __init__(
         self,
@@ -303,7 +303,10 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
+        cleanup: bool | None = None,
         append_only_caches: Mapping[str, str] | None = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        keep_sandboxes: KeepSandboxes | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -316,28 +319,30 @@ class InteractiveProcess(SideEffecting):
         sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
         or capture that signal itself, blocking it from the process.
         """
-        self.argv = tuple(argv)
-        self.env = FrozenDict(env or {})
-        self.input_digest = input_digest
+        self.process = Process(
+            argv,
+            description="Interactive process",
+            env=env,
+            input_digest=input_digest,
+            append_only_caches=append_only_caches,
+            immutable_input_digests=immutable_input_digests,
+        )
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-
-        self.__post_init__()
-
-    def __post_init__(self):
-        if self.input_digest != EMPTY_DIGEST and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess should use the Workspace API to materialize any needed "
-                "files when it runs in the workspace"
+        if cleanup is not None:
+            warn_or_error(
+                removal_version="2.15.0.dev1",
+                entity="InteractiveProcess.cleanup",
+                hint="Use `InteractiveProcess.keep_sandboxes` instead.",
             )
-        if self.append_only_caches and self.run_in_workspace:
-            raise ValueError(
-                "InteractiveProcess requested setup of append-only caches and also requested to run"
-                " in the workspace. These options are incompatible since setting up append-only"
-                " caches would modify the workspace."
-            )
+            if keep_sandboxes is not None:
+                raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
+            self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always
+        elif keep_sandboxes is not None:
+            self.keep_sandboxes = keep_sandboxes
+        else:
+            self.keep_sandboxes = KeepSandboxes.never
 
     @classmethod
     def from_process(
@@ -347,14 +352,6 @@ class InteractiveProcess(SideEffecting):
         forward_signals_to_process: bool = True,
         restartable: bool = False,
     ) -> InteractiveProcess:
-        # TODO: Remove this check once https://github.com/pantsbuild/pants/issues/13852 is
-        #  implemented and the immutable_input_digests are propagated into the InteractiveProcess.
-        if process.immutable_input_digests:
-            raise ValueError(
-                "Process has immutable_input_digests, so it cannot be converted to an "
-                "InteractiveProcess by calling from_process().  Use an async "
-                "InteractiveProcessRequest instead."
-            )
         return InteractiveProcess(
             argv=process.argv,
             env=process.env,
@@ -362,6 +359,7 @@ class InteractiveProcess(SideEffecting):
             forward_signals_to_process=forward_signals_to_process,
             restartable=restartable,
             append_only_caches=process.append_only_caches,
+            immutable_input_digests=process.immutable_input_digests,
         )
 
 
@@ -374,27 +372,15 @@ class InteractiveProcessRequest:
 
 @rule
 async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    # TODO: Temporary workaround until https://github.com/pantsbuild/pants/issues/13852
-    #  is implemented. Once that is implemented we can get rid of this rule, and the
-    #  InteractiveProcessRequest type, and use InteractiveProcess.from_process directly.
-
-    if req.process.immutable_input_digests:
-        prefixed_immutable_input_digests = await MultiGet(
-            Get(Digest, AddPrefix(digest, prefix))
-            for prefix, digest in req.process.immutable_input_digests.items()
-        )
-        full_input_digest = await Get(
-            Digest, MergeDigests([req.process.input_digest, *prefixed_immutable_input_digests])
-        )
-    else:
-        full_input_digest = req.process.input_digest
-    return InteractiveProcess(
-        argv=req.process.argv,
-        env=req.process.env,
-        input_digest=full_input_digest,
+    warn_or_error(
+        removal_version="2.15.0.dev1",
+        entity="InteractiveProcessRequest",
+        hint="Instead, use `InteractiveProcess.from_process`.",
+    )
+    return InteractiveProcess.from_process(
+        req.process,
         forward_signals_to_process=req.forward_signals_to_process,
         restartable=req.restartable,
-        append_only_caches=req.process.append_only_caches,
     )
 
 

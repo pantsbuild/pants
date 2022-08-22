@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -22,6 +24,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
@@ -32,6 +35,7 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.resources import read_resource
 
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
@@ -49,7 +53,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
+class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = TerraformHcl2Parser.options_scope
 
 
@@ -71,7 +75,7 @@ class ParserSetup:
 
 @rule
 async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
-    parser_script_content = pkgutil.get_data("pants.backend.terraform", "hcl2_parser.py")
+    parser_script_content = read_resource("pants.backend.terraform", "hcl2_parser.py")
     if not parser_script_content:
         raise ValueError("Unable to find source to hcl2_parser.py wrapper script.")
 
@@ -115,15 +119,22 @@ async def setup_process_for_parse_terraform_module_sources(
     return process
 
 
+@dataclass(frozen=True)
+class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (TerraformModuleSourcesField,)
+
+    sources: TerraformModuleSourcesField
+
+
 class InferTerraformModuleDependenciesRequest(InferDependenciesRequest):
-    infer_from = TerraformModuleSourcesField
+    infer_from = TerraformModuleDependenciesInferenceFieldSet
 
 
 @rule
 async def infer_terraform_module_dependencies(
     request: InferTerraformModuleDependenciesRequest,
 ) -> InferredDependencies:
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
 
     paths = OrderedSet(
         filename for filename in hydrated_sources.snapshot.files if filename.endswith(".tf")

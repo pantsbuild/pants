@@ -11,7 +11,7 @@ from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.fs import (
@@ -30,7 +30,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -49,12 +49,12 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(FmtRequest):
+class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
     name = ScalafmtSubsystem.options_scope
 
 
-class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalafmtSubsystem.options_scope
 
 
@@ -276,6 +276,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(FmtRequest, ScalafmtRequest),
+        UnionRule(FmtTargetsRequest, ScalafmtRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

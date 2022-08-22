@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -109,7 +109,7 @@ async def gather_coordinates_for_jvm_lockfile(
     for artifact_input in request.artifact_inputs:
         # Try parsing as a `Coordinate` first since otherwise `AddressInput.parse` will try to see if the
         # group name is a file on disk.
-        if 2 <= artifact_input.count(":") <= 3:
+        if 2 <= artifact_input.count(":"):
             try:
                 maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
                 requirements.add(maybe_coord)
@@ -154,6 +154,10 @@ async def gather_coordinates_for_jvm_lockfile(
         )
 
     return ArtifactRequirements(requirements)
+
+
+class GenerateJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
+    pass
 
 
 @dataclass(frozen=True)

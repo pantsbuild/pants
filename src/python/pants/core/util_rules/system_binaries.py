@@ -294,7 +294,12 @@ class GunzipBinary:
 
 class TarBinary(BinaryPath):
     def create_archive_argv(
-        self, output_filename: str, input_files: Sequence[str], tar_format: ArchiveFormat
+        self,
+        output_filename: str,
+        tar_format: ArchiveFormat,
+        *,
+        input_files: Sequence[str] = (),
+        input_file_list_filename: str | None = None,
     ) -> tuple[str, ...]:
         # Note that the parent directory for the output_filename must already exist.
         #
@@ -304,7 +309,9 @@ class TarBinary(BinaryPath):
         compression = {ArchiveFormat.TGZ: "z", ArchiveFormat.TBZ2: "j", ArchiveFormat.TXZ: "J"}.get(
             tar_format, ""
         )
-        return (self.path, f"c{compression}f", output_filename, *input_files)
+
+        files_from = ("--files-from", input_file_list_filename) if input_file_list_filename else ()
+        return (self.path, f"c{compression}f", output_filename, *input_files) + files_from
 
     def extract_archive_argv(
         self, archive_path: str, extract_path: str, *, archive_suffix: str
@@ -316,6 +323,18 @@ class TarBinary(BinaryPath):
 
 
 class MkdirBinary(BinaryPath):
+    pass
+
+
+class CpBinary(BinaryPath):
+    pass
+
+
+class MvBinary(BinaryPath):
+    pass
+
+
+class CatBinary(BinaryPath):
     pass
 
 
@@ -672,12 +691,36 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
+async def find_cat() -> CatBinary:
+    request = BinaryPathRequest(binary_name="cat", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
+    return CatBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
 async def find_mkdir() -> MkdirBinary:
     request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
+async def find_cp() -> CpBinary:
+    request = BinaryPathRequest(binary_name="cp", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="copy files")
+    return CpBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `mv` binary", level=LogLevel.DEBUG)
+async def find_mv() -> MvBinary:
+    request = BinaryPathRequest(binary_name="mv", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="move files")
+    return MvBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
@@ -730,15 +773,22 @@ async def find_git() -> GitBinary:
 # -------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
 class ZipBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class UnzipBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class GunzipBinaryRequest:
+    pass
+
+
+class CatBinaryRequest:
     pass
 
 
@@ -746,22 +796,27 @@ class TarBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class MkdirBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class ChmodBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class DiffBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class ReadlinkBinaryRequest:
     pass
 
 
+@dataclass(frozen=True)
 class GitBinaryRequest:
     pass
 
@@ -784,6 +839,11 @@ async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> G
 @rule
 async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
     return tar_binary
+
+
+@rule
+async def find_cat_wrapper(_: CatBinaryRequest, cat_binary: CatBinary) -> CatBinary:
+    return cat_binary
 
 
 @rule

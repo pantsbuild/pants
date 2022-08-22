@@ -10,7 +10,10 @@ from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -20,14 +23,22 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
+from pants.backend.python.util_rules import partition
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
+from pants.backend.python.util_rules.pex import PexRequest
+from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
+    PexRequirements,
+    ToolCustomLockfile,
+)
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import NO_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
@@ -46,9 +57,10 @@ from pants.option.option_types import (
     FileOption,
     SkipOption,
     StrListOption,
+    StrOption,
     TargetListOption,
 )
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
@@ -151,6 +163,26 @@ class MyPy(PythonToolBase):
 
             Expects a list of pip-style requirement strings, like
             `['types-requests==2.25.9']`.
+
+            We recommend also enabling `[mypy].extra_type_stubs_lockfile` for a more reproducible
+            build and less supply-chain security risk.
+            """
+        ),
+    )
+    extra_type_stubs_lockfile = StrOption(
+        advanced=True,
+        # Note that there is no default lockfile, as by default, extra_type_stubs is empty.
+        default=NO_TOOL_LOCKFILE,
+        help=softwrap(
+            f"""
+            Path to a lockfile for the option `[mypy].extra_type_stubs`.
+
+            Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We
+            do not recommend this if you use `[mypy].extra_type_stubs`, though, as lockfiles are
+            essential for reproducible builds and supply-chain security.
+
+            To use a lockfile, set this option to a file path relative to the
+            build root, then run `{bin_name()} generate-lockfiles --resolve=mypy-extra-type-stubs`.
             """
         ),
     )
@@ -172,6 +204,31 @@ class MyPy(PythonToolBase):
             self._source_plugins,
             owning_address=None,
             description_of_origin=f"the option `[{self.options_scope}].source_plugins`",
+        )
+
+    def extra_type_stubs_pex_request(
+        self, interpreter_constraints: InterpreterConstraints
+    ) -> PexRequest:
+        requirements: PexRequirements | EntireLockfile
+        if self.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
+            requirements = PexRequirements(self.extra_type_stubs)
+        else:
+            tool_lockfile = ToolCustomLockfile(
+                file_path=self.extra_type_stubs_lockfile,
+                file_path_description_of_origin=(
+                    f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
+                ),
+                lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
+                resolve_name=MyPyExtraTypeStubsLockfileSentinel.resolve_name,
+                uses_project_interpreter_constraints=True,
+                uses_source_plugins=False,
+            )
+            requirements = EntireLockfile(tool_lockfile, complete_req_strings=self.extra_type_stubs)
+        return PexRequest(
+            output_filename="extra_type_stubs.pex",
+            internal_only=True,
+            requirements=requirements,
+            interpreter_constraints=interpreter_constraints,
         )
 
     def check_and_warn_if_python_version_configured(self, config: FileContent | None) -> bool:
@@ -200,9 +257,11 @@ class MyPy(PythonToolBase):
                     ({doc_url('python-interpreter-compatibility')}). Instead, it will
                     use what you set.
 
-                    (Automatically setting the option allows Pants to partition your targets by their
-                    constraints, so that, for example, you can run MyPy on Python 2-only code and
-                    Python 3-only code at the same time. This feature may no longer work.)
+                    (Allowing Pants to automatically set the option allows Pants to partition your
+                    targets by their constraints, so that, for example, you can run MyPy on
+                    Python 2-only code and Python 3-only code at the same time. It also allows Pants
+                    to leverage MyPy's cache, making subsequent runs of MyPy very fast.
+                    In the future, this feature may no longer work.)
                     """
                 )
             )
@@ -263,18 +322,17 @@ async def mypy_first_party_plugins(
         TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
     )
 
-    requirements = PexRequirements.create_from_requirement_fields(
+    requirements = PexRequirements.req_strings_from_requirement_fields(
         (
             plugin_tgt[PythonRequirementsField]
             for plugin_tgt in transitive_targets.closure
             if plugin_tgt.has_field(PythonRequirementsField)
         ),
-        constraints_strings=(),
     )
 
     sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
     return MyPyFirstPartyPlugins(
-        requirement_strings=requirements.req_strings,
+        requirement_strings=requirements,
         sources_digest=sources.source_files.snapshot.digest,
         source_roots=sources.source_roots,
     )
@@ -291,14 +349,8 @@ async def _mypy_interpreter_constraints(
 ) -> InterpreterConstraints:
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets([tgt], python_setup)
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
-        }
-        code_constraints = InterpreterConstraints(
-            itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+        code_constraints = await _find_all_unique_interpreter_constraints(
+            python_setup, MyPyFieldSet
         )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_versions_universe):
             constraints = code_constraints
@@ -306,11 +358,11 @@ async def _mypy_interpreter_constraints(
 
 
 # --------------------------------------------------------------------------------------
-# Lockfile
+# Lockfiles
 # --------------------------------------------------------------------------------------
 
 
-class MyPyLockfileSentinel(GenerateToolLockfileSentinel):
+class MyPyLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = MyPy.options_scope
 
 
@@ -335,6 +387,53 @@ async def setup_mypy_lockfile(
         constraints,
         extra_requirements=first_party_plugins.requirement_strings,
         use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+class MyPyExtraTypeStubsLockfileSentinel(GeneratePythonToolLockfileSentinel):
+    resolve_name = "mypy-extra-type-stubs"
+
+
+@rule(desc="Set up lockfile request for [mypy].extra_type_stubs", level=LogLevel.DEBUG)
+async def setup_mypy_extra_type_stubs_lockfile(
+    request: MyPyExtraTypeStubsLockfileSentinel,
+    mypy: MyPy,
+    python_setup: PythonSetup,
+) -> GeneratePythonLockfile:
+    use_pex = python_setup.generate_lockfiles_with_pex
+    if mypy.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
+        return GeneratePythonLockfile(
+            requirements=FrozenOrderedSet(),
+            interpreter_constraints=InterpreterConstraints(),
+            resolve_name=request.resolve_name,
+            lockfile_dest=mypy.extra_type_stubs_lockfile,
+            use_pex=use_pex,
+        )
+
+    # While MyPy will run in partitions, we need a set of constraints that works with every
+    # partition.
+    #
+    # This first finds the ICs of each partition. Then, it ORs all unique resulting interpreter
+    # constraints. The net effect is that every possible Python interpreter used will be covered.
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    all_field_sets = [
+        MyPyFieldSet.create(tgt) for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)
+    ]
+    resolve_and_interpreter_constraints_to_coarsened_targets = (
+        await partition._by_interpreter_constraints_and_resolve(all_field_sets, python_setup)
+    )
+    unique_constraints = {
+        ics for resolve, ics in resolve_and_interpreter_constraints_to_coarsened_targets.keys()
+    }
+    interpreter_constraints = InterpreterConstraints(
+        itertools.chain.from_iterable(unique_constraints)
+    ) or InterpreterConstraints(python_setup.interpreter_constraints)
+    return GeneratePythonLockfile(
+        requirements=FrozenOrderedSet(mypy.extra_type_stubs),
+        interpreter_constraints=interpreter_constraints,
+        resolve_name=request.resolve_name,
+        lockfile_dest=mypy.extra_type_stubs_lockfile,
+        use_pex=use_pex,
     )
 
 
@@ -371,5 +470,6 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, MyPyLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, MyPyExtraTypeStubsLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, MyPyExportSentinel),
     )

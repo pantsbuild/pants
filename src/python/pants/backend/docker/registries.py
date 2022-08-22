@@ -43,7 +43,7 @@ class DockerRegistryOptions:
             extra_image_tags=tuple(
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
-            repository=Parser.to_value_type(d.get("repository"), str, None, None),
+            repository=Parser.to_value_type(d.get("repository"), str, None),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:

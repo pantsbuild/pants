@@ -36,10 +36,10 @@ from pants.core.goals.tailor import (
 )
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -53,13 +53,13 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
-    test_utils_filespec = Filespec(includes=list(PythonTestUtilsGeneratingSourcesField.default))
+    tests_filespec_matcher = FilespecMatcher(PythonTestsGeneratingSourcesField.default, ())
+    test_utils_filespec_matcher = FilespecMatcher(PythonTestUtilsGeneratingSourcesField.default, ())
 
     path_to_file_name = {path: os.path.basename(path) for path in paths}
-    test_file_names = set(matches_filespec(tests_filespec, paths=path_to_file_name.values()))
+    test_file_names = set(tests_filespec_matcher.matches(list(path_to_file_name.values())))
     test_util_file_names = set(
-        matches_filespec(test_utils_filespec, paths=path_to_file_name.values())
+        test_utils_filespec_matcher.matches(list(path_to_file_name.values()))
     )
 
     test_files = {
@@ -90,6 +90,64 @@ def is_entry_point(content: bytes) -> bool:
     return _entry_point_re.search(content) is not None
 
 
+@rule_helper
+async def _find_source_targets(
+    py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
+) -> list[PutativeTarget]:
+    ignore_solitary_explicitly_set = not python_setup.options.is_default(
+        "tailor_ignore_solitary_init_files"
+    )
+    ignore_solitary = (
+        python_setup.tailor_ignore_solitary_init_files
+        if ignore_solitary_explicitly_set
+        else python_setup.tailor_ignore_empty_init_files
+    )
+
+    result = []
+    check_if_init_file_empty: dict[str, tuple[str, str]] = {}  # full_path: (dirname, filename)
+
+    all_py_files = await Get(Paths, PathGlobs, py_files_globs)
+    unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
+    classified_unowned_py_files = classify_source_files(unowned_py_files)
+    for tgt_type, paths in classified_unowned_py_files.items():
+        for dirname, filenames in group_by_dir(paths).items():
+            name: str | None
+            if issubclass(tgt_type, PythonTestsGeneratorTarget):
+                name = "tests"
+            elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
+                name = "test_utils"
+            else:
+                name = None
+            if (
+                ignore_solitary
+                and tgt_type == PythonSourcesGeneratorTarget
+                and filenames in ({"__init__.py"}, {"__init__.pyi"})
+            ):
+                if not ignore_solitary_explicitly_set:
+                    f = next(iter(filenames))
+                    check_if_init_file_empty[os.path.join(dirname, f)] = (dirname, f)
+            else:
+                result.append(
+                    PutativeTarget.for_target_type(
+                        tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
+                    )
+                )
+
+    if check_if_init_file_empty:
+        init_contents = await Get(DigestContents, PathGlobs(check_if_init_file_empty.keys()))
+        for file_content in init_contents:
+            if not file_content.content.strip():
+                continue
+            d, f = check_if_init_file_empty[file_content.path]
+            result.append(
+                PutativeTarget.for_target_type(
+                    PythonSourcesGeneratorTarget, path=d, name=None, triggering_sources=[f]
+                )
+            )
+
+    return result
+
+
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")
 async def find_putative_targets(
     req: PutativePythonTargetsRequest,
@@ -97,33 +155,13 @@ async def find_putative_targets(
     python_setup: PythonSetup,
 ) -> PutativeTargets:
     pts = []
+    all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
 
     if python_setup.tailor_source_targets:
-        # Find library/test/test_util targets.
-        all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
-        all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
-        unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
-        classified_unowned_py_files = classify_source_files(unowned_py_files)
-        for tgt_type, paths in classified_unowned_py_files.items():
-            for dirname, filenames in group_by_dir(paths).items():
-                name: str | None
-                if issubclass(tgt_type, PythonTestsGeneratorTarget):
-                    name = "tests"
-                elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
-                    name = "test_utils"
-                else:
-                    name = None
-                if (
-                    python_setup.tailor_ignore_solitary_init_files
-                    and tgt_type == PythonSourcesGeneratorTarget
-                    and filenames == {"__init__.py"}
-                ):
-                    continue
-                pts.append(
-                    PutativeTarget.for_target_type(
-                        tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
-                    )
-                )
+        source_targets = await _find_source_targets(
+            all_py_files_globs, all_owned_sources, python_setup
+        )
+        pts.extend(source_targets)
 
     if python_setup.tailor_requirements_targets:
         # Find requirements files.

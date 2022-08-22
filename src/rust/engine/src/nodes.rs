@@ -297,7 +297,10 @@ impl ExecuteProcess {
       .map_err(|e| e.enrich("Failed to merge input digests for process"))
   }
 
-  pub fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
+  fn lift_process_fields(
+    value: &PyAny,
+    input_digests: InputDigests,
+  ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
@@ -374,10 +377,15 @@ impl ExecuteProcess {
     })
   }
 
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
+  pub async fn lift_process(store: &Store, value: Value) -> Result<Process, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
-    let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
-    Ok(Self { process })
+    Python::with_gil(|py| Self::lift_process_fields((*value).as_ref(py), input_digests))
+  }
+
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
+    Ok(Self {
+      process: Self::lift_process(store, value).await?,
+    })
   }
 
   async fn run_node(
@@ -458,6 +466,19 @@ impl ExecuteProcess {
         }
         _ => {}
       }
+    }
+
+    if backtrack_level > 0 {
+      // TODO: This message is symmetrical to the "Making attempt {} to backtrack and retry {}"
+      // message in `context.rs`, but both of them are effectively debug output. They should be
+      // quieted down as part of https://github.com/pantsbuild/pants/issues/15867 once all bugs
+      // have been shaken out.
+      log::info!(
+        "On backtrack attempt {} for `{}`, produced: {:?}",
+        backtrack_level,
+        request.description,
+        res.output_directory.digests()
+      );
     }
 
     Ok(ProcessResult {

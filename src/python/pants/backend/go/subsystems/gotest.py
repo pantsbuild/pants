@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-from pants.option.option_types import ArgsListOption
+from pathlib import PurePath
+
+from pants.backend.go.util_rules.coverage import GoCoverMode
+from pants.core.util_rules.distdir import DistDir
+from pants.option.option_types import ArgsListOption, EnumOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -24,3 +28,38 @@ class GoTestSubsystem(Subsystem):
         ),
         passthrough=True,
     )
+
+    coverage_mode = EnumOption(
+        "--cover-mode",
+        default=GoCoverMode.SET,
+        help=softwrap(
+            """\
+            Coverage mode to use when running Go tests with coverage analysis enabled via --test-use-coverage.
+            Valid values are `set`, `count`, and `atomic`:\n
+            * `set`: bool: does this statement run?\n
+            * `count`: int: how many times does this statement run?\n
+            * `atomic`: int: count, but correct in multithreaded tests; significantly more expensive.\n
+            """
+        ),
+    )
+
+    _coverage_output_dir = StrOption(
+        default=str(PurePath("{distdir}", "coverage", "go", "{import_path_escaped}")),
+        advanced=True,
+        help=softwrap(
+            """
+            Path to write the Go coverage reports to. Must be relative to the build root.
+            `{distdir}` is replaced with the Pants `distdir`, and `{import_path_escaped}` is
+            replaced with the applicable package's import path but with slashes converted to
+            underscores.
+            """
+        ),
+    )
+
+    def coverage_output_dir(self, distdir: DistDir, import_path: str) -> PurePath:
+        import_path_escaped = import_path.replace("/", "_")
+        return PurePath(
+            self._coverage_output_dir.format(
+                distdir=distdir.relpath, import_path_escaped=import_path_escaped
+            )
+        )

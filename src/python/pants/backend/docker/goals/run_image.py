@@ -25,7 +25,12 @@ async def docker_image_run_request(
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
     run = docker.run_image(tag, docker_run_args=options.run_args, env=env)
 
-    return RunRequest(args=run.argv, digest=image.digest, extra_env=run.env)
+    return RunRequest(
+        digest=image.digest,
+        args=run.argv,
+        extra_env=run.env,
+        immutable_input_digests=run.immutable_input_digests,
+    )
 
 
 @rule

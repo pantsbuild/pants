@@ -30,8 +30,7 @@ webpki = "0.21"
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
-async-trait = "=0.1.42"
+async-trait = "0.1"
 parking_lot = "0.11"
 prost-types = "0.9"
 

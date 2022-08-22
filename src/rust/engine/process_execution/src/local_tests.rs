@@ -16,7 +16,7 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  local, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
   ProcessError, RelativePath,
 };
@@ -348,13 +348,13 @@ async fn jdk_symlink() {
 
 #[tokio::test]
 #[cfg(unix)]
-async fn test_update_env() {
+async fn test_apply_chroot() {
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
 
   let work_dir = TempDir::new().unwrap();
   let mut req = Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone());
-  local::update_env(&work_dir.path(), &mut req);
+  local::apply_chroot(work_dir.path().to_str().unwrap(), &mut req);
 
   let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
 
@@ -373,7 +373,7 @@ async fn test_chroot_placeholder() {
   let result = run_command_locally_in_dir(
     Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
     work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     None,
     None,
@@ -438,7 +438,7 @@ async fn test_directory_preservation() {
   let result = run_command_locally_in_dir(
     process,
     preserved_work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -494,7 +494,7 @@ async fn test_directory_preservation_error() {
   run_command_locally_in_dir(
     Process::new(vec!["doesnotexist".to_owned()]),
     preserved_work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     None,
     None,
@@ -616,7 +616,7 @@ async fn working_directory() {
   let result = run_command_locally_in_dir(
     process,
     work_dir.path().to_owned(),
-    true,
+    KeepSandboxes::Never,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -679,7 +679,7 @@ async fn immutable_inputs() {
   let result = run_command_locally_in_dir(
     process,
     work_dir.path().to_owned(),
-    true,
+    KeepSandboxes::Never,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -770,13 +770,21 @@ async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessErr
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
-  run_command_locally_in_dir(req, work_dir_path, true, &mut workunit, None, None).await
+  run_command_locally_in_dir(
+    req,
+    work_dir_path,
+    KeepSandboxes::Never,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
 }
 
 async fn run_command_locally_in_dir(
   req: Process,
   dir: PathBuf,
-  cleanup: bool,
+  cleanup: KeepSandboxes,
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,

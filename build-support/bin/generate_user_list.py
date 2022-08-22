@@ -2,6 +2,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import pkgutil
 from dataclasses import dataclass
 
@@ -32,7 +34,7 @@ NOTE: Please consider adding your company/organization to this list! If you wish
 class Org:
     name: str
     website: str
-    image: str
+    image: str | None
 
 
 # Orgs will be displayed in case-insensitive alphabetical order, but it's useful for human readers
@@ -67,6 +69,7 @@ _orgs = (
         "https://housinganywhere.com/",
         "https://files.readme.io/dd2a703-housinganywhere-small.png",
     ),
+    Org("IBM", "https://www.ibm.com/", None),
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
     Org("Lablup", "https://lablup.com/", "https://files.readme.io/a94d375-lablup-small.png"),
     Org("Myst AI", "https://www.myst.ai/", "https://files.readme.io/802d8fa-myst_ai_small.png"),
@@ -103,6 +106,11 @@ _orgs = (
         "https://files.readme.io/43d674d-toolchain_logo_small.png",
     ),
     Org("Valon", "https://valon.com/", "https://files.readme.io/df5216a-valon-small.png"),
+    Org(
+        "Vicara Solutions",
+        "https://vicarasolutions.com/",
+        "https://files.readme.io/1748a22-vicara-solutions.png",
+    ),
 )
 
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import importlib
+import logging
 import traceback
 from typing import Dict, List, Optional
 
@@ -11,6 +12,8 @@ from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
 from pants.util.ordered_set import FrozenOrderedSet
+
+logger = logging.getLogger(__name__)
 
 
 class PluginLoadingError(Exception):
@@ -98,6 +101,13 @@ def load_plugins(
         if "rules" in entries:
             rules = entries["rules"].load()()
             build_configuration.register_rules(req.key, rules)
+        if "remote_auth" in entries:
+            remote_auth_func = entries["remote_auth"].load()
+            logger.debug(
+                f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
+            )
+            build_configuration.register_remote_auth_plugin(remote_auth_func)
+
         loaded[dist.as_requirement().key] = dist
 
 
@@ -133,7 +143,7 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
         traceback.print_exc()
         raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
-    def invoke_entrypoint(name):
+    def invoke_entrypoint(name: str):
         entrypoint = getattr(module, name, lambda: None)
         try:
             return entrypoint()
@@ -152,3 +162,9 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     rules = invoke_entrypoint("rules")
     if rules:
         build_configuration.register_rules(backend_package, rules)
+    remote_auth_func = getattr(module, "remote_auth", None)
+    if remote_auth_func:
+        logger.debug(
+            f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from backend: {backend_package}"
+        )
+        build_configuration.register_remote_auth_plugin(remote_auth_func)

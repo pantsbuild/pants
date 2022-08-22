@@ -187,11 +187,13 @@ backend_packages = [
 ]
 ```
 
-### Bandit and Flake8: report files
+### Bandit, Flake8, and Pylint: report files
 
-Flake8 and Bandit can both generate report files saved to disk. 
+Flake8, Bandit, and Pylint can generate report files saved to disk. 
 
-For Pants to properly preserve the reports, instruct both tools to write to the `reports/` folder by updating their config files or `--flake8-args` and `--bandit-args`. For example, in your `pants.toml`:
+For Pants to properly preserve the reports, instruct the tools to write to the `reports/` folder
+by updating their config files, or `--flake8-args`, `--bandit-args`, and `--pylint-args`. For
+example, in your `pants.toml`:
 
 ```toml
 [bandit]
@@ -199,6 +201,9 @@ args = ["--output=reports/report.txt"]
 
 [flake8]
 args = ["--output-file=reports/report.txt"]
+
+[pylint]
+args = ["--output-format=text:reports/report.txt"]
 ```
 
 Pants will copy all reports into the folder `dist/lint/<linter_name>`.

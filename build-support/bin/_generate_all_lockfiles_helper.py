@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
+from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
@@ -29,9 +30,11 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.poetry import PoetrySubsystem
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -99,36 +102,41 @@ AllTools = (
     DefaultTool.python(Autoflake),
     DefaultTool.python(Bandit, backend="pants.backend.python.lint.bandit"),
     DefaultTool.python(Black),
-    DefaultTool.python(Docformatter),
-    DefaultTool.python(Flake8, source_plugins=True),
-    DefaultTool.python(Isort),
-    DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
-    DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
-    DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
+    DefaultTool.python(ClangFormat, backend="pants.backend.experimental.cc.lint.clangformat"),
+    DefaultTool.python(CoverageSubsystem),
     DefaultTool.python(DebugPy),
+    DefaultTool.python(Docformatter),
+    DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
+    DefaultTool.python(Flake8, source_plugins=True),
     DefaultTool.python(IPython),
+    DefaultTool.python(Isort),
+    DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
+    DefaultTool.python(MyPy, source_plugins=True),
+    DefaultTool.python(PoetrySubsystem),
+    DefaultTool.python(PyTest),
+    DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
+    DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
+    DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
+    DefaultTool.python(PyOxidizer),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),
-    DefaultTool.python(MyPy, source_plugins=True),
-    DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
-    DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
-    DefaultTool.python(PyTest),
-    DefaultTool.python(CoverageSubsystem),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
-    DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
-    DefaultTool.python(ClangFormat, backend="pants.backend.experimental.cc.lint.clangformat"),
+    DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
     # JVM
-    DefaultTool.jvm(JUnit),
+    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
-    DefaultTool.jvm(ScalafmtSubsystem),
+    DefaultTool.jvm(JUnit),
+    DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
     DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
+    DefaultTool.jvm(
+        JavaProtobufGrpcSubsystem, backend="pants.backend.experimental.codegen.protobuf.java"
+    ),
+    DefaultTool.jvm(ScalafmtSubsystem),
     DefaultTool.jvm(Scalatest),
     DefaultTool.jvm(
         ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
-    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
-    DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
 )
 
 

@@ -4,15 +4,53 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Iterable
 
 from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, DictOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, DictOption, StrOption
 from pants.util.memo import memoized_method
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
+
+_VALID_PASSTHROUGH_FLAGS = [
+    "--atomic",
+    "--cleanup-on-fail",
+    "--debug",
+    "--dry-run",
+    "--force",
+    "--wait",
+    "--wait-for-jobs",
+]
+
+_VALID_PASSTHROUGH_OPTS = [
+    "--kubeconfig",
+    "--kube-context",
+    "--kube-apiserver",
+    "--kube-as-group",
+    "--kube-as-user",
+    "--kube-ca-file",
+    "--kube-token",
+]
+
+
+class InvalidHelmPassthroughArgs(Exception):
+    def __init__(self, args: Iterable[str], *, extra_help: str = "") -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                The following command line arguments are not valid: {' '.join(args)}.
+
+                Only the following passthrough arguments are allowed:
+
+                {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
+
+                {extra_help}
+                """
+            )
+        )
+
 
 registries_help = softwrap(
     f"""
@@ -79,6 +117,33 @@ class HelmSubsystem(TemplatedExternalTool):
         advanced=True,
     )
 
+    args = ArgsListOption(
+        example="--dry-run",
+        passthrough=True,
+        extra_help=softwrap(
+            f"""
+            Additional arguments to pass to Helm command line.
+
+            Only a subset of Helm arguments are considered valid as passthrough arguments as most of them
+            have equivalents in the form of fields of the different target types.
+
+            The list of valid arguments is as folows:
+
+            {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
+
+            Before attempting to use passthrough arguments, check the refence of each of the available target types
+            to see what fields are accepted in each of them.
+            """
+        ),
+    )
+
+    @memoized_method
+    def valid_args(self, *, extra_help: str = "") -> tuple[str, ...]:
+        valid, invalid = _cleanup_passthrough_args(self.args)
+        if invalid:
+            raise InvalidHelmPassthroughArgs(invalid, extra_help=extra_help)
+        return tuple(valid)
+
     def generate_exe(self, plat: Platform) -> str:
         mapped_plat = self.default_url_platform_mapping[plat.value]
         bin_path = os.path.join(mapped_plat, "helm")
@@ -87,3 +152,27 @@ class HelmSubsystem(TemplatedExternalTool):
     @memoized_method
     def remotes(self) -> HelmRemotes:
         return HelmRemotes.from_dict(self._registries)
+
+
+def _cleanup_passthrough_args(args: Iterable[str]) -> tuple[list[str], list[str]]:
+    valid_args: list[str] = []
+    removed_args: list[str] = []
+
+    skip = False
+    for arg in args:
+        if skip:
+            valid_args.append(arg)
+            skip = False
+            continue
+
+        if arg in _VALID_PASSTHROUGH_FLAGS:
+            valid_args.append(arg)
+        elif "=" in arg and arg.split("=")[0] in _VALID_PASSTHROUGH_OPTS:
+            valid_args.append(arg)
+        elif arg in _VALID_PASSTHROUGH_OPTS:
+            valid_args.append(arg)
+            skip = True
+        else:
+            removed_args.append(arg)
+
+    return (valid_args, removed_args)

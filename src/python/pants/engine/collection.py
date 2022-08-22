@@ -40,6 +40,8 @@ class Collection(Tuple[T, ...]):
         return self.__class__(cast(Tuple[T, ...], result))
 
     def __eq__(self, other: Any) -> bool:
+        if self is other:
+            return True
         return type(self) == type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:

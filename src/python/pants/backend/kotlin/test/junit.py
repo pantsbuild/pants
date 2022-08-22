@@ -9,12 +9,7 @@ from pants.backend.kotlin.target_types import KotlinJunitTestDependenciesField
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -25,8 +20,16 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 
-class InjectKotlinJunitTestDependencyRequest(InjectDependenciesRequest):
-    inject_for = KotlinJunitTestDependenciesField
+@dataclass(frozen=True)
+class KotlinJunitTestDependencyInferenceFieldSet(FieldSet):
+    required_fields = (KotlinJunitTestDependenciesField, JvmResolveField)
+
+    dependencies: KotlinJunitTestDependenciesField
+    resolve: JvmResolveField
+
+
+class InferKotlinJunitTestDependencyRequest(InferDependenciesRequest):
+    infer_from = KotlinJunitTestDependencyInferenceFieldSet
 
 
 @dataclass(frozen=True)
@@ -47,8 +50,6 @@ async def resolve_kotlin_junit_libraries_for_resolve(
     kotlin_subsystem: KotlinSubsystem,
 ) -> KotlinJunitLibrariesForResolve:
     kotlin_version = kotlin_subsystem.version_for_resolve(request.resolve_name)
-
-    # TODO: Nicer exception messages if this fails due to the resolve missing a jar.
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             Coordinate(
@@ -60,35 +61,28 @@ async def resolve_kotlin_junit_libraries_for_resolve(
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
+        subsystem="the Kotlin test runtime for JUnit",
+        target_type="kotlin_junit_tests",
+        requirement_source="the relevant entry for this resolve in the `[kotlin].version_for_resolve` option",
     )
     return KotlinJunitLibrariesForResolve(addresses)
 
 
-@rule(desc="Inject dependency on Kotlin Junit support artifact.")
-async def inject_kotlin_junit_dependency(
-    request: InjectKotlinJunitTestDependencyRequest,
+@rule(desc="Infer dependency on Kotlin Junit support artifact.")
+async def infer_kotlin_junit_dependency(
+    request: InferKotlinJunitTestDependencyRequest,
     jvm: JvmSubsystem,
-) -> InjectedDependencies:
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
-    target = wrapped_target.target
-
-    if not target.has_field(JvmResolveField):
-        return InjectedDependencies()
-    resolve = target[JvmResolveField].normalized_value(jvm)
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
 
     kotlin_junit_libraries = await Get(
         KotlinJunitLibrariesForResolve, KotlinJunitLibrariesForResolveRequest(resolve)
     )
-    return InjectedDependencies(kotlin_junit_libraries.addresses)
+    return InferredDependencies(kotlin_junit_libraries.addresses)
 
 
 def rules():
     return (
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectKotlinJunitTestDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferKotlinJunitTestDependencyRequest),
     )

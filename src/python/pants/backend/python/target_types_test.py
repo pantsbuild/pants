@@ -19,11 +19,9 @@ from pants.backend.python.target_types import (
     EntryPoint,
     PexBinariesGeneratorTarget,
     PexBinary,
-    PexBinaryDependenciesField,
     PexEntryPointField,
     PexScriptField,
     PythonDistribution,
-    PythonDistributionDependenciesField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -35,22 +33,26 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
-    InjectPexBinaryEntryPointDependency,
-    InjectPythonDistributionDependencies,
+    InferPexBinaryEntryPointDependency,
+    InferPythonDistributionDependencies,
+    PexBinaryEntryPointDependencyInferenceFieldSet,
+    PythonDistributionDependenciesInferenceFieldSet,
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.test import TestSubsystem
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
-    InjectedDependencies,
+    InferredDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
     Tags,
 )
+from pants.option.ranked_value import Rank
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -70,7 +72,9 @@ def test_pex_binary_validation() -> None:
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
-def test_timeout_calculation() -> None:
+# TODO This test will not be necessary once the timeout-related deprecated options at the `pytest` subsystem are removed.
+@pytest.mark.parametrize("use_deprecated", (True, False))
+def test_timeout_calculation(use_deprecated: bool) -> None:
     def assert_timeout_calculated(
         *,
         field_value: int | None,
@@ -80,20 +84,70 @@ def test_timeout_calculation() -> None:
         timeouts_enabled: bool = True,
     ) -> None:
         field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
-        pytest = create_subsystem(
-            PyTest,
+        enabled_values = dict(
             timeouts=timeouts_enabled,
             timeout_default=global_default,
             timeout_maximum=global_max,
         )
-        assert field.calculate_from_global_options(pytest) == expected
+        disabled_values = dict(
+            timeouts=False,
+            timeout_default=3,
+            timeout_maximum=3,
+        )
+        if use_deprecated:
+            test_subsystem = create_subsystem(
+                TestSubsystem,
+                default_rank=Rank.NONE,
+                **disabled_values,
+            )
+            pytest = create_subsystem(
+                PyTest,
+                default_rank=Rank.FLAG,
+                **enabled_values,
+            )
+        else:
+            test_subsystem = create_subsystem(
+                TestSubsystem,
+                default_rank=Rank.FLAG,
+                **enabled_values,
+            )
+            pytest = create_subsystem(
+                PyTest,
+                default_rank=Rank.NONE,
+                **disabled_values,
+            )
 
-    assert_timeout_calculated(field_value=10, expected=10)
-    assert_timeout_calculated(field_value=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=None, global_default=20, expected=20)
-    assert_timeout_calculated(field_value=None, expected=None)
-    assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
-    assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+        assert field.calculate_from_global_options(test_subsystem, pytest) == expected
+
+    assert_timeout_calculated(
+        field_value=10,
+        expected=10,
+    )
+    assert_timeout_calculated(
+        field_value=20,
+        global_max=10,
+        expected=10,
+    )
+    assert_timeout_calculated(
+        field_value=None,
+        global_default=20,
+        expected=20,
+    )
+    assert_timeout_calculated(
+        field_value=None,
+        expected=None,
+    )
+    assert_timeout_calculated(
+        field_value=None,
+        global_default=20,
+        global_max=10,
+        expected=10,
+    )
+    assert_timeout_calculated(
+        field_value=10,
+        timeouts_enabled=False,
+        expected=None,
+    )
 
 
 @pytest.mark.parametrize(
@@ -181,12 +235,12 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"), is_file=True)
 
 
-def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
+def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
-            QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
+            QueryRule(InferredDependencies, [InferPexBinaryEntryPointDependency]),
         ],
         target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
     )
@@ -241,43 +295,47 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         }
     )
 
-    def assert_injected(address: Address, *, expected: Address | None) -> None:
+    def assert_inferred(address: Address, *, expected: Address | None) -> None:
         tgt = rule_runner.get_target(address)
-        injected = rule_runner.request(
-            InjectedDependencies,
-            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
+        inferred = rule_runner.request(
+            InferredDependencies,
+            [
+                InferPexBinaryEntryPointDependency(
+                    PexBinaryEntryPointDependencyInferenceFieldSet.create(tgt)
+                )
+            ],
         )
-        assert injected == InjectedDependencies([expected] if expected else [])
+        assert inferred == InferredDependencies([expected] if expected else [])
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_func"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_shorthand"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="first_party_shorthand_func"),
         expected=Address("project", relative_file_path="app.py"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_party"),
         expected=Address("", target_name="ansicolors"),
     )
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_party_func"),
         expected=Address("", target_name="ansicolors"),
     )
-    assert_injected(Address("project", target_name="unrecognized"), expected=None)
+    assert_inferred(Address("project", target_name="unrecognized"), expected=None)
 
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    assert_injected(Address("project", target_name="ambiguous"), expected=None)
+    assert_inferred(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
         softwrap(
@@ -293,7 +351,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
     # warning about ambiguity.
     caplog.clear()
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="disambiguated"),
         expected=Address("project", target_name="dep1", relative_file_path="ambiguous.py"),
     )
@@ -302,7 +360,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     # Test that using a file path results in ignoring all targets which are not an ancestor. We can
     # do this because we know the file name must be in the current directory or subdir of the
     # `pex_binary`.
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="another_root__file_used"),
         expected=Address(
             "project",
@@ -311,7 +369,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         ),
     )
     caplog.clear()
-    assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
+    assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
         softwrap(
@@ -323,9 +381,9 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
         in caplog.text
     )
 
-    # Test that we can turn off the injection.
+    # Test that we can turn off the inference.
     rule_runner.set_options(["--no-python-infer-entry-points"])
-    assert_injected(Address("project", target_name="first_party"), expected=None)
+    assert_inferred(Address("project", target_name="first_party"), expected=None)
 
 
 def test_requirements_field() -> None:
@@ -393,13 +451,13 @@ def test_resolve_python_distribution_entry_points_required_fields() -> None:
         ResolvePythonDistributionEntryPointsRequest()
 
 
-def test_inject_python_distribution_dependencies() -> None:
+def test_infer_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
-            QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
+            QueryRule(InferredDependencies, [InferPythonDistributionDependencies]),
         ],
         target_types=[
             PythonDistribution,
@@ -488,20 +546,24 @@ def test_inject_python_distribution_dependencies() -> None:
         }
     )
 
-    def assert_injected(address: Address, expected: list[Address]) -> None:
+    def assert_inferred(address: Address, expected: list[Address]) -> None:
         tgt = rule_runner.get_target(address)
-        injected = rule_runner.request(
-            InjectedDependencies,
-            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
+        inferred = rule_runner.request(
+            InferredDependencies,
+            [
+                InferPythonDistributionDependencies(
+                    PythonDistributionDependenciesInferenceFieldSet.create(tgt)
+                )
+            ],
         )
-        assert injected == InjectedDependencies(expected)
+        assert inferred == InferredDependencies(expected)
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="dist-a"),
         [Address("project", target_name="my_binary")],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="dist-b"),
         [
             Address("project", target_name="my_binary"),
@@ -509,14 +571,14 @@ def test_inject_python_distribution_dependencies() -> None:
         ],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_dep"),
         [
             Address("", target_name="ansicolors"),
         ],
     )
 
-    assert_injected(
+    assert_inferred(
         Address("project", target_name="third_dep2"),
         [
             Address("", target_name="ansicolors"),

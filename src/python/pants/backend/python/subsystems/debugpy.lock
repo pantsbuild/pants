@@ -9,7 +9,8 @@
 //     "CPython<3.11,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "debugpy==1.6.0"
+//     "debugpy==1.6.0",
+//     "importlib_metadata==1.4.0"
 //   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
@@ -42,18 +43,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "a65a2499761d47df3e9ea9567109be6e73d412e00ac3ffcf74839f3ddfcdf028",
-              "url": "https://files.pythonhosted.org/packages/1b/b5/eabd458d90029c480069c59c9dc17ae46bc52201b4c11e6d13d046295836/debugpy-1.6.0-cp38-cp38-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "132defb585b518955358321d0f42f6aa815aa15b432be27db654807707c70b2f",
               "url": "https://files.pythonhosted.org/packages/29/14/37d8721384550a40d766634a0aa6ecdcd1967c462f9c1ef38e1ad4d87bb1/debugpy-1.6.0-cp38-cp38-macosx_10_15_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "bd980d533d0ddfc451e03a3bb32acb2900049fec39afc3425b944ebf0889be62",
-              "url": "https://files.pythonhosted.org/packages/2f/e0/535f9a5e4e0c0b5ad79a5ec6820b1409b3d9faa516898ab9206bf0a9807c/debugpy-1.6.0-cp38-cp38-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
@@ -67,18 +58,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "5c492235d6b68f879df3bdbdb01f25c15be15682665517c2c7d0420e5658d71f",
-              "url": "https://files.pythonhosted.org/packages/38/cb/2d4b72588986cd1cdc0e92c610e6bd240f23d3b8de513c03ff9bf12c92c4/debugpy-1.6.0-cp310-cp310-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "245c7789a012f86210847ec7ee9f38c30a30d4c2223c3e111829a76c9006a5d0",
               "url": "https://files.pythonhosted.org/packages/45/a7/0bf4729aa497cc8837e9b525f34e6bad69f2191cfc14d63b36214add7a5c/debugpy-1.6.0-cp39-cp39-macosx_10_15_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "72bcfa97f3afa0064afc77ab811f48ad4a06ac330f290b675082c24437730366",
-              "url": "https://files.pythonhosted.org/packages/56/a4/45ec0767478544d64610fd587be8532705dcc84e8cdf56cbd7f427d76f3c/debugpy-1.6.0-cp39-cp39-win32.whl"
             },
             {
               "algorithm": "sha256",
@@ -94,52 +75,92 @@
               "algorithm": "sha256",
               "hash": "0d383b91efee57dbb923ba20801130cf60450a0eda60bce25bccd937de8e323a",
               "url": "https://files.pythonhosted.org/packages/a2/4f/b194a30eadabe0b578a4e9cf2ac9b1e387f0f5d2d6333d9bca18b69de689/debugpy-1.6.0-cp37-cp37m-macosx_10_15_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "40de9ba137d355538432209d05e0f5fe5d0498dce761c39119ad4b950b51db31",
-              "url": "https://files.pythonhosted.org/packages/ae/0c/fe29f3063a033b7619ce79d5c51f0379631c219ba2c913efe7b412b70de2/debugpy-1.6.0-cp310-cp310-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "a8aaeb53e87225141fda7b9081bd87155c1debc13e2f5a532d341112d1983b65",
-              "url": "https://files.pythonhosted.org/packages/b5/af/160a2ab46f9ff4061b6e1e47cfe4fb23f04cf262f75d7c49324f12368d31/debugpy-1.6.0-cp37-cp37m-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "8e972c717d95f56b6a3a7a29a5ede1ee8f2c3802f6f0e678203b0778eb322bf1",
-              "url": "https://files.pythonhosted.org/packages/d7/d4/abdb31e438dd07bc4f358ac3fef2f2e4abb4d00af9b808dfbe71250be5ef/debugpy-1.6.0-cp37-cp37m-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "30abefefd2ff5a5481162d613cb70e60e2fa80a5eb4c994717c0f008ed25d2e1",
-              "url": "https://files.pythonhosted.org/packages/f8/45/177e6a7623ebe40c1ae732c79011491809c76f758d98dc826098fbe1dd47/debugpy-1.6.0-cp39-cp39-win_amd64.whl"
             }
           ],
           "project_name": "debugpy",
           "requires_dists": [],
           "requires_python": ">=3.7",
           "version": "1.6"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "bdd9b7c397c273bcc9a11d6629a38487cd07154fa255a467bf704cd2c258e359",
+              "url": "https://files.pythonhosted.org/packages/d7/31/74dcb59a601b95fce3b0334e8fc9db758f78e43075f22aeb3677dfb19f4c/importlib_metadata-1.4.0-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f17c015735e1a88296994c0697ecea7e11db24290941983b08c9feb30921e6d8",
+              "url": "https://files.pythonhosted.org/packages/8c/0e/10e247f40c89ba72b7f2a2104ccf1b65de18f79562ffe11bfb837b711acf/importlib_metadata-1.4.0.tar.gz"
+            }
+          ],
+          "project_name": "importlib-metadata",
+          "requires_dists": [
+            "configparser>=3.5; python_version < \"3\"",
+            "contextlib2; python_version < \"3\"",
+            "importlib-resources; python_version < \"3.7\" and extra == \"testing\"",
+            "packaging; extra == \"testing\"",
+            "pathlib2; python_version < \"3\"",
+            "rst.linker; extra == \"docs\"",
+            "sphinx; extra == \"docs\"",
+            "zipp>=0.5"
+          ],
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
+          "version": "1.4"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "47c40d7fe183a6f21403a199b3e4192cca5774656965b0a4988ad2f8feb5f009",
+              "url": "https://files.pythonhosted.org/packages/f0/36/639d6742bcc3ffdce8b85c31d79fcfae7bb04b95f0e5c4c6f8b206a038cc/zipp-3.8.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "05b45f1ee8f807d0cc928485ca40a07cb491cf092ff587c0df9cb1fd154848d2",
+              "url": "https://files.pythonhosted.org/packages/3b/e3/fb79a1ea5f3a7e9745f688855d3c673f2ef7921639a380ec76f7d4d83a85/zipp-3.8.1.tar.gz"
+            }
+          ],
+          "project_name": "zipp",
+          "requires_dists": [
+            "func-timeout; extra == \"testing\"",
+            "jaraco.itertools; extra == \"testing\"",
+            "jaraco.packaging>=9; extra == \"docs\"",
+            "jaraco.tidelift>=1.4; extra == \"docs\"",
+            "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-checkdocs>=2.4; extra == \"testing\"",
+            "pytest-cov; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
+            "pytest-flake8; extra == \"testing\"",
+            "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest>=6; extra == \"testing\"",
+            "rst.linker>=1.9; extra == \"docs\"",
+            "sphinx; extra == \"docs\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "3.8.1"
         }
       ],
-      "platform_tag": [
-        "cp38",
-        "cp38",
-        "manylinux_2_31_x86_64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
-    "debugpy==1.6.0"
+    "debugpy==1.6.0",
+    "importlib_metadata==1.4.0"
   ],
   "requires_python": [
     "<3.11,>=3.7"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }

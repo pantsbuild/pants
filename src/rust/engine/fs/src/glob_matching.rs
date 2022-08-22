@@ -20,6 +20,15 @@ use crate::{
   Vfs,
 };
 
+/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
+///
+/// We use a slightly different limit because this is not exactly the same operation: we're
+/// walking recursively while matching globs, and so our link traversals might involve steps
+/// through non-link destinations.
+const MAX_LINK_DEPTH: u8 = 64;
+
+type LinkDepth = u8;
+
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
   pub static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
@@ -38,12 +47,14 @@ pub enum PathGlob {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
+    link_depth: LinkDepth,
   },
   DirWildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
     remainder: Vec<Pattern>,
+    link_depth: LinkDepth,
   },
 }
 
@@ -57,11 +68,17 @@ pub(crate) struct PathGlobIncludeEntry {
 }
 
 impl PathGlob {
-  fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
+  fn wildcard(
+    canonical_dir: Dir,
+    symbolic_path: PathBuf,
+    wildcard: Pattern,
+    link_depth: LinkDepth,
+  ) -> PathGlob {
     PathGlob::Wildcard {
       canonical_dir,
       symbolic_path,
       wildcard,
+      link_depth,
     }
   }
 
@@ -70,25 +87,26 @@ impl PathGlob {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     remainder: Vec<Pattern>,
+    link_depth: LinkDepth,
   ) -> PathGlob {
     PathGlob::DirWildcard {
       canonical_dir,
       symbolic_path,
       wildcard,
       remainder,
+      link_depth,
     }
   }
 
   pub fn create(filespecs: Vec<String>) -> Result<Vec<PathGlob>, String> {
     // Getting a Vec<PathGlob> per filespec is needed to create a `PreparedPathGlobs`, but we don't
     // need that here.
-    let filespecs_globs = Self::spread_filespecs(filespecs)?;
-    let all_globs = Self::flatten_entries(filespecs_globs);
-    Ok(all_globs)
-  }
-
-  fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
-    entries.into_iter().flat_map(|entry| entry.globs).collect()
+    Ok(
+      Self::spread_filespecs(filespecs)?
+        .into_iter()
+        .flat_map(|entry| entry.globs)
+        .collect(),
+    )
   }
 
   pub(crate) fn spread_filespecs(
@@ -154,7 +172,7 @@ impl PathGlob {
       })
       .collect::<Result<Vec<_>, _>>()?;
 
-    PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
+    PathGlob::parse_globs(canonical_dir, symbolic_path, &parts, 0)
   }
 
   ///
@@ -164,6 +182,7 @@ impl PathGlob {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     parts: &[Pattern],
+    link_depth: LinkDepth,
   ) -> Result<Vec<PathGlob>, String> {
     if parts.is_empty() {
       Ok(vec![])
@@ -179,8 +198,14 @@ impl PathGlob {
             symbolic_path.clone(),
             SINGLE_STAR_GLOB.clone(),
             vec![DOUBLE_STAR_GLOB.clone()],
+            link_depth,
           ),
-          PathGlob::wildcard(canonical_dir, symbolic_path, SINGLE_STAR_GLOB.clone()),
+          PathGlob::wildcard(
+            canonical_dir,
+            symbolic_path,
+            SINGLE_STAR_GLOB.clone(),
+            link_depth,
+          ),
         ]);
       }
 
@@ -192,15 +217,17 @@ impl PathGlob {
         symbolic_path.clone(),
         SINGLE_STAR_GLOB.clone(),
         parts[0..].to_vec(),
+        link_depth,
       );
       let pathglob_no_doublestar = if parts.len() == 2 {
-        PathGlob::wildcard(canonical_dir, symbolic_path, parts[1].clone())
+        PathGlob::wildcard(canonical_dir, symbolic_path, parts[1].clone(), link_depth)
       } else {
         PathGlob::dir_wildcard(
           canonical_dir,
           symbolic_path,
           parts[1].clone(),
           parts[2..].to_vec(),
+          link_depth,
         )
       };
       Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
@@ -219,13 +246,19 @@ impl PathGlob {
         ));
       }
       symbolic_path_parent.push(Path::new(*PARENT_DIR));
-      PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
+      PathGlob::parse_globs(
+        canonical_dir_parent,
+        symbolic_path_parent,
+        &parts[1..],
+        link_depth,
+      )
     } else if parts.len() == 1 {
       // This is the path basename.
       Ok(vec![PathGlob::wildcard(
         canonical_dir,
         symbolic_path,
         parts[0].clone(),
+        link_depth,
       )])
     } else {
       // This is a path dirname.
@@ -234,6 +267,7 @@ impl PathGlob {
         symbolic_path,
         parts[0].clone(),
         parts[1..].to_vec(),
+        link_depth,
       )])
     }
   }
@@ -245,25 +279,9 @@ pub struct PreparedPathGlobs {
   pub(crate) exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
   conjunction: GlobExpansionConjunction,
-  patterns: Vec<glob::Pattern>,
 }
 
 impl PreparedPathGlobs {
-  fn parse_patterns_from_include(
-    include: &[PathGlobIncludeEntry],
-  ) -> Result<Vec<glob::Pattern>, String> {
-    include
-      .iter()
-      .map(|pattern| {
-        PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
-          let normalized_pattern: PathBuf = components.into_iter().collect();
-          Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
-        })
-      })
-      .collect::<Result<Vec<_>, String>>()
-  }
-
   pub fn create(
     globs: Vec<String>,
     strict_match_behavior: StrictGlobMatching,
@@ -281,14 +299,12 @@ impl PreparedPathGlobs {
     }
     let include = PathGlob::spread_filespecs(include_globs)?;
     let exclude = GitignoreStyleExcludes::create(exclude_globs)?;
-    let patterns = PreparedPathGlobs::parse_patterns_from_include(&include)?;
 
     Ok(PreparedPathGlobs {
       include,
       exclude,
       strict_match_behavior,
       conjunction,
-      patterns,
     })
   }
 
@@ -301,32 +317,62 @@ impl PreparedPathGlobs {
       })
       .collect();
 
-    let patterns = PreparedPathGlobs::parse_patterns_from_include(include.as_slice())?;
     Ok(PreparedPathGlobs {
       include,
       // An empty exclude becomes EMPTY_IGNORE.
       exclude: GitignoreStyleExcludes::create(vec![])?,
       strict_match_behavior: StrictGlobMatching::Ignore,
       conjunction: GlobExpansionConjunction::AllMatch,
-      patterns,
     })
+  }
+}
+
+/// Allows checking in-memory if paths match the patterns.
+#[derive(Debug)]
+pub struct FilespecMatcher {
+  includes: Vec<Pattern>,
+  excludes: Arc<GitignoreStyleExcludes>,
+}
+
+impl FilespecMatcher {
+  pub fn new(includes: Vec<String>, excludes: Vec<String>) -> Result<Self, String> {
+    let includes = includes
+      .iter()
+      .map(|glob| {
+        PathGlob::normalize_pattern(glob).and_then(|components| {
+          let normalized_pattern: PathBuf = components.into_iter().collect();
+          Pattern::new(normalized_pattern.to_str().unwrap())
+            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", glob, e))
+        })
+      })
+      .collect::<Result<Vec<_>, String>>()?;
+    let excludes = GitignoreStyleExcludes::create(excludes)?;
+    Ok(Self { includes, excludes })
   }
 
   ///
-  /// Matches these PreparedPathGlobs against the given paths.
+  /// Matches the patterns against the given paths.
   ///
   /// NB: This implementation is independent from GlobMatchingImplementation::expand, and must be
-  /// kept in sync via unit tests (in particular: the python FilespecTest) in order to allow for
+  /// kept in sync via unit tests (in particular: the python filespec_test.py) in order to allow for
   /// owners detection of deleted files (see #6790 and #5636 for more info). The lazy filesystem
   /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
   /// via MemFS).
   ///
   pub fn matches(&self, path: &Path) -> bool {
-    self
-      .patterns
+    let matches_includes = self
+      .includes
       .iter()
-      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS))
-      && !self.exclude.is_ignored_path(path, false)
+      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS));
+    matches_includes && !self.excludes.is_ignored_path(path, false)
+  }
+
+  pub fn include_globs(&self) -> &[Pattern] {
+    self.includes.as_slice()
+  }
+
+  pub fn exclude_globs(&self) -> &[String] {
+    self.excludes.patterns.as_slice()
   }
 }
 
@@ -337,8 +383,6 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: Vfs<E> {
   /// in None if the PathStat represents a broken Link.
   ///
   /// Skips ignored paths both before and after expansion.
-  ///
-  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
   async fn canonicalize_link(
     &self,
@@ -375,7 +419,8 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     exclude: &Arc<GitignoreStyleExcludes>,
-  ) -> Result<Vec<PathStat>, E> {
+    link_depth: LinkDepth,
+  ) -> Result<Vec<(PathStat, LinkDepth)>, E> {
     // List the directory.
     let dir_listing = self.scandir(canonical_dir).await?;
 
@@ -411,12 +456,27 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
             } else {
               match stat {
                 Stat::Link(l) => {
-                  context
+                  // NB: When traversing a link, we increment the link_depth.
+                  if link_depth >= MAX_LINK_DEPTH {
+                    return Err(Self::mk_error(&format!(
+                      "Maximum link depth exceeded at {l:?} for {stat_symbolic_path:?}"
+                    )));
+                  }
+
+                  let dest = context
                     .canonicalize_link(stat_symbolic_path, l.clone())
-                    .await
+                    .await?;
+
+                  Ok(dest.map(|ps| (ps, link_depth + 1)))
                 }
-                Stat::Dir(d) => Ok(Some(PathStat::dir(stat_symbolic_path, d.clone()))),
-                Stat::File(f) => Ok(Some(PathStat::file(stat_symbolic_path, f.clone()))),
+                Stat::Dir(d) => Ok(Some((
+                  PathStat::dir(stat_symbolic_path, d.clone()),
+                  link_depth,
+                ))),
+                Stat::File(f) => Ok(Some((
+                  PathStat::file(stat_symbolic_path, f.clone()),
+                  link_depth,
+                ))),
               }
             }
           }
@@ -555,9 +615,17 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         canonical_dir,
         symbolic_path,
         wildcard,
+        link_depth,
       } => {
         self
-          .expand_wildcard(result, exclude, canonical_dir, symbolic_path, wildcard)
+          .expand_wildcard(
+            result,
+            exclude,
+            canonical_dir,
+            symbolic_path,
+            wildcard,
+            link_depth,
+          )
           .await
       }
       PathGlob::DirWildcard {
@@ -565,6 +633,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         symbolic_path,
         wildcard,
         remainder,
+        link_depth,
       } => {
         self
           .expand_dir_wildcard(
@@ -574,6 +643,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
             symbolic_path,
             wildcard,
             remainder,
+            link_depth,
           )
           .await
       }
@@ -587,15 +657,16 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
+    link_depth: LinkDepth,
   ) -> Result<bool, E> {
     // Filter directory listing to append PathStats, with no continuation.
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude)
+      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
       .await?;
 
     let mut result = result.lock();
     let matched = !path_stats.is_empty();
-    result.extend(path_stats);
+    result.extend(path_stats.into_iter().map(|(ps, _)| ps));
     Ok(matched)
   }
 
@@ -607,18 +678,20 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     remainder: Vec<Pattern>,
+    link_depth: LinkDepth,
   ) -> Result<bool, E> {
     // Filter directory listing and recurse for matched Dirs.
     let context = self.clone();
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude)
+      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
       .await?;
 
     let path_globs = path_stats
       .into_iter()
-      .filter_map(|ps| match ps {
+      .filter_map(|(ps, link_depth)| match ps {
         PathStat::Dir { path, stat } => Some(
-          PathGlob::parse_globs(stat, path, &remainder).map_err(|e| Self::mk_error(e.as_str())),
+          PathGlob::parse_globs(stat, path, &remainder, link_depth)
+            .map_err(|e| Self::mk_error(e.as_str())),
         ),
         PathStat::File { .. } => None,
       })

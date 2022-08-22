@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-  DirectoryDigest, GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching,
+  DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
   EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -28,12 +28,12 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyMergeDigests>()?;
   m.add_class::<PyAddPrefix>()?;
   m.add_class::<PyRemovePrefix>()?;
+  m.add_class::<PyFilespecMatcher>()?;
 
   m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
   m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
-  m.add_function(wrap_pyfunction!(match_path_globs, m)?)?;
   m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
   Ok(())
 }
@@ -51,7 +51,7 @@ pub fn possible_store_missing_digest(e: store::StoreError) -> PyErr {
 }
 
 #[pyclass(name = "Digest")]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyDigest(pub DirectoryDigest);
 
 impl fmt::Display for PyDigest {
@@ -108,7 +108,7 @@ impl PyDigest {
 }
 
 #[pyclass(name = "FileDigest")]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PyFileDigest(pub Digest);
 
 #[pymethods]
@@ -257,7 +257,7 @@ impl PySnapshot {
 }
 
 #[pyclass(name = "MergeDigests")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 
 #[pymethods]
@@ -298,7 +298,7 @@ impl PyMergeDigests {
 }
 
 #[pyclass(name = "AddPrefix")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyAddPrefix {
   pub digest: DirectoryDigest,
   pub prefix: PathBuf,
@@ -339,7 +339,7 @@ impl PyAddPrefix {
 }
 
 #[pyclass(name = "RemovePrefix")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PyRemovePrefix {
   pub digest: DirectoryDigest,
   pub prefix: PathBuf,
@@ -385,17 +385,6 @@ impl PyRemovePrefix {
 
 struct PyPathGlobs(PathGlobs);
 
-impl PyPathGlobs {
-  fn parse(self) -> PyResult<PreparedPathGlobs> {
-    self.0.clone().parse().map_err(|e| {
-      PyValueError::new_err(format!(
-        "Failed to parse PathGlobs: {:?}\n\nError: {}",
-        self.0, e
-      ))
-    })
-  }
-}
-
 impl<'source> FromPyObject<'source> for PyPathGlobs {
   fn extract(obj: &'source PyAny) -> PyResult<Self> {
     let globs: Vec<String> = obj.getattr("globs")?.extract()?;
@@ -426,21 +415,65 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
   }
 }
 
-#[pyfunction]
-fn match_path_globs(
-  py_path_globs: PyPathGlobs,
-  paths: Vec<String>,
-  py: Python,
-) -> PyResult<Vec<String>> {
-  py.allow_threads(|| {
-    let path_globs = py_path_globs.parse()?;
-    Ok(
-      paths
-        .into_iter()
-        .filter(|p| path_globs.matches(Path::new(p)))
-        .collect(),
-    )
-  })
+// -----------------------------------------------------------------------------
+// FilespecMatcher
+// -----------------------------------------------------------------------------
+
+#[pyclass(name = "FilespecMatcher")]
+#[derive(Debug)]
+pub struct PyFilespecMatcher(FilespecMatcher);
+
+#[pymethods]
+impl PyFilespecMatcher {
+  #[new]
+  fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
+    // Parsing the globs has shown up in benchmarks
+    // (https://github.com/pantsbuild/pants/issues/16122), so we use py.allow_threads().
+    let matcher =
+      py.allow_threads(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
+    Ok(Self(matcher))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.include_globs().hash(&mut s);
+    self.0.exclude_globs().hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let includes = self
+      .0
+      .include_globs()
+      .iter()
+      .map(|pattern| pattern.to_string())
+      .join(", ");
+    let excludes = self.0.exclude_globs().join(", ");
+    format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
+  }
+
+  fn __richcmp__(&self, other: &PyFilespecMatcher, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0.include_globs() == other.0.include_globs()
+        && self.0.exclude_globs() == other.0.exclude_globs())
+      .into_py(py),
+      CompareOp::Ne => (self.0.include_globs() != other.0.include_globs()
+        || self.0.exclude_globs() != other.0.exclude_globs())
+      .into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
+    py.allow_threads(|| {
+      Ok(
+        paths
+          .into_iter()
+          .filter(|p| self.0.matches(Path::new(p)))
+          .collect(),
+      )
+    })
+  }
 }
 
 // -----------------------------------------------------------------------------

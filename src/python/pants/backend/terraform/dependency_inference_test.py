@@ -10,6 +10,7 @@ from pants.backend.terraform.dependency_inference import (
     InferTerraformModuleDependenciesRequest,
     ParseTerraformModuleSources,
     TerraformHcl2Parser,
+    TerraformModuleDependenciesInferenceFieldSet,
 )
 from pants.backend.terraform.target_types import TerraformModuleTarget
 from pants.build_graph.address import Address
@@ -83,7 +84,11 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/tf/resources/grok"))
     inferred_deps = rule_runner.request(
         InferredDependencies,
-        [InferTerraformModuleDependenciesRequest(target.get(SourcesField))],
+        [
+            InferTerraformModuleDependenciesRequest(
+                TerraformModuleDependenciesInferenceFieldSet.create(target)
+            )
+        ],
     )
     assert inferred_deps == InferredDependencies(
         FrozenOrderedSet(

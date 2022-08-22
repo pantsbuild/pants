@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -44,6 +45,7 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestContents,
     DigestSubset,
     Directory,
     MergeDigests,
@@ -164,6 +166,13 @@ class TestSetup:
     __test__ = False
 
 
+_TEST_PATTERN = re.compile(b"def\\s+test_")
+
+
+def _count_pytest_tests(contents: DigestContents) -> int:
+    return sum(len(_TEST_PATTERN.findall(file.content)) for file in contents)
+
+
 @rule(level=LogLevel.DEBUG)
 async def setup_pytest_for_target(
     request: TestSetupRequest,
@@ -244,7 +253,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=request.main or pytest.main,
             internal_only=True,
-            pex_path=[*request.additional_pexes, pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=[pytest_pex, requirements_pex, local_dists.pex, *request.additional_pexes],
         ),
     )
     config_files_get = Get(
@@ -325,11 +334,22 @@ async def setup_pytest_for_target(
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
+
+    xdist_concurrency = 0
+    if pytest.xdist_enabled and not request.is_debug:
+        concurrency = request.field_set.xdist_concurrency.value
+        if concurrency is None:
+            contents = await Get(DigestContents, Digest, field_set_source_files.snapshot.digest)
+            concurrency = _count_pytest_tests(contents)
+        xdist_concurrency = concurrency
+
     process = await Get(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
+                *(("-c", pytest.config) if pytest.config else ()),
+                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
                 *coverage_args,
@@ -339,8 +359,11 @@ async def setup_pytest_for_target(
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
-            timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
+            timeout_seconds=request.field_set.timeout.calculate_from_global_options(
+                test_subsystem, pytest
+            ),
             execution_slot_variable=pytest.execution_slot_var,
+            concurrency_available=xdist_concurrency,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,

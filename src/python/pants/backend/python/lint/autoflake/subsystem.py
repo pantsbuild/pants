@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -33,11 +36,17 @@ class Autoflake(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="--target-version=py37 --quiet")
+    args = ArgsListOption(
+        example="--remove-all-unused-imports --target-version=py37 --quiet",
+        # This argument was previously hardcoded. Moved it a default argument
+        # to allow it to be overridden while maintaining the existing api.
+        # See: https://github.com/pantsbuild/pants/issues/16193
+        default=["--remove-all-unused-imports"],
+    )
     export = ExportToolOption()
 
 
-class AutoflakeLockfileSentinel(GenerateToolLockfileSentinel):
+class AutoflakeLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Autoflake.options_scope
 
 

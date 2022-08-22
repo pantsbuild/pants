@@ -8,7 +8,6 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from functools import partial
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Mapping, Union, cast
 
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 # A dict with optional override seed values for buildroot, pants_workdir, and pants_distdir.
-SeedValues = Dict[str, Value]
+SeedValues = Mapping[str, Value]
 
 
 class ConfigSource(Protocol):
@@ -89,7 +88,7 @@ class Config:
         cls, config_source: ConfigSource, normalized_seed_values: dict[str, Any]
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
-        toml_values = cast(Dict[str, Any], toml.loads(config_source.content.decode()))
+        toml_values = toml.loads(config_source.content.decode())
         toml_values[DEFAULT_SECTION] = {
             **normalized_seed_values,
             **toml_values.get(DEFAULT_SECTION, {}),
@@ -163,7 +162,7 @@ class Config:
 
 
 _TomlPrimitive = Union[bool, int, float, str]
-_TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
+_TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive], Dict[str, _TomlPrimitive]]
 
 
 @dataclass(frozen=True)
@@ -172,16 +171,6 @@ class _ConfigValues:
 
     path: str
     section_to_values: dict[str, dict[str, Any]]
-
-    @staticmethod
-    def _is_an_option(option_value: _TomlValue | dict) -> bool:
-        """Determine if the value is actually an option belonging to that section.
-
-        This handles the special syntax of `my_list_option.add` and `my_list_option.remove`.
-        """
-        if isinstance(option_value, dict):
-            return "add" in option_value or "remove" in option_value
-        return True
 
     def _possibly_interpolate_value(
         self,
@@ -193,10 +182,10 @@ class _ConfigValues:
     ) -> str:
         """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or
         the same section."""
+        # TODO(benjy): I wonder if we can abuse ConfigParser to do this for us?
 
         def format_str(value: str) -> str:
-            # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so
-            # that .format() does not try to improperly interpolate.
+            # Escape embedded { and } characters, so that .format() does not act on them.
             escaped_str = value.replace("{", "{{").replace("}", "}}")
             new_style_format_str = re.sub(
                 pattern=r"%\((?P<interpolated>[a-zA-Z_0-9.]+)\)s",
@@ -224,49 +213,6 @@ class _ConfigValues:
 
         return recursively_format_str(raw_value)
 
-    def _stringify_val(
-        self,
-        raw_value: _TomlValue,
-        *,
-        option: str,
-        section: str,
-        section_values: dict,
-        interpolate: bool = True,
-        list_prefix: str | None = None,
-    ) -> str:
-        # We convert all values to strings, which allows us to treat them uniformly with
-        # env vars and cmd-line flags in parser.py.
-        possibly_interpolate = partial(
-            self._possibly_interpolate_value,
-            option=option,
-            section=section,
-            section_values=section_values,
-        )
-        if isinstance(raw_value, str):
-            return possibly_interpolate(raw_value) if interpolate else raw_value
-
-        if isinstance(raw_value, list):
-
-            def stringify_list_member(member: _TomlPrimitive) -> str:
-                if not isinstance(member, str):
-                    return str(member)
-                interpolated_member = possibly_interpolate(member) if interpolate else member
-                return f'"{interpolated_member}"'
-
-            list_members = ", ".join(stringify_list_member(member) for member in raw_value)
-            return f"{list_prefix or ''}[{list_members}]"
-
-        return str(raw_value)
-
-    def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
-        return self._stringify_val(
-            raw_value,
-            option="",
-            section="",
-            section_values={},
-            interpolate=False,
-        )
-
     def get_value(self, section: str, option: str) -> str | None:
         section_values = self.section_to_values.get(section)
         if section_values is None:
@@ -274,32 +220,39 @@ class _ConfigValues:
         if option not in section_values:
             return None
 
-        stringify = partial(
-            self._stringify_val,
-            option=option,
-            section=section,
-            section_values=section_values,
-        )
+        def stringify(raw_val: _TomlValue, prefix: str = "") -> str:
+            string_val = self._possibly_interpolate_value(
+                raw_value=str(raw_val),
+                option=option,
+                section=section,
+                section_values=section_values or {},
+            )
+            return f"{prefix}{string_val}"
 
         option_value = section_values[option]
         if not isinstance(option_value, dict):
             return stringify(option_value)
 
-        # Handle dict options, along with the special `my_list_option.add` and
-        # `my_list_option.remove` syntax. We only treat `add` and `remove` as the special list
-        # syntax if the values are lists to reduce the risk of incorrectly special casing.
-        has_add = isinstance(option_value.get("add"), list)
-        has_remove = isinstance(option_value.get("remove"), list)
-        if not has_add and not has_remove:
-            return stringify(option_value)
+        # Handle dict options, along with the special `my_dict_option.add`, `my_list_option.add` and
+        # `my_list_option.remove` syntax. We only treat `add` and `remove` as the special syntax
+        # if the values have the approprate type, to reduce the risk of incorrectly special casing.
+        has_add_dict = isinstance(option_value.get("add"), dict)
+        has_add_list = isinstance(option_value.get("add"), list)
+        has_remove_list = isinstance(option_value.get("remove"), list)
 
-        add_val = stringify(option_value["add"], list_prefix="+") if has_add else "[]"
-        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else "[]"
-        if has_add and has_remove:
-            return f"{add_val},{remove_val}"
-        if has_add:
-            return add_val
-        return remove_val
+        if has_add_dict:
+            return stringify(option_value["add"], prefix="+")
+
+        if has_add_list or has_remove_list:
+            add_val = stringify(option_value["add"], prefix="+") if has_add_list else "[]"
+            remove_val = stringify(option_value["remove"], prefix="-") if has_remove_list else "[]"
+            if has_add_list and has_remove_list:
+                return f"{add_val},{remove_val}"
+            if has_add_list:
+                return add_val
+            return remove_val
+
+        return stringify(option_value)
 
     @property
     def defaults(self) -> dict[str, Any]:

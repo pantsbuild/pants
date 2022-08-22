@@ -136,7 +136,6 @@ def run_pants_with_workdir_without_waiting(
         for h in (
             "HOME",
             "PATH",  # Needed to find Python interpreters and other binaries.
-            "PANTS_PROFILE",
         ):
             value = os.getenv(h)
             if value is not None:

@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import builtins
 import os.path
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any
 
 from pants.build_graph.address import (
@@ -21,7 +23,7 @@ from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaults
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
@@ -54,20 +56,23 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
-    values: dict[str, Any] = {}
+    globals: dict[str, Any] = {
+        **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+    }
+    locals: dict[str, Any] = {}
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
             content = compile(file_content_str, file_content.path, "exec")
-            exec(content, values)
+            exec(content, globals, locals)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
         error_on_imports(file_content_str, file_content.path)
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
-    values.pop("__builtins__", None)
-    return BuildFilePreludeSymbols(FrozenDict(values))
+    locals.pop("__builtins__", None)
+    return BuildFilePreludeSymbols(FrozenDict(locals))
 
 
 @rule
@@ -159,11 +164,16 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
-    parent_dir = os.path.dirname(directory.path)
-    if parent_dir != directory.path:
-        maybe_parent = await Get(OptionalAddressFamily, AddressFamilyDir(parent_dir))
-        if maybe_parent.address_family is not None:
-            defaults = maybe_parent.address_family.defaults
+    parent_dirs = tuple(PurePath(directory.path).parents)
+    if parent_dirs:
+        maybe_parents = await MultiGet(
+            Get(OptionalAddressFamily, AddressFamilyDir(str(parent_dir)))
+            for parent_dir in parent_dirs
+        )
+        for maybe_parent in maybe_parents:
+            if maybe_parent.address_family is not None:
+                defaults = maybe_parent.address_family.defaults
+                break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership

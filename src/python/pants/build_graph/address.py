@@ -514,10 +514,7 @@ class Address(EngineAwareParameter):
         else:
             target = f"{parent_prefix}{self.target_name}"
         if self.parameters:
-            key_value_strs = ",".join(
-                f"{sanitize(k)}={sanitize(v)}" for k, v in self.parameters.items()
-            )
-            params = f"@@{key_value_strs}"
+            params = f"@{sanitize(self.parameters_repr)}"
         else:
             params = ""
         generated = f"@{sanitize(self.generated_name)}" if self.generated_name else ""
@@ -573,6 +570,8 @@ class Address(EngineAwareParameter):
         )
 
     def __eq__(self, other):
+        if self is other:
+            return True
         if not isinstance(other, Address):
             return False
         return self._equal_without_parameters(other) and self.parameters == other.parameters

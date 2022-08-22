@@ -42,7 +42,9 @@ def create_dynamic_remote_options(
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironment({})
     _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
-    return DynamicRemoteOptions.from_options(options, env)[0]
+    return DynamicRemoteOptions.from_options(
+        options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
+    )[0]
 
 
 def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
@@ -102,6 +104,8 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
     }
     assert opts.execution_headers == {"exec": "xyz", "foo": "baz"}
     assert opts.cache_read is True
+    assert opts.cache_write is False
+    assert opts.execution is False
     assert opts.instance_name == "custom_instance"
     # Note that the grpc:// prefix will be converted to http://.
     assert opts.store_address == "http://custom_store"
@@ -109,7 +113,9 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
 
     opts = compute_options("UNAVAILABLE", tmp_path)
     assert opts.cache_read is False
-    assert opts.instance_name == "main"
+    assert opts.cache_write is False
+    assert opts.execution is False
+    assert opts.instance_name is None
 
 
 def test_execution_options_remote_addresses() -> None:

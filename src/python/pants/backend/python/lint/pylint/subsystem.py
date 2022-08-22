@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
-import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -20,7 +22,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSourceField,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -30,10 +32,8 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
-    AllTargets,
-    AllTargetsRequest,
     Dependencies,
     FieldSet,
     Target,
@@ -217,53 +217,12 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
     )
 
     return PylintFirstPartyPlugins(
-        requirement_strings=PexRequirements.create_from_requirement_fields(
+        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
             requirements_fields,
-            constraints_strings=(),
-        ).req_strings,
+        ),
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
     )
-
-
-# --------------------------------------------------------------------------------------
-# Interpreter constraints
-# --------------------------------------------------------------------------------------
-
-
-@rule_helper
-async def _pylint_interpreter_constraints(
-    first_party_plugins: PylintFirstPartyPlugins,
-    python_setup: PythonSetup,
-) -> InterpreterConstraints:
-    # While Pylint will run in partitions, we need a set of constraints that works with every
-    # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
-    #
-    # This first computes the constraints for each individual target. Then, it ORs all unique
-    # resulting interpreter constraints. The net effect is that every possible Python interpreter
-    # used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-
-    unique_constraints = {
-        InterpreterConstraints.create_from_compatibility_fields(
-            (
-                tgt[InterpreterConstraintsField],
-                *first_party_plugins.interpreter_constraints_fields,
-            ),
-            python_setup,
-        )
-        for tgt in all_tgts
-        if PylintFieldSet.is_applicable(tgt)
-    }
-    if not unique_constraints:
-        unique_constraints.add(
-            InterpreterConstraints.create_from_compatibility_fields(
-                first_party_plugins.interpreter_constraints_fields,
-                python_setup,
-            )
-        )
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
 # --------------------------------------------------------------------------------------
@@ -271,7 +230,7 @@ async def _pylint_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(GenerateToolLockfileSentinel):
+class PylintLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Pylint.options_scope
 
 
@@ -295,7 +254,11 @@ async def setup_pylint_lockfile(
             pylint, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(
+        python_setup,
+        PylintFieldSet,
+        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
+    )
     return GeneratePythonLockfile.from_tool(
         pylint,
         constraints,
@@ -330,7 +293,11 @@ async def pylint_export(
 ) -> ExportPythonTool:
     if not pylint.export:
         return ExportPythonTool(resolve_name=pylint.options_scope, pex_request=None)
-    constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(
+        python_setup,
+        PylintFieldSet,
+        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
+    )
     return ExportPythonTool(
         resolve_name=pylint.options_scope,
         pex_request=pylint.to_pex_request(

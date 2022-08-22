@@ -387,14 +387,15 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
         currentframe = inspect.currentframe()
         assert isinstance(currentframe, FrameType)
         caller_frame = currentframe.f_back
-        caller_module = inspect.getmodule(caller_frame)
-        assert isinstance(caller_module, ModuleType)
-        namespaces = (caller_module,)
+        assert isinstance(caller_frame, FrameType)
+
+        global_items = caller_frame.f_globals
+        namespaces = (global_items,)
 
     def iter_rules():
         for namespace in namespaces:
             mapping = namespace.__dict__ if isinstance(namespace, ModuleType) else namespace
-            for name, item in mapping.items():
+            for item in mapping.values():
                 if not callable(item):
                     continue
                 rule = getattr(item, "rule", None)

@@ -21,7 +21,6 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from time import sleep
 from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
 from urllib.parse import quote_plus
@@ -32,6 +31,7 @@ from common import banner, die, green
 from packaging.version import Version
 from reversion import reversion
 
+from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap, strip_prefix
 
@@ -348,7 +348,7 @@ def install_exercising_namespace_packages(
     :return: The PYTHONPATH that can be used along with venv_bin_dir / "python" to test the
         installed packages with.
     """
-    with TemporaryDirectory() as td:
+    with temporary_dir() as td:
         tempdir = Path(td)
         wheel_dir = tempdir / "wheels"
         pip = venv_bin_dir / "pip"
@@ -555,7 +555,7 @@ def create_tmp_venv() -> Iterator[Path]:
     Note that the venv is not sourced. You should run bin_path / "pip" and bin_path / "python"
     directly.
     """
-    with TemporaryDirectory() as tempdir:
+    with temporary_dir() as tempdir:
         bin_dir = create_venv(Path(tempdir))
         subprocess.run([(bin_dir / "pip"), "install", "--quiet", "wheel"], check=True)
         yield bin_dir
@@ -588,7 +588,7 @@ def download_pex_bin() -> Iterator[Path]:
             )
         )
 
-    with TemporaryDirectory() as tempdir:
+    with temporary_dir() as tempdir:
         resp = requests.get(
             f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
         )
@@ -794,7 +794,7 @@ def build_pex(fetch: bool) -> None:
             "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
-                for plat in ("linux_x86_64", "macosx_10.15_x86_64")
+                for plat in ("linux_x86_64", "macosx_11.0_x86_64")
                 for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
             ),
         ]
@@ -863,7 +863,7 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    with TemporaryDirectory() as tmpdir:
+    with temporary_dir() as tmpdir:
         validated_pex_path = Path(tmpdir, "pants.pex")
         shutil.copyfile(dest, validated_pex_path)
         validated_pex_path.chmod(0o777)
@@ -901,49 +901,6 @@ def publish() -> None:
     tag_release()
     banner("Successfully released to PyPI and GitHub")
     prompt_to_generate_docs()
-
-
-def publish_apple_silicon() -> None:
-    banner("Building and publishing an Apple Silicon wheel")
-    if os.environ.get("USE_PY39") != "true":
-        die("Must set `USE_PY39=true` when building for Apple Silicon.")
-    if os.environ.get("MODE") == "debug":
-        die("Must build Rust in release mode, not debug. Please run `unset MODE`.")
-    check_clean_git_branch()
-    check_pgp()
-    check_roles()
-
-    dest_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    if dest_dir.exists():
-        shutil.rmtree(dest_dir)
-    subprocess.run(
-        [
-            "./pants",
-            "--concurrent",
-            f"--pants-distdir={dest_dir}",
-            "package",
-            PANTS_PKG.target,
-        ],
-        check=True,
-    )
-    expected_whl = (
-        dest_dir
-        / f"pantsbuild.pants-{CONSTANTS.pants_stable_version}-cp39-cp39-macosx_11_0_arm64.whl"
-    )
-    if not expected_whl.exists():
-        die(
-            softwrap(
-                f"""
-                Failed to find {expected_whl}. Are you running from the correct platform and
-                macOS version?
-                """
-            )
-        )
-
-    create_twine_venv()
-    subprocess.run([CONSTANTS.twine_venv_dir / "bin/twine", "check", expected_whl], check=True)
-    upload_wheels_via_twine()
-    banner("Successfully released Apple Silicon wheel to PyPI")
 
 
 def check_clean_git_branch() -> None:
@@ -1225,13 +1182,13 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 7:
+        if is_cross_platform(local_files) and len(local_files) != 10:
             formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
                 softwrap(
                     f"""
-                    {package.name}. Expected 7 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx-arm64),
+                    {package.name}. Expected 10 wheels ({{cp37m, cp38, cp39}} x
+                    {{macosx10.15-x86_64, macosx11-x86_64, linux-x86_64}} + cp39-macosx-arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )
@@ -1251,7 +1208,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("publish")
-    subparsers.add_parser("publish-apple-silicon")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -1268,8 +1224,6 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "publish":
         publish()
-    if args.command == "publish-apple-silicon":
-        publish_apple_silicon()
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
@@ -1287,7 +1241,7 @@ def main() -> None:
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
     if args.command == "check-pants-wheels":
-        with TemporaryDirectory() as tempdir:
+        with temporary_dir() as tempdir:
             fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
             check_pants_wheels_present(tempdir)
 

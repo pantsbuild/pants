@@ -14,6 +14,7 @@ from pkg_resources import Requirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.fs import FileContent
+from pants.util.docutil import git_url
 
 # ----------------------------------------------------------------------------------------
 # Subsystem
@@ -22,12 +23,18 @@ from pants.engine.fs import FileContent
 
 class PoetrySubsystem(PythonToolRequirementsBase):
     options_scope = "poetry"
-    help = "Used to generate lockfiles for third-party Python dependencies."
+    name = "Poetry"
+    help = "Used to generate lockfiles for third-party Python dependencies (deprecated)."
 
-    default_version = "poetry==1.1.8"
+    default_version = "poetry==1.1.14"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
+
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.python.subsystems", "poetry.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/poetry.lock"
+    default_lockfile_url = git_url(default_lockfile_path)
 
 
 # We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed

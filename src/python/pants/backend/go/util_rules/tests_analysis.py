@@ -23,6 +23,7 @@ class GenerateTestMainRequest(EngineAwareParameter):
     test_paths: FrozenOrderedSet[str]
     xtest_paths: FrozenOrderedSet[str]
     import_path: str
+    register_cover: bool
     address: Address
 
     def debug_hint(self) -> str:
@@ -51,16 +52,22 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
     test_paths = tuple(f"{GeneratedTestMain.TEST_PKG}:{path}" for path in request.test_paths)
     xtest_paths = tuple(f"{GeneratedTestMain.XTEST_PKG}:{path}" for path in request.xtest_paths)
 
+    env = {}
+    if request.register_cover:
+        env["GENERATE_COVER"] = "1"
+
     result = await Get(
         FallibleProcessResult,
         Process(
             argv=("./analyzer", request.import_path, *test_paths, *xtest_paths),
             input_digest=input_digest,
+            env=env,
             description=f"Analyze Go test sources for {request.address}",
             level=LogLevel.DEBUG,
             output_files=("_testmain.go",),
         ),
     )
+
     if result.exit_code != 0:
         return GeneratedTestMain(
             digest=EMPTY_DIGEST,

@@ -32,7 +32,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.20.0",
+  "toolchain.pants.plugin==0.22.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -65,14 +65,10 @@ build_ignore.add = [
 
 unmatched_build_file_globs = "error"
 
-# NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
-remote_store_address = "grpcs://cache.toolchain.com:443"
-remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
-
-# See https://github.com/pantsbuild/pants/issues/11331.
-# N.B.: Switched back to eager due to issues documented in:
-#   https://github.com/pantsbuild/pants/issues/15995
-remote_cache_eager_fetch = true
+# TODO: May cause tests which experience missing digests to hang. If you experience an
+# issue, please change this to `fetch` and then report an issue on:
+#   https://github.com/pantsbuild/pants/issues/16096.
+cache_content_behavior = "validate"
 
 [anonymous-telemetry]
 enabled = true
@@ -123,9 +119,12 @@ venv_use_symlinks = true
 # + src/python/pants/testutil:testutil_wheel
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
-lockfile_generator = "pex"
+
+[python.resolves]
+python-default = "3rdparty/python/user_reqs.lock"
+helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
+helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python-infer]
 assets = true
@@ -161,7 +160,6 @@ extra_requirements.add = [
   "pygments",
 ]
 lockfile = "3rdparty/python/pytest.lock"
-timeout_default = 60
 
 [test]
 extra_env_vars = [
@@ -174,6 +172,7 @@ extra_env_vars = [
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
 ]
+timeout_default = 60
 
 [mypy]
 interpreter_constraints = [">=3.7,<3.10"]
@@ -208,6 +207,7 @@ java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parse
 # Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
 # in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
+strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }

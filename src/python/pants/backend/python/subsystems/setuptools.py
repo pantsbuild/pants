@@ -1,24 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonProvidesField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.package import PackageFieldSet
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    AllTargets,
-    AllTargetsRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -36,7 +32,7 @@ class Setuptools(PythonToolRequirementsBase):
     options_scope = "setuptools"
     help = "Python setuptools, used to package `python_distribution` targets."
 
-    default_version = "setuptools>=50.3.0,<58.0"
+    default_version = "setuptools>=63.1.0,<64.0"
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True
@@ -45,7 +41,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
+class SetuptoolsLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Setuptools.options_scope
 
 
@@ -66,22 +62,11 @@ async def setup_setuptools_lockfile(
             setuptools, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    transitive_targets_per_python_dist = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_tgts
-        if PythonDistributionFieldSet.is_applicable(tgt)
+    interpreter_constraints = await _find_all_unique_interpreter_constraints(
+        python_setup, PythonDistributionFieldSet
     )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-        or InterpreterConstraints(python_setup.interpreter_constraints)
-        for transitive_targets in transitive_targets_per_python_dist
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        setuptools,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        setuptools, interpreter_constraints, use_pex=python_setup.generate_lockfiles_with_pex
     )
 
 

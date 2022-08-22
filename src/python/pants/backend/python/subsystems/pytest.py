@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -12,7 +11,10 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -22,22 +24,17 @@ from pants.backend.python.target_types import (
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
-from pants.engine.target import (
-    AllTargets,
-    AllTargetsRequest,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, IntOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, IntOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -53,6 +50,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
+    xdist_concurrency: PythonTestsXdistConcurrencyField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -72,7 +70,7 @@ class PyTest(PythonToolBase):
     # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
-    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
 
     default_main = ConsoleScript("pytest")
 
@@ -92,6 +90,8 @@ class PyTest(PythonToolBase):
             is used or no timeout is configured.
             """
         ),
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeouts` option in the `test` scope instead.",
     )
     timeout_default = IntOption(
         default=None,
@@ -102,11 +102,15 @@ class PyTest(PythonToolBase):
             set on the target.
             """
         ),
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeout_default` option in the `test` scope instead.",
     )
     timeout_maximum = IntOption(
         default=None,
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
+        removal_version="2.15.0.dev1",
+        removal_hint="Use `timeout_maximum` option in the `test` scope instead.",
     )
     junit_family = StrOption(
         default="xunit2",
@@ -128,15 +132,44 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    config = FileOption(
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to a config file understood by Pytest
+            (https://docs.pytest.org/en/latest/reference/customize.html#configuration-file-formats).
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
+        ),
+    )
     config_discovery = BoolOption(
         default=True,
         advanced=True,
-        help=softwrap(
-            """
+        help=lambda cls: softwrap(
+            f"""
             If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`)
             during runs. See
             https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where
             config files should be located for Pytest to discover them.
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
+        ),
+    )
+    xdist_enabled = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            """
+            If true, Pants will use `pytest-xdist` (https://pytest-xdist.readthedocs.io/en/latest/)
+            to parallelize tests within each `python_test` target.
+
+            NOTE: Enabling `pytest-xdist` can cause high-level scoped fixtures (for example `session`)
+            to execute more than once. See the `pytest-xdist` docs for more info:
+            https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once
             """
         ),
     )
@@ -159,6 +192,8 @@ class PyTest(PythonToolBase):
             check_content[os.path.join(d, "setup.cfg")] = b"[tool:pytest]"
 
         return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
             check_existence=check_existence,
             check_content=check_content,
@@ -190,32 +225,7 @@ class PyTest(PythonToolBase):
         )
 
 
-@rule_helper
-async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
-    # Even though we run each python_tests target in isolation, we need a single set of constraints
-    # that works with them all (and their transitive deps).
-    #
-    # This first computes the constraints for each individual `python_test` target
-    # (which will AND across each target in the closure). Then, it ORs all unique resulting
-    # interpreter constraints. The net effect is that every possible Python interpreter used will
-    # be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    transitive_targets_per_test = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_tgts
-        if PythonTestFieldSet.is_applicable(tgt)
-    )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-        for transitive_targets in transitive_targets_per_test
-    }
-    constraints = InterpreterConstraints(
-        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
-    )
-    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
-
-
-class PytestLockfileSentinel(GenerateToolLockfileSentinel):
+class PytestLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PyTest.options_scope
 
 
@@ -236,7 +246,7 @@ async def setup_pytest_lockfile(
             pytest, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await _pytest_interpreter_constraints(python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
     return GeneratePythonLockfile.from_tool(
         pytest,
         constraints,
@@ -262,7 +272,7 @@ async def pytest_export(
 ) -> ExportPythonTool:
     if not pytest.export:
         return ExportPythonTool(resolve_name=pytest.options_scope, pex_request=None)
-    constraints = await _pytest_interpreter_constraints(python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
     return ExportPythonTool(
         resolve_name=pytest.options_scope,
         pex_request=pytest.to_pex_request(interpreter_constraints=constraints),

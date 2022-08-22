@@ -3,7 +3,7 @@ title: "Helm Overview"
 slug: "helm-overview"
 hidden: false
 createdAt: "2022-05-13T16:06:59.247Z"
-updatedAt: "2022-05-17T15:00:11.338Z"
+updatedAt: "2022-07-25T15:00:11.338Z"
 ---
 > 🚧 Helm support is in alpha stage
 > 
@@ -25,7 +25,7 @@ backend_packages = [
 ]
 ```
 
-In the case in which you may have more than one chart in the same repository, it is important that you configure your Pants' source roots in a way that Pants recognises each of your chart folders as a source root. In the following example `foo` and `bar` are Helm charts, so we give Pants a source root pattern to consider `src/helm/foo` and `src/helm/bar` as source roots.
+If you have more than one Helm chart in the same repository, organise them such that each of them lives in a separate folder with the chart definition file (`Chart.yaml`) at their root. The Helm backend is capable of auto-detecting the root folder of your Helm charts taking the chart definition file `Chart.yaml` as the reference for that root. 
 
 ```yaml src/helm/foo/Chart.yaml
 apiVersion: v2
@@ -39,21 +39,13 @@ description: Bar Helm chart
 name: bar
 version: 0.1.0
 ```
-```toml pants.toml
-[source]
-root_patterns = [
-  ...
-  "src/helm/*",
-  ...
-]
-```
 
 Adding `helm_chart` targets
 ---------------------------
 
 Helm charts are identified by the presence of a `Chart.yaml` or `Chart.yml` file, which contains relevant metadata about the chart like its name, version, dependencies, etc. To get started quickly you can create a simple `Chart.yaml` file in your sources folder:
 
-```text Chart.yaml
+```yaml Chart.yaml
 apiVersion: v2
 description: Example Helm chart
 name: example
@@ -104,6 +96,8 @@ helm_chart(lint_strict=True)
 ```
 
 Likewise, in a similar way you could enable strict linting globally and then choose to disable it in a per-target basis. Run `./pants help helm` or `./pants help helm_chart` for more information.
+
+You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
 ### Package
 
@@ -164,6 +158,40 @@ With the test files in places, you can now run `./pants test ::` and Pants will 
 
 ✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
 ```
+
+### Timeouts
+
+Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds, like this:
+
+```python BUILD
+helm_unittest_test(name="tests", source="env-configmap_test.yaml", timeout=120)
+```
+
+When you set `timeout` on the `helm_unittest_tests` target generator, the same timeout will apply to every generated `helm_unittest_test` target. Instead, you can use the `overrides` field:
+
+```python BUILD
+helm_unittest_tests(
+    name="tests",
+    overrides={
+        "env-configmap_test.yaml": {"timeout": 20},
+        ("deployment_test.yaml", "pod_test.yaml"): {"timeout": 35},
+    },
+)
+```
+
+You can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
+Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
 Publishing Helm charts
 ======================

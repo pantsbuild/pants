@@ -3,28 +3,27 @@
 
 from __future__ import annotations
 
-import json
-import typing
 from pathlib import Path
-from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.subsystems.golang import GoRoot, compatible_go_version
-from pants.backend.go.subsystems.golang import rules as golang_rules
+from pants.backend.go.util_rules.go_bootstrap_test import (
+    EXPECTED_VERSION,
+    EXPECTED_VERSION_NEXT_RELEASE,
+    mock_go_binary,
+)
+from pants.backend.go.util_rules.goroot import GoRoot
+from pants.backend.go.util_rules.goroot import rules as goroot_rules
 from pants.core.util_rules.system_binaries import BinaryNotFoundError
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
 
-EXPECTED_VERSION = "1.17"
-EXPECTED_VERSION_NEXT_RELEASE = "1.18"
-
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[*golang_rules(), QueryRule(GoRoot, [])])
+    return RuleRunner(rules=[*goroot_rules(), QueryRule(GoRoot, [])])
 
 
 def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str, str]]) -> GoRoot:
@@ -47,21 +46,6 @@ def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str,
             env_inherit={"PATH"},
         )
         return rule_runner.request(GoRoot, [])
-
-
-def mock_go_binary(*, version_output: str, env_output: typing.Mapping[str, str]) -> str:
-    """Return a bash script that emulates `go version` and `go env`."""
-    return dedent(
-        f"""\
-        #!/bin/bash
-
-        if [[ "$1" == version ]]; then
-            echo '{version_output}'
-        else
-            echo '{json.dumps(env_output)}'
-        fi
-        """
-    )
 
 
 def test_find_valid_binary(rule_runner: RuleRunner) -> None:
@@ -125,15 +109,3 @@ def test_no_valid_versions(rule_runner: RuleRunner) -> None:
     exc = e.value.wrapped_exceptions[0]
     assert isinstance(exc, BinaryNotFoundError)
     assert "Cannot find a `go` binary compatible with the minimum version" in str(exc)
-
-
-def test_compatible_go_version() -> None:
-    def check(version: str, expected: bool) -> None:
-        assert compatible_go_version(compiler_version="1.15", target_version=version) is expected
-
-    for v in range(16):
-        check(f"1.{v}", True)
-    for v in range(17, 40):
-        check(f"1.{v}", False)
-    for v in range(2, 4):
-        check(f"{v}.0", False)

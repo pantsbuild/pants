@@ -9,11 +9,15 @@ from typing import Optional
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     Dependencies,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
@@ -24,6 +28,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
@@ -304,6 +309,14 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
 
 
+class JunitTestTimeoutField(TestTimeoutField):
+    pass
+
+
+class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
+
+
 # -----------------------------------------------------------------------------------------------
 # JAR support fields
 # -----------------------------------------------------------------------------------------------
@@ -382,3 +395,27 @@ class JvmWarTarget(Target):
         deploys in Java Servlet containers.
         """
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Dynamic Field defaults
+# -----------------------------------------------------------------------------------------------#
+
+
+class JvmResolveFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
+    field_type = JvmResolveField
+
+
+@rule
+def jvm_resolve_field_default_factory(
+    request: JvmResolveFieldDefaultFactoryRequest,
+    jvm: JvmSubsystem,
+) -> FieldDefaultFactoryResult:
+    return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
+
+
+def rules():
+    return [
+        *collect_rules(),
+        UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
+    ]

@@ -9,6 +9,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
@@ -16,12 +17,10 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
-    IntField,
     InvalidFieldException,
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
-    StringSequenceField,
     Target,
     TargetGenerator,
     ValidNumbers,
@@ -180,27 +179,12 @@ class SkipGoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
-class GoTestExtraEnvVarsField(StringSequenceField):
+class GoTestExtraEnvVarsField(TestExtraEnvVarsField):
     alias = "test_extra_env_vars"
-    help = softwrap(
-        """
-         Additional environment variables to include in test processes.
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
-         This will be merged with and override values from [test].extra_env_vars.
-        """
-    )
 
 
-class GoTestTimeoutField(IntField):
+class GoTestTimeoutField(TestTimeoutField):
     alias = "test_timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) when running this package's tests.
-
-        If this field is not set, the test will never time out.
-        """
-    )
     valid_numbers = ValidNumbers.positive_and_zero
 
 

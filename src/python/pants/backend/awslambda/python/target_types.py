@@ -24,15 +24,14 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    FieldSet,
+    InferDependenciesRequest,
+    InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
     SecondaryOwnerMixin,
     StringField,
     Target,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
@@ -145,39 +144,46 @@ class PythonAwsLambdaDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-class InjectPythonLambdaHandlerDependency(InjectDependenciesRequest):
-    inject_for = PythonAwsLambdaDependencies
+@dataclass(frozen=True)
+class PythonLambdaHandlerDependencyInferenceFieldSet(FieldSet):
+    required_fields = (
+        PythonAwsLambdaDependencies,
+        PythonAwsLambdaHandlerField,
+        PythonResolveField,
+    )
+
+    dependencies: PythonAwsLambdaDependencies
+    handler: PythonAwsLambdaHandlerField
+    resolve: PythonResolveField
+
+
+class InferPythonLambdaHandlerDependency(InferDependenciesRequest):
+    infer_from = PythonLambdaHandlerDependencyInferenceFieldSet
 
 
 @rule(desc="Inferring dependency from the python_awslambda `handler` field")
-async def inject_lambda_handler_dependency(
-    request: InjectPythonLambdaHandlerDependency,
+async def infer_lambda_handler_dependency(
+    request: InferPythonLambdaHandlerDependency,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> InjectedDependencies:
+) -> InferredDependencies:
     if not python_infer_subsystem.entry_points:
-        return InjectedDependencies()
-    original_tgt = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address, description_of_origin="<infallible>"
-        ),
-    )
+        return InferredDependencies([])
     explicitly_provided_deps, handler = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             ResolvedPythonAwsHandler,
-            ResolvePythonAwsHandlerRequest(original_tgt.target[PythonAwsLambdaHandlerField]),
+            ResolvePythonAwsHandlerRequest(request.field_set.handler),
         ),
     )
     module, _, _func = handler.val.partition(":")
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup)
+            module, resolve=request.field_set.resolve.normalized_value(python_setup)
         ),
     )
-    address = original_tgt.target.address
+    address = request.field_set.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
         address,
@@ -188,7 +194,7 @@ async def inject_lambda_handler_dependency(
         context=softwrap(
             f"""
             The python_awslambda target {address} has the field
-            `handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`,
+            `handler={repr(request.field_set.handler.value)}`,
             which maps to the Python module `{module}`"
             """
         ),
@@ -199,7 +205,7 @@ async def inject_lambda_handler_dependency(
     unambiguous_owners = owners.unambiguous or (
         (maybe_disambiguated,) if maybe_disambiguated else ()
     )
-    return InjectedDependencies(unambiguous_owners)
+    return InferredDependencies(unambiguous_owners)
 
 
 class PythonAwsLambdaIncludeRequirements(BoolField):
@@ -287,5 +293,5 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(InjectDependenciesRequest, InjectPythonLambdaHandlerDependency),
+        UnionRule(InferDependenciesRequest, InferPythonLambdaHandlerDependency),
     )

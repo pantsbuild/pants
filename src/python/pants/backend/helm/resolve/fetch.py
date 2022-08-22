@@ -11,6 +11,7 @@ from typing import Iterable
 from pants.backend.helm.resolve import artifacts
 from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtifact
 from pants.backend.helm.target_types import HelmArtifactFieldSet
+from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -77,6 +78,20 @@ class FetchHelmArfifactsRequest(EngineAwareParameter):
         return f"{self.description_of_origin}: fetch {pluralize(len(self.field_sets), 'artifact')}"
 
 
+@dataclass(frozen=True)
+class _StripHelmArtifactPrefixRequest:
+    artifact: ResolvedHelmArtifact
+    digest: Digest
+
+
+@rule
+async def _strip_prefix_from_fetched_artifact(request: _StripHelmArtifactPrefixRequest) -> Digest:
+    subset_digest = await Get(
+        Digest, DigestSubset(request.digest, PathGlobs([os.path.join(request.artifact.name, "**")]))
+    )
+    return await Get(Digest, RemovePrefix(subset_digest, request.artifact.name))
+
+
 @rule(desc="Fetch third party Helm Chart artifacts", level=LogLevel.DEBUG)
 async def fetch_helm_artifacts(request: FetchHelmArfifactsRequest) -> FetchedHelmArtifacts:
     download_prefix = "__downloads"
@@ -121,7 +136,7 @@ async def fetch_helm_artifacts(request: FetchHelmArfifactsRequest) -> FetchedHel
 
     # Avoid capturing the tarball that has been downloaded by Helm during the pull.
     artifact_snapshots = await MultiGet(
-        Get(Snapshot, DigestSubset(digest, PathGlobs([os.path.join(artifact.name, "**")])))
+        Get(Snapshot, _StripHelmArtifactPrefixRequest(artifact, digest))
         for artifact, digest in zip(artifacts, stripped_artifact_digests)
     )
 
@@ -137,4 +152,4 @@ async def fetch_helm_artifacts(request: FetchHelmArfifactsRequest) -> FetchedHel
 
 
 def rules():
-    return [*collect_rules(), *artifacts.rules()]
+    return [*collect_rules(), *artifacts.rules(), *tool.rules()]

@@ -4,6 +4,7 @@
 import itertools
 import logging
 from itertools import chain
+from pathlib import Path
 
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
 from pants.core.util_rules import stripped_source_files
@@ -26,6 +27,8 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -41,6 +44,7 @@ class JvmResourcesRequest(ClasspathEntryRequest):
 @rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
+    jvm: JvmSubsystem,
     request: JvmResourcesRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
@@ -73,6 +77,13 @@ async def assemble_resources_jar(
     output_filename = f"{request.component.representative.address.path_safe_spec}.resources.jar"
     output_files = [output_filename]
 
+    # #16231: Valid JAR files need the directories of each resource file as well as the files
+    # themselves.
+
+    paths = {Path(filename) for filename in source_files.snapshot.files}
+    directories = {parent for path in paths for parent in path.parents}
+    input_files = {str(path) for path in chain(paths, directories)}
+
     resources_jar_input_digest = source_files.snapshot.digest
     resources_jar_result = await Get(
         ProcessResult,
@@ -80,7 +91,7 @@ async def assemble_resources_jar(
             argv=[
                 zip.path,
                 output_filename,
-                *source_files.snapshot.files,
+                *sorted(input_files),
             ],
             description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
@@ -89,7 +100,10 @@ async def assemble_resources_jar(
         ),
     )
 
-    cpe = ClasspathEntry(resources_jar_result.output_digest, output_files, [])
+    output_digest = resources_jar_result.output_digest
+    if jvm.reproducible_jars:
+        output_digest = await Get(Digest, StripJarRequest(output_digest, tuple(output_files)))
+    cpe = ClasspathEntry(output_digest, output_files, [])
 
     merged_cpe_digest = await Get(
         Digest,

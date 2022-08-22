@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 import ssl
@@ -16,8 +15,6 @@ from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
 from typing import IO, Any, Callable, Iterator, Mapping
-
-from colors import green
 
 from pants.util.dirutil import safe_delete
 
@@ -245,35 +242,6 @@ def open_zip(path_or_file: str | Any, *args, **kwargs) -> Iterator[zipfile.ZipFi
         yield zf
     finally:
         zf.close()
-
-
-@contextmanager
-def maybe_profiled(profile_path: str | None) -> Iterator[None]:
-    """A profiling context manager.
-
-    :param profile_path: The path to write profile information to. If `None`, this will no-op.
-    """
-    if not profile_path:
-        yield
-        return
-
-    import cProfile
-
-    profiler = cProfile.Profile()
-    try:
-        profiler.enable()
-        yield
-    finally:
-        profiler.disable()
-        profiler.dump_stats(profile_path)
-        view_cmd = green(
-            "gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png".format(
-                path=profile_path
-            )
-        )
-        logging.getLogger().info(
-            f"Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view."
-        )
 
 
 @contextmanager

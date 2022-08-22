@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -13,6 +14,7 @@ from pants.engine.target import (
     Dependencies,
     FieldSet,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -20,11 +22,15 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
+    generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
+    JunitTestExtraEnvVarsField,
     JunitTestSourceField,
+    JunitTestTimeoutField,
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
@@ -98,6 +104,14 @@ class ScalatestTestSourceField(ScalaSourceField):
     pass
 
 
+class ScalatestTestTimeoutField(TestTimeoutField):
+    pass
+
+
+class ScalatestTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
+
+
 class ScalatestTestTarget(Target):
     alias = "scalatest_test"
     core_fields = (
@@ -105,6 +119,8 @@ class ScalatestTestTarget(Target):
         ScalaDependenciesField,
         ScalatestTestSourceField,
         ScalaConsumedPluginNamesField,
+        ScalatestTestTimeoutField,
+        ScalatestTestExtraEnvVarsField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -119,17 +135,33 @@ class ScalatestTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     )
 
 
+class ScalatestTestsSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        "scalatest_tests",
+        """
+        overrides={
+            "Foo.scala": {"dependencies": [":files"]},
+            "Bar.scala": {"skip_scalafmt": True},
+            ("Foo.scala", "Bar.scala"): {"tags": ["linter_disabled"]},
+        }"
+        """,
+    )
+
+
 class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     alias = "scalatest_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
+        ScalatestTestsSourcesOverridesField,
     )
     generated_target_cls = ScalatestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
+        ScalatestTestTimeoutField,
+        ScalatestTestExtraEnvVarsField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -159,6 +191,8 @@ class ScalaJunitTestTarget(Target):
         ScalaDependenciesField,
         ScalaJunitTestSourceField,
         ScalaConsumedPluginNamesField,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
@@ -173,17 +207,34 @@ class ScalaJunitTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     )
 
 
+class ScalaJunitTestsSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        "scala_junit_tests",
+        """
+        overrides={
+            "Foo.scala": {"dependencies": [":files"]},
+            "Bar.scala": {"skip_scalafmt": True},
+            ("Foo.scala", "Bar.scala"): {"tags": ["linter_disabled"]},
+        }"
+        """,
+    )
+
+
 class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "scala_junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
+        ScalaJunitTestsSourcesOverridesField,
+        JunitTestTimeoutField,
     )
     generated_target_cls = ScalaJunitTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
+        JunitTestTimeoutField,
+        JunitTestExtraEnvVarsField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -227,11 +278,25 @@ class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
     )
 
 
+class ScalaSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        "scala_sources",
+        """
+        overrides={
+            "Foo.scala": {"dependencies": [":files"]},
+            "Bar.scala": {"skip_scalafmt": True},
+            ("Foo.scala", "Bar.scala"): {"tags": ["linter_disabled"]},
+        }"
+        """,
+    )
+
+
 class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "scala_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaSourcesGeneratorSourcesField,
+        ScalaSourcesOverridesField,
     )
     generated_target_cls = ScalaSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
@@ -293,5 +358,6 @@ class ScalacPluginTarget(Target):
 def rules():
     return (
         *collect_rules(),
+        *jvm_target_types.rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

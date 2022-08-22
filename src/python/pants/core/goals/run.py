@@ -1,9 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
@@ -23,9 +25,8 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
@@ -57,6 +58,8 @@ class RunRequest:
     # be substituted with the (absolute) chroot path.
     args: Tuple[str, ...]
     extra_env: FrozenDict[str, str]
+    immutable_input_digests: Mapping[str, Digest] | None = None
+    append_only_caches: Mapping[str, str] | None = None
 
     def __init__(
         self,
@@ -64,10 +67,14 @@ class RunRequest:
         digest: Digest,
         args: Iterable[str],
         extra_env: Optional[Mapping[str, str]] = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
         self.digest = digest
         self.args = tuple(args)
         self.extra_env = FrozenDict(extra_env or {})
+        self.immutable_input_digests = immutable_input_digests
+        self.append_only_caches = append_only_caches
 
 
 class RunDebugAdapterRequest(RunRequest):
@@ -103,14 +110,17 @@ class RunSubsystem(GoalSubsystem):
     )
     cleanup = BoolOption(
         default=True,
+        deprecation_start_version="2.15.0.dev1",
+        removal_version="2.16.0.dev1",
+        removal_hint="Use the global `keep_sandboxes` option instead.",
         help=softwrap(
             """
             Whether to clean up the temporary directory in which the binary is chrooted.
             Set this to false to retain the directory, e.g., for debugging.
 
-            Note that setting the global --process-cleanup option to false will also conserve
-            this directory, along with those of all other processes that Pants executes.
-            This option is more selective and controls just the target binary's directory.
+            Note that setting the global --keep-sandboxes option may also conserve this directory,
+            along with those of all other processes that Pants executes. This option is more
+            selective and controls just the target binary's directory.
             """
         ),
     )
@@ -161,44 +171,37 @@ async def run(
         WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
     )
     restartable = wrapped_target.target.get(RestartableField).value
-    # Cleanup is the default, so we want to preserve the chroot if either option is off.
-    cleanup = run_subsystem.cleanup and global_options.process_cleanup
+    keep_sandboxes = (
+        global_options.keep_sandboxes
+        if run_subsystem.options.is_default("cleanup")
+        else (KeepSandboxes.never if run_subsystem.cleanup else KeepSandboxes.always)
+    )
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=cleanup) as tmpdir:
-        if not cleanup:
-            logger.info(f"Preserving running binary chroot {tmpdir}")
-        workspace.write_digest(
-            request.digest,
-            path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix(),
-            # We don't want to influence whether the InteractiveProcess is able to restart. Because
-            # we're writing into a temp directory, we can safely mark this side_effecting=False.
-            side_effecting=False,
-        )
-
-        args = (arg.format(chroot=tmpdir) for arg in request.args)
-        env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
-        if run_subsystem.debug_adapter:
-            logger.info(
-                softwrap(
-                    f"""
-                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
-                    which will wait for a client connection...
-                    """
-                )
+    if run_subsystem.debug_adapter:
+        logger.info(
+            softwrap(
+                f"""
+                Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                which will wait for a client connection...
+                """
             )
-
-        result = await Effect(
-            InteractiveProcessResult,
-            InteractiveProcess(
-                argv=(*args, *run_subsystem.args),
-                env=env,
-                run_in_workspace=True,
-                restartable=restartable,
-            ),
         )
-        exit_code = result.exit_code
 
-    return Run(exit_code)
+    result = await Effect(
+        InteractiveProcessResult,
+        InteractiveProcess(
+            argv=(*request.args, *run_subsystem.args),
+            env={**complete_env, **request.extra_env},
+            input_digest=request.digest,
+            run_in_workspace=True,
+            restartable=restartable,
+            keep_sandboxes=keep_sandboxes,
+            immutable_input_digests=request.immutable_input_digests,
+            append_only_caches=request.append_only_caches,
+        ),
+    )
+
+    return Run(result.exit_code)
 
 
 def rules():

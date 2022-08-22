@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #![deny(unused_must_use)]
+// See https://github.com/hyperium/tonic/issues/1056
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 mod conversions;
 pub use conversions::require_digest;

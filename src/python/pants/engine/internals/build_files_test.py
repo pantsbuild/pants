@@ -118,6 +118,19 @@ def test_prelude_parsing_illegal_import() -> None:
         run_prelude_parsing_rule(prelude_content)
 
 
+def test_prelude_exceptions() -> None:
+    prelude_content = dedent(
+        """\
+        def abort():
+            raise ValueError
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert "ValueError" not in result.symbols
+    with pytest.raises(ValueError):
+        result.symbols["abort"]()
+
+
 class ResolveField(StringField):
     alias = "resolve"
 
@@ -270,7 +283,33 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name == "t2"
     assert target_adaptor.kwargs["resolve"] == "mock"
+
+    # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
+    # list rather than a tuple at this time.
     assert target_adaptor.kwargs["tags"] == ["24"]
+
+
+def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": """__defaults__(all=dict(tags=["root"]))""",
+            "helloworld/dir/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(resolve="mock")}, extend=True)
+                mock_tgt()
+                """
+            ),
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
+    assert target_adaptor.kwargs["resolve"] == "mock"
+
+    # The defaults originates from a parent BUILD file, and as such has been frozen.
+    assert target_adaptor.kwargs["tags"] == ("root",)
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:

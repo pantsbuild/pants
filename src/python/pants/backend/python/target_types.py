@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Iterable,
     Iterator,
@@ -27,10 +28,15 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import RuntimePackageDependenciesField
+from pants.core.goals.test import (
+    RuntimePackageDependenciesField,
+    TestExtraEnvVarsField,
+    TestSubsystem,
+)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -148,11 +154,12 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
-class PythonRunGoalUseSandboxField(BoolField):
+class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
-    default = True
     help = softwrap(
         """
+        Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
+
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
 
@@ -584,6 +591,16 @@ class PexIncludeRequirementsField(BoolField):
     )
 
 
+class PexIncludeSourcesField(BoolField):
+    alias = "include_sources"
+    default = True
+    help = softwrap(
+        """
+        Whether to include your first party sources the binary uses in the packaged PEX file.
+        """
+    )
+
+
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
@@ -612,6 +629,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexLayoutField,
     PexExecutionModeField,
     PexIncludeRequirementsField,
+    PexIncludeSourcesField,
     PexIncludeToolsField,
     RestartableField,
 )
@@ -783,46 +801,78 @@ class PythonTestSourceField(PythonSourceField):
             )
 
 
-class PythonTestsDependenciesField(Dependencies):
+class PythonTestsDependenciesField(PythonDependenciesField):
     supports_transitive_excludes = True
 
 
+# TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
 class PythonTestsTimeoutField(IntField):
     alias = "timeout"
     help = softwrap(
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
-        If unset, will default to `[pytest].timeout_default`; if that option is also unset,
-        then the test will never time out. Will never exceed `[pytest].timeout_maximum`. Only
-        applies if the option `--pytest-timeouts` is set to true (the default).
+        If unset, will default to `[test].timeout_default`; if that option is also unset,
+        then the test will never time out. Will never exceed `[test].timeout_maximum`. Only
+        applies if the option `--test-timeouts` is set to true (the default).
         """
     )
     valid_numbers = ValidNumbers.positive_only
 
-    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
-        """Determine the timeout (in seconds) after applying global `pytest` options."""
-        if not pytest.timeouts:
+    def calculate_from_global_options(self, test: TestSubsystem, pytest: PyTest) -> Optional[int]:
+        """Determine the timeout (in seconds) after resolving conflicting global options in the
+        `pytest` and `test` scopes.
+
+        This function is deprecated and should be replaced by the similarly named one in
+        `TestTimeoutField` once the deprecated options in the `pytest` scope are removed.
+        """
+
+        def resolve_opt(*, option: str) -> Any:
+            return resolve_conflicting_options(
+                old_option=option,
+                new_option=option,
+                old_scope="pytest",
+                new_scope="test",
+                old_container=pytest.options,
+                new_container=test.options,
+            )
+
+        enabled = resolve_opt(option="timeouts")
+        timeout_default = resolve_opt(option="timeout_default")
+        timeout_maximum = resolve_opt(option="timeout_maximum")
+
+        if not enabled:
             return None
         if self.value is None:
-            if pytest.timeout_default is None:
+            if timeout_default is None:
                 return None
-            result = pytest.timeout_default
+            result = cast(int, timeout_default)
         else:
             result = self.value
-        if pytest.timeout_maximum is not None:
-            return min(result, pytest.timeout_maximum)
+        if timeout_maximum is not None:
+            return min(result, cast(int, timeout_maximum))
         return result
 
 
-class PythonTestsExtraEnvVarsField(StringSequenceField):
-    alias = "extra_env_vars"
+class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
+
+
+class PythonTestsXdistConcurrencyField(IntField):
+    alias = "xdist_concurrency"
     help = softwrap(
         """
-        Additional environment variables to include in test processes.
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
-        This will be merged with and override values from [test].extra_env_vars.
+        Maximum number of CPUs to allocate to run each test file belonging to this target.
+
+        Tests are spread across multiple CPUs using `pytest-xdist`
+        (https://pytest-xdist.readthedocs.io/en/latest/index.html).
+        Use of `pytest-xdist` must be enabled using the `[pytest].xdist_enabled` option for
+        this field to have an effect.
+
+        If `pytest-xdist` is enabled and this field is unset, Pants will attempt to derive
+        the concurrency for test sources by counting the number of tests in each file.
+
+        Set this field to `0` to explicitly disable use of `pytest-xdist` for a target.
         """
     )
 
@@ -838,6 +888,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,

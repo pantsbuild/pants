@@ -6,11 +6,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.codegen.thrift import dependency_inference
-from pants.backend.codegen.thrift.dependency_inference import InferThriftDependencies, ThriftMapping
-from pants.backend.codegen.thrift.target_types import (
-    ThriftSourceField,
-    ThriftSourcesGeneratorTarget,
+from pants.backend.codegen.thrift.dependency_inference import (
+    InferThriftDependencies,
+    ThriftDependenciesInferenceFieldSet,
+    ThriftMapping,
 )
+from pants.backend.codegen.thrift.target_types import ThriftSourcesGeneratorTarget
 from pants.backend.codegen.thrift.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
@@ -108,7 +109,8 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferThriftDependencies(tgt[ThriftSourceField])]
+            InferredDependencies,
+            [InferThriftDependencies(ThriftDependenciesInferenceFieldSet.create(tgt))],
         )
 
     assert run_dep_inference(

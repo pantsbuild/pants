@@ -5,15 +5,16 @@ from __future__ import annotations
 
 import logging
 import os
-import re
-from collections import OrderedDict
 from dataclasses import dataclass
-from pathlib import Path, PurePath
+from pathlib import Path
+from typing import Iterable, Sequence
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.core.util_rules import asdf
+from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.option_value_container import OptionValueContainer
@@ -82,8 +83,12 @@ class PythonBootstrapSubsystem(Subsystem):
 
 @dataclass(frozen=True)
 class PythonBootstrap:
-    environment: Environment
+    EXTRA_ENV_VAR_NAMES = ("PATH", "PYENV_ROOT")
+
     options: OptionValueContainer
+    environment: Environment
+    asdf_standard_tool_paths: tuple[str, ...]
+    asdf_local_tool_paths: tuple[str, ...]
 
     @property
     def interpreter_names(self) -> tuple[str, ...]:
@@ -91,15 +96,30 @@ class PythonBootstrap:
 
     @memoized_method
     def interpreter_search_paths(self):
-        return self._expand_interpreter_search_paths(self.options.search_path, self.environment)
+        return self._expand_interpreter_search_paths(
+            self.raw_search_paths(self.options),
+            self.environment,
+            self.asdf_standard_tool_paths,
+            self.asdf_local_tool_paths,
+        )
 
     @classmethod
-    def _expand_interpreter_search_paths(cls, interpreter_search_paths, env: Environment):
+    def raw_search_paths(cls, options: OptionValueContainer) -> tuple[str, ...]:
+        return tuple(options.search_path)
+
+    @classmethod
+    def _expand_interpreter_search_paths(
+        cls,
+        interpreter_search_paths: Sequence[str],
+        env: Environment,
+        asdf_standard_tool_paths: tuple[str, ...],
+        asdf_local_tool_paths: tuple[str, ...],
+    ):
         special_strings = {
             "<PEXRC>": cls.get_pex_python_paths,
             "<PATH>": lambda: cls.get_environment_paths(env),
-            "<ASDF>": lambda: cls.get_asdf_paths(env),
-            "<ASDF_LOCAL>": lambda: cls.get_asdf_paths(env, asdf_local=True),
+            "<ASDF>": lambda: asdf_standard_tool_paths,
+            "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
             "<PYENV>": lambda: cls.get_pyenv_paths(env),
             "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(env, pyenv_local=True),
         }
@@ -145,132 +165,16 @@ class PythonBootstrap:
             return []
 
     @staticmethod
-    def get_asdf_paths(env: Environment, *, asdf_local: bool = False) -> list[str]:
-        """Returns a list of paths to Python interpreters managed by ASDF.
-
-        :param env: The environment to use to look up ASDF.
-        :param bool asdf_local: If True, only use the interpreter specified by
-                                '.tool-versions' file under `build_root`.
-        """
-        asdf_dir = get_asdf_data_dir(env)
-        if not asdf_dir:
-            return []
-
-        asdf_dir = Path(asdf_dir)
-
-        # Ignore ASDF if the python plugin isn't installed.
-        asdf_python_plugin = asdf_dir / "plugins" / "python"
-        if not asdf_python_plugin.exists():
-            return []
-
-        # Ignore ASDF if no python versions have ever been installed (the installs folder is
-        # missing).
-        asdf_installs_dir = asdf_dir / "installs" / "python"
-        if not asdf_installs_dir.exists():
-            return []
-
-        # Find all installed versions.
-        asdf_installed_paths: list[str] = []
-        for child in asdf_installs_dir.iterdir():
-            # Aliases, and non-cpython installs may have odd names.
-            # Make sure that the entry is a subdirectory of the installs directory.
-            if child.is_dir():
-                # Make sure that the subdirectory has a bin directory.
-                bin_dir = child / "bin"
-                if bin_dir.exists():
-                    asdf_installed_paths.append(str(bin_dir))
-
-        # Ignore ASDF if there are no installed versions.
-        if not asdf_installed_paths:
-            return []
-
-        asdf_paths: list[str] = []
-        asdf_versions: OrderedDict[str, str] = OrderedDict()
-        tool_versions_file = None
-
-        # Support "shell" based ASDF configuration
-        ASDF_PYTHON_VERSION = env.get("ASDF_PYTHON_VERSION")
-        if ASDF_PYTHON_VERSION:
-            asdf_versions.update(
-                [(v, "ASDF_PYTHON_VERSION") for v in re.split(r"\s+", ASDF_PYTHON_VERSION)]
-            )
-
-        # Target the local tool-versions file.
-        if asdf_local:
-            tool_versions_file = Path(get_buildroot(), ".tool-versions")
-            if not tool_versions_file.exists():
-                logger.warning(
-                    "No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in"
-                    " `[python-bootstrap].search_paths`."
-                )
-                tool_versions_file = None
-        # Target the home directory tool-versions file.
-        else:
-            home = env.get("HOME")
-            if home:
-                tool_versions_file = Path(home) / ".tool-versions"
-                if not tool_versions_file.exists():
-                    tool_versions_file = None
-
-        if tool_versions_file:
-            # Parse the tool-versions file.
-            # A tool-versions file contains multiple lines, one or more per tool.
-            # Standardize that the last line for each tool wins.
-            #
-            # The definition of a tool-versions file can be found here:
-            # https://asdf-vm.com/#/core-configuration?id=tool-versions
-            tool_versions_lines = tool_versions_file.read_text().splitlines()
-            last_line = None
-            for line in tool_versions_lines:
-                # Find the last python line.
-                if line.lower().startswith("python"):
-                    last_line = line
-            if last_line:
-                _, _, versions = last_line.partition("python")
-                for v in re.split(r"\s+", versions.strip()):
-                    if ":" in v:
-                        key, _, value = v.partition(":")
-                        if key.lower() == "path":
-                            asdf_paths.append(value)
-                        elif key.lower() == "ref":
-                            asdf_versions[value] = str(tool_versions_file)
-                        else:
-                            logger.warning(
-                                f"Unknown version format `{v}` from ASDF configured by "
-                                "`[python-bootstrap].search_path`, ignoring. This "
-                                "version will not be considered when determining which Python "
-                                f"interpreters to use. Please check that `{tool_versions_file}` "
-                                "is accurate."
-                            )
-                    elif v == "system":
-                        logger.warning(
-                            "System python set by ASDF configured by "
-                            "`[python-bootstrap].search_path` is unsupported, ignoring. "
-                            "This version will not be considered when determining which Python "
-                            "interpreters to use. Please remove 'system' from "
-                            f"`{tool_versions_file}` to disable this warning."
-                        )
-                    else:
-                        asdf_versions[v] = str(tool_versions_file)
-
-        for version, source in asdf_versions.items():
-            install_dir = asdf_installs_dir / version / "bin"
-            if install_dir.exists():
-                asdf_paths.append(str(install_dir))
-            else:
-                logger.warning(
-                    f"Trying to use ASDF version `{version}` configured by "
-                    f"`[python-bootstrap].search_path` but `{install_dir}` does not "
-                    "exist. This version will not be considered when determining which Python "
-                    f"interpreters to use. Please check that `{source}` is accurate."
-                )
-
-        # For non-local, if no paths have been defined, fallback to every version installed
-        if not asdf_local and len(asdf_paths) == 0:
-            # This could be appended to asdf_paths, but there isn't any reason to
-            return asdf_installed_paths
-        else:
-            return asdf_paths
+    def contains_asdf_path_tokens(interpreter_search_paths: Iterable[str]) -> tuple[bool, bool]:
+        """Returns tuple of whether the path list contains standard or local ASDF path tokens."""
+        standard_path_token = False
+        local_path_token = False
+        for interpreter_search_path in interpreter_search_paths:
+            if interpreter_search_path == "<ASDF>":
+                standard_path_token = True
+            elif interpreter_search_path == "<ASDF_LOCAL>":
+                local_path_token = True
+        return standard_path_token, local_path_token
 
     @staticmethod
     def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> list[str]:
@@ -311,31 +215,6 @@ class PythonBootstrap:
         return paths
 
 
-def get_asdf_data_dir(env: Environment) -> PurePath | None:
-    """Returns the location of asdf's installed tool versions.
-
-    See https://asdf-vm.com/manage/configuration.html#environment-variables.
-
-    `ASDF_DATA_DIR` is an environment variable that can be set to override the directory
-    in which the plugins, installs, and shims are installed.
-
-    `ASDF_DIR` is another environment variable that can be set, but we ignore it since
-    that location only specifies where the asdf tool itself is installed, not the managed versions.
-
-    Per the documentation, if `ASDF_DATA_DIR` is not specified, the tool will fall back to
-    `$HOME/.asdf`, so we do that as well.
-
-    :param env: The environment to use to look up asdf.
-    :return: Path to the data directory, or None if it couldn't be found in the environment.
-    """
-    asdf_data_dir = env.get("ASDF_DATA_DIR")
-    if not asdf_data_dir:
-        home = env.get("HOME")
-        if home:
-            return PurePath(home) / ".asdf"
-    return PurePath(asdf_data_dir) if asdf_data_dir else None
-
-
 def get_pyenv_root(env: Environment) -> str | None:
     """See https://github.com/pyenv/pyenv#environment-variables."""
     from_env = env.get("PYENV_ROOT")
@@ -349,11 +228,33 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 @rule
 async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
-    environment = await Get(
-        Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT", "ASDF_DIR", "ASDF_DATA_DIR"])
+    interpreter_search_paths = PythonBootstrap.raw_search_paths(python_bootstrap_subsystem.options)
+
+    has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
+        interpreter_search_paths
     )
-    return PythonBootstrap(environment, python_bootstrap_subsystem.options)
+    result = await Get(
+        AsdfToolPathsResult,
+        AsdfToolPathsRequest(
+            tool_name="python",
+            tool_description="Python interpreters",
+            resolve_standard=has_standard_path_token,
+            resolve_local=has_local_path_token,
+            extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
+            paths_option_name="[python-bootstrap].search_path",
+        ),
+    )
+
+    return PythonBootstrap(
+        options=python_bootstrap_subsystem.options,
+        environment=result.env,
+        asdf_standard_tool_paths=result.standard_tool_paths,
+        asdf_local_tool_paths=result.local_tool_paths,
+    )
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *asdf.rules(),
+    )

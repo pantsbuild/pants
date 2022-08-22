@@ -135,7 +135,7 @@ PANTS_SCOPE_STROPT=qux
 
 ### Config file entries:
 
-```toml
+```toml pants.toml
 [scope]
 intopt = 42
 stropt = "qux"
@@ -162,7 +162,7 @@ PANTS_SCOPE_BOOLOPT=true
 
 ### Config file entries:
 
-```toml
+```toml pants.toml
 [scope]
 boolopt = true
 ```
@@ -198,7 +198,7 @@ PANTS_SCOPE_LISTOPT=foo
 
 ### Config file entries:
 
-```toml
+```toml pants.toml
 [scope]
 listopt = [
   'foo', 
@@ -239,7 +239,7 @@ will set the value to `[3, 4]`.
 > 
 > The +/- syntax works in .toml files, but the entire value must be quoted:
 > 
-> ```toml
+> ```toml pants.toml
 > [scope]
 > listopt = "+[1,2],-[3,4]"
 > ```
@@ -248,7 +248,7 @@ will set the value to `[3, 4]`.
 > 
 > Alternatively, you can use this syntactic sugar, which allows the values to be regular TOML lists: 
 > 
-> ```toml
+> ```toml pants.toml
 > [scope]
 > listopt.add = [1, 2]
 > listopt.remove = [3, 4]
@@ -277,12 +277,12 @@ PANTS_SCOPE_DICTOPT="{'foo':1,'bar':2}"
 
 You can use TOML's [nested table features](https://toml.io/en/v1.0.0#inline-table). These are equivalent:
 
-```toml
+```toml pants.toml
 [scope]
 dictopt = { foo = 1, bar = 2}
 ```
 
-```toml
+```toml pants.toml
 [scope.dictopt]
 foo = 1
 bar = 2
@@ -290,7 +290,7 @@ bar = 2
 
 You can also use a string literal. Note the quotes:
 
-```toml
+```toml pants.toml
 [scope]
 dictopt = """{
  'foo': 1,
@@ -316,6 +316,43 @@ will set the value to `{'foo': 42, 'bar': 2, 'baz': 3}`, and
 ```
 
 will set the value to `{'foo': 42, 'baz': 3}`.
+
+Reading individual option values from files
+===========================================
+
+If an option value is too large or elaborate to use directly, or if you don't want to hard-code 
+values directly in `pants.toml`, you can set the value of any option to the string 
+`@relative/path/from/repo/root/to/file` (note the leading `@`), and the value will be read 
+from that file. 
+
+If the file name ends with `.json` or `.yaml` then the file will be parsed as the relevant
+format, which is useful for list- and dict-valued options. 
+
+Otherwise, the file is parsed as a literal as described above for each option type.
+
+Note that you can use this feature on the command-line, in an env var, or in a config file:
+
+```toml pants.toml
+[scope]
+opt = "@path/to/file.json"
+```
+
+```bash
+PANTS_SCOPE_OPTION=@path/to/file.json
+```
+
+```bash
+./pants --scope-option="@path/to/file.json"
+```
+
+> 🚧 Gotcha: If you modify the value file, you must manually restart pantsd
+> 
+> Until we resolve [this issue](https://github.com/pantsbuild/pants/issues/10360), changing
+> the value in a file used with the `@` syntax as described above will not invalidate the build.
+> For now, if such a file changes you will have to restart the Pants daemon manually. You can 
+> do so by `kill`ing it (after using `ps -ef | grep pantsd` to find its pid), or by running 
+> Pants once with `--no-pantsd`.
+
 
 `.pants.rc` file
 ================
