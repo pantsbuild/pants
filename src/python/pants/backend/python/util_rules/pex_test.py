@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import os.path
 import re
+import shutil
 import textwrap
 import zipfile
+from pathlib import Path
 
 import pytest
+import requests
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pkg_resources import Requirement
 
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -52,18 +57,28 @@ from pants.backend.python.util_rules.pex_test_utils import (
     create_pex_and_get_pex_info,
     parse_requirements,
 )
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    Directory,
+    FileContent,
+)
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
+    PYTHON_BOOTSTRAP_ENV,
     MockGet,
     QueryRule,
     RuleRunner,
     engine_error,
     run_rule_with_mocks,
 )
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -433,6 +448,84 @@ def test_platforms(rule_runner: RuleRunner) -> None:
 
     # NB: Platforms override interpreter constraints.
     assert pex_data.info["interpreter_constraints"] == []
+
+
+def test_local_requirements_and_path_mappings(tmp_path) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *pex_test_utils.rules(),
+            *pex_rules(),
+            *lockfile.rules(),
+            QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
+            QueryRule(PexResolveInfo, (Pex,)),
+        ],
+        bootstrap_args=[f"--named-caches-dir={tmp_path}"],
+    )
+
+    wheel_content = requests.get(
+        "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl"
+    ).content
+    with temporary_dir() as wheel_base_dir:
+        dir1_path = Path(wheel_base_dir, "dir1")
+        dir2_path = Path(wheel_base_dir, "dir2")
+        dir1_path.mkdir()
+        dir2_path.mkdir()
+
+        wheel_path = dir1_path / "ansicolors-1.1.8-py2.py3-none-any.whl"
+        wheel_req_str = f"ansicolors @ file://{wheel_path}"
+        wheel_path.write_bytes(wheel_content)
+
+        def options(path_mappings_dir: Path) -> tuple[str, ...]:
+            return (
+                "--python-repos-indexes=[]",
+                f"--python-repos-path-mappings=WHEEL_DIR|{path_mappings_dir}",
+                f"--named-caches-dir={tmp_path}",
+            )
+
+        rule_runner.set_options(options(dir1_path), env_inherit=PYTHON_BOOTSTRAP_ENV)
+        lock_result = rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet([wheel_req_str]),
+                    interpreter_constraints=InterpreterConstraints(),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    use_pex=True,
+                )
+            ],
+        )
+        lock_digest_contents = rule_runner.request(DigestContents, [lock_result.digest])
+        assert len(lock_digest_contents) == 1
+        lock_file_content = lock_digest_contents[0]
+        assert (
+            b"file://${WHEEL_DIR}/ansicolors-1.1.8-py2.py3-none-any.whl"
+            in lock_file_content.content
+        )
+        assert b"files.pythonhosted.org" not in lock_file_content.content
+
+        lockfile_obj = EntireLockfile(
+            LockfileContent(lock_file_content, resolve_name="test"), (wheel_req_str,)
+        )
+
+        # Wipe cache to ensure `--path-mappings` works.
+        shutil.rmtree(tmp_path)
+        shutil.rmtree(dir1_path)
+        (dir2_path / "ansicolors-1.1.8-py2.py3-none-any.whl").write_bytes(wheel_content)
+        pex_info = create_pex_and_get_all_data(
+            rule_runner, requirements=lockfile_obj, additional_pants_args=options(dir2_path)
+        ).info
+        assert "ansicolors==1.1.8" in pex_info["requirements"]
+
+        # Confirm that pointing to a bad path fails.
+        shutil.rmtree(tmp_path)
+        shutil.rmtree(dir2_path)
+        with engine_error():
+            create_pex_and_get_all_data(
+                rule_runner,
+                requirements=lockfile_obj,
+                additional_pants_args=options(Path(wheel_base_dir, "dir3")),
+            )
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])

@@ -488,8 +488,7 @@ option, you can either use:
 
 * a URL to an HTML file with links to wheel and/or sdist files, or
 * a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
-  sdist files. See the section
-on local requirements below.
+  sdist files. See the section on local requirements below.
 
 ```toml
 [python-repos]
