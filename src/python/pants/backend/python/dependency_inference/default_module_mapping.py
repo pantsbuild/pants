@@ -73,6 +73,7 @@ DEFAULT_MODULE_MAPPING = {
     "google-cloud-pubsub": ("google.cloud.pubsub_v1", "google.cloud.pubsub"),
     "google-cloud-secret-manager": ("google.cloud.secretmanager",),
     "google-cloud-storage": ("google.cloud.storage",),
+    "grpcio": ("grpc",),
     "ipython": ("IPython",),
     "jack-client": ("jack",),
     "kafka-python": ("kafka",),
