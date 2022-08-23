@@ -33,7 +33,7 @@ from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
-    AllTargets,
+    AllUnexpandedTargets,
     HydratedSources,
     HydrateSourcesRequest,
     InvalidTargetException,
@@ -79,7 +79,7 @@ class AllGoModTargets(Targets):
 
 
 @rule(desc="Find all `go_mod` targets in project", level=LogLevel.DEBUG)
-async def find_all_go_mod_targets(targets: AllTargets) -> AllGoModTargets:
+async def find_all_go_mod_targets(targets: AllUnexpandedTargets) -> AllGoModTargets:
     return AllGoModTargets(tgt for tgt in targets if tgt.has_field(GoModDependenciesField))
 
 
