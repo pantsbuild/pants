@@ -290,7 +290,7 @@ async def setup_pytest_for_target(
         add_opts.extend(
             (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
-        pants_add_opts.extend(["--junitxml", "junit_family"])
+        pants_add_opts.extend(["--junitxml", "--junit-xml", "junit_family"])
         output_files.append(results_file_name)
 
     coverage_args = []
