@@ -8,21 +8,26 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
+    GoBinaryMainPackage,
+    GoBinaryMainPackageField,
+    GoBinaryMainPackageRequest,
+    GoModDependenciesField,
     GoModSourcesField,
+    GoModTarget,
+    GoOwningGoModAddressField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.base.specs import AncestorGlobSpec, RawSpecs
-from pants.build_graph.address import Address
-from pants.engine.addresses import Addresses
+from pants.build_graph.address import Address, AddressInput
+from pants.core.target_types import TargetGeneratorSourcesHelperSourcesField
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
+    AllTargets,
     HydratedSources,
     HydrateSourcesRequest,
     InvalidTargetException,
@@ -32,7 +37,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
-from pants.util.strutil import bullet_list
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +66,15 @@ class NearestAncestorGoModRequest(EngineAwareParameter):
 @dataclass(frozen=True)
 class NearestAncestorGoModResult:
     address: Address
+
+
+class AllGoModTargets(Targets):
+    pass
+
+
+@rule(desc="Find all `go_mod` targets in project", level=LogLevel.DEBUG)
+async def find_all_go_mod_targets(targets: AllTargets) -> AllGoModTargets:
+    return AllGoModTargets(tgt for tgt in targets if tgt.has_field(GoModDependenciesField))
 
 
 @rule
@@ -94,52 +108,73 @@ async def find_nearest_ancestor_go_mod(
 
 
 @rule_helper
-async def _find_go_mod_dependee(address: Address) -> Address:
-    # Find all targets that depend on the given target.
-    dependees = await Get(
-        Dependees,
-        DependeesRequest(
-            addresses=(address,),
-            transitive=True,
-            include_roots=False,
+async def _find_explict_owning_go_mod_address(
+    address: Address,
+    field: GoOwningGoModAddressField,
+    alias: str,
+    all_go_mod_targets: AllGoModTargets,
+) -> Address:
+    # If no value is specified, then see if there is only one `go_mod` target in this repository.
+    if field.value is None:
+        # If so, that is the default.
+        if len(all_go_mod_targets) == 1:
+            return all_go_mod_targets[0].address
+
+        # Otherwise error and inform user to specify the owning `go_mod` target's address.
+        if not all_go_mod_targets:
+            raise InvalidTargetException(
+                f"The `{alias}` target `{address}` requires that the address of an owning `{GoModTarget.alias}` "
+                f"target be given via the `{GoOwningGoModAddressField.alias}` field since it is "
+                "a dependency of a Go target. However, there are no `go_mod` targets in this repository."
+            )
+
+        raise InvalidTargetException(
+            f"The `{alias}` target `{address}` requires that the address of an owning `{GoModTarget.alias}` "
+            f"target be given via the `{GoOwningGoModAddressField.alias}` field since it is "
+            "a dependency of a Go target. However, there are multiple `go_mod` targets in this repository "
+            "which makes the choice of which `go_mod` target to use ambiguous. Please specify which of the "
+            "following addresses to use or consider using the `parametrize` builtin to specify more than "
+            "one of these addresses if this target will be used in multiple Go modules: "
+            f"{', '.join([str(tgt.address) for tgt in all_go_mod_targets])}"
+        )
+
+    # If a value is specified, then resolve it as an address.
+    address_input = AddressInput.parse(
+        field.value,
+        relative_to=address.spec_path,
+        description_of_origin=f"the `{GoOwningGoModAddressField.alias}` field of target `{address}`",
+    )
+    candidate_go_mod_address = await Get(Address, AddressInput, address_input)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            candidate_go_mod_address,
+            description_of_origin=f"the `{GoOwningGoModAddressField.alias}` field of target `{address}`",
         ),
     )
-
-    # Resolve the owning `go_mod` targets for `go_package` targets in the dependees set.
-    targets = await Get(Targets, Addresses(dependees))
-    owning_go_mods = await MultiGet(
-        Get(NearestAncestorGoModResult, NearestAncestorGoModRequest(tgt.address))
-        for tgt in targets
-        if tgt.has_field(GoPackageSourcesField)
-    )
-
-    owning_go_mods_set = set(x.address for x in owning_go_mods)
-    if len(owning_go_mods_set) > 1:
-        addr_bullet_list = bullet_list([str(addr) for addr in owning_go_mods_set])
+    if not wrapped_target.target.has_field(GoModDependenciesField):
         raise InvalidTargetException(
-            f"The target {address} has multiple `go_mod` targets as dependees. Pants currently is limited to "
-            "supporting a single `go_mod` target as a dependee for non-`go_package` targets. The dependee "
-            f"`go_mod` targets are:\n\n{addr_bullet_list}"
+            f"The `{alias}` target `{address}` requires that the address of an owning `{GoModTarget.alias}` "
+            f"target be given via the `{GoOwningGoModAddressField.alias}` field since it is "
+            f"a dependency of a Go target. However, the provided address `{field.value}` does not refer to "
+            f"a `{GoModTarget.alias}` target. Please specify which of the following addresses to use or consider "
+            "using the `parametrize` builtin to specify more than one of these addresses if this target will be "
+            f"used in multiple Go modules: {', '.join([str(tgt.address) for tgt in all_go_mod_targets])}"
         )
-    elif len(owning_go_mods_set) == 0:
-        raise InvalidTargetException(
-            f"The target {address} does not have a `go_mod` target as a dependee. This error should not have "
-            "happened because {address} is not part of the dependency graph of any Go-related target. "
-            "Please open an issue at https://github.com/pantsbuild/pants/issues/new/choose"
-        )
-
-    return list(owning_go_mods_set)[0]
+    return candidate_go_mod_address
 
 
 @rule
-async def find_owning_go_mod(request: OwningGoModRequest) -> OwningGoMod:
+async def find_owning_go_mod(
+    request: OwningGoModRequest, all_go_mod_targets: AllGoModTargets
+) -> OwningGoMod:
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(request.address, description_of_origin="the `OwningGoMod` rule"),
     )
     target = wrapped_target.target
 
-    if target.has_field(GoModSourcesField):
+    if target.has_field(GoModDependenciesField):
         return OwningGoMod(request.address)
     elif target.has_field(GoPackageSourcesField):
         # For `go_package` targets, use the nearest ancestor go_mod target.
@@ -147,14 +182,33 @@ async def find_owning_go_mod(request: OwningGoModRequest) -> OwningGoMod:
             NearestAncestorGoModResult, NearestAncestorGoModRequest(request.address)
         )
         return OwningGoMod(nearest_go_mod_result.address)
-    elif target.has_field(GoThirdPartyPackageDependenciesField):
+    elif target.has_field(GoThirdPartyPackageDependenciesField) or target.has_field(
+        TargetGeneratorSourcesHelperSourcesField
+    ):
         # For `go_third_party_package` targets, use the generator which is the owning `go_mod` target.
         generator_address = target.address.maybe_convert_to_target_generator()
         return OwningGoMod(generator_address)
+    elif target.has_field(GoBinaryMainPackageField):
+        main_pkg = await Get(
+            GoBinaryMainPackage, GoBinaryMainPackageRequest(target.get(GoBinaryMainPackageField))
+        )
+        owning_go_mod_for_main_pkg = await Get(OwningGoMod, OwningGoModRequest(main_pkg.address))
+        return owning_go_mod_for_main_pkg
+    elif target.has_field(GoOwningGoModAddressField):
+        # Otherwise, find any explicitly defined go_mod address (e.g., for `protobuf_sources` targets).
+        explicit_go_mod_address = await _find_explict_owning_go_mod_address(
+            address=request.address,
+            field=target.get(GoOwningGoModAddressField),
+            alias=target.alias,
+            all_go_mod_targets=all_go_mod_targets,
+        )
+        return OwningGoMod(explicit_go_mod_address)
     else:
-        # Otherwise, find the nearest ancestor dependency that is a go_package() and use its owning go_mod.
-        go_mod_dependee = await _find_go_mod_dependee(request.address)
-        return OwningGoMod(go_mod_dependee)
+        raise AssertionError(
+            "Internal error: Unable to determine how to determine the owning `go_mod` target "
+            f"for `{target.alias}` target `{target.address}`. Please file an issue at "
+            "https://github.com/pantsbuild/pants/issues/new."
+        )
 
 
 @dataclass(frozen=True)

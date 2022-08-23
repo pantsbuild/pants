@@ -14,10 +14,12 @@ from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
     ProtobufGrpcToggleField,
     ProtobufSourceField,
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
 )
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import ImportPathToPackages, ImportPathToPackagesRequest
-from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.target_types import GoOwningGoModAddressField, GoPackageSourcesField
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -651,6 +653,8 @@ def rules():
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
         UnionRule(InferDependenciesRequest, InferGoProtobufDependenciesRequest),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
+        ProtobufSourceTarget.register_plugin_field(GoOwningGoModAddressField),
         # Rules needed for this to pass src/python/pants/init/load_backends_integration_test.py:
         *assembly.rules(),
         *build_pkg.rules(),

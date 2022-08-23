@@ -255,3 +255,24 @@ class GoBinaryTarget(Target):
         RestartableField,
     )
     help = "A Go binary."
+
+
+# -----------------------------------------------------------------------------------------------
+# Support for codegen targets that need to specify an owning go_mod target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoOwningGoModAddressField(StringField):
+    alias = "go_mod_address"
+    help = softwrap(
+        """
+        Address of the `go_mod` target representing the Go module that this target is part of.
+
+        This field is similar to the `resolve` field used in the Python and JVM backends. If a codegen
+        target such as `protobuf_sources` will be used in multiple Go modules, then you should use
+        the `parametrize` built-in to parametrize that `protobuf_sources` target for each Go module.
+
+        If there is a single `go_mod` target in the repository, then this field defaults to the address
+        for that single `go_mod` target.
+        """
+    )
