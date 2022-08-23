@@ -312,13 +312,30 @@ async def setup_pytest_for_target(
             *cov_args,
         ]
 
+    extra_add_opts = []
+    if "PYTEST_ADDOPTS" in field_set_extra_env:
+        extra_add_opts.append(field_set_extra_env["PYTEST_ADDOPTS"])
+    if "PYTEST_ADDOPTS" in test_extra_env.env:
+        extra_add_opts.append(test_extra_env.env["PYTEST_ADDOPTS"])
+
+    # Warn the user if there is an option in PYTEST_ADDOPTS already set by Pants.
+    pants_addopts = ["--color=", "--junitxml=", "junit_family="]
+    for opt in pants_addopts:
+        if opt in extra_add_opts:
+            logger.warning(
+                f"The option '{opt}' is set by Pants but also in PYTEST_ADDOPTS environment variable. This can cause unexpected behavior."
+            )
+    add_opts.extend(extra_add_opts)
+
     extra_env = {
-        "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
         # `python_tests`.
         **field_set_extra_env,
+        # NOTE: PYTEST_ADDOPTS after all others envs to avoid stomping comm channel between Pants
+        # and pytest.
+        "PYTEST_ADDOPTS": " ".join(add_opts),
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
