@@ -582,25 +582,40 @@ path `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` co
 This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles
 like Pytest and Black.
 
-When initially generating the lockfile, still set the absolute paths using either
-PEP 440 direct reference requirements or `[python-repos].find_links`. Then, add to 
-`[python-repos].path_mappings` a value in the form `NAME|PATH`. We recommend setting these options in a 
-[`.pants.rc` file](doc:options#pantsrc-file) because your teammates will set different values.
+`[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g.
+`WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. You must also use an absolute path still for
+`[python-repos].find_links` and any PEP 440 direct reference requirements.
+
+If possible, we recommend using a common file location for your whole team, and leveraging [Pants's
+interpolation](doc:options#config-file-interpolation), so that you avoid each user needing to
+manually configure `[python-repos].path_mappings` (and possibly `[python-repos].find_links`).
+For example, in `pants.toml`, you could set `[python-repos].path_mappings` to 
+`WHEELS_DIR|%(buildroot)s/python_wheels` and `[python-repos].find_links` to
+`%(buildroot)s/python_wheels`. Then, as long as every user has the folder `python_wheels` in the
+root of the repository, things will work without additional configuration. Or, you could use a
+value like `%(env.HOME)s/pants_wheels` for the path `~/pants_wheels`.
+
+```toml pants.toml
+[python-repos]
+# No one needs to change these values, as long as they can use the same shared location.
+find_links = ["file://%(buildroot)s/prebuilt_wheels"]
+path_mappings = ["WHEELS_DIR|%(buildroot)s/prebuilt_wheels"]
+```
+
+If you cannot use a common file location via interpolation, then we recommend setting these options
+in a [`.pants.rc` file](doc:options#pantsrc-file). Every teammate will need to set this up for their
+machine.
 
 ```toml .pants.rc
 [python-repos]
-# Still set `find_links` to an absolute path to a directory containing `.whl` and/or sdist files.
+# Each user must set both of these to the absolute paths on their machines.
 find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
 path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
 ```
 
-Then, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`.
-You should see the `path_mappings` key set in the lockfile's JSON. 
-
-Finally, every teammate must also set up a `.pants.rc` file similar to the one above. That is,
-they must set `[python-repos].path_mappings`, using the same logical name like `WHEELS_DIR`,
-but with the path for their machine. If you are using `[python-repos].find_links`, then they must set
-this to the absolute path on their machine.
+After initially setting up `[python-repos].path_mappings`, run `./pants generate-lockfiles` or
+`./pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set
+in the lockfile's JSON.
 
 ### Constraints files
 
