@@ -10,13 +10,11 @@ Run `./pants help` to get basic help, including a list of commands you can run t
 
 ```text Shell
 ❯ ./pants help
-
-
 Pants 2.14.0
 
 Usage:
 
-  ./pants [options] [goals] [files/targets]  Attempt the specified goals on the specified files/targets.
+  ./pants [options] [goals] [specs]          Attempt the specified goals on the specified inputs.
   ./pants help                               Display this usage message.
   ./pants help goals                         List all installed goals.
   ./pants help targets                       List all installed target types.
@@ -29,15 +27,13 @@ Usage:
   ./pants help-advanced [goal/subsystem]     Help for a goal or subsystem's advanced options.
   ./pants help-all                           Print a JSON object containing all help info.
 
-  [file] can be:
-     path/to/file.ext
-     A path glob, such as '**/*.ext', in quotes to prevent premature shell expansion.
-
-  [target] can be:
-    path/to/dir:target_name.
-    path/to/dir for a target whose name is the same as the directory name.
-    path/to/dir:  to include all targets in the specified directory.
-    path/to/dir:: to include all targets found recursively under the directory.
+  [specs] can be:
+     A file, e.g. path/to/file.ext
+     A path glob, e.g. '**/*.ext' (in quotes to prevent premature shell expansion)
+     A directory, e.g. path/to/dir
+     A directory ending in `::` to include all subdirectories, e.g. path/to/dir::
+     A target address, e.g. path/to/dir:target_name.
+     Any of the above with a `-` prefix to ignore the value, e.g. -path/to/ignore_me::.
 
 Documentation at https://www.pantsbuild.org
 Download at https://pypi.org/pypi/pantsbuild.pants/2.14.0
