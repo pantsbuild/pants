@@ -92,6 +92,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Guy Marom
 + Harley Cooper
 + Henry Fuller
++ Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
@@ -226,6 +227,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + SergeKireev
 + Sergey Serebryakov
 + Shane Delmore
++ Shantanu Kumar
 + Shuo Li
 + Simeon Franklin
 + Srikanth Kotagiri
