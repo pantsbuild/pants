@@ -325,6 +325,8 @@ async def determine_requirement_strings_in_closure(
             for tgt in transitive_targets.closure
             if tgt.has_field(PythonRequirementsField)
         ),
+        # This is only set if `[python].requirement_constraints` is configured, which is mutually
+        # exclusive with resolves.
         constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
     )
 
@@ -398,13 +400,8 @@ async def _determine_requirements_for_pex_from_targets(
     should_request_repository_pex = (
         # The entire lockfile was explicitly requested.
         should_return_entire_lockfile
-        # The legacy `resolve_all_constraints`+`requirement_constraints` options were used.
-        or (
-            # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as
-            # part of #12314.
-            python_setup.resolve_all_constraints
-            and python_setup.requirement_constraints
-        )
+        # The legacy `resolve_all_constraints`
+        or (python_setup.resolve_all_constraints and python_setup.requirement_constraints)
         # A non-PEX-native lockfile was used, and so we cannot directly subset it from a
         # LoadedLockfile.
         or not pex_native_subsetting_supported
@@ -534,40 +531,29 @@ async def get_repository_pex(
     if request.platforms or request.complete_platforms:
         return OptionalPexRequest(None)
 
-    interpreter_constraints = await Get(
-        InterpreterConstraints,
-        InterpreterConstraintsRequest,
-        request.to_interpreter_constraints_request(),
-    )
-
-    repository_pex_request: PexRequest | None = None
     if python_setup.requirement_constraints:
         constraints_repository_pex_request = await Get(
-            OptionalPexRequest,
-            _ConstraintsRepositoryPexRequest(request),
+            OptionalPexRequest, _ConstraintsRepositoryPexRequest(request)
         )
-        repository_pex_request = constraints_repository_pex_request.maybe_pex_request
-    elif (
-        python_setup.resolve_all_constraints
-        and python_setup.resolve_all_constraints_was_set_explicitly()
-    ):
-        raise ValueError(
-            softwrap(
-                """
-                `[python].resolve_all_constraints` is enabled, so
-                `[python].requirement_constraints` must also be set.
-                """
-            )
-        )
-    elif python_setup.enable_resolves:
-        chosen_resolve = await Get(
-            ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
-        )
-        repository_pex_request = PexRequest(
+        return OptionalPexRequest(constraints_repository_pex_request.maybe_pex_request)
+
+    if not python_setup.enable_resolves:
+        return OptionalPexRequest(None)
+
+    chosen_resolve, interpreter_constraints = await MultiGet(
+        Get(ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)),
+        Get(
+            InterpreterConstraints,
+            InterpreterConstraintsRequest,
+            request.to_interpreter_constraints_request(),
+        ),
+    )
+    return OptionalPexRequest(
+        PexRequest(
             description=softwrap(
                 f"""
-                Installing {chosen_resolve.lockfile.file_path}
-                for the resolve `{chosen_resolve.name}`
+                Installing {chosen_resolve.lockfile.file_path} for the resolve
+                `{chosen_resolve.name}`
                 """
             ),
             output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
@@ -579,7 +565,7 @@ async def get_repository_pex(
             complete_platforms=request.complete_platforms,
             additional_args=request.additional_lockfile_args,
         )
-    return OptionalPexRequest(repository_pex_request)
+    )
 
 
 @rule
@@ -694,7 +680,7 @@ class RequirementsPexRequest:
 
 
 @rule
-async def generalize_requirementspexrequest(
+async def generalize_requirements_pex_request(
     request: RequirementsPexRequest,
 ) -> PexFromTargetsRequest:
     return PexFromTargetsRequest(
