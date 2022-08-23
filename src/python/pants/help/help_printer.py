@@ -334,7 +334,7 @@ class HelpPrinter(MaybeColor):
         print(f"\nPants {pants_version()}")
         print("\nUsage:\n")
         print_cmd(
-            "[options] [goals] [specs]",
+            "[options] [goals] [inputs]",
             "Attempt the specified goals on the specified inputs.",
         )
         print_cmd("help", "Display this usage message.")
@@ -355,7 +355,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help-all", "Print a JSON object containing all help info.")
 
         print("")
-        print("  [specs] can be:")
+        print("  [inputs] can be:")
         print(f"     A file, e.g. {self.maybe_cyan('path/to/file.ext')}")
         glob_str = self.maybe_cyan("'**/*.ext'")
         print(f"     A path glob, e.g. {glob_str} (in quotes to prevent premature shell expansion)")
