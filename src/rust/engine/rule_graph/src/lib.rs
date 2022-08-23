@@ -511,11 +511,11 @@ impl<R: Rule> RuleGraph<R> {
 ///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
-  dependencies: HashMap<R::DependencyKey, Intern<Entry<R>>>,
+  dependencies: HashMap<DependencyKey<R::TypeId>, Intern<Entry<R>>>,
 }
 
 impl<R: Rule> RuleEdges<R> {
-  pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<Intern<Entry<R>>> {
+  pub fn entry_for(&self, dependency_key: &DependencyKey<R::TypeId>) -> Option<Intern<Entry<R>>> {
     self.dependencies.get(dependency_key).cloned()
   }
 
