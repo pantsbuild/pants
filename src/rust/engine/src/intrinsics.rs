@@ -470,13 +470,12 @@ fn create_digest_to_digest(
 
   let store = context.core.store();
   async move {
+    // The digests returned here are already in the `file_digests` map.
+    let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
     let trie = DigestTrie::from_path_stats(path_stats, &file_digests)?;
-    let store_trie = store.record_digest_trie(trie, true);
-    let store_bytes = store.store_file_bytes_batch(bytes_to_store, true);
-    let (trie_digest, _) = try_join!(store_trie, store_bytes)?;
 
     let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), trie_digest)?;
+    let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)
   }
   .boxed()
