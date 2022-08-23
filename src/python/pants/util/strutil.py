@@ -236,6 +236,9 @@ def softwrap(text: str) -> str:
             width, use trailing backlashes to line-continue the line. Because we squash multiple
             spaces, this will "just work".)
     """
+    if not text:
+        return text
+
     # If callers didnt use a leading "\" thats OK.
     if text[0] == "\n":
         text = text[1:]
