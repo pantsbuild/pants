@@ -34,7 +34,7 @@ from pants.engine.target import (
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
-from pants.util.value_interpolation import InterpolationContext
+from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
 
@@ -469,20 +469,33 @@ class HelmDeploymentFieldSet(FieldSet):
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
 
-    def format_values(self, interpolation_context: InterpolationContext) -> dict[str, str]:
-        def format_value(text: str) -> str:
+    def format_values(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        def format_value(text: str) -> str | None:
             source = InterpolationContext.TextSource(
                 self.address,
                 target_alias=HelmDeploymentTarget.alias,
                 field_alias=HelmDeploymentValuesField.alias,
             )
 
-            return interpolation_context.format(
-                text,
-                source=source,
-            )
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
 
-        return {key: format_value(value) for key, value in (self.values.value or {}).items()}
+        result = {}
+        for key, value in (self.values.value or {}).items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        return result
 
 
 class AllHelmDeploymentTargets(Targets):

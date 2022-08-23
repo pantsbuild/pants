@@ -302,7 +302,9 @@ async def setup_render_helm_deployment_process(
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    inline_values = request.field_set.format_values(interpolation_context)
+    inline_values = request.field_set.format_values(
+        interpolation_context, ignore_missing=request.cmd == HelmDeploymentCmd.RENDER
+    )
 
     def maybe_escape_string_value(value: str) -> str:
         if re.findall("\\s+", value):

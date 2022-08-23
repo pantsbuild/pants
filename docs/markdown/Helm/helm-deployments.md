@@ -194,7 +194,7 @@ helm_deployment(
 )
 ```
 
-### Using interpolated values
+### Using dynamic values
 
 Inline values also support interpolation of environment variables. Since Pants runs all processes in a hermetic sandbox, to be able to use environment variables you must first tell Pants what variables to make available to the Helm process using the `[helm].extra_env_vars` option. Consider the following example:
 
@@ -217,6 +217,11 @@ Now you can launch a deployment using the following command:
 ```
 DEPLOY_TIME=$(date) ./pants experimental-deploy src/deployment:dev
 ```
+
+> 🚧 Ensuring repeatable deployments
+> 
+> You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repetable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
+> Dynamic values are supported to give the option of passing some info or metadata to the software being deployed (i.e. deploy time, commit hash, etc) or some less harmful settings of a deployment (i.e. replica count. etc). Be careful when chossing the values that are going to be calculated dynamically.
 
 Third party chart artifacts
 ---------------------------
