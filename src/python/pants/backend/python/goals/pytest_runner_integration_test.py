@@ -451,16 +451,18 @@ def test_pytest_addopts(rule_runner: RuleRunner) -> None:
                 import os
 
                 def test_addopts():
-                    assert "--color=no" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-vv" in os.getenv("PYTEST_ADDOPTS")
                     assert "--maxfail=2" in os.getenv("PYTEST_ADDOPTS")
-                    assert "-ra -q" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-ra" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-q" in os.getenv("PYTEST_ADDOPTS")
+                    assert "--color=no" in os.getenv("PYTEST_ADDOPTS")
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests(
                     extra_env_vars=(
-                        "PYTEST_ADDOPTS=-ra -q",
+                        "PYTEST_ADDOPTS=-ra -q --color=no",
                     )
                 )
                 """
@@ -472,8 +474,7 @@ def test_pytest_addopts(rule_runner: RuleRunner) -> None:
         rule_runner,
         tgt,
         extra_args=[
-            "--test-report=true",
-            "--test-extra-env-vars=['PYTEST_ADDOPTS=--maxfail=2']",
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",
         ],
     )
     assert result.exit_code == 0

@@ -281,6 +281,7 @@ async def setup_pytest_for_target(
     )
 
     add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
+    pants_add_opts = ["--color"]
     output_files = []
 
     results_file_name = None
@@ -289,6 +290,7 @@ async def setup_pytest_for_target(
         add_opts.extend(
             (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
+        pants_add_opts.extend(["--junitxml", "junit_family"])
         output_files.append(results_file_name)
 
     coverage_args = []
@@ -311,21 +313,22 @@ async def setup_pytest_for_target(
             f"--cov-config={coverage_config.path}",
             *cov_args,
         ]
+        pants_add_opts.extend(["--cov-report", "--cov-config"])  # --cov not there as multi-allowed.
 
+    # Get extra PYTEST_ADDOPTS env var from each possible sources.
     extra_add_opts = []
     if "PYTEST_ADDOPTS" in field_set_extra_env:
         extra_add_opts.append(field_set_extra_env["PYTEST_ADDOPTS"])
     if "PYTEST_ADDOPTS" in test_extra_env.env:
         extra_add_opts.append(test_extra_env.env["PYTEST_ADDOPTS"])
+    add_opts.extend(extra_add_opts)
 
     # Warn the user if there is an option in PYTEST_ADDOPTS already set by Pants.
-    pants_addopts = ["--color=", "--junitxml=", "junit_family="]
-    for opt in pants_addopts:
-        if opt in extra_add_opts:
+    for popt in pants_add_opts:
+        if any(popt in eopt for eopt in extra_add_opts):
             logger.warning(
-                f"The option '{opt}' is set by Pants but also in PYTEST_ADDOPTS environment variable. This can cause unexpected behavior."
+                f"The option '{popt}' is set by Pants but also in PYTEST_ADDOPTS environment variable. This can cause unexpected behavior."
             )
-    add_opts.extend(extra_add_opts)
 
     extra_env = {
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
