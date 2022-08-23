@@ -25,6 +25,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    Field,
     InvalidFieldException,
     OptionalSingleSourceField,
     StringField,
@@ -333,7 +334,7 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         yield from cast("tuple[str]", self.value)
 
 
-class DockerBuildUnaryOptionFieldMixin(ABC):
+class DockerBuildUnaryOptionFieldMixin(Field):
     """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
     to `docker build`."""
 

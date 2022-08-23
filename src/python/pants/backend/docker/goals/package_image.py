@@ -210,9 +210,9 @@ def get_build_options(
                 error_cls=DockerImageOptionValueError,
             )
             yield from target[field_type].options(format)
-        elif issubclass(field_type, DockerBuildUnaryOptionFieldMixin) or issubclass(
-            field_type, DockerBuildSkippingOptionFieldMixin
-        ):
+        elif issubclass(field_type, DockerBuildUnaryOptionFieldMixin):
+            yield from target[field_type].options()
+        elif issubclass(field_type, DockerBuildSkippingOptionFieldMixin):
             yield from target[field_type].options()
 
     # Target stage
