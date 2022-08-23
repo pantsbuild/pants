@@ -440,14 +440,15 @@ async def helm_process(
     request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
 ) -> Process:
     global_extra_env = await Get(Environment, EnvironmentRequest(helm_subsytem.extra_env_vars))
+
+    # Helm binary's setup parameters go last to prevent end users overriding any of its values.
+
     env = {**global_extra_env, **request.extra_env, **helm_binary.env}
-
     immutable_input_digests = {
-        **helm_binary.immutable_input_digests,
         **request.extra_immutable_input_digests,
+        **helm_binary.immutable_input_digests,
     }
-
-    append_only_caches = {**helm_binary.append_only_caches, **request.extra_append_only_caches}
+    append_only_caches = {**request.extra_append_only_caches, **helm_binary.append_only_caches}
 
     return Process(
         [helm_binary.path, *request.argv],
