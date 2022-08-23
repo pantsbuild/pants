@@ -334,7 +334,8 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
 
 
 class DockerBuildUnaryOptionFieldMixin(ABC):
-    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`) to `docker build`."""
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `docker build`."""
 
     docker_build_option: ClassVar[str]
 
@@ -357,7 +358,9 @@ class DockerImageBuildPullOptionField(DockerBuildUnaryOptionFieldMixin, BoolFiel
 
 
 class DockerBuildSkippingOptionFieldMixin(BoolField, ABC):
-    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is `True`) to `docker build`."""
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `docker build`."""
+
     docker_build_option: ClassVar[str]
 
     @final
@@ -367,7 +370,7 @@ class DockerBuildSkippingOptionFieldMixin(BoolField, ABC):
 
 
 class DockerImageBuildSquashOptionField(DockerBuildSkippingOptionFieldMixin):
-    alias="squash"
+    alias = "squash"
     default = False
     help = softwrap(
         """
