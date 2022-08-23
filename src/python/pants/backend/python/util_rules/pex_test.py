@@ -450,7 +450,10 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     assert pex_data.info["interpreter_constraints"] == []
 
 
-def test_local_requirements_and_path_mappings(tmp_path) -> None:
+@pytest.mark.parametrize("use_pep440_rather_than_find_links", [True, False])
+def test_local_requirements_and_path_mappings(
+    use_pep440_rather_than_find_links: bool, tmp_path
+) -> None:
     rule_runner = RuleRunner(
         rules=[
             *pex_test_utils.rules(),
@@ -465,6 +468,7 @@ def test_local_requirements_and_path_mappings(tmp_path) -> None:
     wheel_content = requests.get(
         "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl"
     ).content
+
     with temporary_dir() as wheel_base_dir:
         dir1_path = Path(wheel_base_dir, "dir1")
         dir2_path = Path(wheel_base_dir, "dir2")
@@ -472,12 +476,21 @@ def test_local_requirements_and_path_mappings(tmp_path) -> None:
         dir2_path.mkdir()
 
         wheel_path = dir1_path / "ansicolors-1.1.8-py2.py3-none-any.whl"
-        wheel_req_str = f"ansicolors @ file://{wheel_path}"
+        wheel_req_str = (
+            f"ansicolors @ file://{wheel_path}"
+            if use_pep440_rather_than_find_links
+            else "ansicolors"
+        )
         wheel_path.write_bytes(wheel_content)
 
         def options(path_mappings_dir: Path) -> tuple[str, ...]:
             return (
                 "--python-repos-indexes=[]",
+                (
+                    "--python-repos-find-links=[]"
+                    if use_pep440_rather_than_find_links
+                    else f"--python-repos-find-links={path_mappings_dir}"
+                ),
                 f"--python-repos-path-mappings=WHEEL_DIR|{path_mappings_dir}",
                 f"--named-caches-dir={tmp_path}",
             )
@@ -498,10 +511,7 @@ def test_local_requirements_and_path_mappings(tmp_path) -> None:
         lock_digest_contents = rule_runner.request(DigestContents, [lock_result.digest])
         assert len(lock_digest_contents) == 1
         lock_file_content = lock_digest_contents[0]
-        assert (
-            b"file://${WHEEL_DIR}/ansicolors-1.1.8-py2.py3-none-any.whl"
-            in lock_file_content.content
-        )
+        assert b"${WHEEL_DIR}/ansicolors-1.1.8-py2.py3-none-any.whl" in lock_file_content.content
         assert b"files.pythonhosted.org" not in lock_file_content.content
 
         lockfile_obj = EntireLockfile(
@@ -515,7 +525,7 @@ def test_local_requirements_and_path_mappings(tmp_path) -> None:
         pex_info = create_pex_and_get_all_data(
             rule_runner, requirements=lockfile_obj, additional_pants_args=options(dir2_path)
         ).info
-        assert "ansicolors==1.1.8" in pex_info["requirements"]
+        assert "ansicolors-1.1.8-py2.py3-none-any.whl" in pex_info["distributions"]
 
         # Confirm that pointing to a bad path fails.
         shutil.rmtree(tmp_path)
