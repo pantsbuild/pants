@@ -8,9 +8,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
-    GoBinaryMainPackage,
     GoBinaryMainPackageField,
-    GoBinaryMainPackageRequest,
     GoModDependenciesField,
     GoModSourcesField,
     GoModTarget,
@@ -18,10 +16,18 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
+from pants.backend.go.util_rules import binary
+from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput
-from pants.core.target_types import TargetGeneratorSourcesHelperSourcesField
+from pants.core.target_types import (
+    FilesGeneratingSourcesField,
+    FileSourceField,
+    ResourcesGeneratingSourcesField,
+    ResourceSourceField,
+    TargetGeneratorSourcesHelperSourcesField,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
@@ -176,8 +182,14 @@ async def find_owning_go_mod(
 
     if target.has_field(GoModDependenciesField):
         return OwningGoMod(request.address)
-    elif target.has_field(GoPackageSourcesField):
-        # For `go_package` targets, use the nearest ancestor go_mod target.
+    elif (
+        target.has_field(GoPackageSourcesField)
+        or target.has_field(FileSourceField)
+        or target.has_field(FilesGeneratingSourcesField)
+        or target.has_field(ResourceSourceField)
+        or target.has_field(ResourcesGeneratingSourcesField)
+    ):
+        # For `go_package`, `file`, and `resource` targets, use the nearest ancestor `go_mod` target.
         nearest_go_mod_result = await Get(
             NearestAncestorGoModResult, NearestAncestorGoModRequest(request.address)
         )
@@ -269,4 +281,7 @@ async def determine_go_mod_info(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *binary.rules(),
+    )

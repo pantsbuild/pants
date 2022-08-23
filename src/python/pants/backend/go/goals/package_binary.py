@@ -11,6 +11,8 @@ from pants.backend.go.target_types import (
     GoBinaryTarget,
     GoPackageTarget,
 )
+from pants.backend.go.target_types import GoBinaryMainPackageField
+from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (

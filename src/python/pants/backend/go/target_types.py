@@ -4,14 +4,12 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
-from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -224,19 +222,6 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
         """
     )
     value: str
-
-
-@dataclass(frozen=True)
-class GoBinaryMainPackage:
-    address: Address
-
-
-@dataclass(frozen=True)
-class GoBinaryMainPackageRequest(EngineAwareParameter):
-    field: GoBinaryMainPackageField
-
-    def debug_hint(self) -> str:
-        return self.field.address.spec
 
 
 class GoBinaryDependenciesField(Dependencies):
