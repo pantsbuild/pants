@@ -327,14 +327,14 @@ class HelpPrinter(MaybeColor):
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
-            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(50))
+            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(41))
             print(f"  {cmd}  {desc}")
 
         print(f"\nPants {pants_version()}")
         print("\nUsage:\n")
         print_cmd(
-            "[option ...] [goal ...] [file/target ...]",
-            "Attempt the specified goals on the specified files/targets.",
+            "[options] [goals] [inputs]",
+            "Attempt the specified goals on the specified inputs.",
         )
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
@@ -345,7 +345,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd(
-            "help [target_type/goal/subsystem/api_type/rule]",
+            "help [name]",
             "Help for a target type, goal, subsystem, plugin API type or rule.",
         )
         print_cmd(
@@ -354,24 +354,20 @@ class HelpPrinter(MaybeColor):
         print_cmd("help-all", "Print a JSON object containing all help info.")
 
         print("")
-        print("  [file] can be:")
-        print(f"     {self.maybe_cyan('path/to/file.ext')}")
+        print("  [inputs] can be:")
+        print(f"     A file, e.g. {self.maybe_cyan('path/to/file.ext')}")
         glob_str = self.maybe_cyan("'**/*.ext'")
+        print(f"     A path glob, e.g. {glob_str} (in quotes to prevent premature shell expansion)")
+        print(f"     A directory, e.g. {self.maybe_cyan('path/to/dir')}")
         print(
-            f"     A path glob, such as {glob_str}, in quotes to prevent premature shell expansion."
+            f"     A directory ending in `::` to include all subdirectories, e.g. {self.maybe_cyan('path/to/dir::')}"
         )
-        print("\n  [target] can be:")
-        print(f"    {self.maybe_cyan('path/to/dir:target_name')}.")
+        print(f"     A target address, e.g. {self.maybe_cyan('path/to/dir:target_name')}.")
         print(
-            f"    {self.maybe_cyan('path/to/dir')} for a target whose name is the same as the directory name."
+            f"     Any of the above with a `-` prefix to ignore the value, e.g. {self.maybe_cyan('-path/to/ignore_me::')}"
         )
-        print(
-            f"    {self.maybe_cyan('path/to/dir:')}  to include all targets in the specified directory."
-        )
-        print(
-            f"    {self.maybe_cyan('path/to/dir::')} to include all targets found recursively under the directory.\n"
-        )
-        print(f"Documentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
+
+        print(f"\nDocumentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
         pypi_url = f"https://pypi.org/pypi/pantsbuild.pants/{pants_version()}"
         print(f"Download at {self.maybe_magenta(pypi_url)}")
 

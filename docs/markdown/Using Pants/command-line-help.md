@@ -10,35 +10,33 @@ Run `./pants help` to get basic help, including a list of commands you can run t
 
 ```text Shell
 ❯ ./pants help
-
-Pants 2.8.0
+Pants 2.13.0
 
 Usage:
 
-  ./pants [option ...] [goal ...] [file/target ...]   Attempt the specified goals on the specified files/targets.
-  ./pants help                                        Display this usage message.
-  ./pants help goals                                  List all installed goals.
-  ./pants help targets                                List all installed target types.
-  ./pants help subsystems                             List all configurable subsystems.
-  ./pants help tools                                  List all external tools.
-  ./pants help global                                 Help for global options.
-  ./pants help-advanced global                        Help for global advanced options.
-  ./pants help [target_type/goal/subsystem]           Help for a target type, goal or subsystem.
-  ./pants help-advanced [goal/subsystem]              Help for a goal or subsystem's advanced options.
-  ./pants help-all                                    Print a JSON object containing all help info.
+  ./pants [options] [goals] [inputs]          Attempt the specified goals on the specified inputs.
+  ./pants help                               Display this usage message.
+  ./pants help goals                         List all installed goals.
+  ./pants help targets                       List all installed target types.
+  ./pants help subsystems                    List all configurable subsystems.
+  ./pants help tools                         List all external tools.
+  ./pants help api-types                     List all plugin API types.
+  ./pants help global                        Help for global options.
+  ./pants help-advanced global               Help for global advanced options.
+  ./pants help [name]                        Help for a target type, goal, subsystem, plugin API type or rule.
+  ./pants help-advanced [goal/subsystem]     Help for a goal or subsystem's advanced options.
+  ./pants help-all                           Print a JSON object containing all help info.
 
-  [file] can be:
-     path/to/file.ext
-     A path glob, such as '**/*.ext', in quotes to prevent premature shell expansion.
-
-  [target] can be:
-    path/to/dir:target_name.
-    path/to/dir for a target whose name is the same as the directory name.
-    path/to/dir:  to include all targets in the specified directory.
-    path/to/dir:: to include all targets found recursively under the directory.
+  [inputs] can be:
+     A file, e.g. path/to/file.ext
+     A path glob, e.g. '**/*.ext' (in quotes to prevent premature shell expansion)
+     A directory, e.g. path/to/dir
+     A directory ending in `::` to include all subdirectories, e.g. path/to/dir::
+     A target address, e.g. path/to/dir:target_name.
+     Any of the above with a `-` prefix to ignore the value, e.g. -path/to/ignore_me::
 
 Documentation at https://www.pantsbuild.org
-Download at https://pypi.org/pypi/pantsbuild.pants/2.8.0
+Download at https://pypi.org/pypi/pantsbuild.pants/2.13.0
 ```
 
 For example, to get help on the `test` goal:
