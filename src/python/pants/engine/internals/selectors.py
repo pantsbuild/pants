@@ -130,19 +130,19 @@ class AwaitableConstraints:
 # see https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
 if TYPE_CHECKING:
 
-    class _BasePyGeneratorResponseGet(PyGeneratorResponseGet[_Output, _Input]):
+    class _BasePyGeneratorResponseGet(PyGeneratorResponseGet[_Output]):
         pass
 
 else:
 
-    class _BasePyGeneratorResponseGet(Generic[_Output, _Input], PyGeneratorResponseGet):
+    class _BasePyGeneratorResponseGet(Generic[_Output], PyGeneratorResponseGet):
         pass
 
 
-class Awaitable(Generic[_Output, _Input], _BasePyGeneratorResponseGet[_Output, _Input]):
+class Awaitable(Generic[_Output], _BasePyGeneratorResponseGet[_Output]):
     def __await__(
         self,
-    ) -> Generator[Awaitable[_Output, _Input], None, _Output]:
+    ) -> Generator[Awaitable[_Output], None, _Output]:
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within
@@ -165,7 +165,7 @@ class Awaitable(Generic[_Output, _Input], _BasePyGeneratorResponseGet[_Output, _
         return cast(_Output, result)
 
 
-class Effect(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+class Effect(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for types which are SideEffecting.
 
     Unlike `Get`s, `Effect`s can cause side-effects (writing files to the workspace, publishing
@@ -175,7 +175,7 @@ class Effect(Generic[_Output, _Input], Awaitable[_Output, _Input]):
     """
 
 
-class Get(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+class Get(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for side-effect-free types.
 
     A Get can be constructed in 2 ways with two variants each:
@@ -222,158 +222,145 @@ _Out7 = TypeVar("_Out7")
 _Out8 = TypeVar("_Out8")
 _Out9 = TypeVar("_Out9")
 
-_In0 = TypeVar("_In0")
-_In1 = TypeVar("_In1")
-_In2 = TypeVar("_In2")
-_In3 = TypeVar("_In3")
-_In4 = TypeVar("_In4")
-_In5 = TypeVar("_In5")
-_In6 = TypeVar("_In6")
-_In7 = TypeVar("_In7")
-_In8 = TypeVar("_In8")
-_In9 = TypeVar("_In9")
-
 
 @overload
-async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> tuple[_Output, ...]:  # noqa: F811
+async def MultiGet(__gets: Iterable[Get[_Output]]) -> tuple[_Output, ...]:  # noqa: F811
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Output, _Input],
-    __get1: Get[_Output, _Input],
-    __get2: Get[_Output, _Input],
-    __get3: Get[_Output, _Input],
-    __get4: Get[_Output, _Input],
-    __get5: Get[_Output, _Input],
-    __get6: Get[_Output, _Input],
-    __get7: Get[_Output, _Input],
-    __get8: Get[_Output, _Input],
-    __get9: Get[_Output, _Input],
-    __get10: Get[_Output, _Input],
-    *__gets: Get[_Output, _Input],
+    __get0: Get[_Output],
+    __get1: Get[_Output],
+    __get2: Get[_Output],
+    __get3: Get[_Output],
+    __get4: Get[_Output],
+    __get5: Get[_Output],
+    __get6: Get[_Output],
+    __get7: Get[_Output],
+    __get8: Get[_Output],
+    __get9: Get[_Output],
+    __get10: Get[_Output],
+    *__gets: Get[_Output],
 ) -> tuple[_Output, ...]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
-    __get5: Get[_Out5, _In5],
-    __get6: Get[_Out6, _In6],
-    __get7: Get[_Out7, _In7],
-    __get8: Get[_Out8, _In8],
-    __get9: Get[_Out9, _In9],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
+    __get5: Get[_Out5],
+    __get6: Get[_Out6],
+    __get7: Get[_Out7],
+    __get8: Get[_Out8],
+    __get9: Get[_Out9],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
-    __get5: Get[_Out5, _In5],
-    __get6: Get[_Out6, _In6],
-    __get7: Get[_Out7, _In7],
-    __get8: Get[_Out8, _In8],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
+    __get5: Get[_Out5],
+    __get6: Get[_Out6],
+    __get7: Get[_Out7],
+    __get8: Get[_Out8],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
-    __get5: Get[_Out5, _In5],
-    __get6: Get[_Out6, _In6],
-    __get7: Get[_Out7, _In7],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
+    __get5: Get[_Out5],
+    __get6: Get[_Out6],
+    __get7: Get[_Out7],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
-    __get5: Get[_Out5, _In5],
-    __get6: Get[_Out6, _In6],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
+    __get5: Get[_Out5],
+    __get6: Get[_Out6],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
-    __get5: Get[_Out5, _In5],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
+    __get5: Get[_Out5],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
-    __get4: Get[_Out4, _In4],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
+    __get4: Get[_Out4],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0],
-    __get1: Get[_Out1, _In1],
-    __get2: Get[_Out2, _In2],
-    __get3: Get[_Out3, _In3],
+    __get0: Get[_Out0],
+    __get1: Get[_Out1],
+    __get2: Get[_Out2],
+    __get3: Get[_Out3],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1], __get2: Get[_Out2, _In2]
+    __get0: Get[_Out0], __get1: Get[_Out1], __get2: Get[_Out2]
 ) -> tuple[_Out0, _Out1, _Out2]:
     ...
 
 
 @overload
-async def MultiGet(
-    __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1]
-) -> tuple[_Out0, _Out1]:  # noqa: F811
+async def MultiGet(__get0: Get[_Out0], __get1: Get[_Out1]) -> tuple[_Out0, _Out1]:  # noqa: F811
     ...
 
 
 async def MultiGet(  # noqa: F811
-    __arg0: Iterable[Get[_Output, _Input]] | Get[_Out0, _In0],
-    __arg1: Get[_Out1, _In1] | None = None,
-    __arg2: Get[_Out2, _In2] | None = None,
-    __arg3: Get[_Out3, _In3] | None = None,
-    __arg4: Get[_Out4, _In4] | None = None,
-    __arg5: Get[_Out5, _In5] | None = None,
-    __arg6: Get[_Out6, _In6] | None = None,
-    __arg7: Get[_Out7, _In7] | None = None,
-    __arg8: Get[_Out8, _In8] | None = None,
-    __arg9: Get[_Out9, _In9] | None = None,
-    *__args: Get[_Output, _Input],
+    __arg0: Iterable[Get[_Output]] | Get[_Out0],
+    __arg1: Get[_Out1] | None = None,
+    __arg2: Get[_Out2] | None = None,
+    __arg3: Get[_Out3] | None = None,
+    __arg4: Get[_Out4] | None = None,
+    __arg5: Get[_Out5] | None = None,
+    __arg6: Get[_Out6] | None = None,
+    __arg7: Get[_Out7] | None = None,
+    __arg8: Get[_Out8] | None = None,
+    __arg9: Get[_Out9] | None = None,
+    *__args: Get[_Output],
 ) -> (
     tuple[_Output, ...]
     | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]
@@ -615,8 +602,8 @@ async def MultiGet(  # noqa: F811
             Unexpected MultiGet argument types: {', '.join(map(str, likely_args_exlicitly_passed))}
 
             A MultiGet can be constructed in two ways:
-            1. MultiGet(Iterable[Get[T]]) -> Tuple[T, ...]
-            2. MultiGet(Get[T1], Get[T2], ...) -> Tuple[T1, T2, ...]
+            1. MultiGet(Iterable[Get[T]]) -> Tuple[T]
+            2. MultiGet(Get[T1]], ...) -> Tuple[T1, T2, ...]
 
             The 1st form is intended for homogenous collections of Gets and emulates an
             async `for ...` comprehension used to iterate over the collection in parallel and
