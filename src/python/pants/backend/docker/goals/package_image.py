@@ -17,6 +17,8 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerBuildOptionFieldValueMixin,
+    DockerBuildOptionFlagFieldMixin,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -208,6 +210,10 @@ def get_build_options(
                 error_cls=DockerImageOptionValueError,
             )
             yield from target[field_type].options(format)
+        elif issubclass(field_type, DockerBuildOptionFieldValueMixin):
+            yield from target[field_type].options()
+        elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
+            yield from target[field_type].options()
 
     # Target stage
     target_stage = None

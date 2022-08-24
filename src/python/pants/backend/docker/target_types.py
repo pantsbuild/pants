@@ -25,6 +25,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    Field,
     InvalidFieldException,
     OptionalSingleSourceField,
     StringField,
@@ -333,6 +334,55 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         yield from cast("tuple[str]", self.value)
 
 
+class DockerBuildOptionFieldValueMixin(Field):
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        yield f"{self.docker_build_option}={self.value}"
+
+
+class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
+    alias = "pull"
+    default = True
+    help = softwrap(
+        """
+        If true, then docker will always attempt to pull a newer version of the image.
+
+        Useful to disable it when building images from other intermediate goals.
+        """
+    )
+    docker_build_option = "--pull"
+
+
+class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}"
+
+
+class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
+    alias = "squash"
+    default = False
+    help = softwrap(
+        """
+        If true, then docker will squash newly built layers into a single new layer.
+
+        Note that this option is only supported on a Docker daemon with experimental features enabled.
+        """
+    )
+    docker_build_option = "--squash"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -350,6 +400,8 @@ class DockerImageTarget(Target):
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
         DockerImageTargetStageField,
+        DockerImageBuildPullOptionField,
+        DockerImageBuildSquashOptionField,
         RestartableField,
     )
     help = softwrap(
