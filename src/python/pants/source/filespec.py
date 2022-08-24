@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
-from pants.engine.internals.native_engine import (
-    FilespecMatcher as FilespecMatcher,  # explicit re-export
+from pants.engine.internals.native_engine import (  # noqa: F401 # explicit re-export
+    FilespecMatcher as FilespecMatcher,
 )
 
 
