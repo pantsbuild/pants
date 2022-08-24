@@ -927,9 +927,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         }
     )
     specs = SpecsParser().parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"],
-        convert_dir_literal_to_address_literal=False,
-        description_of_origin="tests",
+        ["src/python/somefiles::", "src/python/others/b.py"], description_of_origin="tests"
     )
 
     class Callback(WorkunitsCallback):

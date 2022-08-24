@@ -35,9 +35,6 @@ def calculate_specs(
         options.specs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
-        convert_dir_literal_to_address_literal=(
-            global_options.use_deprecated_directory_cli_args_semantics
-        ),
     )
 
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))

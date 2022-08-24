@@ -1710,36 +1710,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    use_deprecated_directory_cli_args_semantics = BoolOption(
-        default=False,
-        help=softwrap(
-            f"""
-            If true, Pants will use the old, deprecated semantics for directory arguments like
-            `{bin_name()} test dir`: directories are shorthand for the target `dir:dir`, i.e. the
-            target that leaves off `name=`.
-
-            If false, Pants will use the new semantics: directory arguments will match all files
-            and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
-
-            This also impacts the behavior of the `tailor` goal. If this option is true,
-            `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
-            false, specifying a directory will only add targets for that directory.
-            """
-        ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            f"""
-            If `use_deprecated_directory_cli_args_semantics` is already set explicitly to `false`,
-            simply delete the option from `pants.toml` because `false` is now the default.
-
-            If set to true, removing the option will cause directory arguments like `{bin_name()}
-            test project/dir` to now match all files and targets in the directory, whereas before
-            it matched the target `project/dir:dir`. To keep the old semantics, use the explicit
-            address syntax.
-            """
-        ),
-    )
-
     use_deprecated_pex_binary_run_semantics = BoolOption(
         default=False,
         help=softwrap(
