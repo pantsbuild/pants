@@ -136,7 +136,7 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
     assert_deps = partial(assert_dependencies, rule_runner)
 
     assert_deps(
-        specs=["some/other/target"],
+        specs=["some/other/target:target"],
         transitive=False,
         expected=["some/other/target/a.py"],
     )
@@ -146,7 +146,7 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=["3rdparty/python:req2", "some/target/a.py"],
     )
     assert_deps(
-        specs=["some/other/target"],
+        specs=["some/other/target:target"],
         transitive=True,
         expected=[
             "3rdparty/python:req1",

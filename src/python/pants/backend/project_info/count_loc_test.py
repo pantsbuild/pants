@@ -59,13 +59,15 @@ def test_count_loc(rule_runner: RuleRunner) -> None:
         {
             f"{py_dir}/foo.py": '# A comment.\n\nprint("some code")\n# Another comment.',
             f"{py_dir}/bar.py": '# A comment.\n\nprint("some more code")',
-            f"{py_dir}/BUILD": "python_sources()",
+            f"{py_dir}/BUILD": "python_sources(name='lib')",
             f"{elixir_dir}/foo.ex": 'IO.puts("Some elixir")\n# A comment',
             f"{elixir_dir}/ignored.ex": "# We do not expect this file to appear in counts.",
-            f"{elixir_dir}/BUILD": "elixir(sources=['foo.ex'])",
+            f"{elixir_dir}/BUILD": "elixir(name='lib', sources=['foo.ex'])",
         }
     )
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir, elixir_dir])
+    result = rule_runner.run_goal_rule(
+        CountLinesOfCode, args=[f"{py_dir}:lib", f"{elixir_dir}:lib"]
+    )
     assert result.exit_code == 0
     assert_counts(result.stdout, "Python", num_files=2, blank=2, comment=3, code=2)
     assert_counts(result.stdout, "Elixir", comment=1, code=1)
@@ -98,6 +100,6 @@ def test_files_without_owners(rule_runner: RuleRunner) -> None:
 
 def test_no_sources_exits_gracefully(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
-    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources()"})
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir])
+    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources(name='lib')"})
+    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[f"{py_dir}:lib"])
     assert result == GoalRuleResult.noop()
