@@ -26,6 +26,7 @@ pub trait TypeId:
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct DependencyKey<T: TypeId> {
   product: T,
+  // Most of our expected usecases for multiple-provided-parameters involve two parameters.
   provided_params: SmallVec<[T; 2]>,
 }
 
@@ -41,7 +42,8 @@ impl<T: TypeId> DependencyKey<T> {
     let mut provided_params = provided_params.into_iter().collect::<SmallVec<[T; 2]>>();
     provided_params.sort();
 
-    if cfg!(debug_assertions) {
+    #[cfg(debug_assertions)]
+    {
       let original_len = provided_params.len();
       provided_params.dedup();
       if original_len != provided_params.len() {
@@ -64,6 +66,9 @@ impl<T: TypeId> DependencyKey<T> {
 
   ///
   /// Returns the Param (input) type for this dependency, if it provides one.
+  ///
+  /// TODO: Currently all consumers use either zero or one provided param. This is a compatibility
+  /// shim until #7490 can be implemented.
   ///
   pub fn provided_param(&self) -> Option<T> {
     self.provided_params.get(0).cloned()
