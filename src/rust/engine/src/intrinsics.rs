@@ -44,87 +44,51 @@ impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.create_digest],
-      },
+      Intrinsic::new(types.directory_digest, types.create_digest),
       Box::new(create_digest_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.path_globs],
-      },
+      Intrinsic::new(types.directory_digest, types.path_globs),
       Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.paths,
-        inputs: vec![types.path_globs],
-      },
+      Intrinsic::new(types.paths, types.path_globs),
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.download_file],
-      },
+      Intrinsic::new(types.directory_digest, types.download_file),
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.snapshot,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.snapshot, types.directory_digest),
       Box::new(digest_to_snapshot),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.digest_contents,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.digest_contents, types.directory_digest),
       Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.digest_entries,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.digest_entries, types.directory_digest),
       Box::new(directory_digest_to_digest_entries),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.merge_digests],
-      },
+      Intrinsic::new(types.directory_digest, types.merge_digests),
       Box::new(merge_digests_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.remove_prefix],
-      },
+      Intrinsic::new(types.directory_digest, types.remove_prefix),
       Box::new(remove_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.add_prefix],
-      },
+      Intrinsic::new(types.directory_digest, types.add_prefix),
       Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.process_result,
-        inputs: vec![types.process],
-      },
+      Intrinsic::new(types.process_result, types.process),
       Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.digest_subset],
-      },
+      Intrinsic::new(types.directory_digest, types.digest_subset),
       Box::new(digest_subset_to_digest),
     );
     intrinsics.insert(
@@ -142,10 +106,7 @@ impl Intrinsics {
       Box::new(run_id),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.interactive_process_result,
-        inputs: vec![types.interactive_process],
-      },
+      Intrinsic::new(types.interactive_process_result, types.interactive_process),
       Box::new(interactive_process),
     );
     Intrinsics { intrinsics }

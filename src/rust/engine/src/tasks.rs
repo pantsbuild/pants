@@ -5,13 +5,12 @@ use std::fmt;
 
 use crate::intrinsics::Intrinsics;
 use crate::python::{Function, TypeId};
-use crate::selectors::{DependencyKey, Get, Select};
 
 use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
 use internment::Intern;
 use log::Level;
-use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
+use rule_graph::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Query};
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
@@ -28,7 +27,7 @@ impl DisplayForGraph for Rule {
         let task_name = task.func.full_name();
         let product = format!("{}", task.product);
 
-        let clause_portion = Self::formatted_select_clause(&task.clause, display_args);
+        let clause_portion = Self::formatted_positional_arguments(&task.args, display_args);
 
         let get_clauses = task
           .gets
@@ -63,7 +62,7 @@ impl DisplayForGraph for Rule {
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, display_args),
+        Self::formatted_positional_arguments(&intrinsic.inputs, display_args),
         intrinsic.product,
       ),
     }
@@ -72,7 +71,6 @@ impl DisplayForGraph for Rule {
 
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
-  type DependencyKey = DependencyKey;
 
   fn product(&self) -> TypeId {
     match self {
@@ -81,26 +79,18 @@ impl rule_graph::Rule for Rule {
     }
   }
 
-  fn dependency_keys(&self) -> Vec<DependencyKey> {
+  fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
+    // TODO: The singular `Get::input` below will become plural as part of #7490/#12946.
     match self {
-      &Rule::Task(task) => task
-        .clause
-        .iter()
-        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .chain(task.gets.iter().map(|g| DependencyKey::JustGet(*g)))
-        .collect(),
-      &Rule::Intrinsic(intrinsic) => intrinsic
-        .inputs
-        .iter()
-        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .collect(),
+      Rule::Task(task) => task.args.iter().chain(task.gets.iter()).collect(),
+      Rule::Intrinsic(intrinsic) => intrinsic.inputs.iter().collect(),
     }
   }
 
   fn require_reachable(&self) -> bool {
     match self {
-      &Rule::Task(_) => true,
-      &Rule::Intrinsic(_) => false,
+      Rule::Task(_) => true,
+      Rule::Intrinsic(_) => false,
     }
   }
 
@@ -113,7 +103,10 @@ impl rule_graph::Rule for Rule {
 }
 
 impl Rule {
-  fn formatted_select_clause(clause: &[TypeId], display_args: DisplayForGraphArgs) -> String {
+  fn formatted_positional_arguments(
+    clause: &[DependencyKey<TypeId>],
+    display_args: DisplayForGraphArgs,
+  ) -> String {
     let select_clauses = clause
       .iter()
       .map(|type_id| type_id.to_string())
@@ -147,8 +140,8 @@ pub struct Task {
   pub product: TypeId,
   pub side_effecting: bool,
   pub engine_aware_return_type: bool,
-  pub clause: Vec<TypeId>,
-  pub gets: Vec<Get>,
+  pub args: Vec<DependencyKey<TypeId>>,
+  pub gets: Vec<DependencyKey<TypeId>>,
   // TODO: This is a preliminary implementation of #12934: we should overhaul naming to
   // align Query and @union/Protocol as described there.
   pub unions: Vec<Query<Rule>>,
@@ -167,7 +160,16 @@ pub struct DisplayInfo {
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Intrinsic {
   pub product: TypeId,
-  pub inputs: Vec<TypeId>,
+  pub inputs: Vec<DependencyKey<TypeId>>,
+}
+
+impl Intrinsic {
+  pub fn new(product: TypeId, input: TypeId) -> Self {
+    Self {
+      product,
+      inputs: vec![DependencyKey::new(input)],
+    }
+  }
 }
 
 ///
@@ -240,7 +242,7 @@ impl Tasks {
       product: return_type,
       side_effecting,
       engine_aware_return_type,
-      clause: Vec::new(),
+      args: Vec::new(),
       gets: Vec::new(),
       unions: Vec::new(),
       func,
@@ -254,7 +256,10 @@ impl Tasks {
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get { output, input });
+      .push(DependencyKey::new_with_params(
+        output,
+        std::iter::once(input),
+      ));
   }
 
   pub fn add_union(&mut self, product: TypeId, params: Vec<TypeId>) {
@@ -268,13 +273,13 @@ impl Tasks {
       .push(query);
   }
 
-  pub fn add_select(&mut self, selector: TypeId) {
+  pub fn add_select(&mut self, type_id: TypeId) {
     self
       .preparing
       .as_mut()
-      .expect("Must `begin()` a task creation before adding clauses!")
-      .clause
-      .push(selector);
+      .expect("Must `begin()` a task creation before adding positional arguments!")
+      .args
+      .push(DependencyKey::new(type_id));
   }
 
   pub fn task_end(&mut self) {
