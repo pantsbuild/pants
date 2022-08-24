@@ -329,20 +329,23 @@ async def setup_full_package_build_request(
         candidate_addresses = package_mapping.mapping.get(dep_import_path)
         if candidate_addresses:
             # TODO: Use explicit dependencies to disambiguate? This should never happen with Go backend though.
-            if len(candidate_addresses) > 1:
-                return FallibleBuildGoPackageRequest(
-                    request=None,
-                    import_path=request.import_path,
-                    exit_code=result.exit_code,
-                    stderr=textwrap.dedent(
-                        f"""
-                        Multiple addresses match import of `{dep_import_path}`.
+            if candidate_addresses.infer_all:
+                dep_build_request_addrs.extend(candidate_addresses.addresses)
+            else:
+                if len(candidate_addresses.addresses) > 1:
+                    return FallibleBuildGoPackageRequest(
+                        request=None,
+                        import_path=request.import_path,
+                        exit_code=result.exit_code,
+                        stderr=textwrap.dedent(
+                            f"""
+                            Multiple addresses match import of `{dep_import_path}`.
 
-                        addresses: {', '.join(str(a) for a in candidate_addresses)}
-                        """
-                    ).strip(),
-                )
-            dep_build_request_addrs.extend(candidate_addresses)
+                            addresses: {', '.join(str(a) for a in candidate_addresses.addresses)}
+                            """
+                        ).strip(),
+                    )
+                dep_build_request_addrs.extend(candidate_addresses.addresses)
 
         # Infer dependencies on other generated Go sources.
         go_protobuf_candidate_addresses = go_protobuf_mapping.mapping.get(dep_import_path)

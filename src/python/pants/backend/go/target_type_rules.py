@@ -61,11 +61,17 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class GoAddressSet:
+    addresses: tuple[Address, ...]
+    infer_all: bool
+
+
+@dataclass(frozen=True)
 class GoImportPathToAddressesMapping:
     """Maps import paths (as strings) to one or more addresses of targets providing those import
     path(s)."""
 
-    mapping: FrozenDict[str, tuple[Address, ...]]
+    mapping: FrozenDict[str, GoAddressSet]
 
 
 @dataclass(frozen=True)
@@ -129,7 +135,9 @@ async def go_map_import_paths_by_module(
                 go_mod_addr: GoImportPathToAddressesMapping(
                     mapping=FrozenDict(
                         {
-                            import_path: tuple(sorted(addresses))
+                            import_path: GoAddressSet(
+                                addresses=tuple(sorted(addresses)), infer_all=False
+                            )
                             for import_path, addresses in import_path_mapping.items()
                         }
                     ),
@@ -181,7 +189,7 @@ async def infer_go_dependencies(
         return InferredDependencies([])
     pkg_analysis = maybe_pkg_analysis.analysis
 
-    inferred_dependencies = []
+    inferred_dependencies: list[Address] = []
     for import_path in (
         *pkg_analysis.imports,
         *pkg_analysis.test_imports,
@@ -192,14 +200,23 @@ async def infer_go_dependencies(
         # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
         if import_path == pkg_analysis.import_path:
             continue
-        candidate_packages = package_mapping.mapping.get(import_path, ())
-        if len(candidate_packages) > 1:
-            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
-            logger.warning(
-                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
-            )
-        elif len(candidate_packages) == 1:
-            inferred_dependencies.append(candidate_packages[0])
+        candidate_packages = package_mapping.mapping.get(import_path)
+        if candidate_packages:
+            if candidate_packages.infer_all:
+                inferred_dependencies.extend(candidate_packages.addresses)
+            else:
+                if len(candidate_packages.addresses) > 1:
+                    # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
+                    logger.warning(
+                        f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
+                    )
+                elif len(candidate_packages.addresses) == 1:
+                    inferred_dependencies.append(candidate_packages.addresses[0])
+                else:
+                    logger.debug(
+                        f"Unable to infer dependency for import path '{import_path}' "
+                        f"in go_package at address '{addr}'."
+                    )
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "
@@ -241,19 +258,28 @@ async def infer_go_third_party_package_dependencies(
         ),
     )
 
-    inferred_dependencies = []
+    inferred_dependencies: list[Address] = []
     for import_path in pkg_info.imports:
         if import_path in std_lib_imports:
             continue
 
         candidate_packages = package_mapping.mapping.get(import_path, ())
-        if len(candidate_packages) > 1:
-            # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
-            logger.warning(
-                f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
-            )
-        elif len(candidate_packages) == 1:
-            inferred_dependencies.append(candidate_packages[0])
+        if candidate_packages:
+            if candidate_packages.infer_all:
+                inferred_dependencies.extend(candidate_packages.addresses)
+            else:
+                if len(candidate_packages.addresses) > 1:
+                    # TODO(#12761): Use ExplicitlyProvidedDependencies for disambiguation.
+                    logger.warning(
+                        f"Ambiguous mapping for import path {import_path} on packages at addresses: {candidate_packages}"
+                    )
+                elif len(candidate_packages.addresses) == 1:
+                    inferred_dependencies.append(candidate_packages.addresses[0])
+                else:
+                    logger.debug(
+                        f"Unable to infer dependency for import path '{import_path}' "
+                        f"in go_third_party_package at address '{addr}'."
+                    )
         else:
             logger.debug(
                 f"Unable to infer dependency for import path '{import_path}' "

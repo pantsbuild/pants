@@ -107,9 +107,10 @@ async def dump_go_import_paths_for_module(
         package_mapping = await Get(
             GoImportPathToAddressesMapping, ImportPathToPackagesRequest(tgt.address)
         )
-        for import_path, addresses in package_mapping.mapping.items():
+        for import_path, address_set in package_mapping.mapping.items():
+            maybe_infer_all = " (infer all)" if address_set.infer_all else ""
             console.write_stdout(
-                f"  {import_path}: {', '.join(sorted([str(addr) for addr in addresses]))}\n"
+                f"  {import_path}: {', '.join(sorted([str(addr) for addr in address_set.addresses]))}{maybe_infer_all}\n"
             )
 
     return DumpGoImportPathsForModule(exit_code=0)
