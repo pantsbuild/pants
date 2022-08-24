@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
-from pants.backend.go.target_type_rules import ImportPathToPackages, ImportPathToPackagesRequest
+from pants.backend.go.target_type_rules import (
+    GoImportPathToAddressesMapping,
+    ImportPathToPackagesRequest,
+)
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoModTarget,
@@ -101,7 +104,9 @@ async def dump_go_import_paths_for_module(
         if not isinstance(tgt, GoModTarget):
             continue
 
-        package_mapping = await Get(ImportPathToPackages, ImportPathToPackagesRequest(tgt.address))
+        package_mapping = await Get(
+            GoImportPathToAddressesMapping, ImportPathToPackagesRequest(tgt.address)
+        )
         for import_path, addresses in package_mapping.mapping.items():
             console.write_stdout(
                 f"  {import_path}: {', '.join(sorted([str(addr) for addr in addresses]))}\n"
