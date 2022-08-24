@@ -905,19 +905,10 @@ impl Store {
     }
 
     // Filter out file digests that exist locally.
-    // TODO: Implement a local batch API: see https://github.com/pantsbuild/pants/issues/16400.
-    let local_file_exists = future::try_join_all(
-      file_digests
-        .iter()
-        .map(|file_digest| self.local.exists(EntryType::File, *file_digest))
-        .collect::<Vec<_>>(),
-    )
-    .await?;
-    let missing_locally = local_file_exists
-      .into_iter()
-      .zip(file_digests.into_iter())
-      .filter_map(|(exists, digest)| if exists { None } else { Some(digest) })
-      .collect::<Vec<_>>();
+    let missing_locally = self
+      .local
+      .get_missing_digests(EntryType::File, file_digests)
+      .await?;
 
     // If there are any digests which don't exist locally, check remotely.
     if missing_locally.is_empty() {

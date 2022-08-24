@@ -25,7 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Debug;
 use std::io::{self, Read};
@@ -327,25 +327,70 @@ impl ShardedLmdb {
       .await
   }
 
+  ///
+  /// Singular form of `Self::exists_batch`. When checking the existence of more than one item,
+  /// prefer `Self::exists_batch`.
+  ///
   pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let missing = self.get_missing_fingerprints(vec![fingerprint]).await?;
+    Ok(!missing.contains(&fingerprint))
+  }
+
+  ///
+  /// Determine which of the given Fingerprints are not already present in the store.
+  ///
+  pub async fn get_missing_fingerprints(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> Result<HashSet<Fingerprint>, String> {
     let store = self.clone();
-    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
     self
       .executor
       .spawn_blocking(move || {
-        let fingerprint = effective_key.get_fingerprint();
-        let (env, db, _) = store.get(&fingerprint);
-        let txn = env
-          .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
-        match txn.get(db, &effective_key) {
-          Ok(_) => Ok(true),
-          Err(lmdb::Error::NotFound) => Ok(false),
-          Err(err) => Err(format!(
-            "Error reading from store when checking existence of {}: {}",
-            fingerprint, err
-          )),
+        // Group the items by the Environment that they will be applied to.
+        let mut items_by_env = HashMap::new();
+        let mut missing = HashSet::new();
+
+        for fingerprint in &fingerprints {
+          let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::SCHEMA_VERSION);
+          let (env_id, _, env, db, _) = store.get_raw(&fingerprint.0);
+
+          let (_, _, batch) = items_by_env
+            .entry(*env_id)
+            .or_insert_with(|| (env.clone(), *db, vec![]));
+          batch.push(effective_key);
         }
+
+        // Open and commit a Transaction per Environment. Since we never have more than one
+        // Transaction open at a time, we don't have to worry about ordering.
+        for (_, (env, db, batch)) in items_by_env {
+          env
+            .begin_ro_txn()
+            .and_then(|txn| {
+              for effective_key in &batch {
+                let get_res = txn.get(db, &effective_key);
+                match get_res {
+                  Ok(_) => (),
+                  Err(lmdb::Error::NotFound) => {
+                    missing.insert(effective_key.get_fingerprint());
+                  }
+                  Err(err) => return Err(err),
+                };
+              }
+              txn.commit()
+            })
+            .map_err(|e| {
+              format!(
+                "Error checking existence of fingerprints {:?}: {}",
+                batch
+                  .iter()
+                  .map(|key| key.get_fingerprint())
+                  .collect::<Vec<_>>(),
+                e
+              )
+            })?;
+        }
+        Ok(missing)
       })
       .await
   }
