@@ -332,14 +332,15 @@ impl ShardedLmdb {
   /// prefer `Self::exists_batch`.
   ///
   pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
-    let missing = self.get_missing_fingerprints(vec![fingerprint]).await?;
-    Ok(!missing.contains(&fingerprint))
+    let missing = self.exists_batch(vec![fingerprint]).await?;
+    Ok(missing.contains(&fingerprint))
   }
 
   ///
-  /// Determine which of the given Fingerprints are not already present in the store.
+  /// Determine which of the given Fingerprints are already present in the store,
+  /// returning them as a set.
   ///
-  pub async fn get_missing_fingerprints(
+  pub async fn exists_batch(
     &self,
     fingerprints: Vec<Fingerprint>,
   ) -> Result<HashSet<Fingerprint>, String> {
@@ -349,7 +350,7 @@ impl ShardedLmdb {
       .spawn_blocking(move || {
         // Group the items by the Environment that they will be applied to.
         let mut items_by_env = HashMap::new();
-        let mut missing = HashSet::new();
+        let mut exists = HashSet::new();
 
         for fingerprint in &fingerprints {
           let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::SCHEMA_VERSION);
@@ -370,10 +371,10 @@ impl ShardedLmdb {
               for effective_key in &batch {
                 let get_res = txn.get(db, &effective_key);
                 match get_res {
-                  Ok(_) => (),
-                  Err(lmdb::Error::NotFound) => {
-                    missing.insert(effective_key.get_fingerprint());
+                  Ok(_) => {
+                    exists.insert(effective_key.get_fingerprint());
                   }
+                  Err(lmdb::Error::NotFound) => (),
                   Err(err) => return Err(err),
                 };
               }
@@ -390,7 +391,7 @@ impl ShardedLmdb {
               )
             })?;
         }
-        Ok(missing)
+        Ok(exists)
       })
       .await
   }

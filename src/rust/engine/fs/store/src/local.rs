@@ -366,11 +366,11 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     }?;
 
-    let missing = dbs.get_missing_fingerprints(fingerprints_to_check).await?;
+    let existing = dbs.exists_batch(fingerprints_to_check).await?;
 
     let missing = digests
       .into_iter()
-      .filter(|digest| *digest != EMPTY_DIGEST && missing.contains(&digest.hash))
+      .filter(|digest| *digest != EMPTY_DIGEST && !existing.contains(&digest.hash))
       .collect::<HashSet<_>>();
     Ok(missing)
   }
