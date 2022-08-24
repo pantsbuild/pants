@@ -390,9 +390,7 @@ async def fmt(
             )
         ),
     ]
-    target_batch_results = cast(
-        "tuple[_FmtBatchResult, ...]", await MultiGet(all_requests)  # type: ignore[arg-type]
-    )
+    target_batch_results = cast("tuple[_FmtBatchResult, ...]", await MultiGet(all_requests))
 
     individual_results = list(
         itertools.chain.from_iterable(result.results for result in target_batch_results)
