@@ -472,13 +472,13 @@ class HelmDeploymentFieldSet(FieldSet):
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
-        def format_value(text: str) -> str | None:
-            source = InterpolationContext.TextSource(
-                self.address,
-                target_alias=HelmDeploymentTarget.alias,
-                field_alias=HelmDeploymentValuesField.alias,
-            )
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
 
+        def format_value(text: str) -> str | None:
             try:
                 return interpolation_context.format(
                     text,
