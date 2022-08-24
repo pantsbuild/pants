@@ -1158,7 +1158,7 @@ class BootstrapOptions:
     process_cleanup = BoolOption(
         default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
         deprecation_start_version="2.15.0.dev1",
-        removal_version="2.17.0.dev1",
+        removal_version="3.0.0.dev0",
         removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """

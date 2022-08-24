@@ -428,6 +428,20 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+
+    __constraints_deprecation_msg = softwrap(
+        f"""
+        We encourage instead migrating to `[python].enable_resolves` and `[python].resolves`,
+        which is an improvement over this option. The `[python].resolves` feature ensures that
+        your lockfiles are fully comprehensive, i.e. include all transitive dependencies;
+        uses hashes for better supply chain security; and supports advanced features like VCS
+        and local requirements, along with options `[python].resolves_to_only_binary`.
+
+        To migrate, stop setting `[python].requirement_constraints` and
+        `[python].resolve_all_constraints`, and instead set `[python].enable_resolves` to
+        `true`. Then, run `{bin_name()} generate-lockfiles`.
+        """
+    )
     requirement_constraints = FileOption(
         default=None,
         help=softwrap(
@@ -449,8 +463,10 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
         mutually_exclusive_group="lockfile",
+        removal_version="3.0.0.dev0",
+        removal_hint=__constraints_deprecation_msg,
     )
-    resolve_all_constraints = BoolOption(
+    _resolve_all_constraints = BoolOption(
         default=True,
         help=softwrap(
             """
@@ -466,6 +482,8 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="3.0.0.dev0",
+        removal_hint=__constraints_deprecation_msg,
     )
     no_binary = StrListOption(
         help=softwrap(
@@ -755,15 +773,29 @@ class PythonSetup(Subsystem):
             ).items()
         }
 
-    def resolve_all_constraints_was_set_explicitly(self) -> bool:
-        return not self.options.is_default("resolve_all_constraints")
-
     @property
     def manylinux(self) -> str | None:
         manylinux = cast(Optional[str], self.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
+
+    @property
+    def resolve_all_constraints(self) -> bool:
+        if (
+            self._resolve_all_constraints
+            and not self.options.is_default("resolve_all_constraints")
+            and not self.requirement_constraints
+        ):
+            raise ValueError(
+                softwrap(
+                    """
+                    `[python].resolve_all_constraints` is enabled, so
+                    `[python].requirement_constraints` must also be set.
+                    """
+                )
+            )
+        return self._resolve_all_constraints
 
     @property
     def scratch_dir(self):

@@ -153,6 +153,7 @@ def test_validate_tool_lockfiles(
             only_binary=FrozenOrderedSet(
                 [PipRequirement.parse("not-bdist" if invalid_only_binary else "bdist")]
             ),
+            path_mappings=(),
         ),
     )
 
@@ -273,6 +274,7 @@ def test_validate_user_lockfiles(
             only_binary=FrozenOrderedSet(
                 [PipRequirement.parse("not-bdist" if invalid_only_binary else "bdist")]
             ),
+            path_mappings=(),
         ),
     )
 

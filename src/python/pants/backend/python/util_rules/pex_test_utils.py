@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.strutil import softwrap
 
 
@@ -154,11 +154,7 @@ def create_pex_and_get_all_data(
         additional_args=additional_pex_args,
         layout=layout,
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args],
-        env=env,
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
+    rule_runner.set_options(additional_pants_args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     pex: Pex | VenvPex
     if pex_type == Pex:
