@@ -334,7 +334,7 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         yield from cast("tuple[str]", self.value)
 
 
-class DockerBuildUnaryOptionFieldMixin(Field):
+class DockerBuildOptionFieldValueMixin(Field):
     """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
     to `docker build`."""
 
@@ -345,7 +345,7 @@ class DockerBuildUnaryOptionFieldMixin(Field):
         yield f"{self.docker_build_option}={self.value}"
 
 
-class DockerImageBuildPullOptionField(DockerBuildUnaryOptionFieldMixin, BoolField):
+class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
     default = True
     help = softwrap(
@@ -358,7 +358,7 @@ class DockerImageBuildPullOptionField(DockerBuildUnaryOptionFieldMixin, BoolFiel
     docker_build_option = "--pull"
 
 
-class DockerBuildSkippingOptionFieldMixin(BoolField, ABC):
+class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
     """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
     `True`) to `docker build`."""
 
@@ -370,7 +370,7 @@ class DockerBuildSkippingOptionFieldMixin(BoolField, ABC):
             yield f"{self.docker_build_option}"
 
 
-class DockerImageBuildSquashOptionField(DockerBuildSkippingOptionFieldMixin):
+class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
     alias = "squash"
     default = False
     help = softwrap(
