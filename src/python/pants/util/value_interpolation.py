@@ -8,6 +8,7 @@ from typing import ClassVar, Mapping, TypeVar, Union
 
 from pants.engine.addresses import Address
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 class InterpolationError(ValueError):
@@ -76,10 +77,14 @@ class InterpolationContext(FrozenDict[str, Union[str, InterpolationValue]]):
                 if self:
                     msg += f" Try with one of: {', '.join(sorted(self.keys()))}."
                 else:
-                    msg += (
-                        " There are currently no known placeholders to use. These placeholders "
-                        "can come from `[docker].build_args` or parsed from instructions in your "
-                        "`Dockerfile`."
+                    msg += " "
+                    msg += softwrap(
+                        f"""
+                        There are currently no known placeholders to use.
+
+                        Check the documentation of the {source} to understand where you may need
+                        to configure your placeholders.
+                        """
                     )
             raise (error_cls or default_error_cls)(msg) from e
 

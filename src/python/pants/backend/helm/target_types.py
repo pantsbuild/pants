@@ -413,7 +413,35 @@ class HelmDeploymentSourcesField(MultipleSourcesField):
 class HelmDeploymentValuesField(DictStringToStringField):
     alias = "values"
     required = False
-    help = "Individual values to use when rendering a given deployment."
+    help = softwrap(
+        """
+        Individual values to use when rendering a given deployment.
+
+        Value names should be defined using dot-syntax as in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "nameOverride": "my_custom_name",
+                "image.pullPolicy": "Always",
+            },
+        )
+        ```
+
+        Values can be dynamically calculated using interpolation as shown in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "configmap.deployedAt": "{env.DEPLOY_TIME}",
+            },
+        )
+        ```
+
+        Check the Helm backend documentation on what are the options available and its caveats when making
+        usage of dynamic values in your deployments.
+        """
+    )
 
 
 class HelmDeploymentCreateNamespaceField(BoolField):
