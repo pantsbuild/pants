@@ -12,12 +12,9 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterable, Iterator, TypeVar, cast
 
 from pants.base.specs import Specs
-from pants.core.goals.style_request import (
-    StyleRequest,
-    determine_specified_tool_names,
-    only_option_help,
-    style_batch_size_help,
-)
+from pants.core.goals.style_request import StyleRequest, determine_specified_tool_names
+from pants.core.goals.style_request import only_option_help as make_only_option_help
+from pants.core.goals.style_request import style_batch_size_help
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -42,6 +39,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
@@ -150,10 +148,16 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
+class FmtRequestBase:
+    # NB: This should be `Literal["fmt", "fix"]` however mypy treats `goal_name = "fix"` as type `str`,
+    # and not type `Literal["fix"]`, and therefore will error.
+    goal_name: ClassVar[str] = "fmt"
+
+
 @union
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FmtTargetsRequest(StyleRequest[_FS]):
+class FmtTargetsRequest(FmtRequestBase, StyleRequest[_FS]):
     snapshot: Snapshot
 
     def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
@@ -165,7 +169,7 @@ class FmtTargetsRequest(StyleRequest[_FS]):
 @dataclass(frozen=True)
 # Prefixed with `_` because we aren't sure if this union will stick long-term, or be subsumed when
 # we implement https://github.com/pantsbuild/pants/issues/16480.
-class _FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
+class _FmtBuildFilesRequest(FmtRequestBase, EngineAwareParameter, metaclass=ABCMeta):
     name: ClassVar[str]
 
     snapshot: Snapshot
@@ -202,22 +206,30 @@ class _FmtBatchResult:
         return self.input != self.output
 
 
-class FmtSubsystem(GoalSubsystem):
-    name = "fmt"
-    help = "Autoformat source code."
+class FmtSubsystemBase(GoalSubsystem):
+    only_option_help: ClassVar[str]
+    batch_size_option_help: ClassVar[str]
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtTargetsRequest in union_membership
+        request_types = cast(
+            "FrozenOrderedSet[type[FmtRequestBase]]", union_membership.get(FmtTargetsRequest)
+        ).union(union_membership.get(_FmtBuildFilesRequest))
+        return any(request_type.goal_name == cls.name for request_type in request_types)
 
-    only = StrListOption(
-        help=only_option_help("fmt", "formatter", "isort", "shfmt"),
-    )
+    only = StrListOption(help=lambda cls: cls.only_option_help)
     batch_size = IntOption(
         advanced=True,
         default=128,
-        help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
+        help=lambda cls: cls.batch_size_option_help,
     )
+
+
+class FmtSubsystem(FmtSubsystemBase):
+    name = "fmt"
+    help = "Autoformat source code."
+    only_option_help = make_only_option_help("fmt", "formatter", "isort", "shfmt")
+    batch_size_option_help = style_batch_size_help(uppercase="Formatter", lowercase="formatter")
 
 
 class Fmt(Goal):
@@ -225,11 +237,19 @@ class Fmt(Goal):
 
 
 def _get_request_types(
-    fmt_subsystem: FmtSubsystem,
+    fmt_subsystem: FmtSubsystemBase,
     union_membership: UnionMembership,
 ) -> tuple[tuple[type[FmtTargetsRequest], ...], tuple[type[_FmtBuildFilesRequest], ...]]:
-    fmt_target_request_types = union_membership.get(FmtTargetsRequest)
-    fmt_build_files_request_types = union_membership.get(_FmtBuildFilesRequest)
+    fmt_target_request_types = [
+        request_type
+        for request_type in union_membership.get(FmtTargetsRequest)
+        if request_type.goal_name == fmt_subsystem.name
+    ]
+    fmt_build_files_request_types = [
+        request_type
+        for request_type in union_membership.get(_FmtBuildFilesRequest)
+        if request_type.goal_name == fmt_subsystem.name
+    ]
 
     # NOTE: Unlike lint.py, we don't check for ambiguous names between target formatters and BUILD
     # formatters, since BUILD files are Python and we re-use Python formatters for BUILD files
@@ -337,17 +357,17 @@ def _print_results(
         console.print_stderr(f"{sigil} {formatter} {status}.")
 
 
-@goal_rule
-async def fmt(
+@rule_helper
+async def _fmt_impl(
     console: Console,
     specs: Specs,
-    fmt_subsystem: FmtSubsystem,
+    subsystem: FmtSubsystemBase,
     build_file_options: BuildFileOptions,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
     fmt_target_request_types, fmt_build_files_request_types = _get_request_types(
-        fmt_subsystem, union_membership
+        subsystem, union_membership
     )
 
     _get_targets = Get(
@@ -368,7 +388,7 @@ async def fmt(
     targets_to_request_types = _batch_targets(
         fmt_target_request_types,
         targets,
-        fmt_subsystem.batch_size,
+        subsystem.batch_size,
     )
 
     all_requests = [
@@ -386,7 +406,7 @@ async def fmt(
             )
             for paths_batch in _batch(
                 specified_build_files,
-                fmt_subsystem.batch_size,
+                subsystem.batch_size,
             )
         ),
     ]
@@ -407,6 +427,25 @@ async def fmt(
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
+
+
+@goal_rule
+async def fmt(
+    console: Console,
+    specs: Specs,
+    fmt_subsystem: FmtSubsystem,
+    build_file_options: BuildFileOptions,
+    workspace: Workspace,
+    union_membership: UnionMembership,
+) -> Fmt:
+    return await _fmt_impl(
+        console=console,
+        specs=specs,
+        subsystem=fmt_subsystem,
+        build_file_options=build_file_options,
+        workspace=workspace,
+        union_membership=union_membership,
+    )
 
 
 @rule
