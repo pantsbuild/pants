@@ -149,6 +149,19 @@ class FailingFormatter(MockFmtRequest):
         return FmtResult(before, after, "", "", formatter_name=self.name)
 
 
+class MockFixRequest(FmtTargetsRequest):
+    goal_name = "fix"
+    field_set_type = MockLinterFieldSet
+
+
+class Fixer(MockFixRequest):
+    name = "Fixer"
+
+    @property
+    def fmt_result(self) -> FmtResult:
+        return FmtResult(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, "", "", formatter_name=self.name)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -168,6 +181,7 @@ def run_lint_rule(
     batch_size: int = 128,
     only: list[str] | None = None,
     skip_formatters: bool = False,
+    skip_fixers: bool = False,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
@@ -181,6 +195,7 @@ def run_lint_rule(
         batch_size=batch_size,
         only=only or [],
         skip_formatters=skip_formatters,
+        skip_fixers=skip_fixers,
     )
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
@@ -258,6 +273,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
     fmt_request_types = [
         SuccessfulFormatter,
         FailingFormatter,
+        Fixer,
     ]
     targets = [make_target(good_address), make_target(bad_address)]
 
@@ -276,10 +292,11 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✕ FailingFormatter failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+        ✓ Fixer succeeded.
         ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
 
-        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more formatters/fixers failed. Run `./pants fmt` to fix.)
         """
     )
 
@@ -298,7 +315,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
 
-        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more formatters/fixers failed. Run `./pants fmt` to fix.)
         """
     )
 
@@ -309,6 +326,48 @@ def test_summary(rule_runner: RuleRunner) -> None:
         targets=targets,
         run_files_linter=True,
         skip_formatters=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ Fixer succeeded.
+        ✓ SuccessfulLinter succeeded.
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
+        targets=targets,
+        run_files_linter=True,
+        skip_fixers=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulFormatter succeeded.
+        ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters/fixers failed. Run `./pants fmt` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
+        targets=targets,
+        run_files_linter=True,
+        skip_formatters=True,
+        skip_fixers=True,
     )
     assert stderr == dedent(
         """\

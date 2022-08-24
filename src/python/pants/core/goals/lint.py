@@ -204,6 +204,17 @@ class LintSubsystem(GoalSubsystem):
             """
         ),
     )
+    skip_fixers = BoolOption(
+        default=False,
+        help=softwrap(
+            f"""
+            If true, skip running all fixers in check-only mode.
+
+            FYI: when running `{bin_name()} fix lint ::`, there should be little performance
+            benefit to using this flag. Pants will reuse the results from `fix` when running `lint`.
+            """
+        ),
+    )
     batch_size = IntOption(
         advanced=True,
         default=128,
@@ -246,7 +257,9 @@ def _print_results(
 
     if formatter_failed:
         console.print_stderr("")
-        console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
+        console.print_stderr(
+            f"(One or more formatters/fixers failed. Run `{bin_name()} fmt` to fix.)"
+        )
 
 
 def _get_error_code(results: tuple[LintResults, ...]) -> int:
@@ -329,7 +342,19 @@ async def lint(
     )
 
     fmt_requests: Iterable[FmtTargetsRequest] = ()
-    if not lint_subsystem.skip_formatters:
+    if lint_subsystem.skip_formatters:
+        fmt_target_request_types = [
+            request_type
+            for request_type in fmt_target_request_types
+            if request_type.goal_name != "fmt"
+        ]
+    if lint_subsystem.skip_fixers:
+        fmt_target_request_types = [
+            request_type
+            for request_type in fmt_target_request_types
+            if request_type.goal_name != "fix"
+        ]
+    if fmt_target_request_types:
         batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
         all_fmt_source_batches = await MultiGet(
             Get(
