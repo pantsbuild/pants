@@ -7,7 +7,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
@@ -36,12 +35,8 @@ class LambdexLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 
 @rule
-def setup_lambdex_lockfile(
-    _: LambdexLockfileSentinel, lambdex: Lambdex, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        lambdex, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+def setup_lambdex_lockfile(_: LambdexLockfileSentinel, lambdex: Lambdex) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(lambdex)
 
 
 def rules():

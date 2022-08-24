@@ -132,14 +132,10 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            black, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(black)
 
     constraints = await _black_interpreter_constraints(black, python_setup)
-    return GeneratePythonLockfile.from_tool(
-        black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(black, constraints)
 
 
 class BlackExportSentinel(ExportPythonToolSentinel):

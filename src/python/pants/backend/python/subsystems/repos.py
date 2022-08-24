@@ -92,8 +92,8 @@ class PythonRepos(Subsystem):
             recommend setting that each user set these options via a `.pants.rc` file
             ({doc_url('options#pantsrc-file')}.
 
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            Note: Only takes effect if using Pex lockfiles, i.e. using the
+            `generate-lockfiles` goal.
             """
         ),
         advanced=True,

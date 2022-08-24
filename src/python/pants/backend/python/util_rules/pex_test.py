@@ -504,7 +504,6 @@ def test_local_requirements_and_path_mappings(
                     interpreter_constraints=InterpreterConstraints(),
                     resolve_name="test",
                     lockfile_dest="test.lock",
-                    use_pex=True,
                 )
             ],
         )

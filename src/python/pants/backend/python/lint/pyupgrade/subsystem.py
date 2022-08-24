@@ -10,7 +10,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
@@ -48,11 +47,9 @@ class PyUpgradeLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_pyupgrade_lockfile(
-    _: PyUpgradeLockfileSentinel, pyupgrade: PyUpgrade, python_setup: PythonSetup
+    _: PyUpgradeLockfileSentinel, pyupgrade: PyUpgrade
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        pyupgrade, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(pyupgrade)
 
 
 class PyUpgradeExportSentinel(ExportPythonToolSentinel):

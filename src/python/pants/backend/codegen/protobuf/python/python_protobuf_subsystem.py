@@ -95,13 +95,9 @@ class MypyProtobufLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_mypy_protobuf_lockfile(
-    _: MypyProtobufLockfileSentinel,
-    mypy_protobuf: PythonProtobufMypyPlugin,
-    python_setup: PythonSetup,
+    _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        mypy_protobuf, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(mypy_protobuf)
 
 
 @dataclass(frozen=True)
