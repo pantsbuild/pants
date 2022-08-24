@@ -24,9 +24,9 @@ class Fix(Goal):
     subsystem_cls = FixSubsystem
 
 
-# This is it! We're just going to completely piggy-back off fmt for `fix`. Plugins just need to
+# This is it! We're just going to completely piggy-back off `fmt` for `fix`. Plugins just need to
 # register a union implementation which subclasses `FmtTargetsRequest` and sets the class variable
-# `is_fixer` to `True`.
+# `goal_name` to `"fix"`.
 
 
 @goal_rule
