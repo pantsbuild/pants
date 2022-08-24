@@ -366,6 +366,23 @@ impl Store {
   }
 
   ///
+  /// A convenience method for storing batches of small files.
+  ///
+  /// NB: This method should not be used for large blobs: prefer to stream them from their source
+  /// using `store_file`.
+  ///
+  pub async fn store_file_bytes_batch(
+    &self,
+    items: Vec<(Option<Digest>, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<Vec<Digest>, String> {
+    self
+      .local
+      .store_bytes_batch(EntryType::File, items, initial_lease)
+      .await
+  }
+
+  ///
   /// Store a file locally by streaming its contents.
   ///
   pub async fn store_file<F, R>(
