@@ -102,8 +102,10 @@ class UnionMembership:
         """
         return self.union_rules[union_type]  # type: ignore[return-value]
 
-    def get(self, union_type: _T) -> FrozenOrderedSet[_T]:
+    def get(self, union_type: _T, include_subclass_members: bool = False) -> FrozenOrderedSet[_T]:
         """Get all members of this union type.
+
+        If `include_subclass_members` is True, also include all members of all direct/indirect subclasses.
 
         If the union type does not exist because it has no members registered, return an empty
         FrozenOrderedSet.
@@ -112,7 +114,11 @@ class UnionMembership:
         - this is only a convention and is not actually enforced. So, you may have inaccurate type
         hints.
         """
-        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[return-value]
+        members = self.union_rules.get(union_type, FrozenOrderedSet())
+        if include_subclass_members:
+            for sub_union in union_type.__subclasses__():
+                members |= self.union_rules.get(sub_union, FrozenOrderedSet())
+        return members  # type: ignore[return-value]
 
     def is_member(self, union_type: type, putative_member: type) -> bool:
         members = self.union_rules.get(union_type)
