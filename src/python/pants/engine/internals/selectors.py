@@ -517,7 +517,7 @@ async def MultiGet(  # noqa: F811
         if arg is None:
             return None
         if isinstance(arg, Get):
-            return f"Get({arg.output_type.__name__}, {arg.input_type.__name__}, ...)"
+            return repr(arg)
         return repr(arg)
 
     likely_args_exlicitly_passed = tuple(

@@ -348,8 +348,8 @@ _Input = TypeVar("_Input")
 
 class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]
-    input_type: type
-    input: Any
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
 
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...

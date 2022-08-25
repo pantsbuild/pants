@@ -23,14 +23,14 @@ class BClass:
 def test_create_get() -> None:
     get = Get(AClass, int, 42)
     assert get.output_type is AClass
-    assert get.input_type is int
-    assert get.input == 42
+    assert get.input_types == [int]
+    assert get.inputs == [42]
 
     # Also test the equivalence of the 1-arg and 2-arg versions.
     get2 = Get(AClass, int(42))
     assert get.output_type == get2.output_type
-    assert get.input_type == get2.input_type
-    assert get.input == get2.input
+    assert get.input_types == get2.input_types
+    assert get.inputs == get2.inputs
 
 
 def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
@@ -93,14 +93,14 @@ def test_invalid_get_input_does_not_match_type() -> None:
         pass
 
     union_get = Get(AClass, UnionBase, 1)
-    assert union_get.input_type == UnionBase
-    assert union_get.input == 1
+    assert union_get.input_types == [UnionBase]
+    assert union_get.inputs == [1]
 
 
 def test_multiget_invalid_types() -> None:
     with pytest.raises(
         expected_exception=TypeError,
-        match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, ...), 'bob'"),
+        match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, BClass()), 'bob'"),
     ):
         next(MultiGet(Get(AClass, BClass()), "bob").__await__())  # type: ignore[call-overload]
 
@@ -108,7 +108,7 @@ def test_multiget_invalid_types() -> None:
 def test_multiget_invalid_Nones() -> None:
     with pytest.raises(
         expected_exception=ValueError,
-        match=re.escape("Unexpected MultiGet None arguments: None, Get(AClass, BClass, ...)"),
+        match=re.escape("Unexpected MultiGet None arguments: None, Get(AClass, BClass, BClass())"),
     ):
         next(
             MultiGet(None, Get(AClass, BClass()), None, None).__await__()  # type: ignore[call-overload]

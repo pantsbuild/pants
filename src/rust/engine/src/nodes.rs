@@ -1002,8 +1002,8 @@ impl Task {
         let mut params = params.clone();
         async move {
           let dependency_key =
-            DependencyKey::new_with_params(get.output, std::iter::once(*get.input.type_id()));
-          params.put(get.input.clone());
+            DependencyKey::new_with_params(get.output, get.inputs.iter().map(|t| *t.type_id()));
+          params.extend(get.inputs.iter().cloned());
 
           let edges = context
             .core
@@ -1021,12 +1021,12 @@ impl Task {
               Select::new(params.clone(), get.output, entry)
             })
             .or_else(|| {
-              if get.input_type.is_union() {
+              if get.input_types.iter().any(|t| t.is_union()) {
                 // Is a union.
                 let (_, rule_edges) = context
                   .core
                   .rule_graph
-                  .find_root(vec![*get.input.type_id()], get.output)
+                  .find_root(get.inputs.iter().map(|t| *t.type_id()), get.output)
                   .ok()?;
                 Some(Select::new_from_edges(
                   params,
@@ -1038,27 +1038,22 @@ impl Task {
               }
             })
             .ok_or_else(|| {
-              if get.input_type.is_union() {
+              if get.input_types.iter().any(|t| t.is_union()) {
                 throw(format!(
-                  "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
-                  with `@union`, the third argument should be a member of that union. Did you \
-                  intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
-                  type ({}) for the third argument.",
-                  get.output,
-                  get.input_type,
-                  get.input,
-                  get.input_type,
-                  get.input.type_id(),
-                  get.input.type_id(),
+                  "Invalid Get. Because an input type for `{}` was annotated with `@union`, \
+                  the value for that type should be a member of that union. Did you \
+                  intend to register a `UnionRule`? If not, you may be using the incorrect \
+                  explicitly declared type.",
+                  get,
                 ))
               } else {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
                 throw(format!(
-                  "Get({}, {}, {}) was not detected in your @rule body at rule compile time. \
+                  "{} was not detected in your @rule body at rule compile time. \
                   Was the `Get` constructor called in a separate function, or perhaps \
                   dynamically? If so, it must be inlined into the @rule body.",
-                  get.output, get.input_type, get.input
+                  get,
                 ))
               }
             })?;

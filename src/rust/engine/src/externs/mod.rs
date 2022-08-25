@@ -15,6 +15,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
+use smallvec::{smallvec, SmallVec};
 
 use logging::PythonLogLevel;
 
@@ -314,8 +315,9 @@ impl PyGeneratorResponseGet {
         `{product}` with type {actual_type}."
       ))
     })?;
+    let output = TypeId::new(product);
 
-    let (declared_subject, subject) = if let Some(input_arg1) = input_arg1 {
+    let (input_types, inputs) = if let Some(input_arg1) = input_arg1 {
       let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
         let input_arg0_type = input_arg0.get_type();
         PyTypeError::new_err(format!(
@@ -341,7 +343,10 @@ impl PyGeneratorResponseGet {
         )));
       }
 
-      (declared_type, input_arg1)
+      (
+        smallvec![TypeId::new(declared_type)],
+        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
+      )
     } else {
       if input_arg0.is_instance_of::<PyType>()? {
         return Err(PyTypeError::new_err(format!(
@@ -349,21 +354,18 @@ impl PyGeneratorResponseGet {
           Get(OutputType, InputType(constructor args)), the second argument should be \
           a constructor call, rather than a type, but given {input_arg0}."
         )));
+      } else {
+        (
+          smallvec![TypeId::new(input_arg0.get_type())],
+          smallvec![INTERNS.key_insert(py, input_arg0.into())?],
+        )
       }
-
-      (input_arg0.get_type(), input_arg0)
     };
-
-    let output = TypeId::new(product);
-    let input_type = TypeId::new(declared_subject);
-    let input = INTERNS
-      .key_insert(py, subject.into())
-      .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
 
     Ok(Self(RefCell::new(Some(Get {
       output,
-      input_type,
-      input,
+      input_types,
+      inputs,
     }))))
   }
 
@@ -385,7 +387,7 @@ impl PyGeneratorResponseGet {
   }
 
   #[getter]
-  fn input_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+  fn input_types<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<&'p PyType>> {
     Ok(
       self
         .0
@@ -396,13 +398,15 @@ impl PyGeneratorResponseGet {
             "A `Get` may not be consumed after being provided to the @rule engine.",
           )
         })?
-        .input_type
-        .as_py_type(py),
+        .input_types
+        .iter()
+        .map(|t| t.as_py_type(py))
+        .collect(),
     )
   }
 
   #[getter]
-  fn input(&self) -> PyResult<PyObject> {
+  fn inputs(&self) -> PyResult<Vec<PyObject>> {
     Ok(
       self
         .0
@@ -413,11 +417,25 @@ impl PyGeneratorResponseGet {
             "A `Get` may not be consumed after being provided to the @rule engine.",
           )
         })?
-        .input
-        .value
-        .clone()
-        .into(),
+        .inputs
+        .iter()
+        .map(|k| {
+          let pyo: PyObject = k.value.clone().into();
+          pyo
+        })
+        .collect(),
     )
+  }
+
+  fn __repr__(&self) -> PyResult<String> {
+    Ok(format!(
+      "{}",
+      self.0.borrow().as_ref().ok_or_else(|| {
+        PyException::new_err(
+          "A `Get` may not be consumed after being provided to the @rule engine.",
+        )
+      })?
+    ))
   }
 }
 
@@ -435,13 +453,28 @@ impl PyGeneratorResponseGetMulti {
 #[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
-  pub input_type: TypeId,
-  pub input: Key,
+  pub input_types: SmallVec<[TypeId; 2]>,
+  pub inputs: SmallVec<[Key; 2]>,
 }
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(f, "Get({}, {})", self.output, self.input)
+    write!(f, "Get({}", self.output)?;
+    match self.input_types.len() {
+      0 => write!(f, ")"),
+      1 => write!(f, ", {}, {})", self.input_types[0], self.inputs[0]),
+      _ => write!(
+        f,
+        ", {{{}}})",
+        self
+          .input_types
+          .iter()
+          .zip(self.inputs.iter())
+          .map(|(t, k)| { format!("{k}: {t}") })
+          .collect::<Vec<_>>()
+          .join(", ")
+      ),
+    }
   }
 }
 
