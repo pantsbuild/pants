@@ -7,6 +7,13 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
+from pants.backend.go.dependency_inference import (
+    AllGoModuleImportPathsMappings,
+    GoImportPathsMappingAddressSet,
+    GoModuleImportPathsMapping,
+    GoModuleImportPathsMappings,
+    GoModuleImportPathsMappingsHook,
+)
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoModSourcesField,
@@ -16,7 +23,6 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import first_party_pkg, import_analysis
-from pants.backend.go.util_rules.build_pkg_target import GoCodegenBuildRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
@@ -61,39 +67,22 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class GoAddressSet:
-    addresses: tuple[Address, ...]
-    infer_all: bool
-
-
-@dataclass(frozen=True)
-class GoImportPathToAddressesMapping:
-    """Maps import paths (as strings) to one or more addresses of targets providing those import
-    path(s)."""
-
-    mapping: FrozenDict[str, GoAddressSet]
-
-
-@dataclass(frozen=True)
-class GoModuleImportPathMappings:
-    modules: FrozenDict[Address, GoImportPathToAddressesMapping]
-
-
-@dataclass(frozen=True)
-class ImportPathToPackagesRequest(EngineAwareParameter):
+class GoImportPathMappingRequest(EngineAwareParameter):
     go_mod_address: Address
 
     def debug_hint(self) -> str | None:
         return str(self.go_mod_address)
 
 
-@rule(desc="Analyze Go import paths for all modules.", level=LogLevel.DEBUG)
-async def go_map_import_paths_by_module(
-    all_targets: AllTargets,
-    union_membership: UnionMembership,
-) -> GoModuleImportPathMappings:
-    go_codegen_build_requests = union_membership.get(GoCodegenBuildRequest)
+class FirstPartyGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook):
+    pass
 
+
+@rule(desc="Analyze and map first-party Go import paths for all modules.", level=LogLevel.DEBUG)
+async def go_map_first_party_import_paths_by_module(
+    _request: FirstPartyGoModuleImportPathsMappingsHook,
+    all_targets: AllTargets,
+) -> GoModuleImportPathsMappings:
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
         lambda: defaultdict(set)
     )
@@ -101,9 +90,7 @@ async def go_map_import_paths_by_module(
     candidate_go_source_targets = [
         tgt
         for tgt in all_targets
-        if tgt.has_field(GoImportPathField)
-        or tgt.has_field(GoPackageSourcesField)
-        or any(tgt.has_field(br.generate_from) for br in go_codegen_build_requests)
+        if tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField)
     ]
 
     owning_go_mod_targets = await MultiGet(
@@ -129,14 +116,59 @@ async def go_map_import_paths_by_module(
     ):
         import_paths_by_module[owning_go_mod.address][import_path_info.import_path].add(addr)
 
-    return GoModuleImportPathMappings(
+    return GoModuleImportPathsMappings(
         FrozenDict(
             {
-                go_mod_addr: GoImportPathToAddressesMapping(
+                go_mod_addr: GoModuleImportPathsMapping(
                     mapping=FrozenDict(
                         {
-                            import_path: GoAddressSet(
+                            import_path: GoImportPathsMappingAddressSet(
                                 addresses=tuple(sorted(addresses)), infer_all=False
+                            )
+                            for import_path, addresses in import_path_mapping.items()
+                        }
+                    ),
+                )
+                for go_mod_addr, import_path_mapping in import_paths_by_module.items()
+            }
+        )
+    )
+
+
+@rule(desc="Analyze Go import paths for all modules.", level=LogLevel.DEBUG)
+async def go_map_import_paths_by_module(
+    union_membership: UnionMembership,
+) -> AllGoModuleImportPathsMappings:
+    import_path_mappers = union_membership.get(GoModuleImportPathsMappingsHook)
+    all_results = await MultiGet(
+        Get(GoModuleImportPathsMappings, GoModuleImportPathsMappingsHook, impl())
+        for impl in import_path_mappers
+    )
+
+    import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    infer_all_by_module: dict[Address, dict[str, bool]] = defaultdict(lambda: defaultdict(bool))
+
+    # Merge all of the mappings together.
+    for result in all_results:
+        for go_mod_address, mapping in result.modules.items():
+            imports_paths_for_module = import_paths_by_module[go_mod_address]
+            for import_path, address_set in mapping.mapping.items():
+                for address in address_set.addresses:
+                    imports_paths_for_module[import_path].add(address)
+                if address_set.infer_all:
+                    infer_all_by_module[go_mod_address][import_path] = True
+
+    return AllGoModuleImportPathsMappings(
+        FrozenDict(
+            {
+                go_mod_addr: GoModuleImportPathsMapping(
+                    mapping=FrozenDict(
+                        {
+                            import_path: GoImportPathsMappingAddressSet(
+                                addresses=tuple(sorted(addresses)),
+                                infer_all=infer_all_by_module[go_mod_addr][import_path],
                             )
                             for import_path, addresses in import_path_mapping.items()
                         }
@@ -150,9 +182,9 @@ async def go_map_import_paths_by_module(
 
 @rule(desc="Map Go targets owned by module to import paths", level=LogLevel.DEBUG)
 async def map_import_paths_to_packages(
-    request: ImportPathToPackagesRequest,
-    module_import_path_mappings: GoModuleImportPathMappings,
-) -> GoImportPathToAddressesMapping:
+    request: GoImportPathMappingRequest,
+    module_import_path_mappings: AllGoModuleImportPathsMappings,
+) -> GoModuleImportPathsMapping:
     return module_import_path_mappings.modules[request.go_mod_address]
 
 
@@ -174,7 +206,7 @@ async def infer_go_dependencies(
 ) -> InferredDependencies:
     go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
     package_mapping = await Get(
-        GoImportPathToAddressesMapping, ImportPathToPackagesRequest(go_mod_addr.address)
+        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
     )
 
     addr = request.field_set.address
@@ -247,7 +279,7 @@ async def infer_go_third_party_package_dependencies(
     go_mod_address = addr.maybe_convert_to_target_generator()
 
     package_mapping, go_mod_info = await MultiGet(
-        Get(GoImportPathToAddressesMapping, ImportPathToPackagesRequest(go_mod_address)),
+        Get(GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_address)),
         Get(GoModInfo, GoModInfoRequest(go_mod_address)),
     )
 
@@ -350,4 +382,5 @@ def rules():
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
+        UnionRule(GoModuleImportPathsMappingsHook, FirstPartyGoModuleImportPathsMappingsHook),
     )

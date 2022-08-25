@@ -18,10 +18,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceTarget,
 )
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import (
-    GoImportPathToAddressesMapping,
-    ImportPathToPackagesRequest,
-)
+from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import GoOwningGoModAddressField, GoPackageSourcesField
 from pants.backend.go.util_rules import (
     assembly,
@@ -202,10 +200,9 @@ async def setup_full_package_build_request(
         Get(Digest, CreateDigest([Directory(output_dir)])),
     )
 
-    # TODO: Assumes that all of the transitive targets are in the same module!
     go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(transitive_targets.roots[0].address))
     package_mapping = await Get(
-        GoImportPathToAddressesMapping, ImportPathToPackagesRequest(go_mod_addr.address)
+        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
     )
 
     all_sources = await Get(

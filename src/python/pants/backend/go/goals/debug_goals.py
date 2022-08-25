@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-from pants.backend.go.target_type_rules import (
-    GoImportPathToAddressesMapping,
-    ImportPathToPackagesRequest,
-)
+from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoModTarget,
@@ -105,7 +103,7 @@ async def dump_go_import_paths_for_module(
             continue
 
         package_mapping = await Get(
-            GoImportPathToAddressesMapping, ImportPathToPackagesRequest(tgt.address)
+            GoModuleImportPathsMapping, GoImportPathMappingRequest(tgt.address)
         )
         for import_path, address_set in package_mapping.mapping.items():
             maybe_infer_all = " (infer all)" if address_set.infer_all else ""
