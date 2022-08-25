@@ -4,13 +4,6 @@
 resource(
     name="dependency_parser",
     source="dependency_parser_py",
-    dependencies=[
-        ":init_py",
-    ],
-)
-resource(
-    name="init_py",
-    source="__init__.py",
 )
 
 # Also expose scripts as python sources so they get formatted/linted/checked.

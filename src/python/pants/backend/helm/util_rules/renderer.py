@@ -150,6 +150,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
     address: Address
     chart: HelmChart
     snapshot: Snapshot
+    post_processed: bool
 
     def level(self) -> LogLevel | None:
         return LogLevel.DEBUG
@@ -166,7 +167,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return {"content": self.snapshot}
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"address": self.address, "chart": self.chart}
+        return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
 
 
 @rule_helper
@@ -271,7 +272,10 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
-    release_name = request.field_set.release_name.value or request.field_set.address.target_name
+    release_name = (
+        request.field_set.release_name.value
+        or request.field_set.address.target_name.replace("_", "-")
+    )
     inline_values = request.field_set.values.value
 
     def maybe_escape_string_value(value: str) -> str:
@@ -388,7 +392,10 @@ async def run_renderer(process_wrapper: _HelmDeploymentProcessWrapper) -> Render
         )
 
     return RenderedHelmFiles(
-        address=process_wrapper.address, chart=process_wrapper.chart, snapshot=output_snapshot
+        address=process_wrapper.address,
+        chart=process_wrapper.chart,
+        snapshot=output_snapshot,
+        post_processed=process_wrapper.uses_post_renderer,
     )
 
 

@@ -10,7 +10,7 @@ from typing import Iterable
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.javascript.target_types import JSSourceField
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
@@ -30,7 +30,7 @@ class PrettierFmtFieldSet(FieldSet):
     sources: JSSourceField
 
 
-class PrettierFmtRequest(FmtRequest):
+class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
     name = Prettier.options_scope
 
@@ -79,5 +79,5 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        UnionRule(FmtRequest, PrettierFmtRequest),
+        UnionRule(FmtTargetsRequest, PrettierFmtRequest),
     )

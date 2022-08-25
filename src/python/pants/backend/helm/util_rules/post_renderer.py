@@ -20,7 +20,10 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
 )
-from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDeploymentMappings
+from pants.backend.helm.dependency_inference.deployment import (
+    FirstPartyHelmDeploymentMapping,
+    FirstPartyHelmDeploymentMappingRequest,
+)
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
@@ -45,11 +48,13 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
 @rule(desc="Prepare Helm deployment post-renderer", level=LogLevel.DEBUG)
 async def prepare_post_renderer_for_helm_deployment(
     request: HelmDeploymentPostRendererRequest,
-    mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
 ) -> HelmPostRenderer:
-    docker_addr_index = mappings.deployment_to_docker_addresses[request.field_set.address]
-    docker_addresses = [addr for _, addr in docker_addr_index.values()]
+    mapping = await Get(
+        FirstPartyHelmDeploymentMapping, FirstPartyHelmDeploymentMappingRequest(request.field_set)
+    )
+
+    docker_addresses = [addr for _, addr in mapping.indexed_docker_addresses.values()]
 
     logger.debug(
         softwrap(
@@ -113,7 +118,7 @@ async def prepare_post_renderer_for_helm_deployment(
         _, addr = value
         return docker_addr_ref_mapping.get(addr)
 
-    replacements = docker_addr_index.transform_values(find_replacement)
+    replacements = mapping.indexed_docker_addresses.transform_values(find_replacement)
 
     return await Get(
         HelmPostRenderer,

@@ -32,7 +32,12 @@ def test_metadata_header_round_trip() -> None:
             ["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]
         ),
         requirements=reqset("ansicolors==0.1.0"),
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -62,7 +67,22 @@ def test_add_header_to_lockfile() -> None:
 #   "generated_with_requirements": [
 #     "ansicolors==0.1.0"
 #   ],
-#   "requirement_constraints": []
+#   "indexes": [
+#     "index"
+#   ],
+#   "find_links": [
+#     "find-links"
+#   ],
+#   "manylinux": null,
+#   "requirement_constraints": [
+#     "constraint"
+#   ],
+#   "only_binary": [
+#     "bdist"
+#   ],
+#   "no_binary": [
+#     "sdist"
+#   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 dave==3.1.4 \\
@@ -75,7 +95,12 @@ dave==3.1.4 \\
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints([">=3.7"]),
         requirements=reqset("ansicolors==0.1.0"),
-        requirement_constraints=set(),
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux=None,
+        requirement_constraints={PipRequirement.parse("constraint")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     result = metadata.add_header_to_lockfile(
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
@@ -158,7 +183,12 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 user_interpreter_constraints=InterpreterConstraints(user_ic),
                 interpreter_universe=INTERPRETER_UNIVERSE,
                 user_requirements=set(),
+                indexes=set(),
+                find_links=set(),
+                manylinux=None,
                 requirement_constraints=set(),
+                only_binary=set(),
+                no_binary=set(),
             )
         )
         == matches
@@ -232,7 +262,14 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
     for m in [
         PythonLockfileMetadataV2(InterpreterConstraints(lock_ics), reqset(*lock_reqs)),
         PythonLockfileMetadataV3(
-            InterpreterConstraints(lock_ics), reqset(*lock_reqs), requirement_constraints=set()
+            InterpreterConstraints(lock_ics),
+            reqset(*lock_reqs),
+            indexes=set(),
+            find_links=set(),
+            manylinux=None,
+            requirement_constraints=set(),
+            only_binary=set(),
+            no_binary=set(),
         ),
     ]:
         result = m.is_valid_for(
@@ -241,21 +278,46 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             user_interpreter_constraints=InterpreterConstraints(user_ics),
             interpreter_universe=INTERPRETER_UNIVERSE,
             user_requirements=reqset(*user_reqs),
+            indexes=set(),
+            find_links=set(),
+            manylinux=None,
             requirement_constraints=set(),
+            only_binary=set(),
+            no_binary=set(),
         )
         assert result.failure_reasons == set(expected)
 
 
 @pytest.mark.parametrize("is_tool", [True, False])
-def test_is_valid_for_requirement_constraints(is_tool: bool) -> None:
+def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
     result = PythonLockfileMetadataV3(
-        InterpreterConstraints([]), reqset(), requirement_constraints={PipRequirement.parse("c1")}
+        InterpreterConstraints([]),
+        reqset(),
+        # Everything below is new to v3+.
+        indexes={"index"},
+        find_links={"find-links"},
+        manylinux=None,
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     ).is_valid_for(
         is_tool=is_tool,
         expected_invalidation_digest="",
         user_interpreter_constraints=InterpreterConstraints([]),
         interpreter_universe=INTERPRETER_UNIVERSE,
         user_requirements=reqset(),
+        indexes={"different-index"},
+        find_links={"different-find-links"},
+        manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("c2")},
+        only_binary={"not-bdist"},
+        no_binary={"not-sdist"},
     )
-    assert result.failure_reasons == {InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH}
+    assert result.failure_reasons == {
+        InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
+        InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH,
+        InvalidPythonLockfileReason.NO_BINARY_MISMATCH,
+        InvalidPythonLockfileReason.INDEXES_MISMATCH,
+        InvalidPythonLockfileReason.FIND_LINKS_MISMATCH,
+        InvalidPythonLockfileReason.MANYLINUX_MISMATCH,
+    }

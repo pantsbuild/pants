@@ -6,7 +6,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
-from typing import Iterable, Iterator, Optional, cast
+from typing import Iterable, List, Optional, TypeVar, cast
 
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
@@ -36,6 +36,11 @@ class InvalidLockfileBehavior(enum.Enum):
 class LockfileGenerator(enum.Enum):
     PEX = "pex"
     POETRY = "poetry"
+
+
+RESOLVE_OPTION_KEY__DEFAULT = "__default__"
+
+_T = TypeVar("_T")
 
 
 class PythonSetup(Subsystem):
@@ -215,7 +220,7 @@ class PythonSetup(Subsystem):
     )
     _resolves_to_constraints_file = DictOption[str](
         help=softwrap(
-            """
+            f"""
             When generating a resolve's lockfile, use a constraints file to pin the version of
             certain requirements. This is particularly useful to pin the versions of transitive
             dependencies of your direct requirements.
@@ -226,10 +231,63 @@ class PythonSetup(Subsystem):
             Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
             `black` and `pytest`) to file paths for
             constraints files. For example,
-            `{'data-science': '3rdparty/data-science-constraints.txt'}`.
+            `{{'data-science': '3rdparty/data-science-constraints.txt'}}`.
             If a resolve is not set in the dictionary, it will not use a constraints file.
 
-            You can use the key `__default__` to set a default value for all resolves.
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_no_binary = DictOption[List[str]](
+        help=softwrap(
+            f"""
+            When generating a resolve's lockfile, do not use binary packages (i.e. wheels) for
+            these 3rdparty project names.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to lists of project names. For example,
+            `{{'data-science': ['requests', 'numpy']}}`. If a resolve is not set in the dictionary,
+            it will have no restrictions on binary packages.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            For each resolve's value, you can use the value `:all:` to disable all binary packages.
+
+            Note that some packages are tricky to compile and may fail to install when this option
+            is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
+            for details.
+
+            Note: Only takes effect if you use Pex lockfiles. Use the default
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
+        advanced=True,
+    )
+    _resolves_to_only_binary = DictOption[List[str]](
+        help=softwrap(
+            f"""
+            When generating a resolve's lockfile, do not use source packages (i.e. sdists) for
+            these 3rdparty project names, e.g `['django', 'requests']`.
+
+            Expects a dictionary of resolve names from `[python].resolves` and Python tools (e.g.
+            `black` and `pytest`) to lists of project names. For example,
+            `{{'data-science': ['requests', 'numpy']}}`. If a resolve is not set in the dictionary,
+            it will have no restrictions on source packages.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            For each resolve's value, you can use the value `:all:` to disable all source packages.
+
+            Packages without binary distributions will fail to install when this option is used on
+            them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
+            details.
 
             Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
@@ -423,6 +481,15 @@ class PythonSetup(Subsystem):
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            Use `[python].resolves_to_no_binary`, which allows you to set `--no-binary` on a
+            per-resolve basis for more flexibility. To keep this option's behavior, set
+            `[python].resolves_to_no_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
+            value you used on this option.
+            """
+        ),
     )
     only_binary = StrListOption(
         help=softwrap(
@@ -437,6 +504,15 @@ class PythonSetup(Subsystem):
 
             Note: Only takes effect if you use Pex lockfiles. Use the default
             `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            Use `[python].resolves_to_only_binary`, which allows you to set `--only-binary` on a
+            per-resolve basis for more flexibility. To keep this option's behavior, set
+            `[python].resolves_to_only_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
+            value you used on this option.
             """
         ),
     )
@@ -562,28 +638,91 @@ class PythonSetup(Subsystem):
             )
         return result
 
-    @memoized_method
-    def resolves_to_constraints_file(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, str]:
+    def _resolves_to_option_helper(
+        self,
+        option_value: dict[str, _T],
+        option_name: str,
+        all_python_tool_resolve_names: tuple[str, ...],
+    ) -> dict[str, _T]:
         all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
-        unrecognized_resolves = set(self._resolves_to_constraints_file.keys()) - {
-            "__default__",
+        unrecognized_resolves = set(option_value.keys()) - {
+            RESOLVE_OPTION_KEY__DEFAULT,
             *all_valid_resolves,
         }
         if unrecognized_resolves:
             raise UnrecognizedResolveNamesError(
                 sorted(unrecognized_resolves),
-                all_valid_resolves,
-                description_of_origin="the option `[python].resolves_to_constraints_file`",
+                {*all_valid_resolves, RESOLVE_OPTION_KEY__DEFAULT},
+                description_of_origin=f"the option `[python].{option_name}`",
             )
-        default_val = self._resolves_to_constraints_file.get("__default__")
+        default_val = option_value.get(RESOLVE_OPTION_KEY__DEFAULT)
         if not default_val:
-            return self._resolves_to_constraints_file
-        return {
-            resolve: self._resolves_to_constraints_file.get(resolve, default_val)
-            for resolve in all_valid_resolves
-        }
+            return option_value
+        return {resolve: option_value.get(resolve, default_val) for resolve in all_valid_resolves}
+
+    @memoized_method
+    def resolves_to_constraints_file(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, str]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_constraints_file,
+            "resolves_to_constraints_file",
+            all_python_tool_resolve_names,
+        )
+
+    @memoized_method
+    def resolves_to_no_binary(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, list[str]]:
+        if self.no_binary:
+            if self._resolves_to_no_binary:
+                raise ValueError(
+                    softwrap(
+                        """
+                        Conflicting options used. You used the new, preferred
+                        `[python].resolves_to_no_binary`, but also used the deprecated
+                        `[python].no_binary`.
+
+                        Please use only one of these (preferably `[python].resolves_to_no_binary`).
+                        """
+                    )
+                )
+            return {
+                resolve: list(self.no_binary)
+                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+            }
+        return self._resolves_to_option_helper(
+            self._resolves_to_no_binary,
+            "resolves_to_no_binary",
+            all_python_tool_resolve_names,
+        )
+
+    @memoized_method
+    def resolves_to_only_binary(
+        self, all_python_tool_resolve_names: tuple[str, ...]
+    ) -> dict[str, list[str]]:
+        if self.only_binary:
+            if self._resolves_to_only_binary:
+                raise ValueError(
+                    softwrap(
+                        """
+                        Conflicting options used. You used the new, preferred
+                        `[python].resolves_to_only_binary`, but also used the deprecated
+                        `[python].only_binary`.
+
+                        Please use only one of these (preferably `[python].resolves_to_only_binary`).
+                        """
+                    )
+                )
+            return {
+                resolve: list(self.only_binary)
+                for resolve in {*self.resolves, *all_python_tool_resolve_names}
+            }
+        return self._resolves_to_option_helper(
+            self._resolves_to_only_binary,
+            "resolves_to_only_binary",
+            all_python_tool_resolve_names,
+        )
 
     def resolve_all_constraints_was_set_explicitly(self) -> bool:
         return not self.options.is_default("resolve_all_constraints")
@@ -594,14 +733,6 @@ class PythonSetup(Subsystem):
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
-
-    @property
-    def manylinux_pex_args(self) -> Iterator[str]:
-        if self.manylinux:
-            yield "--manylinux"
-            yield self.manylinux
-        else:
-            yield "--no-manylinux"
 
     @property
     def scratch_dir(self):

@@ -14,7 +14,8 @@ from pants.backend.python.goals.lockfile import (
 )
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
 from pants.backend.python.goals.lockfile import setup_user_lockfile_requests
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.repos import PythonRepos
+from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -44,7 +45,8 @@ def _generate(
     rule_runner: RuleRunner,
     use_pex: bool,
     ansicolors_version: str = "==1.1.8",
-    requirement_constraints_str: str = '//   "requirement_constraints": []',
+    requirement_constraints_str: str = '//   "requirement_constraints": [],\n',
+    only_binary_and_no_binary_str: str = '//   "only_binary": [],\n//   "no_binary": []',
 ) -> str:
     result = rule_runner.request(
         GenerateLockfileResult,
@@ -78,9 +80,15 @@ def _generate(
             //   "generated_with_requirements": [
             //     "ansicolors{ansicolors_version}"
             //   ],
+            //   "indexes": [
+            //     "{PythonRepos.pypi_index}"
+            //   ],
+            //   "find_links": [],
+            //   "manylinux": "manylinux2014",
             """
         )
         + requirement_constraints_str
+        + only_binary_and_no_binary_str
         + dedent(
             """
             // }
@@ -111,14 +119,36 @@ def test_poetry_lockfile_generation(rule_runner: RuleRunner) -> None:
 def test_pex_lockfile_generation(
     rule_runner: RuleRunner, no_binary: bool, only_binary: bool
 ) -> None:
-    args = []
+    args = ["--python-resolves={'test': 'foo.lock'}"]
+    only_binary_lock_str = '//   "only_binary": [],\n'
+    no_binary_lock_str = '//   "no_binary": []'
+    no_binary_arg = f"{{'{RESOLVE_OPTION_KEY__DEFAULT}': ['ansicolors']}}"
     if no_binary:
-        args.append("--python-no-binary=ansicolors")
+        no_binary_lock_str = dedent(
+            """\
+            //   "no_binary": [
+            //     "ansicolors"
+            //   ]"""
+        )
+        args.append(f"--python-resolves-to-no-binary={no_binary_arg}")
     if only_binary:
-        args.append("--python-only-binary=ansicolors")
+        only_binary_lock_str = dedent(
+            """\
+            //   "only_binary": [
+            //     "ansicolors"
+            //   ],
+            """
+        )
+        args.append(f"--python-resolves-to-only-binary={no_binary_arg}")
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    lock_entry = json.loads(_generate(rule_runner=rule_runner, use_pex=True))
+    lock_entry = json.loads(
+        _generate(
+            rule_runner=rule_runner,
+            use_pex=True,
+            only_binary_and_no_binary_str=only_binary_lock_str + no_binary_lock_str,
+        )
+    )
     reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
     assert len(reqs) == 1
     assert reqs[0]["project_name"] == "ansicolors"
@@ -162,7 +192,7 @@ def test_constraints_file(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
             "--python-resolves={'test': 'foo.lock'}",
-            "--python-resolves-to-constraints-file={'test': 'constraints.txt'}",
+            f"--python-resolves-to-constraints-file={{'{RESOLVE_OPTION_KEY__DEFAULT}': 'constraints.txt'}}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -176,7 +206,8 @@ def test_constraints_file(rule_runner: RuleRunner) -> None:
                 """\
                 //   "requirement_constraints": [
                 //     "ansicolors==1.1.7"
-                //   ]"""
+                //   ],
+                """
             ),
         )
     )
@@ -219,7 +250,6 @@ def test_multiple_resolves() -> None:
             # Override interpreter constraints for 'b', but use default for 'a'.
             "--python-resolves-to-interpreter-constraints={'b': ['==3.7.*']}",
             "--python-enable-resolves",
-            "--python-lockfile-generator=pex",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

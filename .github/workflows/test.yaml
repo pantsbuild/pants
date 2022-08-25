@@ -57,7 +57,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.1-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -203,7 +203,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.1-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -288,7 +288,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:
@@ -420,7 +420,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.1-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -525,7 +525,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.1-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 
@@ -665,7 +665,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
-        path: '~/.rustup/toolchains/1.62.1-*
+        path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
 

@@ -39,6 +39,7 @@ from pants.core.goals.test import (
 from pants.core.util_rules import config_files, distdir
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.process import InteractiveProcessResult
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -94,6 +95,20 @@ GOOD_TEST = dedent(
 )
 
 
+def _configure_pytest_runner(
+    rule_runner: RuleRunner,
+    *,
+    extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+) -> None:
+    args = [
+        "--backend-packages=pants.backend.python",
+        f"--source-root-patterns={SOURCE_ROOT}",
+        *(extra_args or ()),
+    ]
+    rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+
+
 def run_pytest(
     rule_runner: RuleRunner,
     test_target: Target,
@@ -101,12 +116,7 @@ def run_pytest(
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> TestResult:
-    args = [
-        "--backend-packages=pants.backend.python",
-        f"--source-root-patterns={SOURCE_ROOT}",
-        *(extra_args or ()),
-    ]
-    rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     inputs = [PythonTestFieldSet.create(test_target)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
@@ -115,6 +125,32 @@ def run_pytest(
             debug_result = rule_runner.run_interactive_process(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
     return test_result
+
+
+def run_pytest_noninteractive(
+    rule_runner: RuleRunner,
+    test_target: Target,
+    *,
+    extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+) -> TestResult:
+    _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
+    inputs = [PythonTestFieldSet.create(test_target)]
+    return rule_runner.request(TestResult, inputs)
+
+
+def run_pytest_interactive(
+    rule_runner: RuleRunner,
+    test_target: Target,
+    *,
+    extra_args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+) -> InteractiveProcessResult:
+    _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
+    inputs = [PythonTestFieldSet.create(test_target)]
+    debug_request = rule_runner.request(TestDebugRequest, inputs)
+    with mock_console(rule_runner.options_bootstrapper):
+        return rule_runner.run_interactive_process(debug_request.process)
 
 
 @pytest.mark.platform_specific_behavior
@@ -231,7 +267,11 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--pytest-version=pytest>=4.6.6,<4.7", "--pytest-lockfile=<none>"]
+    extra_args = [
+        "--pytest-version=pytest>=4.6.6,<4.7",
+        "--pytest-extra-requirements=[]",
+        "--pytest-lockfile=<none>",
+    ]
 
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
@@ -268,6 +308,72 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
     assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
+
+
+def test_xdist_enabled_noninteractive(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": dedent(
+                """\
+                import os
+
+                def test_worker_id_set():
+                  assert "PYTEST_XDIST_WORKER" in os.environ
+
+                def test_worker_count_set():
+                  assert "PYTEST_XDIST_WORKER_COUNT" in os.environ
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_tests(xdist_concurrency=2)",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(rule_runner, tgt, extra_args=["--pytest-xdist-enabled"])
+    assert result.exit_code == 0
+
+
+def test_xdist_enabled_but_disabled_for_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": dedent(
+                """\
+                import os
+
+                def test_worker_id_not_set():
+                  assert "PYTEST_XDIST_WORKER" not in os.environ
+
+                def test_worker_count_not_set():
+                  assert "PYTEST_XDIST_WORKER_COUNT" not in os.environ
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_tests(xdist_concurrency=0)",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(rule_runner, tgt, extra_args=["--pytest-xdist-enabled"])
+    assert result.exit_code == 0
+
+
+def test_xdist_enabled_interactive(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": dedent(
+                """\
+                import os
+
+                def test_worker_id_not_set():
+                  assert "PYTEST_XDIST_WORKER" not in os.environ
+
+                def test_worker_count_not_set():
+                  assert "PYTEST_XDIST_WORKER_COUNT" not in os.environ
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_tests(xdist_concurrency=2)",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_interactive(rule_runner, tgt, extra_args=["--pytest-xdist-enabled"])
+    assert result.exit_code == 0
 
 
 @pytest.mark.parametrize(

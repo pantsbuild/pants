@@ -25,7 +25,7 @@ Defining Helm deployments
 
 Helm deployments are defined using the `helm_deployment` target which has a series of fields that can be used to guarantee the reproducibility of the given deployment. `helm_deployment` targets need to be added by hand as there is no deterministic way of instrospecting your repository to find sources that are specific to Helm:
 
-```text src/chart/BUILD
+```python src/chart/BUILD
 helm_chart()
 ```
 ```yaml src/chart/Chart.yaml
@@ -34,7 +34,7 @@ description: Example Helm chart
 name: example
 version: 0.1.0
 ```
-```text src/deployment/BUILD
+```python src/deployment/BUILD
 helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], dependencies=["//src/chart"])
 
 helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], dependencies=["//src/chart"])
@@ -82,13 +82,13 @@ A Helm deployment will in most cases deploy one or more Docker images into Kuber
 
 To illustrate this, let's imagine the following scenario: Let's say we have a first-party Docker image that we want to deploy into Kubernetes as a `Pod` resource kind. For achieving this we define the following workspace:
 
-```text src/docker/BUILD
+```python src/docker/BUILD
 docker_image()
 ```
 ```text src/docker/Dockerfile
 FROM busybox:1.28
 ```
-```text src/chart/BUILD
+```python src/chart/BUILD
 helm_chart()
 ```
 ```yaml src/chart/Chart.yaml
@@ -115,7 +115,7 @@ spec:
       # Uses the `image` value entry from the deployment inputs
       image: {{ .Values.image }}
 ```
-```text src/deployment/BUILD
+```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
 helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 ```
@@ -144,7 +144,7 @@ Value files
 
 It's very common that Helm deployments use a series of files providing with values that customise the given chart. When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. For example, given the following `BUILD` file:
 
-```text src/deployment/BUILD
+```python src/deployment/BUILD
 helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "second.yaml", "last.yaml"])
 ```
 
@@ -163,7 +163,7 @@ src/deployment/last.yaml
 
 And also the following `helm_deployment` target definition:
 
-```text src/deployment/BUILD
+```python src/deployment/BUILD
 helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
 ```
 
@@ -181,6 +181,33 @@ src/deployment/last.yaml
 We believe that this approach gives a very consistent and predictable ordering while at the same time total flexibility to the end user to organise their files as they best fit each particular case of a deployment.
 
 In addition to value files, you can also use inline values in your `helm_deployment` targets by means of the `values` field. All inlines values that are set this way will override any entry that may come from value files.
+
+Third party chart artifacts
+---------------------------
+
+Previous examples on the usage of the `helm_deployment` target are all based on the fact that the deployment declares a dependency on a Helm chart that is also part of the same repository. Since charts support having dependencies with other charts in the same repository or with external 3rd party Helm artifacts (declared as `helm_artifact`), all that dependency resolution is handled for us.
+
+However, `helm_deployment`s are not limited to only first party charts, as it is also possible to declare a deployment having a dependency on a 3rd party Helm artifact instead. As an example, consider the following workspace layout:
+
+```python 3rdparty/helm/jetstack/BUILD
+helm_artifact(
+  name="cert-manager",
+  artifact="cert-manager",
+  version="v0.7.0",
+  repository="https://charts.jetstack.io",
+)
+```
+```python src/deploy/BUILD
+helm_deployment(
+  name="main",
+  dependencies=["//3rdparty/helm/jetstack:cert-manager"],
+  values={
+    "installCRDs": "true"
+  },
+)
+```
+
+In this example, the deployment at `src/deploy:main` declares a dependency on a 3rd party Helm artifact instead of a chart in the same repository. The only difference in this case when compared to first party charts is that Pants will resolve and fetch the third party artifact automatically. Once the artifact has been resolved, there is no difference to Pants.
 
 Deploying
 ---------

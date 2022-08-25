@@ -156,39 +156,40 @@ def maybe_warn_python_repos(
 
 @dataclass(frozen=True)
 class _PipArgsAndConstraintsSetup:
+    resolve_config: ResolvePexConfig
     args: tuple[str, ...]
     digest: Digest
-    constraints: FrozenOrderedSet[PipRequirement]
 
 
 @rule_helper
 async def _setup_pip_args_and_constraints_file(
-    python_setup: PythonSetup, *, resolve_name: str
+    resolve_name: str, *, generate_with_pex: bool
 ) -> _PipArgsAndConstraintsSetup:
-    args = []
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+
+    args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
     digests = []
 
-    if python_setup.no_binary or python_setup.only_binary:
+    # This feature only works with Pex lockfiles.
+    if generate_with_pex and (resolve_config.no_binary or resolve_config.only_binary):
         pip_args_file = "__pip_args.txt"
         args.extend(["-r", pip_args_file])
         pip_args_file_content = "\n".join(
-            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
-            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
+            [f"--no-binary {pkg}" for pkg in resolve_config.no_binary]
+            + [f"--only-binary {pkg}" for pkg in resolve_config.only_binary]
         )
         pip_args_digest = await Get(
             Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
         )
         digests.append(pip_args_digest)
 
-    constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
-    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
-    if resolve_config.constraints_file:
+    # This feature only works with Pex lockfiles.
+    if generate_with_pex and resolve_config.constraints_file:
         args.append(f"--constraints={resolve_config.constraints_file.path}")
         digests.append(resolve_config.constraints_file.digest)
-        constraints = resolve_config.constraints_file.constraints
 
     input_digest = await Get(Digest, MergeDigests(digests))
-    return _PipArgsAndConstraintsSetup(tuple(args), input_digest, constraints)
+    return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
@@ -196,17 +197,12 @@ async def generate_lockfile(
     req: GeneratePythonLockfile,
     poetry_subsystem: PoetrySubsystem,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
-    python_repos: PythonRepos,
-    python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
-    requirement_constraints: FrozenOrderedSet[PipRequirement] = FrozenOrderedSet()
+    pip_args_setup = await _setup_pip_args_and_constraints_file(
+        req.resolve_name, generate_with_pex=req.use_pex
+    )
 
     if req.use_pex:
-        pip_args_setup = await _setup_pip_args_and_constraints_file(
-            python_setup, resolve_name=req.resolve_name
-        )
-        requirement_constraints = pip_args_setup.constraints
-
         header_delimiter = "//"
         result = await Get(
             ProcessResult,
@@ -236,8 +232,6 @@ async def generate_lockfile(
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
                     *pip_args_setup.args,
-                    *python_repos.pex_args,
-                    *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
                     *req.requirements,
                 ),
@@ -304,11 +298,20 @@ async def generate_lockfile(
         )
 
     initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
-    # TODO(#12314) Improve error message on `Requirement.parse`
     metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=req.interpreter_constraints,
+        # TODO(#12314) Improve error message on `Requirement.parse`
         requirements={PipRequirement.parse(i) for i in req.requirements},
-        requirement_constraints=set(requirement_constraints),
+        indexes=set(pip_args_setup.resolve_config.indexes),
+        find_links=set(pip_args_setup.resolve_config.find_links),
+        manylinux=pip_args_setup.resolve_config.manylinux,
+        requirement_constraints=(
+            set(pip_args_setup.resolve_config.constraints_file.constraints)
+            if pip_args_setup.resolve_config.constraints_file
+            else set()
+        ),
+        only_binary=set(pip_args_setup.resolve_config.only_binary),
+        no_binary=set(pip_args_setup.resolve_config.no_binary),
     )
     lockfile_with_header = metadata.add_header_to_lockfile(
         initial_lockfile_digest_contents[0].content,
@@ -375,7 +378,7 @@ async def setup_user_lockfile_requests(
     )
 
 
-class PoetryLockfileSentinel(GenerateToolLockfileSentinel):
+class PoetryLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PoetrySubsystem.options_scope
 
 

@@ -705,6 +705,7 @@ class OwnersRequest:
     sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
     filter_by_global_options: bool = False
+    match_if_owning_build_file_included_in_sources: bool = False
 
 
 class Owners(Collection[Address]):
@@ -799,7 +800,10 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
                 matching_files.update(
                     matches_filespec(secondary_owner_field.filespec, paths=sources_set)
                 )
-            if not matching_files and bfa.rel_path not in sources_set:
+            if not matching_files and not (
+                owners_request.match_if_owning_build_file_included_in_sources
+                and bfa.rel_path in sources_set
+            ):
                 continue
 
             unmatched_sources -= matching_files

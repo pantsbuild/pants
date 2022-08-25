@@ -8,7 +8,7 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
@@ -30,7 +30,7 @@ class DocformatterFieldSet(FieldSet):
         return tgt.get(SkipDocformatterField).value
 
 
-class DocformatterRequest(FmtRequest):
+class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
     name = Docformatter.options_scope
 
@@ -62,6 +62,6 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, DocformatterRequest),
+        UnionRule(FmtTargetsRequest, DocformatterRequest),
         *pex.rules(),
     ]

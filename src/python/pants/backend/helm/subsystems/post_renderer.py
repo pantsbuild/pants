@@ -21,6 +21,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.system_binaries import CatBinary
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -59,7 +60,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class HelmPostRendererLockfileSentinel(GenerateToolLockfileSentinel):
+class HelmPostRendererLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = HelmPostRendererSubsystem.options_scope
 
 

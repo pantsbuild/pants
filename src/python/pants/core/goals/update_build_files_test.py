@@ -146,6 +146,11 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
         valid_for_interpreter_constraints=InterpreterConstraints(["==2.7.*"]),
         requirements=set(),
         requirement_constraints=set(),
+        only_binary=set(),
+        no_binary=set(),
+        indexes=set(),
+        find_links=set(),
+        manylinux=None,
     )
 
     def assert_ics(
@@ -168,7 +173,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             metadata=metadata,
             requirement_estimate=1,
             is_pex_native=True,
-            constraints_strings=None,
+            as_constraints_strings=None,
             original_lockfile=Lockfile(
                 "black.lock", file_path_description_of_origin="foo", resolve_name="black"
             ),

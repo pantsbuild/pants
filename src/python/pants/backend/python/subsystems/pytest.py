@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -56,6 +57,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
+    xdist_concurrency: PythonTestsXdistConcurrencyField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -75,7 +77,7 @@ class PyTest(PythonToolBase):
     # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
-    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
 
     default_main = ConsoleScript("pytest")
 
@@ -161,6 +163,20 @@ class PyTest(PythonToolBase):
 
             Use `[{cls.options_scope}].config` instead if your config is in a
             non-standard location.
+            """
+        ),
+    )
+    xdist_enabled = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            """
+            If true, Pants will use `pytest-xdist` (https://pytest-xdist.readthedocs.io/en/latest/)
+            to parallelize tests within each `python_test` target.
+
+            NOTE: Enabling `pytest-xdist` can cause high-level scoped fixtures (for example `session`)
+            to execute more than once. See the `pytest-xdist` docs for more info:
+            https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once
             """
         ),
     )

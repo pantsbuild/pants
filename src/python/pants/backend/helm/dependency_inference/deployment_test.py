@@ -10,8 +10,9 @@ import pytest
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.dependency_inference.deployment import (
-    FirstPartyHelmDeploymentMappings,
-    HelmDeploymentDependenciesInferenceFieldSet,
+    AnalyseHelmDeploymentRequest,
+    FirstPartyHelmDeploymentMapping,
+    FirstPartyHelmDeploymentMappingRequest,
     HelmDeploymentReport,
     InferHelmDeploymentDependenciesRequest,
 )
@@ -51,8 +52,8 @@ def rule_runner() -> RuleRunner:
             *process.rules(),
             *stripped_source_files.rules(),
             *tool.rules(),
-            QueryRule(FirstPartyHelmDeploymentMappings, ()),
-            QueryRule(HelmDeploymentReport, (HelmDeploymentFieldSet,)),
+            QueryRule(FirstPartyHelmDeploymentMapping, (FirstPartyHelmDeploymentMappingRequest,)),
+            QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InferredDependencies, (InferHelmDeploymentDependenciesRequest,)),
         ],
     )
@@ -97,7 +98,9 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = HelmDeploymentFieldSet.create(target)
 
-    dependencies_report = rule_runner.request(HelmDeploymentReport, [field_set])
+    dependencies_report = rule_runner.request(
+        HelmDeploymentReport, [AnalyseHelmDeploymentRequest(field_set)]
+    )
 
     expected_container_refs = [
         "busybox:1.28",
@@ -144,22 +147,21 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
 
     deployment_addr = Address("src/deployment", target_name="foo")
     tgt = rule_runner.get_target(deployment_addr)
+    field_set = HelmDeploymentFieldSet.create(tgt)
 
     expected_image_ref = "src/image:myapp"
     expected_dependency_addr = Address("src/image", target_name="myapp")
 
-    mappings = rule_runner.request(FirstPartyHelmDeploymentMappings, [])
-    assert mappings.docker_addresses_referenced_by(deployment_addr) == [
+    mapping = rule_runner.request(
+        FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+    )
+    assert list(mapping.indexed_docker_addresses.values()) == [
         (expected_image_ref, expected_dependency_addr)
     ]
 
     inferred_dependencies = rule_runner.request(
         InferredDependencies,
-        [
-            InferHelmDeploymentDependenciesRequest(
-                HelmDeploymentDependenciesInferenceFieldSet.create(tgt)
-            )
-        ],
+        [InferHelmDeploymentDependenciesRequest(field_set)],
     )
 
     assert len(inferred_dependencies.include) == 1
@@ -214,11 +216,7 @@ def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
 
     inferred_dependencies = rule_runner.request(
         InferredDependencies,
-        [
-            InferHelmDeploymentDependenciesRequest(
-                HelmDeploymentDependenciesInferenceFieldSet.create(tgt)
-            )
-        ],
+        [InferHelmDeploymentDependenciesRequest(HelmDeploymentFieldSet.create(tgt))],
     )
 
     assert len(inferred_dependencies.include) == 0

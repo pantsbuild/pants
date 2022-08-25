@@ -524,6 +524,57 @@ the user:
 indexes.add = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
 ```
 
+
+### Constraints files
+
+Sometimes, transitive dependencies of one of your third-party requirements can cause trouble.
+For example, sometimes requirements do not pin their dependencies well enough, and a newer
+version of its transitive dependency is released that breaks the requirement.
+[Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) 
+allow you to pin transitive dependencies to certain versions, overriding the version that
+pip/Pex would normally choose.
+
+Constraints files are configured per-resolve, meaning that the resolves for your user code from
+`[python].resolves` and each Python tool, such as Black and Pytest, can have different
+configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to
+paths to pip-compatible constraints files. For example:
+
+```toml pants.toml
+[python.resolves_to_constraints_file]
+data-science = "3rdparty/python/data_science_constraints.txt"
+pytest = "3rdparty/python/pytest_constraints.txt"
+```
+```text 3rdparty/python/data_science_constraints.txt
+requests==22.1.0
+urrllib3==4.2
+```
+
+You can also set the key `__default__` to apply the same constraints file to every resolve by
+default, although this is not always useful because resolves often need different constraints.
+
+### `only_binary` and `no_binary`
+
+You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for
+certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for
+certain requirements.
+
+`only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user
+code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different
+configuration. Use the options `[python].resolves_to_only_binary` and 
+`[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
+For example:
+
+```toml pants.toml
+[python.resolves_to_only_binary]
+data-science = ["numpy"]
+
+[python.resolves_to_no_binary]
+pytest = ["pytest-xdist"]
+mypy_extra_type_stubs = ["django-stubs"]
+```
+
+You can also set the key `__default__` to apply the same value to every resolve by default.
+
 Tip: use `./pants export` to create a virtual environment for IDEs
 ------------------------------------------------------------------
 

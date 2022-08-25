@@ -604,7 +604,7 @@ def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
-            "timeout-minutes": 40,
+            "timeout-minutes": 60,
             "if": IS_PANTS_OWNER,
             "steps": [
                 *helper.bootstrap_pants(install_python=True),

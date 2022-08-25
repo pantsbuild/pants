@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -93,7 +94,7 @@ class LoadedLockfile:
     is_pex_native: bool
     # If !is_pex_native, the lockfile parsed as constraints strings, for use when the lockfile
     # needs to be subsetted (see #15031, ##12222).
-    constraints_strings: FrozenOrderedSet[str] | None
+    as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
     original_lockfile: Lockfile | LockfileContent
@@ -297,27 +298,77 @@ class ResolvePexConstraintsFile:
 class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
+    indexes: tuple[str, ...]
+    find_links: tuple[str, ...]
+    manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
+    only_binary: tuple[str, ...]
+    no_binary: tuple[str, ...]
+
+    def indexes_and_find_links_and_manylinux_pex_args(self) -> Iterator[str]:
+        # NB: In setting `--no-pypi`, we rely on the default value of `[python-repos].indexes`
+        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
+        # case. Why set `--no-pypi`, then? We need to do this so that
+        # `[python-repos].indexes = ['custom_url']` will only point to that index and not include
+        # PyPI.
+        yield "--no-pypi"
+        yield from (f"--index={index}" for index in self.indexes)
+        yield from (f"--find-links={repo}" for repo in self.find_links)
+
+        if self.manylinux:
+            yield "--manylinux"
+            yield self.manylinux
+        else:
+            yield "--no-manylinux"
 
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
-    """Find all configuration from `[python]` that impacts how the resolve is created."""
+    """Find all configuration from `[python]` that impacts how the resolve is created.
 
-    resolve_name: str
+    If `resolve_name` is None, then most per-resolve options will be ignored because there is no way
+    for users to configure them. However, some options like `[python-repos].indexes` will still be
+    loaded.
+    """
+
+    resolve_name: str | None
 
     def debug_hint(self) -> str:
-        return self.resolve_name
+        return self.resolve_name or "<no resolve>"
 
 
 @rule
 async def determine_resolve_pex_config(
-    request: ResolvePexConfigRequest, python_setup: PythonSetup, union_membership: UnionMembership
+    request: ResolvePexConfigRequest,
+    python_setup: PythonSetup,
+    python_repos: PythonRepos,
+    union_membership: UnionMembership,
 ) -> ResolvePexConfig:
+    if request.resolve_name is None:
+        return ResolvePexConfig(
+            indexes=python_repos.indexes,
+            find_links=python_repos.repos,
+            manylinux=python_setup.manylinux,
+            constraints_file=None,
+            no_binary=(),
+            only_binary=(),
+        )
+
     all_python_tool_resolve_names = tuple(
         sentinel.resolve_name
         for sentinel in union_membership.get(GenerateToolLockfileSentinel)
         if issubclass(sentinel, GeneratePythonToolLockfileSentinel)
+    )
+
+    no_binary = (
+        python_setup.resolves_to_no_binary(all_python_tool_resolve_names).get(request.resolve_name)
+        or []
+    )
+    only_binary = (
+        python_setup.resolves_to_only_binary(all_python_tool_resolve_names).get(
+            request.resolve_name
+        )
+        or []
     )
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -360,7 +411,14 @@ async def determine_resolve_pex_config(
             _constraints_digest, _constraints_file_path, FrozenOrderedSet(constraints)
         )
 
-    return ResolvePexConfig(constraints_file=constraints_file)
+    return ResolvePexConfig(
+        indexes=python_repos.indexes,
+        find_links=python_repos.repos,
+        manylinux=python_setup.manylinux,
+        constraints_file=constraints_file,
+        no_binary=tuple(no_binary),
+        only_binary=tuple(only_binary),
+    )
 
 
 def should_validate_metadata(
@@ -379,7 +437,7 @@ def validate_metadata(
     lockfile: Lockfile | LockfileContent,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
-    constraints_file: ResolvePexConstraintsFile | None,
+    resolve_config: ResolvePexConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
@@ -391,7 +449,16 @@ def validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
         user_requirements=user_requirements,
-        requirement_constraints=constraints_file.constraints if constraints_file else set(),
+        indexes=resolve_config.indexes,
+        find_links=resolve_config.find_links,
+        manylinux=resolve_config.manylinux,
+        requirement_constraints=(
+            resolve_config.constraints_file.constraints
+            if resolve_config.constraints_file
+            else set()
+        ),
+        only_binary=resolve_config.only_binary,
+        no_binary=resolve_config.no_binary,
     )
     if validation:
         return
@@ -402,7 +469,9 @@ def validate_metadata(
         lockfile=lockfile,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
-        maybe_constraints_file_path=(constraints_file.path if constraints_file else None),
+        maybe_constraints_file_path=(
+            resolve_config.constraints_file.path if resolve_config.constraints_file else None
+        ),
     )
     is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
     msg_iter = (
@@ -416,13 +485,55 @@ def validate_metadata(
     logger.warning("%s", msg)
 
 
-def _stale_constraints_file_error(file_path: str) -> str:
-    return softwrap(
-        f"""
-        - The constraints file at {file_path} has changed from when the lockfile was generated.
-        (Constraints files are set via the option `[python].resolves_to_constraints_file`)
-        """
-    )
+def _common_failure_reasons(
+    failure_reasons: set[InvalidPythonLockfileReason], maybe_constraints_file_path: str | None
+) -> Iterator[str]:
+    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in failure_reasons:
+        assert maybe_constraints_file_path is not None
+        yield softwrap(
+            f"""
+            - The constraints file at {maybe_constraints_file_path} has changed from when the
+            lockfile was generated. (Constraints files are set via the option
+            `[python].resolves_to_constraints_file`)
+            """
+        )
+    if InvalidPythonLockfileReason.ONLY_BINARY_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `only_binary` arguments have changed from when the lockfile was generated.
+            (`only_binary` is set via the options `[python].resolves_to_only_binary` and deprecated
+            `[python].only_binary`)
+            """
+        )
+    if InvalidPythonLockfileReason.NO_BINARY_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `no_binary` arguments have changed from when the lockfile was generated.
+            (`no_binary` is set via the options `[python].resolves_to_no_binary` and deprecated
+            `[python].no_binary`)
+            """
+        )
+    if InvalidPythonLockfileReason.INDEXES_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `indexes` arguments have changed from when the lockfile was generated.
+            (Indexes are set via the option `[python-repos].indexes`
+            """
+        )
+    if InvalidPythonLockfileReason.FIND_LINKS_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `find_links` arguments have changed from when the lockfile was generated.
+            (Find links is set via the option `[python-repos].repos`
+            """
+        )
+    if InvalidPythonLockfileReason.MANYLINUX_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `manylinux` argument has changed from when the lockfile was generated.
+            (manylinux is set via the option `[python].resolver_manylinux`
+            """
+        )
 
 
 def _invalid_tool_lockfile_error(
@@ -506,9 +617,7 @@ def _invalid_tool_lockfile_error(
         )
         yield "\n\n"
 
-    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
-        assert maybe_constraints_file_path is not None
-        yield _stale_constraints_file_error(maybe_constraints_file_path)
+    yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield softwrap(
         f"""
@@ -586,9 +695,7 @@ def _invalid_user_lockfile_error(
             """
         ) + "\n\n"
 
-    if InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH in validation.failure_reasons:
-        assert maybe_constraints_file_path is not None
-        yield _stale_constraints_file_error(maybe_constraints_file_path)
+    yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(

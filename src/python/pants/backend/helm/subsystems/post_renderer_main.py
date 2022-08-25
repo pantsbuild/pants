@@ -120,6 +120,13 @@ def main(args: list[str]) -> None:
 
             output_manifest_map[source_filename].append(dump_yaml_data(yaml, manifest_yaml))
 
+    # Include in the output the files that didn't require any replacement
+    remaining_files = set(input_manifest_map.keys()) - set(output_manifest_map.keys())
+    for remaining_file in remaining_files:
+        input_file = input_manifest_map.get(remaining_file)
+        if input_file:
+            output_manifest_map[remaining_file] = input_file
+
     print_manifests(output_manifest_map)
 
 

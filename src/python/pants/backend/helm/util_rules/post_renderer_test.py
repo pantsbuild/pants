@@ -59,6 +59,16 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
                 """
             ),
             "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/mychart/templates/configmap.yaml": dedent(
+                """\
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: foo-config
+              data:
+                foo_key: foo_value
+              """
+            ),
             "src/mychart/templates/pod.yaml": dedent(
                 """\
                 {{- $root := . -}}
@@ -192,6 +202,7 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
         ],
     )
     assert "mychart/templates/pod.yaml" in rendered_output.snapshot.files
+    assert "mychart/templates/configmap.yaml" in rendered_output.snapshot.files
 
     rendered_pod_file = _read_file_from_digest(
         rule_runner, digest=rendered_output.snapshot.digest, filename="mychart/templates/pod.yaml"

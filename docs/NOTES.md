@@ -35,11 +35,10 @@ npm install rdme
 ### Log in.
 
 ```
-npx rdme login --2fa
+npx rdme login --project pants --2fa
 ```
 
 (the `--2fa` flag makes `rdme` prompt for 2fa codes, which is necessary if you have TOTP 2fa set up on your account)
-
 
 ## When cutting a new release branch
 
@@ -49,16 +48,14 @@ Create a fork of the most recent docs branch, and mark it as `beta`, for example
 npx rdme versions:create --version=v2.98 --fork="v2.97" --main=false --beta=true --isPublic=true
 ```
 
-will create a new docs version, `2.98` based on a copy of the docs from version `2.97`. 
-
+will create a new docs version, `2.98` based on a copy of the docs from version `2.97`.
 
 ## Sync docs changes up to `readme.com`
 
-Docs markdown files are stored in the `markdown` directory. `rdme` does not do bidirectional sync, so any changes made on readme.com itself _will be deleted_.
+Docs markdown files are stored in the `markdown` directory. `rdme` does not do bidirectional sync, so any changes made on readme.com itself _will be deleted_. Make sure you apply any changes from readme.com locally before syncing up.
 
-Make sure you apply any changes from readme.com locally before syncing up.
+From the root of the repository:
 
 ```
-npx rdme docs markdown --version v2.98
+npx rdme docs docs/markdown --version v2.98
 ```
-

@@ -10,7 +10,7 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
@@ -33,7 +33,7 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest):
+class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
     name = Isort.options_scope
 
@@ -100,6 +100,6 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, IsortRequest),
+        UnionRule(FmtTargetsRequest, IsortRequest),
         *pex.rules(),
     ]
