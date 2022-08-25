@@ -73,16 +73,12 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            ipython, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(ipython)
 
     interpreter_constraints = await _find_all_unique_interpreter_constraints(
         python_setup, _IpythonFieldSetForLockfiles
     )
-    return GeneratePythonLockfile.from_tool(
-        ipython, interpreter_constraints, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(ipython, interpreter_constraints)
 
 
 def rules():

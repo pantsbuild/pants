@@ -10,7 +10,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
@@ -52,11 +51,9 @@ class AutoflakeLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule()
 async def setup_autoflake_lockfile(
-    _: AutoflakeLockfileSentinel, autoflake: Autoflake, python_setup: PythonSetup
+    _: AutoflakeLockfileSentinel, autoflake: Autoflake
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        autoflake, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(autoflake)
 
 
 class AutoflakeExportSentinel(ExportPythonToolSentinel):
