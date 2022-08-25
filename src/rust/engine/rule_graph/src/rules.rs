@@ -25,9 +25,10 @@ pub trait TypeId:
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct DependencyKey<T: TypeId> {
-  product: T,
-  // Most of our expected usecases for multiple-provided-parameters involve two parameters.
-  provided_params: SmallVec<[T; 2]>,
+  pub product: T,
+  // Most of our expected usecases for multiple-provided-parameters involve two parameters. See
+  // also `Self::provides`.
+  pub provided_params: SmallVec<[T; 2]>,
 }
 
 impl<T: TypeId> DependencyKey<T> {
@@ -65,13 +66,13 @@ impl<T: TypeId> DependencyKey<T> {
   }
 
   ///
-  /// Returns the Param (input) type for this dependency, if it provides one.
+  /// True if this DependencyKey provides the given type.
   ///
-  /// TODO: Currently all consumers use either zero or one provided param. This is a compatibility
-  /// shim until #7490 can be implemented.
+  /// NB: This is a linear scan, but that should be fine for small numbers of provided
+  /// params: see the struct doc.
   ///
-  pub fn provided_param(&self) -> Option<T> {
-    self.provided_params.get(0).cloned()
+  pub fn provides(&self, t: &T) -> bool {
+    self.provided_params.contains(t)
   }
 }
 
