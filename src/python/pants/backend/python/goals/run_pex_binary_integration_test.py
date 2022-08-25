@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 from textwrap import dedent
-from typing import Optional
+from typing import Callable, Optional
 
 import pytest
 
-from pants.backend.python.target_types import PexExecutionMode
+from pants.backend.python.target_types import PexExecutionMode, PexLayout
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
 use_new_semantics_args = pytest.mark.parametrize(
@@ -20,30 +20,14 @@ use_new_semantics_args = pytest.mark.parametrize(
 )
 
 
-@pytest.mark.parametrize(
-    ("entry_point", "execution_mode", "include_tools"),
-    [
-        ("app.py", None, True),
-        ("app.py", None, True),
-        ("app.py", PexExecutionMode.VENV, False),
-        ("app.py:main", PexExecutionMode.ZIPAPP, True),
-        ("app.py:main", None, False),
-    ],
-)
-@use_new_semantics_args
-def test_run_sample_script(
-    entry_point: str,
-    execution_mode: Optional[PexExecutionMode],
-    include_tools: bool,
+def run_generic_test(
+    *,
     use_new_semantics_args: tuple[str, ...],
-) -> None:
-    """Test that we properly run a `pex_binary` target.
-
-    This checks a few things:
-    - We can handle source roots.
-    - We properly load third party requirements.
-    - We propagate the error code.
-    """
+    entry_point: str = "app.py",
+    execution_mode: Optional[PexExecutionMode] = None,
+    include_tools: bool = False,
+    layout: Optional[PexLayout] = None,
+) -> Callable[..., PantsResult]:
     sources = {
         "src_root1/project/app.py": dedent(
             """\
@@ -68,6 +52,7 @@ def test_run_sample_script(
               entry_point={entry_point!r},
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
+              layout={layout.value if layout is not None else None!r},
             )
             """
         ),
@@ -103,19 +88,50 @@ def test_run_sample_script(
             return run_pants(args, extra_env=extra_env)
 
     result = run()
+
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
     if use_new_semantics_args:
         assert file.endswith("utils/strutil.py")
-        assert "pants-sandbox-" not in file
+        if layout == PexLayout.LOOSE:
+            # Loose PEXs execute their own code directly
+            assert "pants-sandbox-" in file
+        else:
+            assert "pants-sandbox-" not in file
     else:
         assert file.endswith("src_root2/utils/strutil.py")
         assert "pants-sandbox-" in file
     assert result.exit_code == 23
 
+    return run
+
+
+@pytest.mark.parametrize("entry_point", ["app.py", "app.py:main"])
+@use_new_semantics_args
+def test_entry_point(
+    entry_point: str,
+    use_new_semantics_args: tuple[str, ...],
+):
+    run_generic_test(use_new_semantics_args=use_new_semantics_args, entry_point=entry_point)
+
+
+@pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
+@pytest.mark.parametrize("include_tools", [True, False])
+@use_new_semantics_args
+def test_execution_mode_and_include_tools(
+    execution_mode: Optional[PexExecutionMode],
+    include_tools: bool,
+    use_new_semantics_args: tuple[str, ...],
+):
+    run = run_generic_test(
+        use_new_semantics_args=use_new_semantics_args,
+        execution_mode=execution_mode,
+        include_tools=include_tools,
+    )
+
     if include_tools:
         result = run("--", "info", PEX_TOOLS="1")
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.stderr
         pex_info = json.loads(result.stdout)
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
@@ -125,6 +141,15 @@ def test_run_sample_script(
             assert pex_info["strip_pex_env"]
         else:
             assert not pex_info["strip_pex_env"]
+
+
+@pytest.mark.parametrize("layout", PexLayout)
+@use_new_semantics_args
+def test_layout(
+    layout: Optional[PexLayout],
+    use_new_semantics_args: tuple[str, ...],
+):
+    run_generic_test(use_new_semantics_args=use_new_semantics_args, layout=layout)
 
 
 @use_new_semantics_args
