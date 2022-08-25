@@ -10,14 +10,21 @@ def test_simple() -> None:
     class Fruit:
         pass
 
-    class Banana(Fruit):
+    class Strawberry(Fruit):
         pass
 
     class Apple(Fruit):
         pass
 
     @union
-    class CitrusFruit(Fruit):
+    class TropicalFruit(Fruit):
+        pass
+
+    class Mango(TropicalFruit):
+        pass
+
+    @union
+    class CitrusFruit(TropicalFruit):
         pass
 
     class Orange(CitrusFruit):
@@ -27,22 +34,37 @@ def test_simple() -> None:
     class Vegetable:
         pass
 
-    class Potato:  # Doesn't _have_ to inherit from the union
+    class Zucchini:  # Doesn't _have_ to inherit from the union
+        pass
+
+    class Tubers(Vegetable):
+        pass
+
+    # Also test a non-union middle-ancestor
+    @union
+    class StarchyTubers(Tubers):
+        pass
+
+    class Potato(StarchyTubers):
         pass
 
     union_membership = UnionMembership.from_rules(
         [
-            UnionRule(Fruit, Banana),
+            UnionRule(Fruit, Strawberry),
             UnionRule(Fruit, Apple),
+            UnionRule(TropicalFruit, Mango),
             UnionRule(CitrusFruit, Orange),
-            UnionRule(Vegetable, Potato),
+            UnionRule(Vegetable, Zucchini),
+            UnionRule(StarchyTubers, Potato),
         ]
     )
 
     assert union_membership == UnionMembership(
         {
-            Fruit: FrozenOrderedSet([Banana, Apple]),
-            CitrusFruit: FrozenOrderedSet([Orange, Banana, Apple]),
-            Vegetable: FrozenOrderedSet([Potato]),
+            Fruit: FrozenOrderedSet([Strawberry, Apple]),
+            TropicalFruit: FrozenOrderedSet([Mango, Strawberry, Apple]),
+            CitrusFruit: FrozenOrderedSet([Orange, Strawberry, Apple, Mango]),
+            Vegetable: FrozenOrderedSet([Zucchini]),
+            StarchyTubers: FrozenOrderedSet([Potato, Zucchini]),
         }
     )

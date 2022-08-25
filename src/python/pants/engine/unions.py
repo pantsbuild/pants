@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Iterable, Mapping, TypeVar
 
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -67,6 +69,17 @@ _T = TypeVar("_T", bound=type)
 class UnionMembership:
     union_rules: FrozenDict[type, FrozenOrderedSet[type]]
 
+    @staticmethod
+    @memoized
+    def _get_descendants(cls: type) -> Iterable[type]:
+        subclasses = cls.__subclasses__()
+        return (
+            *subclasses,
+            *itertools.chain.from_iterable(
+                UnionMembership._get_descendants(sub) for sub in subclasses
+            ),
+        )
+
     @classmethod
     def from_rules(cls, rules: Iterable[UnionRule]) -> UnionMembership:
         mapping: DefaultDict[type, OrderedSet[type]] = defaultdict(OrderedSet)
@@ -74,14 +87,12 @@ class UnionMembership:
             mapping[rule.union_base].add(rule.union_member)
 
         # Base union classes inherit the members of any subclasses that are also unions
-        bases = list(mapping.keys())
-        while len(bases) > 0:
-            union_base = bases.pop()
-            for sub_union in union_base.__subclasses__():
-                if is_union(sub_union):
-                    if sub_union not in mapping:
-                        bases.append(sub_union)
-                    mapping[sub_union].update(mapping[union_base])
+        for base in mapping:
+            for descendant in UnionMembership._get_descendants(base):
+                if is_union(descendant):
+                    mapping[descendant].update(mapping[base])
+
+        UnionMembership._get_descendants.clear()  # type: ignore[attr-defined]
         return cls(mapping)
 
     def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
