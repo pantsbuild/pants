@@ -3,7 +3,7 @@ use std::fmt;
 use indexmap::{indexset, IndexSet};
 
 use crate::builder::combinations_of_one;
-use crate::{Palette, Query, RuleGraph};
+use crate::{DependencyKey, Palette, Query, RuleGraph};
 
 #[test]
 fn combinations_of_one_test() {
@@ -32,7 +32,7 @@ fn combinations_of_one_test() {
 
 #[test]
 fn basic() {
-  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
+  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey::new("b")])];
   let queries = indexset![Query::new("a", vec!["b"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
@@ -52,7 +52,7 @@ fn singleton() {
 
 #[test]
 fn insufficient_query() {
-  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
+  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey::new("b")])];
   let queries = indexset![Query::new("a", vec![])];
 
   assert!(RuleGraph::new(rules, queries)
@@ -75,8 +75,8 @@ fn no_rules() {
 #[test]
 fn ambiguity() {
   let rules = indexset![
-    Rule("a", "a_from_b", vec![DependencyKey("b", None)]),
-    Rule("a", "a_from_c", vec![DependencyKey("c", None)]),
+    Rule("a", "a_from_b", vec![DependencyKey::new("b")]),
+    Rule("a", "a_from_c", vec![DependencyKey::new("c")]),
   ];
   let queries = indexset![Query::new("a", vec!["b", "c"])];
 
@@ -89,11 +89,15 @@ fn ambiguity() {
 #[test]
 fn nested_single() {
   let rules = indexset![
-    Rule("a", "a_from_b", vec![DependencyKey("b", Some("c"))]),
+    Rule(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new_with_params("b", vec!["c"])]
+    ),
     Rule(
       "b",
       "b_from_c",
-      vec![DependencyKey("c", None), DependencyKey("d", None)],
+      vec![DependencyKey::new("c"), DependencyKey::new("d")],
     ),
   ];
   let queries = indexset![Query::new("a", vec!["d"])];
@@ -106,16 +110,20 @@ fn nested_single() {
 #[test]
 fn nested_multiple() {
   let rules = indexset![
-    Rule("a", "a_from_b", vec![DependencyKey("b", Some("c"))]),
+    Rule(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new_with_params("b", vec!["c"])]
+    ),
     Rule(
       "b",
       "b_from_c",
-      vec![DependencyKey("c", None), DependencyKey("d", None)],
+      vec![DependencyKey::new("c"), DependencyKey::new("d")],
     ),
     Rule(
       "b",
       "b_from_other_unreachable",
-      vec![DependencyKey("d", None)],
+      vec![DependencyKey::new("d")],
     ),
   ];
   let queries = indexset![Query::new("a", vec!["d"])];
@@ -131,8 +139,8 @@ fn self_cycle_simple() {
     "Fib",
     "fib",
     vec![
-      DependencyKey("int", None),
-      DependencyKey("Fib", Some("int")),
+      DependencyKey::new("int"),
+      DependencyKey::new_with_params("Fib", vec!["int"]),
     ],
   )];
   let queries = indexset![
@@ -153,17 +161,17 @@ fn self_cycle_with_external_dep() {
       "Thing",
       "transitive_thing",
       vec![
-        DependencyKey("int", None),
+        DependencyKey::new("int"),
         // We expect this to be a self-cycle.
-        DependencyKey("Thing", Some("int")),
+        DependencyKey::new_with_params("Thing", vec!["int"]),
         // And this to be satisfied by the second rule, even though we already have an int in scope.
-        DependencyKey("int", Some("ExternalDep")),
+        DependencyKey::new_with_params("int", vec!["ExternalDep"]),
       ],
     ),
     Rule(
       "int",
       "external_dep",
-      vec![DependencyKey("ExternalDep", None)],
+      vec![DependencyKey::new("ExternalDep")],
     ),
   ];
   let queries = indexset![Query::new("Thing", vec!["int"])];
@@ -181,20 +189,20 @@ fn ambiguous_cycle() {
       "Root",
       "me",
       vec![
-        DependencyKey("ME", Some("P")),
-        DependencyKey("ME", Some("MPP")),
+        DependencyKey::new_with_params("ME", vec!["P"]),
+        DependencyKey::new_with_params("ME", vec!["MPP"]),
       ],
     ),
-    Rule("ME", "me", vec![DependencyKey("FERR", None)]),
+    Rule("ME", "me", vec![DependencyKey::new("FERR")]),
     Rule(
       "FERR",
       "ferr",
-      vec![DependencyKey("PD", None), DependencyKey("FPR", None)],
+      vec![DependencyKey::new("PD"), DependencyKey::new("FPR")],
     ),
-    Rule("PD", "pd_for_p", vec![DependencyKey("P", None)]),
-    Rule("PD", "pd_for_mpp", vec![DependencyKey("MPP", None)]),
-    Rule("FPR", "fpr_for_p", vec![DependencyKey("P", None)]),
-    Rule("FPR", "fpr_for_mpp", vec![DependencyKey("MPP", None)]),
+    Rule("PD", "pd_for_p", vec![DependencyKey::new("P")]),
+    Rule("PD", "pd_for_mpp", vec![DependencyKey::new("MPP")]),
+    Rule("FPR", "fpr_for_p", vec![DependencyKey::new("P")]),
+    Rule("FPR", "fpr_for_mpp", vec![DependencyKey::new("MPP")]),
   ];
   let queries = indexset![Query::new("Root", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
@@ -209,17 +217,26 @@ fn natural_loop() {
     Rule(
       "A",
       "a",
-      vec![DependencyKey("D", None), DependencyKey("B", Some("E"))],
+      vec![
+        DependencyKey::new("D"),
+        DependencyKey::new_with_params("B", vec!["E"])
+      ],
     ),
     Rule(
       "B",
       "b",
-      vec![DependencyKey("E", None), DependencyKey("C", Some("F"))],
+      vec![
+        DependencyKey::new("E"),
+        DependencyKey::new_with_params("C", vec!["F"])
+      ],
     ),
     Rule(
       "C",
       "c",
-      vec![DependencyKey("F", None), DependencyKey("A", Some("D"))],
+      vec![
+        DependencyKey::new("F"),
+        DependencyKey::new_with_params("A", vec!["D"])
+      ],
     ),
   ];
   let queries = indexset![Query::new("A", vec!["D"])];
@@ -237,15 +254,15 @@ fn multi_path_cycle() {
       "A",
       "sao",
       vec![
-        DependencyKey("AWO", Some("AS")),
-        DependencyKey("AWO", Some("FS")),
+        DependencyKey::new_with_params("AWO", vec!["AS"]),
+        DependencyKey::new_with_params("AWO", vec!["FS"]),
       ],
     ),
-    Rule("AWO", "awofs", vec![DependencyKey("FS", None)]),
+    Rule("AWO", "awofs", vec![DependencyKey::new("FS")]),
     Rule(
       "AWO",
       "awoas",
-      vec![DependencyKey("AS", None), DependencyKey("A", None)],
+      vec![DependencyKey::new("AS"), DependencyKey::new("A")],
     ),
   ];
   let queries = indexset![Query::new("A", vec![])];
@@ -262,16 +279,16 @@ fn mutual_recursion() {
       "IsEven",
       "is_even",
       vec![
-        DependencyKey("int", None),
-        DependencyKey("IsOdd", Some("int")),
+        DependencyKey::new("int"),
+        DependencyKey::new_with_params("IsOdd", vec!["int"]),
       ],
     ),
     Rule(
       "IsOdd",
       "is_odd",
       vec![
-        DependencyKey("int", None),
-        DependencyKey("IsEven", Some("int")),
+        DependencyKey::new("int"),
+        DependencyKey::new_with_params("IsEven", vec!["int"]),
       ],
     ),
   ];
@@ -290,21 +307,31 @@ fn mutual_recursion() {
 fn wide() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule("Output", "one", vec![DependencyKey("Output", Some("A"))]),
+    Rule(
+      "Output",
+      "one",
+      vec![DependencyKey::new_with_params("Output", vec!["A"])]
+    ),
     Rule(
       "Output",
       "two",
-      vec![DependencyKey("A", None), DependencyKey("Output", Some("B"))],
+      vec![
+        DependencyKey::new("A"),
+        DependencyKey::new_with_params("Output", vec!["B"])
+      ],
     ),
     Rule(
       "Output",
       "three",
-      vec![DependencyKey("B", None), DependencyKey("Output", Some("C"))],
+      vec![
+        DependencyKey::new("B"),
+        DependencyKey::new_with_params("Output", vec!["C"])
+      ],
     ),
     Rule(
       "Output",
       "four",
-      vec![DependencyKey("C", None), DependencyKey("D", None)],
+      vec![DependencyKey::new("C"), DependencyKey::new("D")],
     ),
   ];
   let queries = indexset![Query::new("Output", vec!["D"])];
@@ -323,64 +350,64 @@ fn reduced_source_roots() {
       "OptionalSourceRootsResult",
       "get_optional_source_roots",
       vec![
-        DependencyKey("SourceRootsRequest", None),
-        DependencyKey("OptionalSourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("SourceRootsRequest"),
+        DependencyKey::new_with_params("OptionalSourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("RemovePrefix", None)],
+      vec![DependencyKey::new("RemovePrefix")],
     ),
     Rule(
       "Snapshot",
       "<intrinsic>",
-      vec![DependencyKey("Digest", None)],
+      vec![DependencyKey::new("Digest")],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("DigestSubset", None)],
+      vec![DependencyKey::new("DigestSubset")],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("PathGlobs", None)],
+      vec![DependencyKey::new("PathGlobs")],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("MergeDigests", None)],
+      vec![DependencyKey::new("MergeDigests")],
     ),
     Rule(
       "SourceRootsResult",
       "get_source_roots",
       vec![
-        DependencyKey("SourceRootsRequest", None),
-        DependencyKey("OptionalSourceRootsResult", Some("SourceRootsRequest")),
+        DependencyKey::new("SourceRootsRequest"),
+        DependencyKey::new_with_params("OptionalSourceRootsResult", vec!["SourceRootsRequest"]),
       ],
     ),
     Rule(
       "OptionalSourceRoot",
       "get_optional_source_root",
       vec![
-        DependencyKey("SourceRootRequest", None),
-        DependencyKey("SourceRootConfig", None),
-        DependencyKey("Snapshot", Some("PathGlobs")),
-        DependencyKey("OptionalSourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("SourceRootRequest"),
+        DependencyKey::new("SourceRootConfig"),
+        DependencyKey::new_with_params("Snapshot", vec!["PathGlobs"]),
+        DependencyKey::new_with_params("OptionalSourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "StrippedSourceFiles",
       "strip_source_roots",
       vec![
-        DependencyKey("SourceFiles", None),
-        DependencyKey("Snapshot", Some("DigestSubset")),
-        DependencyKey("SourceRootsResult", Some("SourceRootsRequest")),
-        DependencyKey("Snapshot", Some("RemovePrefix")),
-        DependencyKey("Digest", Some("DigestSubset")),
-        DependencyKey("Digest", Some("RemovePrefix")),
-        DependencyKey("Snapshot", Some("MergeDigests")),
+        DependencyKey::new("SourceFiles"),
+        DependencyKey::new_with_params("Snapshot", vec!["DigestSubset"]),
+        DependencyKey::new_with_params("SourceRootsResult", vec!["SourceRootsRequest"]),
+        DependencyKey::new_with_params("Snapshot", vec!["RemovePrefix"]),
+        DependencyKey::new_with_params("Digest", vec!["DigestSubset"]),
+        DependencyKey::new_with_params("Digest", vec!["RemovePrefix"]),
+        DependencyKey::new_with_params("Snapshot", vec!["MergeDigests"]),
       ],
     ),
   ];
@@ -398,32 +425,32 @@ fn reduced_codegen_cycle() {
       "Process",
       "setup_pex_cli_process",
       vec![
-        DependencyKey("PexCliProcess", None),
-        DependencyKey("ProcessResult", Some("Process")),
+        DependencyKey::new("PexCliProcess"),
+        DependencyKey::new_with_params("ProcessResult", vec!["Process"]),
       ],
     ),
     Rule(
       "ProcessResult",
       "fallible_to_exec_result_or_raise",
       vec![
-        DependencyKey("FallibleProcessResult", None),
-        DependencyKey("ProductDescription", None),
+        DependencyKey::new("FallibleProcessResult"),
+        DependencyKey::new("ProductDescription"),
       ],
     ),
     Rule(
       "MultiPlatformProcess",
       "upcast_process",
-      vec![DependencyKey("Process", None)],
+      vec![DependencyKey::new("Process")],
     ),
     Rule(
       "ProductDescription",
       "get_multi_platform_request_description",
-      vec![DependencyKey("MultiPlatformProcess", None)],
+      vec![DependencyKey::new("MultiPlatformProcess")],
     ),
     Rule(
       "FallibleProcessResult",
       "remove_platform_information",
-      vec![DependencyKey("MultiPlatformProcess", None)],
+      vec![DependencyKey::new("MultiPlatformProcess")],
     ),
   ];
   let queries = indexset![Query::new("Process", vec!["PexCliProcess"])];
@@ -440,191 +467,200 @@ fn full_scale_target() {
       "InferredDependencies",
       "infer_python_conftest_dependencies",
       vec![
-        DependencyKey("InferConftestDependencies", None),
-        DependencyKey("HydratedSources", Some("HydrateSourcesRequest")),
-        DependencyKey("AncestorFiles", Some("AncestorFilesRequest")),
-        DependencyKey("Owners", Some("OwnersRequest")),
+        DependencyKey::new("InferConftestDependencies"),
+        DependencyKey::new_with_params("HydratedSources", vec!["HydrateSourcesRequest"]),
+        DependencyKey::new_with_params("AncestorFiles", vec!["AncestorFilesRequest"]),
+        DependencyKey::new_with_params("Owners", vec!["OwnersRequest"]),
       ],
     ),
     Rule(
       "ThirdPartyModuleToAddressMapping",
       "map_third_party_modules_to_addresses",
-      vec![DependencyKey("Targets", Some("AddressSpecs"))],
+      vec![DependencyKey::new_with_params(
+        "Targets",
+        vec!["AddressSpecs"]
+      )],
     ),
     Rule(
       "Targets",
       "resolve_targets",
       vec![
-        DependencyKey("UnexpandedTargets", None),
-        DependencyKey("Subtargets", Some("Address")),
+        DependencyKey::new("UnexpandedTargets"),
+        DependencyKey::new_with_params("Subtargets", vec!["Address"]),
       ],
     ),
     Rule(
       "Owners",
       "find_owners",
       vec![
-        DependencyKey("OwnersRequest", None),
-        DependencyKey("Targets", Some("AddressSpecs")),
-        DependencyKey("UnexpandedTargets", Some("AddressSpecs")),
-        DependencyKey("BuildFileAddress", Some("Address")),
+        DependencyKey::new("OwnersRequest"),
+        DependencyKey::new_with_params("Targets", vec!["AddressSpecs"]),
+        DependencyKey::new_with_params("UnexpandedTargets", vec!["AddressSpecs"]),
+        DependencyKey::new_with_params("BuildFileAddress", vec!["Address"]),
       ],
     ),
     Rule(
       "AddressesWithOrigins",
       "resolve_addresses_with_origins",
       vec![
-        DependencyKey("Specs", None),
-        DependencyKey("AddressesWithOrigins", Some("AddressSpecs")),
-        DependencyKey("AddressesWithOrigins", Some("FilesystemSpecs")),
+        DependencyKey::new("Specs"),
+        DependencyKey::new_with_params("AddressesWithOrigins", vec!["AddressSpecs"]),
+        DependencyKey::new_with_params("AddressesWithOrigins", vec!["FilesystemSpecs"]),
       ],
     ),
     Rule(
       "InferredDependencies",
       "infer_python_dependencies",
       vec![
-        DependencyKey("InferPythonDependencies", None),
-        DependencyKey("StrippedSourceFiles", Some("SourceFilesRequest")),
-        DependencyKey("PythonModuleOwner", Some("PythonModule")),
+        DependencyKey::new("InferPythonDependencies"),
+        DependencyKey::new_with_params("StrippedSourceFiles", vec!["SourceFilesRequest"]),
+        DependencyKey::new_with_params("PythonModuleOwner", vec!["PythonModule"]),
       ],
     ),
     Rule(
       "InferredDependencies",
       "infer_python_init_dependencies",
       vec![
-        DependencyKey("InferInitDependencies", None),
-        DependencyKey("HydratedSources", Some("HydrateSourcesRequest")),
-        DependencyKey("AncestorFiles", Some("AncestorFilesRequest")),
-        DependencyKey("Owners", Some("OwnersRequest")),
+        DependencyKey::new("InferInitDependencies"),
+        DependencyKey::new_with_params("HydratedSources", vec!["HydrateSourcesRequest"]),
+        DependencyKey::new_with_params("AncestorFiles", vec!["AncestorFilesRequest"]),
+        DependencyKey::new_with_params("Owners", vec!["OwnersRequest"]),
       ],
     ),
     Rule(
       "PythonModuleOwner",
       "map_module_to_address",
       vec![
-        DependencyKey("PythonModule", None),
-        DependencyKey("FirstPartyModuleToAddressMapping", None),
-        DependencyKey("ThirdPartyModuleToAddressMapping", None),
+        DependencyKey::new("PythonModule"),
+        DependencyKey::new("FirstPartyModuleToAddressMapping"),
+        DependencyKey::new("ThirdPartyModuleToAddressMapping"),
       ],
     ),
     Rule(
       "DownloadedExternalTool",
       "download_external_tool",
       vec![
-        DependencyKey("ExternalToolRequest", None),
-        DependencyKey("Digest", Some("DownloadFile")),
-        DependencyKey("ExtractedDigest", Some("MaybeExtractable")),
+        DependencyKey::new("ExternalToolRequest"),
+        DependencyKey::new_with_params("Digest", vec!["DownloadFile"]),
+        DependencyKey::new_with_params("ExtractedDigest", vec!["MaybeExtractable"]),
       ],
     ),
     Rule(
       "GlobalOptions",
       "construct_scope_",
-      vec![DependencyKey("ScopedOptions", Some("Scope"))],
+      vec![DependencyKey::new_with_params(
+        "ScopedOptions",
+        vec!["Scope"]
+      )],
     ),
     Rule(
       "PexEnvironment",
       "find_pex_python",
-      vec![DependencyKey("BinaryPaths", Some("BinaryPathRequest"))],
+      vec![DependencyKey::new_with_params(
+        "BinaryPaths",
+        vec!["BinaryPathRequest"]
+      )],
     ),
     Rule(
       "ProcessResult",
       "fallible_to_exec_result_or_raise",
       vec![
-        DependencyKey("FallibleProcessResult", None),
-        DependencyKey("ProductDescription", None),
+        DependencyKey::new("FallibleProcessResult"),
+        DependencyKey::new("ProductDescription"),
       ],
     ),
     Rule(
       "HydratedSources",
       "hydrate_sources",
       vec![
-        DependencyKey("HydrateSourcesRequest", None),
-        DependencyKey("WrappedTarget", Some("Address")),
-        DependencyKey(
+        DependencyKey::new("HydrateSourcesRequest"),
+        DependencyKey::new_with_params("WrappedTarget", vec!["Address"]),
+        DependencyKey::new_with_params(
           "GeneratedSources",
-          Some("GeneratePythonFromProtobufRequest"),
+          vec!["GeneratePythonFromProtobufRequest"],
         ),
       ],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("MergeDigests", None)],
+      vec![DependencyKey::new("MergeDigests")],
     ),
     Rule(
       "SourceFiles",
       "determine_source_files",
       vec![
-        DependencyKey("SourceFilesRequest", None),
-        DependencyKey("HydratedSources", Some("HydrateSourcesRequest")),
+        DependencyKey::new("SourceFilesRequest"),
+        DependencyKey::new_with_params("HydratedSources", vec!["HydrateSourcesRequest"]),
       ],
     ),
     Rule(
       "UnexpandedTargets",
       "resolve_unexpanded_targets",
       vec![
-        DependencyKey("Addresses", None),
-        DependencyKey("WrappedTarget", Some("Address")),
+        DependencyKey::new("Addresses"),
+        DependencyKey::new_with_params("WrappedTarget", vec!["Address"]),
       ],
     ),
     Rule(
       "ExtractedDigest",
       "maybe_extract",
       vec![
-        DependencyKey("MaybeExtractable", None),
-        DependencyKey("ProcessResult", Some("Process")),
+        DependencyKey::new("MaybeExtractable"),
+        DependencyKey::new_with_params("ProcessResult", vec!["Process"]),
       ],
     ),
     Rule(
       "AddressesWithOrigins",
       "addresses_with_origins_from_address_specs",
       vec![
-        DependencyKey("AddressSpecs", None),
-        DependencyKey("Address", Some("AddressInput")),
-        DependencyKey("TargetAdaptor", Some("Address")),
-        DependencyKey("UnexpandedTargets", Some("Addresses")),
-        DependencyKey("AddressFamily", Some("Dir")),
+        DependencyKey::new("AddressSpecs"),
+        DependencyKey::new_with_params("Address", vec!["AddressInput"]),
+        DependencyKey::new_with_params("TargetAdaptor", vec!["Address"]),
+        DependencyKey::new_with_params("UnexpandedTargets", vec!["Addresses"]),
+        DependencyKey::new_with_params("AddressFamily", vec!["Dir"]),
       ],
     ),
     Rule(
       "BuildFileAddress",
       "find_build_file",
       vec![
-        DependencyKey("Address", None),
-        DependencyKey("AddressFamily", Some("Dir")),
+        DependencyKey::new("Address"),
+        DependencyKey::new_with_params("AddressFamily", vec!["Dir"]),
       ],
     ),
     Rule(
       "AncestorFiles",
       "find_missing_ancestor_files",
-      vec![DependencyKey("AncestorFilesRequest", None)],
+      vec![DependencyKey::new("AncestorFilesRequest")],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("DownloadFile", None)],
+      vec![DependencyKey::new("DownloadFile")],
     ),
     Rule(
       "BinaryPaths",
       "find_binary",
       vec![
-        DependencyKey("BinaryPathRequest", None),
-        DependencyKey("FallibleProcessResult", Some("Process")),
+        DependencyKey::new("BinaryPathRequest"),
+        DependencyKey::new_with_params("FallibleProcessResult", vec!["Process"]),
       ],
     ),
     Rule(
       "OptionalSourceRootsResult",
       "get_optional_source_roots",
       vec![
-        DependencyKey("SourceRootsRequest", None),
-        DependencyKey("OptionalSourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("SourceRootsRequest"),
+        DependencyKey::new_with_params("OptionalSourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "AddressesWithOrigins",
       "addresses_with_origins_from_filesystem_specs",
       vec![
-        DependencyKey("FilesystemSpecs", None),
-        DependencyKey("Owners", Some("OwnersRequest")),
+        DependencyKey::new("FilesystemSpecs"),
+        DependencyKey::new_with_params("Owners", vec!["OwnersRequest"]),
       ],
     ),
     Rule(
@@ -635,159 +671,156 @@ fn full_scale_target() {
     Rule(
       "Addresses",
       "strip_address_origins",
-      vec![DependencyKey("AddressesWithOrigins", None)],
+      vec![DependencyKey::new("AddressesWithOrigins")],
     ),
     Rule(
       "FallibleProcessResult",
       "remove_platform_information",
-      vec![DependencyKey("FallibleProcessResultWithPlatform", None)],
+      vec![DependencyKey::new("FallibleProcessResultWithPlatform")],
     ),
     Rule(
       "ScopedOptions",
       "scope_options",
-      vec![
-        DependencyKey("Scope", None),
-        DependencyKey("_Options", None),
-      ],
+      vec![DependencyKey::new("Scope"), DependencyKey::new("_Options"),],
     ),
     Rule(
       "TransitiveTargets",
       "transitive_targets",
       vec![
-        DependencyKey("Targets", None),
-        DependencyKey("Targets", Some("DependenciesRequest")),
+        DependencyKey::new("Targets"),
+        DependencyKey::new_with_params("Targets", vec!["DependenciesRequest"]),
       ],
     ),
     Rule(
       "FirstPartyModuleToAddressMapping",
       "map_first_party_modules_to_addresses",
       vec![
-        DependencyKey("Targets", Some("AddressSpecs")),
-        DependencyKey("StrippedSourceFiles", Some("SourceFilesRequest")),
+        DependencyKey::new_with_params("Targets", vec!["AddressSpecs"]),
+        DependencyKey::new_with_params("StrippedSourceFiles", vec!["SourceFilesRequest"]),
       ],
     ),
     Rule(
       "Digest",
       "<intrinsic>",
-      vec![DependencyKey("DigestSubset", None)],
+      vec![DependencyKey::new("DigestSubset")],
     ),
     Rule(
       "_Options",
       "parse_options",
-      vec![DependencyKey("OptionsBootstrapper", None)],
+      vec![DependencyKey::new("OptionsBootstrapper")],
     ),
     Rule(
       "GeneratedSources",
       "generate_python_from_protobuf",
       vec![
-        DependencyKey("GeneratePythonFromProtobufRequest", None),
-        DependencyKey("DownloadedExternalTool", Some("ExternalToolRequest")),
-        DependencyKey("ProcessResult", Some("Process")),
-        DependencyKey("TransitiveTargets", Some("Addresses")),
-        DependencyKey("StrippedSourceFiles", Some("SourceFilesRequest")),
-        DependencyKey("Digest", Some("MergeDigests")),
-        DependencyKey("SourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("GeneratePythonFromProtobufRequest"),
+        DependencyKey::new_with_params("DownloadedExternalTool", vec!["ExternalToolRequest"]),
+        DependencyKey::new_with_params("ProcessResult", vec!["Process"]),
+        DependencyKey::new_with_params("TransitiveTargets", vec!["Addresses"]),
+        DependencyKey::new_with_params("StrippedSourceFiles", vec!["SourceFilesRequest"]),
+        DependencyKey::new_with_params("Digest", vec!["MergeDigests"]),
+        DependencyKey::new_with_params("SourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "SourceRoot",
       "get_source_root",
       vec![
-        DependencyKey("SourceRootRequest", None),
-        DependencyKey("OptionalSourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("SourceRootRequest"),
+        DependencyKey::new_with_params("OptionalSourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "MultiPlatformProcess",
       "upcast_process",
-      vec![DependencyKey("Process", None)],
+      vec![DependencyKey::new("Process")],
     ),
     Rule(
       "TargetAdaptor",
       "find_target_adaptor",
       vec![
-        DependencyKey("Address", None),
-        DependencyKey("AddressFamily", Some("Dir")),
+        DependencyKey::new("Address"),
+        DependencyKey::new_with_params("AddressFamily", vec!["Dir"]),
       ],
     ),
     Rule(
       "Address",
       "resolve_address",
-      vec![DependencyKey("AddressInput", None)],
+      vec![DependencyKey::new("AddressInput")],
     ),
     Rule(
       "FallibleProcessResultWithPlatform",
       "<intrinsic>",
-      vec![DependencyKey("MultiPlatformProcess", None)],
+      vec![DependencyKey::new("MultiPlatformProcess")],
     ),
     Rule(
       "SourceRootsResult",
       "get_source_roots",
       vec![
-        DependencyKey("SourceRootsRequest", None),
-        DependencyKey("OptionalSourceRootsResult", Some("SourceRootsRequest")),
+        DependencyKey::new("SourceRootsRequest"),
+        DependencyKey::new_with_params("OptionalSourceRootsResult", vec!["SourceRootsRequest"]),
       ],
     ),
     Rule(
       "OptionalSourceRoot",
       "get_optional_source_root",
       vec![
-        DependencyKey("SourceRootRequest", None),
-        DependencyKey("OptionalSourceRoot", Some("SourceRootRequest")),
+        DependencyKey::new("SourceRootRequest"),
+        DependencyKey::new_with_params("OptionalSourceRoot", vec!["SourceRootRequest"]),
       ],
     ),
     Rule(
       "StrippedSourceFiles",
       "strip_source_roots",
       vec![
-        DependencyKey("SourceFiles", None),
-        DependencyKey("SourceRootsResult", Some("SourceRootsRequest")),
-        DependencyKey("Digest", Some("DigestSubset")),
+        DependencyKey::new("SourceFiles"),
+        DependencyKey::new_with_params("SourceRootsResult", vec!["SourceRootsRequest"]),
+        DependencyKey::new_with_params("Digest", vec!["DigestSubset"]),
       ],
     ),
     Rule(
       "Subtargets",
       "generate_subtargets",
       vec![
-        DependencyKey("Address", None),
-        DependencyKey("WrappedTarget", Some("Address")),
+        DependencyKey::new("Address"),
+        DependencyKey::new_with_params("WrappedTarget", vec!["Address"]),
       ],
     ),
     Rule(
       "ProductDescription",
       "get_multi_platform_request_description",
-      vec![DependencyKey("MultiPlatformProcess", None)],
+      vec![DependencyKey::new("MultiPlatformProcess")],
     ),
     Rule(
       "Addresses",
       "resolve_dependencies",
       vec![
-        DependencyKey("DependenciesRequest", None),
-        DependencyKey("RegisteredTargetTypes", None),
-        DependencyKey("Address", Some("AddressInput")),
-        DependencyKey("WrappedTarget", Some("Address")),
-        DependencyKey("InferredDependencies", Some("InferPythonDependencies")),
-        DependencyKey("InferredDependencies", Some("InferInitDependencies")),
-        DependencyKey("InferredDependencies", Some("InferConftestDependencies")),
-        DependencyKey("Subtargets", Some("Address")),
+        DependencyKey::new("DependenciesRequest"),
+        DependencyKey::new("RegisteredTargetTypes"),
+        DependencyKey::new_with_params("Address", vec!["AddressInput"]),
+        DependencyKey::new_with_params("WrappedTarget", vec!["Address"]),
+        DependencyKey::new_with_params("InferredDependencies", vec!["InferPythonDependencies"]),
+        DependencyKey::new_with_params("InferredDependencies", vec!["InferInitDependencies"]),
+        DependencyKey::new_with_params("InferredDependencies", vec!["InferConftestDependencies"]),
+        DependencyKey::new_with_params("Subtargets", vec!["Address"]),
       ],
     ),
     Rule(
       "WrappedTarget",
       "resolve_target",
       vec![
-        DependencyKey("Address", None),
-        DependencyKey("RegisteredTargetTypes", None),
-        DependencyKey("WrappedTarget", Some("Address")),
-        DependencyKey("TargetAdaptor", Some("Address")),
+        DependencyKey::new("Address"),
+        DependencyKey::new("RegisteredTargetTypes"),
+        DependencyKey::new_with_params("WrappedTarget", vec!["Address"]),
+        DependencyKey::new_with_params("TargetAdaptor", vec!["Address"]),
       ],
     ),
     Rule(
       "AddressFamily",
       "parse_address_family",
       vec![
-        DependencyKey("GlobalOptions", None),
-        DependencyKey("Dir", None),
+        DependencyKey::new("GlobalOptions"),
+        DependencyKey::new("Dir"),
       ],
     ),
   ];
@@ -827,18 +860,17 @@ impl super::TypeId for &'static str {
 
 // A name and vec of DependencyKeys. Abbreviated for simpler construction and matching.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct Rule(&'static str, &'static str, Vec<DependencyKey>);
+struct Rule(&'static str, &'static str, Vec<DependencyKey<&'static str>>);
 
 impl super::Rule for Rule {
   type TypeId = &'static str;
-  type DependencyKey = DependencyKey;
 
   fn product(&self) -> Self::TypeId {
     self.0
   }
 
-  fn dependency_keys(&self) -> Vec<Self::DependencyKey> {
-    self.2.clone()
+  fn dependency_keys(&self) -> Vec<&DependencyKey<&'static str>> {
+    self.2.iter().collect()
   }
 
   fn require_reachable(&self) -> bool {
@@ -859,31 +891,5 @@ impl super::DisplayForGraph for Rule {
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
     write!(f, "{}({}) -> {}", self.1, self.2.len(), self.0)
-  }
-}
-
-// A product and a param. Abbreviated for simpler construction and matching.
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, Hash, PartialEq)]
-struct DependencyKey(&'static str, Option<&'static str>);
-
-impl super::DependencyKey for DependencyKey {
-  type TypeId = &'static str;
-
-  fn new_root(product: Self::TypeId) -> Self {
-    DependencyKey(product, None)
-  }
-
-  fn product(&self) -> Self::TypeId {
-    self.0
-  }
-
-  fn provided_param(&self) -> Option<Self::TypeId> {
-    self.1
-  }
-}
-
-impl fmt::Display for DependencyKey {
-  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    write!(f, "{:?}", self)
   }
 }

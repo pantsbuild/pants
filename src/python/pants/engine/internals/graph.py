@@ -723,10 +723,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     def create_live_and_deleted_gets(
         *, filter_by_global_options: bool
-    ) -> tuple[
-        Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners],
-        Get[UnexpandedTargets, RawSpecsWithoutFileOwners],
-    ]:
+    ) -> tuple[Get[FilteredTargets | Targets], Get[UnexpandedTargets],]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
         For live files, we use Targets, which causes generated targets to be used rather than their
@@ -741,7 +738,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             description_of_origin="<owners rule - unused>",
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
         )
-        live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners] = (
+        live_get: Get[FilteredTargets | Targets] = (
             Get(FilteredTargets, RawSpecsWithoutFileOwners, live_raw_specs)
             if filter_by_global_options
             else Get(Targets, RawSpecsWithoutFileOwners, live_raw_specs)

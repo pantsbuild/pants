@@ -13,7 +13,6 @@ from pants.backend.helm.utils.yaml import YamlPath
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -57,13 +56,9 @@ class HelmKubeParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_k8s_parser_lockfile_request(
-    _: HelmKubeParserLockfileSentinel,
-    post_renderer: HelmKubeParserSubsystem,
-    python_setup: PythonSetup,
+    _: HelmKubeParserLockfileSentinel, post_renderer: HelmKubeParserSubsystem
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        post_renderer, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(post_renderer)
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,6 @@ from pants.backend.helm.utils.yaml import FrozenYamlIndex
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -66,13 +65,9 @@ class HelmPostRendererLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_postrenderer_lockfile_request(
-    _: HelmPostRendererLockfileSentinel,
-    post_renderer: HelmPostRendererSubsystem,
-    python_setup: PythonSetup,
+    _: HelmPostRendererLockfileSentinel, post_renderer: HelmPostRendererSubsystem
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        post_renderer, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(post_renderer)
 
 
 _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"

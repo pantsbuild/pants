@@ -11,7 +11,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
@@ -59,13 +58,9 @@ class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_lockfile_request(
-    _: TerraformHcl2ParserLockfileSentinel,
-    hcl2_parser: TerraformHcl2Parser,
-    python_setup: PythonSetup,
+    _: TerraformHcl2ParserLockfileSentinel, hcl2_parser: TerraformHcl2Parser
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        hcl2_parser, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(hcl2_parser)
 
 
 @dataclass(frozen=True)

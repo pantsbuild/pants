@@ -1,6 +1,7 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use smallvec::SmallVec;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
@@ -22,26 +23,66 @@ pub trait TypeId:
     I: Iterator<Item = Self>;
 }
 
-pub trait DependencyKey:
-  Clone + Copy + Debug + Display + Hash + Ord + Eq + Sized + 'static
-{
-  type TypeId: TypeId;
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
+pub struct DependencyKey<T: TypeId> {
+  product: T,
+  // Most of our expected usecases for multiple-provided-parameters involve two parameters.
+  provided_params: SmallVec<[T; 2]>,
+}
 
-  ///
-  /// Generate a DependencyKey for a dependency at the "root" of the RuleGraph, which represents an
-  /// entrypoint into the set of installed Rules.
-  ///
-  fn new_root(product: Self::TypeId) -> Self;
+impl<T: TypeId> DependencyKey<T> {
+  pub fn new(product: T) -> Self {
+    DependencyKey {
+      product,
+      provided_params: SmallVec::default(),
+    }
+  }
+
+  pub fn new_with_params<I: IntoIterator<Item = T>>(product: T, provided_params: I) -> Self {
+    let mut provided_params = provided_params.into_iter().collect::<SmallVec<[T; 2]>>();
+    provided_params.sort();
+
+    #[cfg(debug_assertions)]
+    {
+      let original_len = provided_params.len();
+      provided_params.dedup();
+      if original_len != provided_params.len() {
+        panic!("Expected unique provided params.");
+      }
+    }
+
+    DependencyKey {
+      product,
+      provided_params,
+    }
+  }
 
   ///
   /// Returns the product (output) type for this dependency.
   ///
-  fn product(&self) -> Self::TypeId;
+  pub fn product(&self) -> T {
+    self.product
+  }
 
   ///
   /// Returns the Param (input) type for this dependency, if it provides one.
   ///
-  fn provided_param(&self) -> Option<Self::TypeId>;
+  /// TODO: Currently all consumers use either zero or one provided param. This is a compatibility
+  /// shim until #7490 can be implemented.
+  ///
+  pub fn provided_param(&self) -> Option<T> {
+    self.provided_params.get(0).cloned()
+  }
+}
+
+impl<T: TypeId> Display for DependencyKey<T> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    if self.provided_params.is_empty() {
+      write!(f, "{}", self.product)
+    } else {
+      write!(f, "Get({}, {:?})", self.product, self.provided_params)
+    }
+  }
 }
 
 pub trait DisplayForGraph {
@@ -81,7 +122,6 @@ pub trait Rule:
   Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + Send + Sync + 'static
 {
   type TypeId: TypeId;
-  type DependencyKey: DependencyKey<TypeId = Self::TypeId>;
 
   ///
   /// Returns the product (output) type for this Rule.
@@ -91,7 +131,7 @@ pub trait Rule:
   ///
   /// Return keys for the dependencies of this Rule.
   ///
-  fn dependency_keys(&self) -> Vec<Self::DependencyKey>;
+  fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>>;
 
   ///
   /// True if this rule implementation should be required to be reachable in the RuleGraph.

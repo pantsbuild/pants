@@ -250,9 +250,7 @@ async def setup_pylint_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not pylint.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            pylint, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(pylint)
 
     constraints = await _find_all_unique_interpreter_constraints(
         python_setup,
@@ -263,7 +261,6 @@ async def setup_pylint_lockfile(
         pylint,
         constraints,
         extra_requirements=first_party_plugins.requirement_strings,
-        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

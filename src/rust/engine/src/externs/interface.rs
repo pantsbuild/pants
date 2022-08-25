@@ -987,10 +987,10 @@ fn session_run_interactive_process(
       true,
       &Arc::new(std::sync::atomic::AtomicBool::new(true)),
       core.intrinsics.run(
-        &Intrinsic {
-          product: core.types.interactive_process_result,
-          inputs: vec![core.types.interactive_process],
-        },
+        &Intrinsic::new(
+          core.types.interactive_process_result,
+          core.types.interactive_process,
+        ),
         context,
         vec![interactive_process],
       ),

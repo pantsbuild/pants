@@ -6,7 +6,7 @@ from typing import Tuple
 import pytest
 
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.source.filespec import FilespecMatcher, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -20,8 +20,6 @@ def assert_rule_match(
 ) -> None:
     # Confirm in-memory behavior.
     matched_filespec = tuple(FilespecMatcher([glob], ()).matches(paths))
-    deprecated_matched_filespec = matches_filespec({"includes": [glob]}, paths=paths)
-    assert matched_filespec == deprecated_matched_filespec
     if should_match:
         assert matched_filespec == paths
     else:

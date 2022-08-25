@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
@@ -14,6 +15,7 @@ from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -23,6 +25,7 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    Field,
     InvalidFieldException,
     OptionalSingleSourceField,
     StringField,
@@ -30,6 +33,7 @@ from pants.engine.target import (
     Target,
     Targets,
 )
+from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
 
@@ -330,6 +334,55 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         yield from cast("tuple[str]", self.value)
 
 
+class DockerBuildOptionFieldValueMixin(Field):
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        yield f"{self.docker_build_option}={self.value}"
+
+
+class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
+    alias = "pull"
+    default = True
+    help = softwrap(
+        """
+        If true, then docker will always attempt to pull a newer version of the image.
+
+        Useful to disable it when building images from other intermediate goals.
+        """
+    )
+    docker_build_option = "--pull"
+
+
+class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}"
+
+
+class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
+    alias = "squash"
+    default = False
+    help = softwrap(
+        """
+        If true, then docker will squash newly built layers into a single new layer.
+
+        Note that this option is only supported on a Docker daemon with experimental features enabled.
+        """
+    )
+    docker_build_option = "--squash"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -347,6 +400,8 @@ class DockerImageTarget(Target):
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
         DockerImageTargetStageField,
+        DockerImageBuildPullOptionField,
+        DockerImageBuildSquashOptionField,
         RestartableField,
     )
     help = softwrap(
@@ -372,6 +427,23 @@ class DockerImageTarget(Target):
 
         """
     )
+
+
+@union
+@dataclass(frozen=True)
+class DockerImageTagsRequest:
+    """A request to provide additional image tags."""
+
+    target: Target
+
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        """Whether to provide additional tags for this target or not."""
+        return True
+
+
+class DockerImageTags(Collection[str]):
+    """Additional image tags to apply to built Docker images."""
 
 
 class AllDockerImageTargets(Targets):

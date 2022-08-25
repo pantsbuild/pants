@@ -346,10 +346,10 @@ class PyGeneratorResponseBreak:
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseGet(Generic[_Output, _Input]):
+class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]
-    input_type: type[_Input]
-    input: _Input
+    input_type: type
+    input: Any
 
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...

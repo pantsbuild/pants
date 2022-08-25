@@ -416,12 +416,8 @@ async def _setup_pex_requirements(
         resolve_name = None
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
-    pex_lock_resolver_args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
-    pip_resolver_args = [
-        *resolve_config.indexes_and_find_links_and_manylinux_pex_args(),
-        "--resolver-version",
-        "pip-2020-resolver",
-    ]
+    pex_lock_resolver_args = list(resolve_config.pex_args())
+    pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
 
     if isinstance(request.requirements, EntireLockfile):
         lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))

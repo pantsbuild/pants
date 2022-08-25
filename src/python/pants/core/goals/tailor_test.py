@@ -10,7 +10,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -26,7 +25,6 @@ from pants.core.goals.tailor import (
     default_sources_for_target_type,
     group_by_dir,
     make_content_str,
-    specs_to_dirs,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
@@ -429,54 +427,6 @@ def test_group_by_dir() -> None:
         "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
         "foo/bar/qux": {"quux1.ext"},
     } == group_by_dir(paths)
-
-
-def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(RawSpecs(description_of_origin="tests")) == ("",)
-    assert specs_to_dirs(
-        RawSpecs(
-            address_literals=(AddressLiteralSpec("src/python/foo"),), description_of_origin="tests"
-        )
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),), description_of_origin="tests")
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        RawSpecs(
-            address_literals=(
-                AddressLiteralSpec("src/python/foo"),
-                AddressLiteralSpec("src/python/bar"),
-            ),
-            description_of_origin="tests",
-        )
-    ) == ("src/python/foo", "src/python/bar")
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                file_literals=(FileLiteralSpec("src/python/foo.py"),), description_of_origin="tests"
-            )
-        )
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),),
-                description_of_origin="tests",
-            )
-        )
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                address_literals=(
-                    AddressLiteralSpec(
-                        "src/python/bar", target_component=None, generated_component="gen"
-                    ),
-                ),
-                description_of_origin="tests",
-            )
-        )
 
 
 def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:

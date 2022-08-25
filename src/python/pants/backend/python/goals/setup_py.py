@@ -554,8 +554,9 @@ async def determine_explicitly_provided_setup_kwargs(
                 """
             )
         )
-    setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
+    setup_kwargs_request_type = tuple(applicable_setup_kwargs_requests)[0]
+    setup_kwargs_request: SetupKwargsRequest = setup_kwargs_request_type(target)  # type: ignore[abstract]
+    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request)
 
 
 @dataclass(frozen=True)

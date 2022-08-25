@@ -153,7 +153,6 @@ def resolve_raw_specs_without_file_owners(
     specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
-        convert_dir_literal_to_address_literal=False,
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
@@ -533,7 +532,6 @@ def resolve_raw_specs_with_only_file_owners(
     specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
-        convert_dir_literal_to_address_literal=True,
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
@@ -641,7 +639,6 @@ def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs],
-        convert_dir_literal_to_address_literal=False,
         description_of_origin="tests",
     )
 
@@ -672,9 +669,7 @@ def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
     )
 
     def assert_resolved(specs: Iterable[str], expected: set[str]) -> None:
-        specs_obj = SpecsParser().parse_specs(
-            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
-        )
+        specs_obj = SpecsParser().parse_specs(specs, description_of_origin="tests")
         result = rule_runner.request(Addresses, [specs_obj])
         assert {addr.spec for addr in result} == expected
 
@@ -805,9 +800,7 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     def assert_paths(
         specs: Iterable[str], expected_files: set[str], expected_dirs: set[str]
     ) -> None:
-        specs_obj = SpecsParser().parse_specs(
-            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
-        )
+        specs_obj = SpecsParser().parse_specs(specs, description_of_origin="tests")
         result = rule_runner.request(SpecsPaths, [specs_obj])
         assert set(result.files) == expected_files
         assert set(result.dirs) == expected_dirs
@@ -914,11 +907,7 @@ def test_find_valid_field_sets(caplog) -> None:
             [
                 request,
                 Specs(
-                    includes=RawSpecs.create(
-                        specs,
-                        convert_dir_literal_to_address_literal=True,
-                        description_of_origin="tests",
-                    ),
+                    includes=RawSpecs.create(specs, description_of_origin="tests"),
                     ignores=RawSpecs(description_of_origin="tests"),
                 ),
             ],

@@ -11,6 +11,11 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 
 See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x.md> for the changelog.
 
+### Removed second type parameter from `Get`
+
+`Get` now takes only a single type parameter for the output type: `Get[_Output]`. The input type
+parameter was unused.
+
 ### `FmtRequest` -> `FmtTargetsRequest`
 
 In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt`

@@ -787,10 +787,8 @@ class SkipOption(BoolOption[bool]):
         return super().__new__(
             cls,  # type: ignore[arg-type]
             default=False,  # type: ignore[arg-type]
-            help=(
-                lambda subsystem_cls: (
-                    f"Don't use {subsystem_cls.name} when running {invocation_str}."
-                )
+            help=lambda subsystem_cls: (
+                f"If true, don't use {subsystem_cls.name} when running {invocation_str}."
             ),
         )
 

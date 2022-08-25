@@ -1,6 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str::FromStr;
@@ -18,14 +19,15 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
+use bytes::Bytes;
+use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
-use fs::{DirectoryDigest, RelativePath};
-use hashing::Digest;
+use fs::{DigestTrie, DirectoryDigest, PathStat, RelativePath};
+use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
 use process_execution::ManagedChild;
 use stdio::TryCloneAsFile;
@@ -42,87 +44,51 @@ impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.create_digest],
-      },
+      Intrinsic::new(types.directory_digest, types.create_digest),
       Box::new(create_digest_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.path_globs],
-      },
+      Intrinsic::new(types.directory_digest, types.path_globs),
       Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.paths,
-        inputs: vec![types.path_globs],
-      },
+      Intrinsic::new(types.paths, types.path_globs),
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.download_file],
-      },
+      Intrinsic::new(types.directory_digest, types.download_file),
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.snapshot,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.snapshot, types.directory_digest),
       Box::new(digest_to_snapshot),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.digest_contents,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.digest_contents, types.directory_digest),
       Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.digest_entries,
-        inputs: vec![types.directory_digest],
-      },
+      Intrinsic::new(types.digest_entries, types.directory_digest),
       Box::new(directory_digest_to_digest_entries),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.merge_digests],
-      },
+      Intrinsic::new(types.directory_digest, types.merge_digests),
       Box::new(merge_digests_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.remove_prefix],
-      },
+      Intrinsic::new(types.directory_digest, types.remove_prefix),
       Box::new(remove_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.add_prefix],
-      },
+      Intrinsic::new(types.directory_digest, types.add_prefix),
       Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.process_result,
-        inputs: vec![types.process],
-      },
+      Intrinsic::new(types.process_result, types.process),
       Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.directory_digest,
-        inputs: vec![types.digest_subset],
-      },
+      Intrinsic::new(types.directory_digest, types.digest_subset),
       Box::new(digest_subset_to_digest),
     );
     intrinsics.insert(
@@ -140,10 +106,7 @@ impl Intrinsics {
       Box::new(run_id),
     );
     intrinsics.insert(
-      Intrinsic {
-        product: types.interactive_process_result,
-        inputs: vec![types.interactive_process],
-      },
+      Intrinsic::new(types.interactive_process_result, types.interactive_process),
       Box::new(interactive_process),
     );
     Intrinsics { intrinsics }
@@ -406,6 +369,8 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
+  let mut new_file_count = 0;
+
   let items: Vec<CreateDigestItem> = {
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -419,6 +384,7 @@ fn create_digest_to_digest(
         if obj.hasattr("content").unwrap() {
           let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(obj, "content").unwrap());
           let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
+          new_file_count += 1;
           CreateDigestItem::FileContent(path, bytes, is_executable)
         } else if obj.hasattr("file_digest").unwrap() {
           let py_file_digest: PyFileDigest = externs::getattr(obj, "file_digest").unwrap();
@@ -431,45 +397,46 @@ fn create_digest_to_digest(
       .collect()
   };
 
-  // TODO: Rather than creating independent Digests and then merging them, this should use
-  // `DigestTrie::from_path_stats`.
-  //   see https://github.com/pantsbuild/pants/pull/14569#issuecomment-1057286943
-  let digest_futures: Vec<_> = items
-    .into_iter()
-    .map(|item| {
-      let store = context.core.store();
-      async move {
-        match item {
-          CreateDigestItem::FileContent(path, bytes, is_executable) => {
-            let digest = store.store_file_bytes(bytes, true).await?;
-            let snapshot = store
-              .snapshot_of_one_file(path, digest, is_executable)
-              .await?;
-            let res: Result<DirectoryDigest, String> = Ok(snapshot.into());
-            res
-          }
-          CreateDigestItem::FileEntry(path, digest, is_executable) => {
-            let snapshot = store
-              .snapshot_of_one_file(path, digest, is_executable)
-              .await?;
-            let res: Result<_, String> = Ok(snapshot.into());
-            res
-          }
-          CreateDigestItem::Dir(path) => store
-            .create_empty_dir(&path)
-            .await
-            .map_err(|e| e.to_string()),
-        }
+  let mut path_stats: Vec<PathStat> = Vec::with_capacity(items.len());
+  let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
+  let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
+
+  for item in items {
+    match item {
+      CreateDigestItem::FileContent(path, bytes, is_executable) => {
+        let digest = Digest::of_bytes(&bytes);
+        bytes_to_store.push((Some(digest), bytes));
+        let stat = fs::File {
+          path: path.to_path_buf(),
+          is_executable,
+        };
+        path_stats.push(PathStat::file(path.to_path_buf(), stat));
+        file_digests.insert(path.to_path_buf(), digest);
       }
-    })
-    .collect();
+      CreateDigestItem::FileEntry(path, digest, is_executable) => {
+        let stat = fs::File {
+          path: path.to_path_buf(),
+          is_executable,
+        };
+        path_stats.push(PathStat::file(path.to_path_buf(), stat));
+        file_digests.insert(path.to_path_buf(), digest);
+      }
+      CreateDigestItem::Dir(path) => {
+        let stat = fs::Dir(path.to_path_buf());
+        path_stats.push(PathStat::dir(path.to_path_buf(), stat));
+        file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
+      }
+    }
+  }
 
   let store = context.core.store();
   async move {
-    let digests = future::try_join_all(digest_futures).await?;
-    let digest = store.merge(digests).await?;
+    // The digests returned here are already in the `file_digests` map.
+    let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
+    let trie = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+
     let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), digest)?;
+    let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)
   }
   .boxed()
