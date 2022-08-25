@@ -6,7 +6,7 @@ from typing import Tuple
 import pytest
 
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.source.filespec import matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -19,7 +19,7 @@ def assert_rule_match(
     rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...], *, should_match: bool
 ) -> None:
     # Confirm in-memory behavior.
-    matched_filespec = matches_filespec({"includes": [glob]}, paths=paths)
+    matched_filespec = tuple(FilespecMatcher([glob], ()).matches(paths))
     if should_match:
         assert matched_filespec == paths
     else:

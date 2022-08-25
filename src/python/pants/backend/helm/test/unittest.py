@@ -10,6 +10,7 @@ from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
 from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
+    HelmChartMetaSourceField,
     HelmChartTarget,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
@@ -20,6 +21,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
@@ -29,8 +31,7 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.target_types import ResourceSourceField
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
@@ -85,10 +86,12 @@ async def run_helm_unittest(
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 
-    chart, source_files = await MultiGet(
-        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0])),
+    chart_target = chart_targets[0]
+    chart, chart_root, test_files = await MultiGet(
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
+        Get(HelmChartRoot, HelmChartRootRequest(chart_target[HelmChartMetaSourceField])),
         Get(
-            StrippedSourceFiles,
+            SourceFiles,
             SourceFilesRequest(
                 sources_fields=[
                     field_set.source,
@@ -103,16 +106,19 @@ async def run_helm_unittest(
             ),
         ),
     )
-    prefixed_test_files_digest = await Get(
-        Digest, AddPrefix(source_files.snapshot.digest, chart.path)
+
+    stripped_test_files = await Get(
+        Digest, RemovePrefix(test_files.snapshot.digest, chart_root.path)
     )
 
     reports_dir = "__reports_dir"
     reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
 
-    input_digest = await Get(
-        Digest, MergeDigests([chart.snapshot.digest, prefixed_test_files_digest])
+    merged_digests = await Get(
+        Digest,
+        MergeDigests([chart.snapshot.digest, stripped_test_files]),
     )
+    input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = (
@@ -132,7 +138,7 @@ async def run_helm_unittest(
                 unittest_subsystem.output_type.value,
                 "--output-file",
                 reports_file,
-                chart.path,
+                chart.name,
             ],
             description=f"Running Helm unittest suite {field_set.address}",
             input_digest=input_digest,

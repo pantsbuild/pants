@@ -36,7 +36,7 @@ from pants.engine.fs import (
     PathGlobs,
     RemovePrefix,
 )
-from pants.engine.internals.native_engine import AddPrefix, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, MergeDigests, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -215,7 +215,7 @@ class HelmPlugin(EngineAwareReturnType):
         return self.info.version
 
     def level(self) -> LogLevel | None:
-        return LogLevel.INFO
+        return LogLevel.DEBUG
 
     def message(self) -> str | None:
         return f"Materialized Helm plugin {self.name} with version {self.version} for {self.platform} platform."
@@ -332,8 +332,8 @@ class HelmProcess:
         self,
         argv: Iterable[str],
         *,
-        input_digest: Digest,
         description: str,
+        input_digest: Digest = EMPTY_DIGEST,
         level: LogLevel = LogLevel.INFO,
         output_directories: Iterable[str] | None = None,
         output_files: Iterable[str] | None = None,

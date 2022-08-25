@@ -8,6 +8,7 @@ import logging
 import os
 from typing import Iterable, List, Optional, TypeVar, cast
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
@@ -92,19 +93,9 @@ class PythonSetup(Subsystem):
     enable_resolves = BoolOption(
         default=False,
         help=softwrap(
-            f"""
+            """
             Set to true to enable lockfiles for user code. See `[python].resolves` for an
             explanation of this feature.
-
-            Warning: the `generate-lockfiles` goal does not yet work if you have local
-            requirements, regardless of using Pex vs. Poetry for the lockfile generator.
-            Support is coming in a future Pants release. In the meantime, the workaround is to host
-            the files in a custom repository with `[python-repos]`
-            ({doc_url('python-third-party-dependencies#custom-repositories')}).
-
-            You may also run into issues generating lockfiles when using Poetry as the generator,
-            rather than Pex. See the option `[python].lockfile_generator` for more
-            information.
 
             This option is mutually exclusive with `[python].requirement_constraints`. We strongly
             recommend using this option because it:
@@ -236,9 +227,6 @@ class PythonSetup(Subsystem):
 
             You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
             resolves.
-
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -262,9 +250,6 @@ class PythonSetup(Subsystem):
             Note that some packages are tricky to compile and may fail to install when this option
             is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
             for details.
-
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -288,9 +273,6 @@ class PythonSetup(Subsystem):
             Packages without binary distributions will fail to install when this option is used on
             them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
             details.
-
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
             """
         ),
         advanced=True,
@@ -312,72 +294,6 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
-    )
-    _lockfile_generator = EnumOption(
-        default=LockfileGenerator.PEX,
-        help=softwrap(
-            f"""
-            Whether to use Pex or Poetry with the `generate-lockfiles` goal.
-
-            Poetry does not support these features:
-
-              1) `[python-repos]` for custom indexes/cheeseshops.
-              2) VCS (Git) requirements.
-              3) `[GLOBAL].ca_certs_path`.
-
-            If you use any of these features, you should use Pex.
-
-            Several users have also had issues with how Poetry's lockfile generation handles
-            environment markers for transitive dependencies; certain dependencies end up with
-            nonsensical environment markers which cause the dependency to not be installed, then
-            for Pants/Pex to complain the dependency is missing, even though it's in the
-            lockfile. There is a workaround: for `[python].resolves`, manually create a
-            `python_requirement` target for the problematic transitive dependencies so that they
-            are seen as direct requirements, rather than transitive. For tool lockfiles, add the
-            problematic transitive dependency to `[tool].extra_requirements`, e.g.
-            `[isort].extra_requirements`. Then, regenerate the lockfile(s) with the
-            `generate-lockfiles` goal. Alternatively, use Pex for generation.
-
-            Finally, installing from a Poetry-generated lockfile is slower than installing from a
-            Pex lockfile. When using a Pex lockfile, Pants will only install the subset needed
-            for the current task.
-
-            However, Pex lockfile generation is a new feature. Given how vast the Python packaging
-            ecosystem is, it is possible you may experience edge cases / bugs we haven't yet
-            covered. Bug reports are appreciated!
-            https://github.com/pantsbuild/pants/issues/new/choose
-
-            Note that while Pex generates locks in a proprietary JSON format, you can use the
-            `{bin_name()} export` goal for Pants to create a virtual environment for
-            interoperability with tools like IDEs.
-            """
-        ),
-        advanced=True,
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            f"""
-            Pants will soon only support generating lockfiles via the Pex format, as
-            Poetry-generated lockfiles mismatch with Pants's pip-based approach.
-
-            If you do not want to use Pex lockfiles, you will still be able to manually generate
-            lockfiles, e.g. by manually running `poetry export --dev` on your `poetry.lock`. See
-            {doc_url("python-third-party-dependencies#manually-generating-lockfiles")} for more
-            information.
-
-            While Pex generates locks in a proprietary JSON format, you can use the
-            `{bin_name()} export` goal for Pants to create a virtual environment for
-            interoperability with tools like IDEs.
-
-            Please open a GitHub issue or reach out on Slack if you encounter issues while
-            migrating: {doc_url("getting-help")}
-
-            Tip: you can incrementally migrate one lockfile at-a-time by dynamically setting the
-            option `--python-lockfile-generator`. For example:
-
-              {bin_name()} --python-lockfile-generator=pex generate-lockfiles --resolve=black --resolve=isort
-              {bin_name()} --python-lockfile-generator=poetry generate-lockfiles --resolve=python-default
-            """
-        ),
     )
     resolves_generate_lockfiles = BoolOption(
         default=True,
@@ -427,6 +343,20 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+
+    __constraints_deprecation_msg = softwrap(
+        f"""
+        We encourage instead migrating to `[python].enable_resolves` and `[python].resolves`,
+        which is an improvement over this option. The `[python].resolves` feature ensures that
+        your lockfiles are fully comprehensive, i.e. include all transitive dependencies;
+        uses hashes for better supply chain security; and supports advanced features like VCS
+        and local requirements, along with options `[python].resolves_to_only_binary`.
+
+        To migrate, stop setting `[python].requirement_constraints` and
+        `[python].resolve_all_constraints`, and instead set `[python].enable_resolves` to
+        `true`. Then, run `{bin_name()} generate-lockfiles`.
+        """
+    )
     requirement_constraints = FileOption(
         default=None,
         help=softwrap(
@@ -448,8 +378,10 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
         mutually_exclusive_group="lockfile",
+        removal_version="3.0.0.dev0",
+        removal_hint=__constraints_deprecation_msg,
     )
-    resolve_all_constraints = BoolOption(
+    _resolve_all_constraints = BoolOption(
         default=True,
         help=softwrap(
             """
@@ -465,6 +397,8 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="3.0.0.dev0",
+        removal_hint=__constraints_deprecation_msg,
     )
     no_binary = StrListOption(
         help=softwrap(
@@ -617,11 +551,6 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
-    @property
-    def generate_lockfiles_with_pex(self) -> bool:
-        """Else, generate with Poetry."""
-        return self._lockfile_generator == LockfileGenerator.PEX
-
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
         result = {}
@@ -673,7 +602,7 @@ class PythonSetup(Subsystem):
     @memoized_method
     def resolves_to_no_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PipRequirement]]:
         if self.no_binary:
             if self._resolves_to_no_binary:
                 raise ValueError(
@@ -687,20 +616,35 @@ class PythonSetup(Subsystem):
                         """
                     )
                 )
+            no_binary_opt = [
+                PipRequirement.parse(v, description_of_origin="the option `[python].no_binary`")
+                for v in self.no_binary
+            ]
             return {
-                resolve: list(self.no_binary)
+                resolve: no_binary_opt
                 for resolve in {*self.resolves, *all_python_tool_resolve_names}
             }
-        return self._resolves_to_option_helper(
-            self._resolves_to_no_binary,
-            "resolves_to_no_binary",
-            all_python_tool_resolve_names,
-        )
+        return {
+            resolve: [
+                PipRequirement.parse(
+                    v,
+                    description_of_origin=(
+                        f"the option `[python].resolves_to_no_binary` for the resolve {resolve}"
+                    ),
+                )
+                for v in vals
+            ]
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_no_binary,
+                "resolves_to_no_binary",
+                all_python_tool_resolve_names,
+            ).items()
+        }
 
     @memoized_method
     def resolves_to_only_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PipRequirement]]:
         if self.only_binary:
             if self._resolves_to_only_binary:
                 raise ValueError(
@@ -714,18 +658,30 @@ class PythonSetup(Subsystem):
                         """
                     )
                 )
+            only_binary_opt = [
+                PipRequirement.parse(v, description_of_origin="the option `[python].only_binary`")
+                for v in self.only_binary
+            ]
             return {
-                resolve: list(self.only_binary)
+                resolve: only_binary_opt
                 for resolve in {*self.resolves, *all_python_tool_resolve_names}
             }
-        return self._resolves_to_option_helper(
-            self._resolves_to_only_binary,
-            "resolves_to_only_binary",
-            all_python_tool_resolve_names,
-        )
-
-    def resolve_all_constraints_was_set_explicitly(self) -> bool:
-        return not self.options.is_default("resolve_all_constraints")
+        return {
+            resolve: [
+                PipRequirement.parse(
+                    v,
+                    description_of_origin=(
+                        f"the option `[python].resolves_to_only_binary` for the resolve {resolve}"
+                    ),
+                )
+                for v in vals
+            ]
+            for resolve, vals in self._resolves_to_option_helper(
+                self._resolves_to_only_binary,
+                "resolves_to_only_binary",
+                all_python_tool_resolve_names,
+            ).items()
+        }
 
     @property
     def manylinux(self) -> str | None:
@@ -733,6 +689,23 @@ class PythonSetup(Subsystem):
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
+
+    @property
+    def resolve_all_constraints(self) -> bool:
+        if (
+            self._resolve_all_constraints
+            and not self.options.is_default("resolve_all_constraints")
+            and not self.requirement_constraints
+        ):
+            raise ValueError(
+                softwrap(
+                    """
+                    `[python].resolve_all_constraints` is enabled, so
+                    `[python].requirement_constraints` must also be set.
+                    """
+                )
+            )
+        return self._resolve_all_constraints
 
     @property
     def scratch_dir(self):

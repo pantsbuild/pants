@@ -187,7 +187,7 @@ def test_union_rules() -> None:
     ) in str(exc.value.args[0])
 
 
-def create_outlined_get() -> Get[int, str]:
+def create_outlined_get() -> Get[int]:
     return Get(int, str, "hello")
 
 

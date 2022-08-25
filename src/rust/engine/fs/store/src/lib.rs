@@ -366,6 +366,23 @@ impl Store {
   }
 
   ///
+  /// A convenience method for storing batches of small files.
+  ///
+  /// NB: This method should not be used for large blobs: prefer to stream them from their source
+  /// using `store_file`.
+  ///
+  pub async fn store_file_bytes_batch(
+    &self,
+    items: Vec<(Option<Digest>, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<Vec<Digest>, String> {
+    self
+      .local
+      .store_bytes_batch(EntryType::File, items, initial_lease)
+      .await
+  }
+
+  ///
   /// Store a file locally by streaming its contents.
   ///
   pub async fn store_file<F, R>(
@@ -888,19 +905,10 @@ impl Store {
     }
 
     // Filter out file digests that exist locally.
-    // TODO: Implement a local batch API: see https://github.com/pantsbuild/pants/issues/16400.
-    let local_file_exists = future::try_join_all(
-      file_digests
-        .iter()
-        .map(|file_digest| self.local.exists(EntryType::File, *file_digest))
-        .collect::<Vec<_>>(),
-    )
-    .await?;
-    let missing_locally = local_file_exists
-      .into_iter()
-      .zip(file_digests.into_iter())
-      .filter_map(|(exists, digest)| if exists { None } else { Some(digest) })
-      .collect::<Vec<_>>();
+    let missing_locally = self
+      .local
+      .get_missing_digests(EntryType::File, file_digests)
+      .await?;
 
     // If there are any digests which don't exist locally, check remotely.
     if missing_locally.is_empty() {

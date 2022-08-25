@@ -34,7 +34,6 @@ from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.subsystems.poetry import PoetrySubsystem
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -112,7 +111,6 @@ AllTools = (
     DefaultTool.python(Isort),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
     DefaultTool.python(MyPy, source_plugins=True),
-    DefaultTool.python(PoetrySubsystem),
     DefaultTool.python(PyTest),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),

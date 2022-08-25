@@ -46,6 +46,20 @@ New maintainers should be:
   - to the [pants-maintainers@ Google Group](https://groups.google.com/g/pants-maintainers)
   - to [`MAINTAINERS.md`](https://github.com/pantsbuild/pants/blob/main/MAINTAINERS.md)
   - to the [Slack #maintainers-confidential room](doc:getting-help#slack)
+  - to the [Meet the Team page](doc:team), with their proudest contribution
+- Welcomed:
+  - on the [pants-devel@ Google Group](https://groups.google.com/g/pants-devel)
+  - in the [Slack #announce room](doc:getting-help#slack)
+  - by [@pantsbuild on Twitter](https://twitter.com/pantsbuild)
+
+Contributor onboarding
+----------------------
+
+New Contributors should be:
+
+- Added:
+  - to the [Contributors Github team](https://github.com/orgs/pantsbuild/teams/contributors)
+  - to the [Meet the Team page](doc:team), with their proudest contribution
 - Welcomed:
   - on the [pants-devel@ Google Group](https://groups.google.com/g/pants-devel)
   - in the [Slack #announce room](doc:getting-help#slack)

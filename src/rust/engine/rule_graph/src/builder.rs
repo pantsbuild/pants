@@ -30,10 +30,11 @@ impl<R: Rule> std::fmt::Display for Node<R> {
 }
 
 impl<R: Rule> Node<R> {
-  fn dependency_keys(&self) -> Vec<R::DependencyKey> {
+  fn dependency_keys(&self) -> Vec<DependencyKey<R::TypeId>> {
+    // TODO: Give Query an internal DependencyKey to avoid cloning here.
     match self {
-      Node::Rule(r) => r.dependency_keys(),
-      Node::Query(q) => vec![R::DependencyKey::new_root(q.product)],
+      Node::Rule(r) => r.dependency_keys().into_iter().cloned().collect(),
+      Node::Query(q) => vec![DependencyKey::new(q.product)],
       Node::Param(_) => vec![],
     }
   }
@@ -137,25 +138,28 @@ enum EdgePrunedReason {
 
 // Nodes labeled with out_sets.
 type Graph<R> =
-  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
+  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), DependencyKey<<R as Rule>::TypeId>, u32>;
 // Nodes labeled with out_sets and possibly marked deleted.
 type OutLabeledGraph<R> = DiGraph<
   MaybeDeleted<(Node<R>, ParamTypes<<R as Rule>::TypeId>), NodePrunedReason>,
-  <R as Rule>::DependencyKey,
+  DependencyKey<<R as Rule>::TypeId>,
   u32,
 >;
 // Nodes labeled with both an out_set and in_set, and possibly marked deleted.
-type LabeledGraph<R> =
-  DiGraph<MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>, <R as Rule>::DependencyKey, u32>;
+type LabeledGraph<R> = DiGraph<
+  MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>,
+  DependencyKey<<R as Rule>::TypeId>,
+  u32,
+>;
 // Nodes labeled with both out_sets and in_sets, and both edges and nodes possibly marked deleted.
 type MonomorphizedGraph<R> = DiGraph<
   MaybeDeleted<ParamsLabeled<R>, NodePrunedReason>,
-  MaybeDeleted<<R as Rule>::DependencyKey, EdgePrunedReason>,
+  MaybeDeleted<DependencyKey<<R as Rule>::TypeId>, EdgePrunedReason>,
   u32,
 >;
 // Node labeled with in_sets.
 type InLabeledGraph<R> =
-  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
+  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), DependencyKey<<R as Rule>::TypeId>, u32>;
 
 ///
 /// Given the set of Rules and Queries, produce a RuleGraph that allows dependency nodes
@@ -253,7 +257,8 @@ impl<R: Rule> Builder<R> {
     // Rules are created on the fly based on the out_set of dependees.
     let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::new();
     let mut satisfiable_nodes: HashSet<Node<R>> = HashSet::new();
-    let mut unsatisfiable_nodes: HashMap<NodeIndex<u32>, Vec<R::DependencyKey>> = HashMap::new();
+    let mut unsatisfiable_nodes: HashMap<NodeIndex<u32>, Vec<DependencyKey<R::TypeId>>> =
+      HashMap::new();
 
     // Starting from Queries, visit all reachable nodes in the graph.
     let mut visited = HashSet::new();
@@ -298,7 +303,7 @@ impl<R: Rule> Builder<R> {
         .iter()
         .filter_map(|(dependency_key, candidates)| {
           if candidates.is_empty() {
-            Some(*dependency_key)
+            Some(dependency_key.clone())
           } else {
             None
           }
@@ -340,7 +345,7 @@ impl<R: Rule> Builder<R> {
               graph.add_edge(
                 node_id,
                 *params.get(&dependency_key.product()).unwrap(),
-                dependency_key,
+                dependency_key.clone(),
               );
             }
             Node::Rule(rule) => {
@@ -356,7 +361,7 @@ impl<R: Rule> Builder<R> {
               let rule_id = rules
                 .entry((rule.clone(), out_set.clone()))
                 .or_insert_with(|| graph.add_node((Node::Rule(rule.clone()), out_set)));
-              graph.add_edge(node_id, *rule_id, dependency_key);
+              graph.add_edge(node_id, *rule_id, dependency_key.clone());
               to_visit.push(*rule_id);
             }
             Node::Query(_) => unreachable!("A Query may not be a dependency."),
@@ -376,7 +381,7 @@ impl<R: Rule> Builder<R> {
         }
         result
       },
-      |_, edge_weight| *edge_weight,
+      |_, edge_weight| edge_weight.clone(),
     )
   }
 
@@ -414,7 +419,7 @@ impl<R: Rule> Builder<R> {
     // Initialize with no deleted nodes/edges.
     let mut graph: MonomorphizedGraph<R> = graph.map(
       |_node_id, node| node.clone(),
-      |_edge_id, edge_weight| MaybeDeleted::new(*edge_weight),
+      |_edge_id, edge_weight| MaybeDeleted::new(edge_weight.clone()),
     );
 
     // In order to reduce the number of permutations rapidly, we make a best effort attempt to
@@ -532,13 +537,14 @@ impl<R: Rule> Builder<R> {
       }
 
       // Group dependencies by DependencyKey.
-      let dependencies_by_key: Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> =
+      #[allow(clippy::type_complexity)]
+      let dependencies_by_key: Vec<Vec<(DependencyKey<R::TypeId>, NodeIndex<u32>)>> =
         Self::edges_by_dependency_key(&graph, node_id, false)
           .into_iter()
           .map(|(_, edge_refs)| {
             edge_refs
               .iter()
-              .map(|edge_ref| (edge_ref.weight().0, edge_ref.target()))
+              .map(|edge_ref| (edge_ref.weight().0.clone(), edge_ref.target()))
               .collect()
           })
           .collect();
@@ -555,7 +561,11 @@ impl<R: Rule> Builder<R> {
       }
 
       // Group dependees by out_set.
-      let dependees_by_out_set: HashMap<ParamTypes<R::TypeId>, Vec<(R::DependencyKey, _)>> = {
+      #[allow(clippy::type_complexity)]
+      let dependees_by_out_set: HashMap<
+        ParamTypes<R::TypeId>,
+        Vec<(DependencyKey<R::TypeId>, _)>,
+      > = {
         let mut dbos = HashMap::new();
         for edge_ref in graph.edges_directed(node_id, Direction::Incoming) {
           if edge_ref.weight().is_deleted() || graph[edge_ref.source()].is_deleted() {
@@ -571,7 +581,7 @@ impl<R: Rule> Builder<R> {
           dbos
             .entry(out_set)
             .or_insert_with(Vec::new)
-            .push((edge_ref.weight().0, edge_ref.source()));
+            .push((edge_ref.weight().0.clone(), edge_ref.source()));
         }
         dbos
       };
@@ -642,7 +652,10 @@ impl<R: Rule> Builder<R> {
                 if graph[edge_ref.target()].is_deleted() {
                   None
                 } else {
-                  edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target()))
+                  edge_ref
+                    .weight()
+                    .inner()
+                    .map(|dk| (dk.clone(), edge_ref.target()))
                 }
               })
               .collect::<HashSet<_>>();
@@ -750,7 +763,7 @@ impl<R: Rule> Builder<R> {
         // Give all dependees edges to the new node.
         for (dependency_key, dependee_id) in &dependees {
           // Add a new edge.
-          let mut edge = MaybeDeleted::new(*dependency_key);
+          let mut edge = MaybeDeleted::new(dependency_key.clone());
           if let Some(p) = dependency_key.provided_param() {
             // NB: If the edge is invalid because it does not consume the provide param, we
             // create it as deleted with that reason.
@@ -774,10 +787,7 @@ impl<R: Rule> Builder<R> {
             dependency_id
           };
           if looping {
-            log::trace!(
-              "dependency edge: adding: {:?}",
-              (dependency_key, dependency_id)
-            );
+            log::trace!("dependency edge: adding: ({dependency_key:?}, {dependency_id:?})");
           }
           graph.add_edge(
             replacement_id,
@@ -808,7 +818,7 @@ impl<R: Rule> Builder<R> {
           node.1,
         )
       },
-      |_edge_id, edge_weight| *edge_weight,
+      |_edge_id, edge_weight| edge_weight.clone(),
     );
 
     // Because the leaves of the graph (generally Param nodes) are the most significant source of
@@ -832,7 +842,7 @@ impl<R: Rule> Builder<R> {
               .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
               .map(|edge_ref| {
                 (
-                  *edge_ref.weight(),
+                  edge_ref.weight().clone(),
                   edge_ref.target(),
                   &graph[edge_ref.target()].0.in_set,
                 )
@@ -854,7 +864,7 @@ impl<R: Rule> Builder<R> {
               .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
               .map(|edge_ref| {
                 (
-                  *edge_ref.weight(),
+                  edge_ref.weight().clone(),
                   edge_ref.target(),
                   &graph[edge_ref.target()].0.in_set,
                 )
@@ -1048,7 +1058,7 @@ impl<R: Rule> Builder<R> {
             .inner()
             .map(|node| (node.node.clone(), node.in_set.clone()))
         },
-        |_edge_id, edge| edge.inner().copied(),
+        |_edge_id, edge| edge.inner().cloned(),
       ))
     } else {
       // Render the most specific errors.
@@ -1056,12 +1066,13 @@ impl<R: Rule> Builder<R> {
     }
   }
 
+  #[allow(clippy::type_complexity)]
   fn render_no_source_of_dependency_error(
     &self,
     graph: &MonomorphizedGraph<R>,
     node: &Node<R>,
-    dependency_key: R::DependencyKey,
-    edge_refs: Vec<EdgeReference<MaybeDeleted<R::DependencyKey, EdgePrunedReason>, u32>>,
+    dependency_key: DependencyKey<R::TypeId>,
+    edge_refs: Vec<EdgeReference<MaybeDeleted<DependencyKey<R::TypeId>, EdgePrunedReason>, u32>>,
   ) -> String {
     if self.rules.contains_key(&dependency_key.product()) {
       format!(
@@ -1192,7 +1203,7 @@ impl<R: Rule> Builder<R> {
         .edges_directed(node_id, Direction::Outgoing)
         .map(|edge_ref| {
           (
-            *edge_ref.weight(),
+            edge_ref.weight().clone(),
             Intern::new(entry_for(edge_ref.target())),
           )
         })
@@ -1231,8 +1242,8 @@ impl<R: Rule> Builder<R> {
     node_id: NodeIndex<u32>,
     include_deleted_dependencies: bool,
   ) -> BTreeMap<
-    R::DependencyKey,
-    Vec<EdgeReference<MaybeDeleted<R::DependencyKey, EdgePrunedReason>, u32>>,
+    DependencyKey<R::TypeId>,
+    Vec<EdgeReference<MaybeDeleted<DependencyKey<R::TypeId>, EdgePrunedReason>, u32>>,
   > {
     let node = &graph[node_id].0.node;
     let mut edges_by_dependency_key = node
@@ -1266,7 +1277,7 @@ impl<R: Rule> Builder<R> {
   ///
   fn dependency_in_set<'a>(
     node_id: NodeIndex<u32>,
-    dependency_key: &R::DependencyKey,
+    dependency_key: &DependencyKey<R::TypeId>,
     dependency_id: NodeIndex<u32>,
     dependency_in_set: &'a ParamTypes<R::TypeId>,
   ) -> Box<dyn Iterator<Item = R::TypeId> + 'a> {
@@ -1302,7 +1313,11 @@ impl<R: Rule> Builder<R> {
   fn dependencies_in_set<'a>(
     node_id: NodeIndex<u32>,
     dependency_edges: impl Iterator<
-      Item = (R::DependencyKey, NodeIndex<u32>, &'a ParamTypes<R::TypeId>),
+      Item = (
+        DependencyKey<R::TypeId>,
+        NodeIndex<u32>,
+        &'a ParamTypes<R::TypeId>,
+      ),
     >,
   ) -> ParamTypes<R::TypeId> {
     // Union the in_sets of our dependencies, less any Params "provided" (ie "declared variables"
@@ -1340,13 +1355,19 @@ impl<R: Rule> Builder<R> {
     node_id: NodeIndex<u32>,
     out_set: ParamTypes<R::TypeId>,
     minimal_in_set: &HashSet<NodeIndex<u32>>,
-    deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
-  ) -> HashMap<ParamsLabeled<R>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
+    deps: &[Vec<(DependencyKey<R::TypeId>, NodeIndex<u32>)>],
+  ) -> HashMap<ParamsLabeled<R>, HashSet<(DependencyKey<R::TypeId>, NodeIndex<u32>)>> {
     let mut combinations = HashMap::new();
 
     // We start by computing per-dependency in_sets, and filtering out dependencies that will be
     // illegal in any possible combination.
-    let filtered_deps: Vec<Vec<(R::DependencyKey, NodeIndex<u32>, ParamTypes<R::TypeId>)>> = deps
+    let filtered_deps: Vec<
+      Vec<(
+        DependencyKey<R::TypeId>,
+        NodeIndex<u32>,
+        ParamTypes<R::TypeId>,
+      )>,
+    > = deps
       .iter()
       .map(|choices| {
         choices
@@ -1367,7 +1388,7 @@ impl<R: Rule> Builder<R> {
               &graph[*dependency_id].0.in_set,
             )
             .collect::<ParamTypes<_>>();
-            (*dependency_key, *dependency_id, dependency_in_set)
+            (dependency_key.clone(), *dependency_id, dependency_in_set)
           })
           .collect()
       })
@@ -1449,7 +1470,7 @@ impl<R: Rule> Builder<R> {
       combinations
         .entry(entry)
         .or_insert_with(HashSet::new)
-        .extend(combination.into_iter().map(|(dk, di, _)| (*dk, *di)));
+        .extend(combination.into_iter().map(|(dk, di, _)| (dk.clone(), *di)));
     }
 
     combinations

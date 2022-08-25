@@ -20,7 +20,7 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRequest,
     RenderedHelmFiles,
 )
-from pants.core.util_rules import external_tool, stripped_source_files
+from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, HelmDeploymentTarget],
         rules=[
             *external_tool.rules(),
-            *stripped_source_files.rules(),
+            *source_files.rules(),
             *renderer.rules(),
             QueryRule(InteractiveProcess, (HelmDeploymentRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
@@ -113,7 +113,10 @@ def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
     )
 
     render_process = rule_runner.request(InteractiveProcess, [render_request])
-    assert "a.yaml,b.yaml" in render_process.process.argv
+    assert (
+        "__values/src/deployment/a.yaml,__values/src/deployment/b.yaml"
+        in render_process.process.argv
+    )
 
 
 def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
@@ -136,7 +139,10 @@ def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
     )
 
     render_process = rule_runner.request(InteractiveProcess, [render_request])
-    assert "b.yaml,a.yaml" in render_process.process.argv
+    assert (
+        "__values/src/deployment/b.yaml,__values/src/deployment/a.yaml"
+        in render_process.process.argv
+    )
 
 
 def test_renders_files(rule_runner: RuleRunner) -> None:

@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Iterable
 
 from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
@@ -43,8 +43,9 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Target, Targets
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize, softwrap
@@ -65,8 +66,12 @@ class HelmChart:
     artifact: ResolvedHelmArtifact | None = None
 
     @property
-    def path(self) -> str:
+    def name(self) -> str:
         return self.info.name
+
+    @property
+    def immutable_input_digests(self) -> FrozenDict[str, Digest]:
+        return FrozenDict({self.name: self.snapshot.digest})
 
 
 @dataclass(frozen=True)
@@ -89,8 +94,7 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
         HelmChartMetadata,
         ParseHelmChartMetadataDigest(
             fetched_artifact.snapshot.digest,
-            description_of_origin=fetched_artifact.address.spec,
-            prefix=fetched_artifact.artifact.name,
+            description_of_origin=f"the `helm_artifact` {fetched_artifact.address.spec}",
         ),
     )
     return HelmChart(
@@ -99,6 +103,15 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
         fetched_artifact.snapshot,
         artifact=fetched_artifact.artifact,
     )
+
+
+@rule_helper
+async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
+    prefixed_chart_digests = await MultiGet(
+        Get(Digest, AddPrefix(chart.snapshot.digest, chart.name)) for chart in charts
+    )
+    merged_digests = await Get(Digest, MergeDigests(prefixed_chart_digests))
+    return await Get(Digest, AddPrefix(merged_digests, "charts"))
 
 
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
@@ -147,10 +160,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
             )
         )
 
-        merged_subcharts = await Get(
-            Digest, MergeDigests([chart.snapshot.digest for chart in subcharts])
-        )
-        subcharts_digest = await Get(Digest, AddPrefix(merged_subcharts, "charts"))
+        subcharts_digest = await _merge_subchart_digests(subcharts)
 
         # Update subchart dependencies in the metadata and re-render it.
         remotes = subsystem.remotes()
@@ -208,11 +218,10 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     )
 
     # Merge all digests that conform chart's content.
-    content_digest = await Get(
-        Digest, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
+    chart_snapshot = await Get(
+        Snapshot, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
     )
 
-    chart_snapshot = await Get(Snapshot, AddPrefix(content_digest, chart_info.name))
     return HelmChart(address=request.field_set.address, info=chart_info, snapshot=chart_snapshot)
 
 
@@ -268,7 +277,7 @@ async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmCha
         ),
     )
 
-    find_charts: Iterable[Get[HelmChart, Any]] = [
+    find_charts: Iterable[Get[HelmChart]] = [
         *(
             Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(tgt))
             for tgt in explicit_targets

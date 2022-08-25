@@ -12,7 +12,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -115,10 +114,8 @@ class TwineLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 
 @rule
-def setup_twine_lockfile(
-    _: TwineLockfileSentinel, twine: TwineSubsystem, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(twine, use_pex=python_setup.generate_lockfiles_with_pex)
+def setup_twine_lockfile(_: TwineLockfileSentinel, twine: TwineSubsystem) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(twine)
 
 
 def rules():

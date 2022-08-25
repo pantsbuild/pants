@@ -46,7 +46,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
     logger.debug(f"Linting {pluralize(len(charts), 'chart')}...")
 
     def create_process(chart: HelmChart, field_set: HelmLintFieldSet) -> HelmProcess:
-        argv = ["lint", chart.path]
+        argv = ["lint", chart.name]
 
         strict: bool = field_set.lint_strict.value or helm_subsystem.lint_strict
         if strict:
@@ -54,7 +54,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
 
         return HelmProcess(
             argv,
-            input_digest=chart.snapshot.digest,
+            extra_immutable_input_digests=chart.immutable_input_digests,
             description=f"Linting chart: {chart.info.name}",
         )
 

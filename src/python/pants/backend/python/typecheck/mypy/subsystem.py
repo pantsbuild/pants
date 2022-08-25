@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.util_rules import partition
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -348,14 +349,8 @@ async def _mypy_interpreter_constraints(
 ) -> InterpreterConstraints:
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets([tgt], python_setup)
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
-        }
-        code_constraints = InterpreterConstraints(
-            itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+        code_constraints = await _find_all_unique_interpreter_constraints(
+            python_setup, MyPyFieldSet
         )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_versions_universe):
             constraints = code_constraints
@@ -382,16 +377,11 @@ async def setup_mypy_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not mypy.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            mypy, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(mypy)
 
     constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return GeneratePythonLockfile.from_tool(
-        mypy,
-        constraints,
-        extra_requirements=first_party_plugins.requirement_strings,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        mypy, constraints, extra_requirements=first_party_plugins.requirement_strings
     )
 
 
@@ -405,14 +395,12 @@ async def setup_mypy_extra_type_stubs_lockfile(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    use_pex = python_setup.generate_lockfiles_with_pex
     if mypy.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
         return GeneratePythonLockfile(
             requirements=FrozenOrderedSet(),
             interpreter_constraints=InterpreterConstraints(),
             resolve_name=request.resolve_name,
             lockfile_dest=mypy.extra_type_stubs_lockfile,
-            use_pex=use_pex,
         )
 
     # While MyPy will run in partitions, we need a set of constraints that works with every
@@ -438,7 +426,6 @@ async def setup_mypy_extra_type_stubs_lockfile(
         interpreter_constraints=interpreter_constraints,
         resolve_name=request.resolve_name,
         lockfile_dest=mypy.extra_type_stubs_lockfile,
-        use_pex=use_pex,
     )
 
 

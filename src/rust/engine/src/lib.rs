@@ -39,7 +39,6 @@ mod intrinsics;
 mod nodes;
 mod python;
 mod scheduler;
-mod selectors;
 mod session;
 mod tasks;
 mod types;

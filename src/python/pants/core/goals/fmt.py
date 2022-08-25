@@ -9,7 +9,7 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterable, Iterator, TypeVar
+from typing import Callable, ClassVar, Iterable, Iterator, TypeVar, cast
 
 from pants.base.specs import Specs
 from pants.core.goals.style_request import (
@@ -38,7 +38,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, ru
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
-from pants.source.filespec import matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -360,13 +360,10 @@ async def fmt(
     )
 
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
-    specified_build_files = matches_filespec(
-        {
-            "includes": [os.path.join("**", p) for p in build_file_options.patterns],
-            "excludes": list(build_file_options.ignores),
-        },
-        paths=specs_paths.files,
-    )
+    specified_build_files = FilespecMatcher(
+        includes=[os.path.join("**", p) for p in build_file_options.patterns],
+        excludes=build_file_options.ignores,
+    ).matches(specs_paths.files)
 
     targets_to_request_types = _batch_targets(
         fmt_target_request_types,
@@ -374,7 +371,7 @@ async def fmt(
         fmt_subsystem.batch_size,
     )
 
-    target_batch_results = await MultiGet(
+    all_requests = [
         *(
             Get(
                 _FmtBatchResult,
@@ -392,7 +389,8 @@ async def fmt(
                 fmt_subsystem.batch_size,
             )
         ),
-    )
+    ]
+    target_batch_results = cast("tuple[_FmtBatchResult, ...]", await MultiGet(all_requests))
 
     individual_results = list(
         itertools.chain.from_iterable(result.results for result in target_batch_results)

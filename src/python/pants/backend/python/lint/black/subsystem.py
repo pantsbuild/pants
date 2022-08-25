@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
@@ -15,17 +16,34 @@ from pants.backend.python.goals.lockfile import (
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.target_types import (
+    ConsoleScript,
+    InterpreterConstraintsField,
+    PythonSourceField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
-from pants.engine.target import AllTargets, AllTargetsRequest
+from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
+
+
+@dataclass(frozen=True)
+class BlackFieldSet(FieldSet):
+    required_fields = (PythonSourceField,)
+
+    source: PythonSourceField
+    interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipBlackField).value
 
 
 class Black(PythonToolBase):
@@ -92,10 +110,8 @@ async def _black_interpreter_constraints(
 ) -> InterpreterConstraints:
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        # TODO: fix to use `FieldSet.is_applicable()`.
-        code_constraints = InterpreterConstraints.create_from_targets(
-            (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
+        code_constraints = await _find_all_unique_interpreter_constraints(
+            python_setup, BlackFieldSet
         )
         if code_constraints is not None and code_constraints.requires_python38_or_newer(
             python_setup.interpreter_versions_universe
@@ -116,14 +132,10 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            black, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(black)
 
     constraints = await _black_interpreter_constraints(black, python_setup)
-    return GeneratePythonLockfile.from_tool(
-        black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(black, constraints)
 
 
 class BlackExportSentinel(ExportPythonToolSentinel):

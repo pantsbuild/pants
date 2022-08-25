@@ -21,7 +21,7 @@ from pants.backend.helm.testutil import (
 from pants.backend.helm.util_rules import chart, sources, tool
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import config_files, external_tool, stripped_source_files
+from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *tool.rules(),
             *chart.rules(),
             *package.rules(),
-            *stripped_source_files.rules(),
+            *source_files.rules(),
             *source_root_rules(),
             *sources.rules(),
             *target_types_rules(),
@@ -48,8 +48,6 @@ def rule_runner() -> RuleRunner:
 
 
 def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_version: str) -> None:
-    rule_runner.set_options(["--source-root-patterns=['src/*']"])
-
     target = rule_runner.get_target(Address(f"src/{chart_name}", target_name=chart_name))
     field_set = HelmPackageFieldSet.create(target)
 

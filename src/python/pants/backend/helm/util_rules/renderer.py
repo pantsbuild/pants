@@ -19,8 +19,7 @@ from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeployme
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -172,11 +171,16 @@ class RenderedHelmFiles(EngineAwareReturnType):
 
 @rule_helper
 async def _sort_value_file_names_for_evaluation(
-    address: Address, *, sources_field: HelmDeploymentSourcesField, value_files_snapshot: Snapshot
+    address: Address,
+    *,
+    sources_field: HelmDeploymentSourcesField,
+    value_files_snapshot: Snapshot,
+    prefix: str,
 ) -> list[str]:
     """Sorts the list of files in `value_files_snapshot` alphabetically but grouping them in the
     order in which they have been given in the `sources_field` field glob patterns."""
 
+    base_path = address.spec_path
     result: list[str] = []
 
     if not sources_field.value:
@@ -185,7 +189,12 @@ async def _sort_value_file_names_for_evaluation(
     else:
         # Break the list of filenames in subsets that follow the order given in the `sources` field
         subset_snapshots = await MultiGet(
-            Get(Snapshot, DigestSubset(value_files_snapshot.digest, PathGlobs([glob_pattern])))
+            Get(
+                Snapshot,
+                DigestSubset(
+                    value_files_snapshot.digest, PathGlobs([os.path.join(base_path, glob_pattern)])
+                ),
+            )
             for glob_pattern in sources_field.globs
         )
         sources_subsets = [set(snapshot.files) for snapshot in subset_snapshots]
@@ -216,17 +225,18 @@ async def _sort_value_file_names_for_evaluation(
         )
     )
 
-    return result
+    return [os.path.join(prefix, filename) for filename in result]
 
 
 @rule(desc="Prepare Helm deployment renderer")
 async def setup_render_helm_deployment_process(
     request: HelmDeploymentRequest,
 ) -> _HelmDeploymentProcessWrapper:
+    value_files_prefix = "__values"
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(
-            StrippedSourceFiles,
+            SourceFiles,
             SourceFilesRequest(
                 sources_fields=[request.field_set.sources],
                 for_sources_types=[HelmDeploymentSourcesField],
@@ -250,24 +260,24 @@ async def setup_render_helm_deployment_process(
         request.field_set.address,
         sources_field=request.field_set.sources,
         value_files_snapshot=value_files.snapshot,
+        prefix=value_files_prefix,
     )
 
     # Digests to be used as an input into the renderer process.
-    input_digests = [
-        chart.snapshot.digest,
-        value_files.snapshot.digest,
-        output_digest,
-    ]
+    input_digests = [output_digest]
 
     # Additional process values in case a post_renderer has been requested.
     env: Mapping[str, str] = {}
-    immutable_input_digests: Mapping[str, Digest] = {}
+    immutable_input_digests: dict[str, Digest] = {
+        **chart.immutable_input_digests,
+        value_files_prefix: value_files.snapshot.digest,
+    }
     append_only_caches: Mapping[str, str] = {}
     if request.post_renderer:
         logger.debug(f"Using post-renderer stage in deployment {request.field_set.address}")
         input_digests.append(request.post_renderer.digest)
         env = request.post_renderer.env
-        immutable_input_digests = request.post_renderer.immutable_input_digests
+        immutable_input_digests.update(request.post_renderer.immutable_input_digests)
         append_only_caches = request.post_renderer.append_only_caches
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
@@ -287,7 +297,7 @@ async def setup_render_helm_deployment_process(
         argv=[
             request.cmd.value,
             release_name,
-            chart.path,
+            chart.name,
             *(
                 ("--description", f'"{request.field_set.description.value}"')
                 if request.field_set.description.value

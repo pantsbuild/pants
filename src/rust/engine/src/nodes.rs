@@ -25,7 +25,6 @@ use crate::context::{Context, Core};
 use crate::downloads;
 use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
-use crate::selectors;
 use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
@@ -40,6 +39,7 @@ use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
+use rule_graph::DependencyKey;
 use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -155,38 +155,39 @@ impl Select {
 
   pub fn new_from_edges(
     params: Params,
-    product: TypeId,
+    dependency_key: &DependencyKey<TypeId>,
     edges: &rule_graph::RuleEdges<Rule>,
   ) -> Select {
-    let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
-    // TODO: Is it worth propagating an error here?
-    let entry = edges
-      .entry_for(&dependency_key)
-      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product));
-    Select::new(params, product, entry)
+    let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
+      panic!(
+        "{:?} did not declare a dependency on {:?}",
+        edges, dependency_key
+      )
+    });
+    Select::new(params, dependency_key.product(), entry)
   }
 
-  fn select_product(
+  fn select_product<'a>(
     &self,
-    context: &Context,
-    product: TypeId,
+    context: &'a Context,
+    dependency_key: &'a DependencyKey<TypeId>,
     caller_description: &str,
-  ) -> BoxFuture<NodeResult<Value>> {
+  ) -> BoxFuture<'a, NodeResult<Value>> {
     let edges = context
       .core
       .rule_graph
       .edges_for_inner(&self.entry)
       .ok_or_else(|| {
         throw(format!(
-          "Tried to select product {} for {} but found no edges",
-          product, caller_description
+          "Tried to request {} for {} but found no edges",
+          dependency_key, caller_description
         ))
       });
     let params = self.params.clone();
     let context = context.clone();
     async move {
       let edges = edges?;
-      Select::new_from_edges(params, product, &edges)
+      Select::new_from_edges(params, dependency_key, &edges)
         .run_node(context)
         .await
     }
@@ -212,7 +213,7 @@ impl Select {
               intrinsic
                 .inputs
                 .iter()
-                .map(|type_id| self.select_product(&context, *type_id, "intrinsic"))
+                .map(|dependency_key| self.select_product(&context, dependency_key, "intrinsic"))
                 .collect::<Vec<_>>(),
             )
             .await?;
@@ -1000,10 +1001,8 @@ impl Task {
         let context = context.clone();
         let mut params = params.clone();
         async move {
-          let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
-            output: get.output,
-            input: *get.input.type_id(),
-          });
+          let dependency_key =
+            DependencyKey::new_with_params(get.output, std::iter::once(*get.input.type_id()));
           params.put(get.input.clone());
 
           let edges = context
@@ -1029,7 +1028,11 @@ impl Task {
                   .rule_graph
                   .find_root(vec![*get.input.type_id()], get.output)
                   .ok()?;
-                Some(Select::new_from_edges(params, get.output, &rule_edges))
+                Some(Select::new_from_edges(
+                  params,
+                  &DependencyKey::new(get.output),
+                  &rule_edges,
+                ))
               } else {
                 None
               }
@@ -1115,10 +1118,10 @@ impl Task {
       future::try_join_all(
         self
           .task
-          .clause
+          .args
           .iter()
-          .map(|type_id| {
-            Select::new_from_edges(params.clone(), *type_id, edges).run_node(context.clone())
+          .map(|dependency_key| {
+            Select::new_from_edges(params.clone(), dependency_key, edges).run_node(context.clone())
           })
           .collect::<Vec<_>>(),
       )

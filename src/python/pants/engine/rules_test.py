@@ -78,7 +78,7 @@ def fmt_rule(
     gets_str = ""
     if gets:
         get_members = f",{line_sep}".join(
-            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
+            f"Get({product_subject_pair[0]}, [{product_subject_pair[1]}])"
             for product_subject_pair in gets
         )
         gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"

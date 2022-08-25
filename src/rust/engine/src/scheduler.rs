@@ -89,9 +89,11 @@ impl Scheduler {
       .core
       .rule_graph
       .find_root_edges(params.type_ids(), product)?;
-    request
-      .roots
-      .push(Select::new_from_edges(params, product, &edges));
+    request.roots.push(Select::new_from_edges(
+      params,
+      &rule_graph::DependencyKey::new(product),
+      &edges,
+    ));
     Ok(())
   }
 

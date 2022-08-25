@@ -30,7 +30,6 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
-    _find_python_interpreter_constraints_from_lockfile,
     determine_renamed_field_types,
     format_build_file_with_black,
     format_build_file_with_yapf,
@@ -148,8 +147,6 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
         requirement_constraints=set(),
         only_binary=set(),
         no_binary=set(),
-        indexes=set(),
-        find_links=set(),
         manylinux=None,
     )
 
@@ -179,7 +176,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             ),
         )
         result = run_rule_with_mocks(
-            _find_python_interpreter_constraints_from_lockfile,
+            Black._find_python_interpreter_constraints_from_lockfile,
             rule_args=[black],
             mock_gets=[
                 MockGet(

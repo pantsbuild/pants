@@ -91,7 +91,6 @@ from pants.option.global_options import (
     OwnersNotFoundBehavior,
     UnmatchedBuildFileGlobs,
 )
-from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -724,10 +723,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     def create_live_and_deleted_gets(
         *, filter_by_global_options: bool
-    ) -> tuple[
-        Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners],
-        Get[UnexpandedTargets, RawSpecsWithoutFileOwners],
-    ]:
+    ) -> tuple[Get[FilteredTargets | Targets], Get[UnexpandedTargets],]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
         For live files, we use Targets, which causes generated targets to be used rather than their
@@ -742,7 +738,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             description_of_origin="<owners rule - unused>",
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
         )
-        live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners] = (
+        live_get: Get[FilteredTargets | Targets] = (
             Get(FilteredTargets, RawSpecsWithoutFileOwners, live_raw_specs)
             if filter_by_global_options
             else Get(Targets, RawSpecsWithoutFileOwners, live_raw_specs)
@@ -786,7 +782,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
         for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
             matching_files = set(
-                matches_filespec(candidate_tgt.get(SourcesField).filespec, paths=sources_set)
+                candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
             # Also consider secondary ownership, meaning it's not a `SourcesField` field with
             # primary ownership, but the target still should match the file. We can't use
@@ -798,7 +794,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             )
             for secondary_owner_field in secondary_owner_fields:
                 matching_files.update(
-                    matches_filespec(secondary_owner_field.filespec, paths=sources_set)
+                    *secondary_owner_field.filespec_matcher.matches(list(sources_set))
                 )
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources

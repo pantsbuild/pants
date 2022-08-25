@@ -16,10 +16,10 @@ from pants.util.strutil import bullet_list, softwrap
 
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
-    "--dry-run",
+    "--cleanup-on-fail",
     "--debug",
+    "--dry-run",
     "--force",
-    "--replace",
     "--wait",
     "--wait-for-jobs",
 ]
