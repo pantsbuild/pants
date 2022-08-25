@@ -300,7 +300,7 @@ addresses =
   "tests/jvm::",  
 ]
 
-resolve = "jvm-default"
+resolve = "jvm:jvm-default"
 ```
 ```Text ...
 
