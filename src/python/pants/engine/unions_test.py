@@ -30,14 +30,16 @@ def test_simple() -> None:
     class Potato:  # Doesn't _have_ to inherit from the union
         pass
 
-    assert UnionMembership.from_rules(
+    union_membership = UnionMembership.from_rules(
         [
             UnionRule(Fruit, Banana),
             UnionRule(Fruit, Apple),
             UnionRule(CitrusFruit, Orange),
             UnionRule(Vegetable, Potato),
         ]
-    ) == UnionMembership(
+    )
+
+    assert union_membership == UnionMembership(
         {
             Fruit: FrozenOrderedSet([Banana, Apple]),
             CitrusFruit: FrozenOrderedSet([Orange, Banana, Apple]),
