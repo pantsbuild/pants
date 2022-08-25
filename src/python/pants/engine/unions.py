@@ -104,7 +104,7 @@ class UnionMembership:
         """
         return self.union_rules[union_type]  # type: ignore[return-value]
 
-    def get(self, union_type: _T, include_subclass_members: bool = False) -> FrozenOrderedSet[_T]:
+    def get(self, union_type: _T, *, include_subclass_members: bool = False) -> FrozenOrderedSet[_T]:
         """Get all members of this union type.
 
         If `include_subclass_members` is True, also include all members of all direct/indirect subclasses.
