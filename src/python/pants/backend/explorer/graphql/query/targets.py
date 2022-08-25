@@ -166,9 +166,7 @@ class QueryTargetsMixin:
         req = GraphQLContext.request_state_from_info(info).product_request
         specs = (
             specs_parser.parse_specs(
-                query.specs,
-                convert_dir_literal_to_address_literal=False,
-                description_of_origin="GraphQL targets `query.specs`",
+                query.specs, description_of_origin="GraphQL targets `query.specs`"
             )
             if query is not None and query.specs
             else None

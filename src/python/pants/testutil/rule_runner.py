@@ -336,9 +336,7 @@ class RuleRunner:
             [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(
-            raw_specs,
-            convert_dir_literal_to_address_literal=True,
-            description_of_origin="RuleRunner.run_goal_rule()",
+            raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
 
         stdout, stderr = StringIO(), StringIO()
