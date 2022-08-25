@@ -72,14 +72,16 @@ class UnionMembership:
         mapping: DefaultDict[type, OrderedSet[type]] = defaultdict(OrderedSet)
         for rule in rules:
             mapping[rule.union_base].add(rule.union_member)
-        # Subclassed union bases should inherit the superclass's union members.
+
+        # Base union classes inherit the members of any subclasses that are also unions
         bases = list(mapping.keys())
         while len(bases) > 0:
             union_base = bases.pop()
             for sub_union in union_base.__subclasses__():
-                if sub_union not in mapping:
-                    bases.append(sub_union)
-                mapping[sub_union].update(mapping[union_base])
+                if is_union(sub_union):
+                    if sub_union not in mapping:
+                        bases.append(sub_union)
+                    mapping[sub_union].update(mapping[union_base])
         return cls(mapping)
 
     def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
