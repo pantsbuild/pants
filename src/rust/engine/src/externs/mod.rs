@@ -4,6 +4,7 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
@@ -230,17 +231,18 @@ pub fn generator_send(
       TypeId::new(b.0.as_ref(py).get_type()),
     ))
   } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
-    Ok(GeneratorResponse::Get(Get::new(py, get)?))
+    Ok(GeneratorResponse::Get(get.take()?))
   } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
     let gets = get_multi
       .0
       .as_ref(py)
       .iter()
-      .map(|g| {
-        let get = g
+      .map(|gr_get| {
+        let get = gr_get
           .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
-        Get::new(py, get)
+          .map_err(|e| Failure::from_py_err_with_gil(py, e))?
+          .take()?;
+        Ok::<Get, Failure>(get)
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
@@ -282,11 +284,18 @@ impl PyGeneratorResponseBreak {
   }
 }
 
+// Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseGet {
-  product: Py<PyType>,
-  declared_subject: Py<PyType>,
-  subject: PyObject,
+pub struct PyGeneratorResponseGet(RefCell<Option<Get>>);
+
+impl PyGeneratorResponseGet {
+  fn take(&self) -> Result<Get, String> {
+    self
+      .0
+      .borrow_mut()
+      .take()
+      .ok_or_else(|| "A `Get` may only be consumed once.".to_owned())
+  }
 }
 
 #[pymethods]
@@ -345,26 +354,70 @@ impl PyGeneratorResponseGet {
       (input_arg0.get_type(), input_arg0)
     };
 
-    Ok(Self {
-      product: product.into_py(py),
-      declared_subject: declared_subject.into_py(py),
-      subject: subject.into_py(py),
-    })
+    let output = TypeId::new(product);
+    let input_type = TypeId::new(declared_subject);
+    let input = INTERNS
+      .key_insert(py, subject.into())
+      .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
+
+    Ok(Self(RefCell::new(Some(Get {
+      output,
+      input_type,
+      input,
+    }))))
   }
 
   #[getter]
-  fn output_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
-    self.product.as_ref(py)
+  fn output_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .output
+        .as_py_type(py),
+    )
   }
 
   #[getter]
-  fn input_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
-    self.declared_subject.as_ref(py)
+  fn input_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .input_type
+        .as_py_type(py),
+    )
   }
 
   #[getter]
-  fn input<'p>(&'p self, py: Python<'p>) -> &'p PyAny {
-    self.subject.as_ref(py)
+  fn input(&self) -> PyResult<PyObject> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .input
+        .value
+        .clone()
+        .into(),
+    )
   }
 }
 
@@ -384,18 +437,6 @@ pub struct Get {
   pub output: TypeId,
   pub input_type: TypeId,
   pub input: Key,
-}
-
-impl Get {
-  fn new(py: Python, get: PyRef<PyGeneratorResponseGet>) -> Result<Get, Failure> {
-    Ok(Get {
-      output: TypeId::new(get.product.as_ref(py)),
-      input_type: TypeId::new(get.declared_subject.as_ref(py)),
-      input: INTERNS
-        .key_insert(py, get.subject.clone_ref(py))
-        .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-    })
-  }
 }
 
 impl fmt::Display for Get {
