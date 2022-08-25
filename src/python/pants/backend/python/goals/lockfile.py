@@ -263,7 +263,6 @@ async def setup_user_lockfile_requests(
             ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
-            use_pex=python_setup.generate_lockfiles_with_pex,
         )
         for resolve in requested
     )

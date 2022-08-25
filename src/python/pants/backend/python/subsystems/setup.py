@@ -93,7 +93,7 @@ class PythonSetup(Subsystem):
     enable_resolves = BoolOption(
         default=False,
         help=softwrap(
-            f"""
+            """
             Set to true to enable lockfiles for user code. See `[python].resolves` for an
             explanation of this feature.
 
@@ -550,11 +550,6 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-
-    @property
-    def generate_lockfiles_with_pex(self) -> bool:
-        """Else, generate with Poetry."""
-        return True
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
