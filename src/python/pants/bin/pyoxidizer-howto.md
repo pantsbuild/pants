@@ -1,6 +1,6 @@
 NOTES:
 
-Run `./pants --no-pantsd --no-remote-cache-write package --pyoxidizer-args="--target-triple=aarch64-apple-darwin" --pyoxidizer-interpreter-constraints="['CPython==3.9.*']" src/python/pants/bin:pants_oxidized_experimental`
+Run `./pants package --pyoxidizer-interpreter-constraints="['CPython==3.9.*']" src/python/pants/bin:pants_oxidized_experimental`
 
 The binary will be `dist/src.python.pants.bin/pants_oxidized_experimental/aarch64-apple-darwin/debug/install/pants_oxidized_experimental` -- this will not work on the pants repo itself (yet?)
 
