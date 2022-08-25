@@ -467,9 +467,9 @@ class Target:
     @final
     @memoized_classproperty
     def _plugin_field_cls(cls) -> type:
-        # NB: We ensure that each Target subtype has its own `PluginField` class so that
-        # registering a plugin field doesn't leak across target types.
-
+        # Use the `PluginField` of the first `Target`-subclass ancestor as a base to ours, so that
+        # we inherit the registered fields. E.g. If I inherit from `PythonSourceTarget`, I want all
+        # the registered fields on `PythonSourceTarget` to also be registered for me.
         baseclass = (
             object
             if cast("Type[Target]", cls) is Target
