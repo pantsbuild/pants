@@ -94,15 +94,6 @@ def is_entry_point(content: bytes) -> bool:
 async def _find_source_targets(
     py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
 ) -> list[PutativeTarget]:
-    ignore_solitary_explicitly_set = not python_setup.options.is_default(
-        "tailor_ignore_solitary_init_files"
-    )
-    ignore_solitary = (
-        python_setup.tailor_ignore_solitary_init_files
-        if ignore_solitary_explicitly_set
-        else python_setup.tailor_ignore_empty_init_files
-    )
-
     result = []
     check_if_init_file_empty: dict[str, tuple[str, str]] = {}  # full_path: (dirname, filename)
 
@@ -119,13 +110,12 @@ async def _find_source_targets(
             else:
                 name = None
             if (
-                ignore_solitary
+                python_setup.tailor_ignore_empty_init_files
                 and tgt_type == PythonSourcesGeneratorTarget
                 and filenames in ({"__init__.py"}, {"__init__.pyi"})
             ):
-                if not ignore_solitary_explicitly_set:
-                    f = next(iter(filenames))
-                    check_if_init_file_empty[os.path.join(dirname, f)] = (dirname, f)
+                f = next(iter(filenames))
+                check_if_init_file_empty[os.path.join(dirname, f)] = (dirname, f)
             else:
                 result.append(
                     PutativeTarget.for_target_type(

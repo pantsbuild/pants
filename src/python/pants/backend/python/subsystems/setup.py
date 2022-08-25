@@ -485,56 +485,6 @@ class PythonSetup(Subsystem):
         removal_version="3.0.0.dev0",
         removal_hint=__constraints_deprecation_msg,
     )
-    no_binary = StrListOption(
-        help=softwrap(
-            """
-            Do not use binary packages (i.e., wheels) for these 3rdparty projects.
-
-            Also accepts `:all:` to disable all binary packages.
-
-            Note that some packages are tricky to compile and may fail to install when this option
-            is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
-            for details.
-
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
-            """
-        ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            f"""
-            Use `[python].resolves_to_no_binary`, which allows you to set `--no-binary` on a
-            per-resolve basis for more flexibility. To keep this option's behavior, set
-            `[python].resolves_to_no_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
-            value you used on this option.
-            """
-        ),
-    )
-    only_binary = StrListOption(
-        help=softwrap(
-            """
-            Do not use source packages (i.e., sdists) for these 3rdparty projects.
-
-            Also accepts `:all:` to disable all source packages.
-
-            Packages without binary distributions will fail to install when this option is used on
-            them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
-            details.
-
-            Note: Only takes effect if you use Pex lockfiles. Use the default
-            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
-            """
-        ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            f"""
-            Use `[python].resolves_to_only_binary`, which allows you to set `--only-binary` on a
-            per-resolve basis for more flexibility. To keep this option's behavior, set
-            `[python].resolves_to_only_binary` with the key `{RESOLVE_OPTION_KEY__DEFAULT}` and the
-            value you used on this option.
-            """
-        ),
-    )
     resolver_manylinux = StrOption(
         default="manylinux2014",
         help=softwrap(
@@ -555,27 +505,6 @@ class PythonSetup(Subsystem):
             the `tailor` goal."""
         ),
         advanced=True,
-    )
-    tailor_ignore_solitary_init_files = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            If true, don't add `python_sources` targets for solitary `__init__.py` files with the
-            `tailor` goal.
-
-            Solitary `__init__.py` files usually exist as import scaffolding rather than true
-            library code, so it can be noisy to add BUILD files.
-
-            Set to false if you commonly have packages containing real code in
-            `__init__.py` without other `.py` files in the package.
-            """
-        ),
-        advanced=True,
-        removal_version="2.15.0.dev0",
-        removal_hint=(
-            "Use `[python].tailor_ignore_empty_init_files`, which checks that the `__init__.py`"
-            "file is both solitary and also empty."
-        ),
     )
     tailor_ignore_empty_init_files = BoolOption(
         "--tailor-ignore-empty-init-files",
@@ -693,27 +622,6 @@ class PythonSetup(Subsystem):
     def resolves_to_no_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
     ) -> dict[str, list[PipRequirement]]:
-        if self.no_binary:
-            if self._resolves_to_no_binary:
-                raise ValueError(
-                    softwrap(
-                        """
-                        Conflicting options used. You used the new, preferred
-                        `[python].resolves_to_no_binary`, but also used the deprecated
-                        `[python].no_binary`.
-
-                        Please use only one of these (preferably `[python].resolves_to_no_binary`).
-                        """
-                    )
-                )
-            no_binary_opt = [
-                PipRequirement.parse(v, description_of_origin="the option `[python].no_binary`")
-                for v in self.no_binary
-            ]
-            return {
-                resolve: no_binary_opt
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
-            }
         return {
             resolve: [
                 PipRequirement.parse(
@@ -735,27 +643,6 @@ class PythonSetup(Subsystem):
     def resolves_to_only_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
     ) -> dict[str, list[PipRequirement]]:
-        if self.only_binary:
-            if self._resolves_to_only_binary:
-                raise ValueError(
-                    softwrap(
-                        """
-                        Conflicting options used. You used the new, preferred
-                        `[python].resolves_to_only_binary`, but also used the deprecated
-                        `[python].only_binary`.
-
-                        Please use only one of these (preferably `[python].resolves_to_only_binary`).
-                        """
-                    )
-                )
-            only_binary_opt = [
-                PipRequirement.parse(v, description_of_origin="the option `[python].only_binary`")
-                for v in self.only_binary
-            ]
-            return {
-                resolve: only_binary_opt
-                for resolve in {*self.resolves, *all_python_tool_resolve_names}
-            }
         return {
             resolve: [
                 PipRequirement.parse(
