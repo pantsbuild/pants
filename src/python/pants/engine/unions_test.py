@@ -5,17 +5,44 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-def test_union_membership_from_rules() -> None:
+def test_simple() -> None:
     @union
-    class Base:
+    class Fruit:
         pass
 
-    class A:
+    class Banana(Fruit):
         pass
 
-    class B:
+    class Apple(Fruit):
         pass
 
-    assert UnionMembership.from_rules([UnionRule(Base, A), UnionRule(Base, B)]) == UnionMembership(
-        {Base: FrozenOrderedSet([A, B])}
+    @union
+    class CitrusFruit(Fruit):
+        pass
+
+    class Orange(CitrusFruit):
+        pass
+
+    @union
+    class Vegetable:
+        pass
+
+    class Potato:  # Doesn't _have_ to inherit from the union
+        pass
+
+    union_membership = UnionMembership.from_rules(
+        [
+            UnionRule(Fruit, Banana),
+            UnionRule(Fruit, Apple),
+            UnionRule(CitrusFruit, Orange),
+            UnionRule(Vegetable, Potato),
+        ]
+    )
+
+    assert union_membership == UnionMembership(
+        {
+            Fruit: FrozenOrderedSet([Banana, Apple]),
+            CitrusFruit: FrozenOrderedSet([Orange, Banana, Apple]),
+            Vegetable: FrozenOrderedSet([Potato]),
+        }
     )
