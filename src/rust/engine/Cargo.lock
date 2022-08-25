@@ -180,7 +180,7 @@ name = "brfs"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap 3.2.15",
+ "clap 3.2.17",
  "dirs-next",
  "env_logger",
  "errno",
@@ -339,9 +339,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.15"
+version = "3.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44bbe24bbd31a185bc2c4f7c2abe80bea13a20d57ee4e55be70ac512bdc76417"
+checksum = "29e724a68d9319343bb3328c9cc2dfde263f4b3142ee1059a9980580171c954b"
 dependencies = [
  "atty",
  "bitflags",
@@ -865,7 +865,7 @@ name = "fs_util"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap 3.2.15",
+ "clap 3.2.17",
  "env_logger",
  "fs",
  "futures",
@@ -1490,7 +1490,7 @@ dependencies = [
 name = "local_cas"
 version = "0.0.1"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.17",
  "env_logger",
  "mock",
 ]
@@ -1499,7 +1499,7 @@ dependencies = [
 name = "local_execution_server"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.17",
  "mock",
  "protos",
  "structopt",
@@ -2214,7 +2214,7 @@ dependencies = [
 name = "process_executor"
 version = "0.0.1"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.17",
  "dirs-next",
  "env_logger",
  "fs",
@@ -3056,9 +3056,9 @@ checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 
 [[package]]
 name = "strum_macros"
-version = "0.24.2"
+version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4faebde00e8ff94316c01800f9054fd2ba77d30d9e922541913051d1d978918b"
+checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
 dependencies = [
  "heck 0.4.0",
  "proc-macro2",
