@@ -7,7 +7,11 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import (
+    DockerImageTags,
+    DockerImageTagsRequest,
+    DockerImageTarget,
+)
 from pants.backend.helm.dependency_inference import deployment as infer_deployment
 from pants.backend.helm.subsystems.post_renderer import (
     HELM_POST_RENDERER_CFG_FILENAME,
@@ -31,8 +35,21 @@ from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
-from pants.engine.rules import QueryRule
+from pants.engine.rules import QueryRule, rule
+from pants.engine.target import Target
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+
+
+class CustomTestImageTagRequest(DockerImageTagsRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return "bar" in target.address.target_name
+
+
+@rule
+async def custom_test_image_tags(_: CustomTestImageTagRequest) -> DockerImageTags:
+    return DockerImageTags(["custom-tag"])
 
 
 @pytest.fixture
@@ -43,6 +60,8 @@ def rule_runner() -> RuleRunner:
             *infer_deployment.rules(),
             *source_files.rules(),
             *post_renderer.rules(),
+            custom_test_image_tags,
+            UnionRule(DockerImageTagsRequest, CustomTestImageTagRequest),
             QueryRule(HelmPostRenderer, (HelmDeploymentPostRendererRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
             QueryRule(ProcessResult, (HelmProcess,)),
@@ -134,8 +153,8 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
             /spec/containers/1/image: app_foo:latest
             /spec/initContainers/0/image: init_foo:latest
         - paths:
-            /spec/containers/1/image: app_bar:latest
-            /spec/initContainers/0/image: init_bar:latest
+            /spec/containers/1/image: app_bar:custom-tag
+            /spec/initContainers/0/image: init_bar:custom-tag
         """
     )
 
@@ -169,12 +188,12 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
         spec:
           initContainers:
             - name: myapp-init-container
-              image: init_bar:latest
+              image: init_bar:custom-tag
           containers:
             - name: busy
               image: busybox:1.29
             - name: myapp-container
-              image: app_bar:latest
+              image: app_bar:custom-tag
         """
     )
 
