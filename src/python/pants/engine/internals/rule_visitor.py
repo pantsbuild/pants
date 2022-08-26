@@ -9,7 +9,7 @@ import logging
 import sys
 import types
 from functools import partial
-from typing import Callable, List, cast
+from typing import Callable, List, Sequence, cast
 
 from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
 from pants.util.memo import memoized
@@ -55,7 +55,21 @@ class _AwaitableCollector(ast.NodeVisitor):
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
-    def _resolve_constrain_arg_type(self, name: str, lineno: int) -> type:
+    def _expect_dict_value_is_name(
+        self, call_node_name: ast.Name, call_node_args: Sequence[ast.expr], value_expr: ast.expr
+    ) -> ast.Name:
+        lineno = value_expr.lineno + self.func.__code__.co_firstlineno - 1
+        if not isinstance(value_expr, ast.Name):
+            raise GetParseError(
+                f"All values of the input dict should be literal type names, but got "
+                f"{value_expr} (type `{type(value_expr).__name__}`)`) "
+                f"in {self.source_file}:{lineno}",
+                get_args=call_node_args,
+                source_file_name=(self.source_file or "<none>"),
+            )
+        return value_expr
+
+    def _resolve_constraint_arg_type(self, name: str, lineno: int) -> type:
         lineno += self.func.__code__.co_firstlineno - 1
         resolved = (
             getattr(self.owning_module, name, None)
@@ -95,20 +109,28 @@ class _AwaitableCollector(ast.NodeVisitor):
         input_types: List[ast.Name]
         if len(input_args) == 1:
             input_constructor = input_args[0]
-            if not isinstance(input_constructor, ast.Call):
+            if isinstance(input_constructor, ast.Call):
+                if not isinstance(input_constructor.func, ast.Name):
+                    raise parse_error(
+                        f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
+                        "InputType(constructor args)), the second argument should be a top-level "
+                        "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
+                        "than a method call."
+                    )
+                input_types = [input_constructor.func]
+            elif isinstance(input_constructor, ast.Dict):
+                input_types = [
+                    self._expect_dict_value_is_name(call_node.func, get_args, v)
+                    for v in input_constructor.values
+                ]
+            else:
                 raise parse_error(
-                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
-                    "InputType(constructor args), the second argument should be a constructor "
-                    "call, like `MergeDigest(...)` or `Process(...)`."
+                    f"Because you are using the two-argument form {call_node.func.id}(OutputType, "
+                    "$input), the $input argument should either be a "
+                    "constructor call, like `MergeDigest(...)` or `Process(...)`, or a dict "
+                    "literal mapping inputs to their declared types, like "
+                    "`{merge_digest: MergeDigest}`."
                 )
-            if not isinstance(input_constructor.func, ast.Name):
-                raise parse_error(
-                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
-                    "InputType(constructor args), the second argument should be a top-level "
-                    "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
-                    "than a method call."
-                )
-            input_types = [input_constructor.func]
         else:
             if not isinstance(input_args[0], ast.Name):
                 raise parse_error(
@@ -119,9 +141,9 @@ class _AwaitableCollector(ast.NodeVisitor):
             input_types = [input_args[0]]
 
         return AwaitableConstraints(
-            self._resolve_constrain_arg_type(output_type.id, output_type.lineno),
+            self._resolve_constraint_arg_type(output_type.id, output_type.lineno),
             tuple(
-                self._resolve_constrain_arg_type(input_type.id, input_type.lineno)
+                self._resolve_constraint_arg_type(input_type.id, input_type.lineno)
                 for input_type in input_types
             ),
             is_effect,
