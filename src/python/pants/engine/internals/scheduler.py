@@ -211,6 +211,7 @@ class Scheduler:
             child_default_memory=execution_options.process_per_child_memory_usage,
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
             use_docker=execution_options.process_execution_use_docker,
+            docker_image=execution_options.process_execution_docker_image,
         )
 
         self._py_scheduler = native_engine.scheduler_create(

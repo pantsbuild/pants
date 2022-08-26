@@ -2276,6 +2276,7 @@ version = "0.0.1"
 dependencies = [
  "async-lock",
  "async-oncecell",
+ "async-stream",
  "async-trait",
  "bincode",
  "bollard",

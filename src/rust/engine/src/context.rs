@@ -116,6 +116,7 @@ pub struct ExecutionStrategyOptions {
   pub child_default_memory: usize,
   pub graceful_shutdown_timeout: Duration,
   pub use_docker: bool,
+  pub docker_image: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -221,6 +222,14 @@ impl Core {
           named_caches.clone(),
           immutable_inputs.clone(),
           exec_strategy_opts.local_keep_sandboxes,
+          exec_strategy_opts
+            .docker_image
+            .as_ref()
+            .map(|s| s.to_owned())
+            .ok_or_else(|| {
+              "--process-execution-docker-image must be specified when Docker mode is enabled"
+                .to_string()
+            })?,
         )?)
       } else {
         Box::new(local::CommandRunner::new(

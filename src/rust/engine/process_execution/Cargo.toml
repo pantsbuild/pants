@@ -6,6 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
 bollard = "0.13"

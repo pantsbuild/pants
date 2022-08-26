@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::Docker;
 use futures::stream::BoxStream;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use futures::{StreamExt, TryFutureExt};
 use nails::execution::ExitCode;
 use store::Store;
 use task_executor::Executor;
@@ -22,7 +22,6 @@ use crate::{
 
 /// `CommandRunner` executes processes using a local Docker client.
 pub struct CommandRunner {
-  #[allow(dead_code)]
   docker: Docker,
   store: Store,
   executor: Executor,
@@ -30,6 +29,7 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  image: String,
 }
 
 impl CommandRunner {
@@ -40,6 +40,7 @@ impl CommandRunner {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    image: String,
   ) -> Result<Self, String> {
     let docker = Docker::connect_with_local_defaults()
       .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
@@ -51,6 +52,7 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      image,
     })
   }
 }
@@ -103,12 +105,12 @@ impl super::CommandRunner for CommandRunner {
         // Start working on a mutable version of the process.
         let mut req = req;
 
-        // Update env, replacing `{chroot}` placeholders with `/input`. This is the mount point
-        // for the input root within the Docker container.
+        // Update env, replacing `{chroot}` placeholders with `/pants-work`. This is the mount point
+        // for the work directory within the Docker container.
         //
         // DOCKER-TODO: When dealing with invocations from cached containers, `{chroot}` should be
         // replaced by the Pants executor process running inside the container.
-        apply_chroot("/input", &mut req);
+        apply_chroot("/pants-work", &mut req);
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -208,6 +210,8 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
+    // DOCKER-TODO: Set creation options so we can set platform.
+
     let config = bollard::container::Config {
       env: Some(env),
       cmd: Some(req.argv),
@@ -217,8 +221,7 @@ impl CapturedWorkdir for CommandRunner {
         auto_remove: Some(self.keep_sandboxes == KeepSandboxes::Never),
         ..bollard_stubs::models::HostConfig::default()
       }),
-      // DOCKER-TODO: Make `image` be a configuration option.
-      image: Some("debian:latest".to_string()),
+      image: Some(self.image.clone()),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
       ..bollard::container::Config::default()
@@ -271,53 +274,57 @@ impl CapturedWorkdir for CommandRunner {
 
     log::debug!("attached to container {}", &container.id);
 
-    let output_stream: BoxStream<'static, Result<ChildOutput, String>> = attach_result
-      .output
-      .filter_map(|log_msg| {
-        futures::future::ready(match log_msg {
-          Ok(LogOutput::StdOut { message }) => {
-            log::debug!("container wrote {} bytes to stdout", message.len());
-            Some(Ok(ChildOutput::Stdout(message)))
-          }
-          Ok(LogOutput::StdErr { message }) => {
-            log::debug!("container wrote {} bytes to stderr", message.len());
-            Some(Ok(ChildOutput::Stderr(message)))
-          }
-          _ => None,
-        })
-      })
-      .boxed();
+    let mut output_stream = attach_result.output.boxed();
 
     let wait_options = bollard::container::WaitContainerOptions {
       condition: "not-running",
     };
-    let wait_stream = self
+    let mut wait_stream = self
       .docker
       .wait_container(&container.id, Some(wait_options))
-      .inspect(|wr| log::debug!("wait_container stream: {:?}", wr))
-      .filter_map(|wr| {
-        futures::future::ready(match wr {
-          Ok(r) => {
-            // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
-            // `ChildResults` to better support exit code vs signal vs error message?
-            let status_code = r.status_code;
-            Some(Ok(ChildOutput::Exit(ExitCode(status_code as i32))))
-          }
-          Err(err) => {
-            // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
-            log::error!("Docker wait failure: {:?}", err);
-            None
-          }
-        })
-      })
       .boxed();
 
-    let result_stream = futures::stream::select_all(vec![output_stream, wait_stream]);
+    let container_id = container.id.to_owned();
+    let result_stream = async_stream::stream! {
+      let mut run_stream = true;
+      while run_stream {
+        tokio::select! {
+          Some(output_msg) = output_stream.next() => {
+            match output_msg {
+              Ok(LogOutput::StdOut { message }) => {
+                log::debug!("container {} wrote {} bytes to stdout", &container_id, message.len());
+                yield Ok(ChildOutput::Stdout(message));
+              }
+              Ok(LogOutput::StdErr { message }) => {
+                log::debug!("container {} wrote {} bytes to stderr", &container_id, message.len());
+                yield Ok(ChildOutput::Stderr(message));
+              }
+              _ => (),
+            }
+          }
+          Some(wait_msg) = wait_stream.next() => {
+            log::debug!("wait_container stream ({}): {:?}", &container_id, wait_msg);
+            match wait_msg {
+              Ok(r) => {
+                // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
+                // `ChildResults` to better support exit code vs signal vs error message?
+                let status_code = r.status_code;
+                yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
+                run_stream = false;
+              }
+              Err(err) => {
+                // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
+                log::error!("Docker wait failure: {:?}", err);
+                yield Err(format!("Docker wait_container failure: {:?}", err));
+                run_stream = false;
+              }
+            }
+          }
+        }
+      }
+    }
+    .boxed();
 
-    Ok(
-      result_stream
-        .map_err(|err| format!("Failed to consume Docker attach outputs: {:?}", err))
-        .boxed(),
-    )
+    Ok(result_stream)
   }
 }
