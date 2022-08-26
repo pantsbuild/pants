@@ -250,20 +250,17 @@ impl Tasks {
     });
   }
 
-  pub fn add_get(&mut self, output: TypeId, input: TypeId) {
+  pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(DependencyKey::new_with_params(
-        output,
-        std::iter::once(input),
-      ));
+      .push(DependencyKey::new_with_params(output, inputs));
   }
 
-  pub fn add_union(&mut self, product: TypeId, params: Vec<TypeId>) {
-    let query = Query::new(product, params);
+  pub fn add_union(&mut self, output: TypeId, inputs: Vec<TypeId>) {
+    let query = Query::new(output, inputs);
     self.queries.insert(query.clone());
     self
       .preparing

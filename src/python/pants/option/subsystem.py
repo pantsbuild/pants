@@ -63,7 +63,9 @@ class Subsystem(metaclass=ABCMeta):
             input_selectors=(),
             func=partial_construct_subsystem,
             input_gets=(
-                AwaitableConstraints(output_type=ScopedOptions, input_type=Scope, is_effect=False),
+                AwaitableConstraints(
+                    output_type=ScopedOptions, input_types=(Scope,), is_effect=False
+                ),
             ),
             canonical_name=name,
         )

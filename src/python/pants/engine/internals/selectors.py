@@ -61,12 +61,19 @@ class GetParseError(ValueError):
 @dataclass(unsafe_hash=True)
 class AwaitableConstraints:
     output_type: type
-    input_type: type
+    input_types: tuple[type, ...]
     is_effect: bool
 
     def __repr__(self) -> str:
         name = "Effect" if self.is_effect else "Get"
-        return f"{name}({self.output_type.__name__}, {self.input_type.__name__}, ..)"
+        if len(self.input_types) == 0:
+            inputs = ""
+        elif len(self.input_types) == 1:
+            inputs = f", {self.input_types[0].__name__}, .."
+        else:
+            input_items = ", ".join(f"{t.__name__}: .." for t in self.input_types)
+            inputs = f", {{{input_items}}}"
+        return f"{name}({self.output_type.__name__}{inputs})"
 
     def __str__(self) -> str:
         return repr(self)
@@ -517,7 +524,7 @@ async def MultiGet(  # noqa: F811
         if arg is None:
             return None
         if isinstance(arg, Get):
-            return f"Get({arg.output_type.__name__}, {arg.input_type.__name__}, ...)"
+            return repr(arg)
         return repr(arg)
 
     likely_args_exlicitly_passed = tuple(
