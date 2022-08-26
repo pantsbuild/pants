@@ -14,14 +14,17 @@ from itertools import chain
 from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentSourcesField
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationValue
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -41,6 +44,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize, softwrap
+from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +174,16 @@ class RenderedHelmFiles(EngineAwareReturnType):
 
 
 @rule_helper
+async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
+    interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
+
+    env = await Get(Environment, EnvironmentRequest(helm_subsystem.extra_env_vars))
+    interpolation_context["env"] = HelmEnvironmentInterpolationValue(env)
+
+    return InterpolationContext.from_dict(interpolation_context)
+
+
+@rule_helper
 async def _sort_value_file_names_for_evaluation(
     address: Address,
     *,
@@ -230,7 +244,7 @@ async def _sort_value_file_names_for_evaluation(
 
 @rule(desc="Prepare Helm deployment renderer")
 async def setup_render_helm_deployment_process(
-    request: HelmDeploymentRequest,
+    request: HelmDeploymentRequest, helm_subsystem: HelmSubsystem
 ) -> _HelmDeploymentProcessWrapper:
     value_files_prefix = "__values"
     chart, value_files = await MultiGet(
@@ -282,11 +296,15 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
+    interpolation_context = await _build_interpolation_context(helm_subsystem)
+
     release_name = (
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    inline_values = request.field_set.values.value
+    inline_values = request.field_set.format_values(
+        interpolation_context, ignore_missing=request.cmd == HelmDeploymentCmd.RENDER
+    )
 
     def maybe_escape_string_value(value: str) -> str:
         if re.findall("\\s+", value):

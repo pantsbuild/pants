@@ -17,7 +17,6 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import docker_binary
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
-from pants.backend.docker.value_interpolation import DockerInterpolationContext
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
@@ -27,6 +26,7 @@ from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.value_interpolation import InterpolationContext
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def build(tgt: DockerImageTarget, options: DockerOptions):
                     fs.image_refs(
                         options.default_repository,
                         options.registries(),
-                        DockerInterpolationContext(),
+                        InterpolationContext(),
                     ),
                 ),
             ),
