@@ -438,9 +438,30 @@ def test_duplicated_names(rule_runner: RuleRunner) -> None:
     with pytest.raises(AmbiguousRequestNamesError):
         run_lint_rule(
             rule_runner,
-            lint_request_types=[
-                AmbiguousLintTargetsRequest,
-            ],
+            lint_request_types=[AmbiguousLintTargetsRequest],
             run_files_linter=True,  # needed for MockFilesRequest
             targets=[],
         )
+
+    class BuildAndLintTargetType(LintTargetsRequest):
+        name = BuildFileFormatter.name
+
+    with pytest.raises(AmbiguousRequestNamesError):
+        run_lint_rule(
+            rule_runner,
+            lint_request_types=[BuildAndLintTargetType],
+            targets=[],
+            run_build_formatter=True,
+        )
+
+    class BuildAndFmtTargetType(FmtTargetsRequest):
+        name = BuildFileFormatter.name
+
+    # Ambiguity between a target formatter and BUILD formatter are OK
+    run_lint_rule(
+        rule_runner,
+        lint_request_types=[],
+        fmt_request_types=[BuildAndFmtTargetType],
+        run_build_formatter=True,
+        targets=[],
+    )
