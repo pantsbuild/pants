@@ -92,7 +92,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         output_type = output_expr
 
         input_args = get_args[1:]
-        input_type: ast.Name
+        input_types: List[ast.Name]
         if len(input_args) == 1:
             input_constructor = input_args[0]
             if not isinstance(input_constructor, ast.Call):
@@ -108,7 +108,7 @@ class _AwaitableCollector(ast.NodeVisitor):
                     "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
                     "than a method call."
                 )
-            input_type = input_constructor.func
+            input_types = [input_constructor.func]
         else:
             if not isinstance(input_args[0], ast.Name):
                 raise parse_error(
@@ -116,11 +116,14 @@ class _AwaitableCollector(ast.NodeVisitor):
                     "InputType, input), the second argument should be a type, like `MergeDigests` or "
                     "`Process`."
                 )
-            input_type = input_args[0]
+            input_types = [input_args[0]]
 
         return AwaitableConstraints(
             self._resolve_constrain_arg_type(output_type.id, output_type.lineno),
-            self._resolve_constrain_arg_type(input_type.id, input_type.lineno),
+            tuple(
+                self._resolve_constrain_arg_type(input_type.id, input_type.lineno)
+                for input_type in input_types
+            ),
             is_effect,
         )
 

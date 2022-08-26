@@ -364,7 +364,7 @@ class PluginAPITypeInfo:
     def _rule_uses(api_type: type) -> Callable[[TaskRule], bool]:
         def satisfies(rule: TaskRule) -> bool:
             return any(
-                api_type in (constraint.input_type, constraint.output_type)
+                api_type in (*constraint.input_types, constraint.output_type)
                 for constraint in rule.input_gets
             )
 
@@ -673,7 +673,8 @@ class HelpInfoExtracter:
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
                 for constraint in rule.input_gets:
-                    yield constraint.input_type, _find_provider(constraint.input_type), ()
+                    for input_type in constraint.input_types:
+                        yield input_type, _find_provider(input_type), ()
 
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():

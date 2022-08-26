@@ -43,7 +43,9 @@ container_instance = HelperContainer()
 
 def assert_awaitables(func, awaitable_types: Iterable[Tuple[type, type]]):
     gets = collect_awaitables(func)
-    get_types = tuple((get.input_type, get.output_type) for get in gets)
+    if any(len(get.input_types) != 1 for get in gets):
+        raise AssertionError("TODO: Add support for multiple-parameter Gets.")
+    get_types = tuple((get.input_types[0], get.output_type) for get in gets)
     assert get_types == tuple(awaitable_types)
 
 
