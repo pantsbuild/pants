@@ -6,12 +6,10 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable
 
 from typing_extensions import Literal
 
-from pants.backend.cc.target_types import CPP_SOURCE_FILE_EXTENSIONS
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
@@ -119,8 +117,7 @@ class CCSubsystem(Subsystem):
 # TODO: What's a good way to grab the compiler (filename or target language) and linker (... language of compiled objects?)
 @dataclass(frozen=True)
 class CCToolchainRequest:
-    filename: str | None = None
-    language: Literal["c", "c++"] | None = None
+    language: Literal["c", "c++"]
 
 
 @dataclass(frozen=True)
@@ -185,8 +182,7 @@ async def setup_cc_toolchain(subsystem: CCSubsystem, request: CCToolchainRequest
     search_paths = tuple(OrderedSet(raw_search_paths))
 
     # Populate the toolchain for C or C++ accordingly
-    filename = request.filename or ""
-    if request.language == "c++" or PurePath(filename).suffix in CPP_SOURCE_FILE_EXTENSIONS:
+    if request.language == "c++":
         cpp_executable = await _executable_path(tuple(subsystem.cpp_executable), search_paths)
         return CCToolchain(
             cpp_executable,

@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
+    BoolField,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -54,6 +57,7 @@ class CCFieldSet(FieldSet):
     sources: CCSourceField
     compile_flags: CCCompileFlagsField
     defines: CCDefinesField
+    language: CCLanguageField
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,32 @@ class CCDefinesField(StringSequenceField):
     )
 
 
+# TODO: Alternatively, can this just be left as None, using that to know we should auto determine?
+class CCLanguageField(StringField, AsyncFieldMixin):
+    alias = "language"
+    default = "<AUTO>"
+    valid_choices = ("<AUTO>", "c", "c++")
+    help = softwrap(
+        """
+        A field to indicate what programming language the source is written in.
+
+        The default selection is `<AUTO>` which attempts to determine the correct compiler based on file extension.
+        Alternatively, `c` or `c++` may be specified to force compilation with the specified toolchains/flags.
+        """
+    )
+
+    def normalized_value(self) -> str:
+        """Get the value after applying the default and validating that the key is recognized."""
+        compile_language = self.value
+        if compile_language == "<AUTO>":
+            filename = self.address.filename
+            compile_language = (
+                "c++" if PurePath(filename).suffix in CPP_SOURCE_FILE_EXTENSIONS else "c"
+            )
+
+        return compile_language
+
+
 class CCSourceTarget(Target):
     alias = "cc_source"
     core_fields = (
@@ -95,6 +125,7 @@ class CCSourceTarget(Target):
         CCCompileFlagsField,
         CCDefinesField,
         CCDependenciesField,
+        CCLanguageField,
         CCSourceField,
     )
     help = "A single C/C++ source file or header file."
@@ -119,6 +150,7 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
         CCCompileFlagsField,
         CCDefinesField,
         CCDependenciesField,
+        CCLanguageField,
     )
     help = "Generate a `cc_source` target for each file in the `sources` field."
 
@@ -162,10 +194,22 @@ class CCLibraryTarget(Target):
     help = "TODO"
 
 
+# TODO: Need this so building a binary doesn't build a library too
+class CCContrivedField(BoolField):
+    alias = "contrived"
+    default = False
+    help = softwrap(
+        """
+        Contrived Placeholder.
+        """
+    )
+
+
 class CCBinaryTarget(Target):
     alias = "cc_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        CCContrivedField,
         CCDependenciesField,
         # CCLinkFlagsField,
         OutputPathField,

@@ -106,7 +106,9 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
 
-    toolchain = await Get(CCToolchain, CCToolchainRequest(target_file))
+    toolchain = await Get(
+        CCToolchain, CCToolchainRequest(request.field_set.language.normalized_value())
+    )
 
     argv = list(toolchain.compile_argv)
     for d in include_directories:
@@ -119,7 +121,7 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
     argv += request.field_set.defines.value or []
     argv += ["-c", target_file, "-o", compiled_object_name]
 
-    logger.warning(f"Compilation args for {target_file}: {argv}")
+    logger.debug(f"Compilation args for {target_file}: {argv}")
     compile_result = await Get(
         FallibleProcessResult,
         Process(
@@ -131,7 +133,7 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
             env={"__PANTS_CC_COMPILER_FINGERPRINT": toolchain.compiler.fingerprint},
         ),
     )
-    logger.warning(compile_result.stderr)
+    logger.debug(compile_result.stderr)
     return FallibleCompiledCCObject(compiled_object_name, compile_result)
 
 

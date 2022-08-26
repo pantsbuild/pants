@@ -7,6 +7,8 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
+from typing_extensions import Literal
+
 from pants.backend.cc.subsystems.toolchain import CCToolchain, CCToolchainRequest
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
@@ -23,6 +25,7 @@ class LinkCCObjectsRequest:
 
     input_digest: Digest
     output_name: str
+    compile_language: Literal["c", "c++"]
     link_type: str | None = None
 
 
@@ -36,17 +39,17 @@ class LinkedCCObjects:
 @rule(desc="Create a library or executable from object files")
 async def link_cc_objects(request: LinkCCObjectsRequest) -> LinkedCCObjects:
 
-    # Get object files in digest
+    # Get object files stored in digest
     snapshot = await Get(Snapshot, Digest, request.input_digest)
 
-    # TODO: Determine language from files or passed in
-    toolchain = await Get(CCToolchain, CCToolchainRequest(language="c"))
+    # Get the appropriate toolchain for the object files (should be C++ if any object files were compiled in C++)
+    toolchain = await Get(CCToolchain, CCToolchainRequest(language=request.compile_language))
 
     argv = list(toolchain.link_argv) + ["-o", request.output_name, *snapshot.files]
     if request.link_type:
         argv += [f"-{str(request.link_type)}"]
 
-    logger.error(f"Linker args for {request.output_name}: {argv}")
+    logger.debug(f"Linker args for {request.output_name}: {argv}")
     link_result = await Get(
         FallibleProcessResult,
         Process(
@@ -58,7 +61,7 @@ async def link_cc_objects(request: LinkCCObjectsRequest) -> LinkedCCObjects:
             env={"__PANTS_CC_COMPILER_FINGERPRINT": toolchain.compiler.fingerprint},
         ),
     )
-    logger.warning(link_result.stderr)
+    logger.debug(link_result.stderr)
 
     return LinkedCCObjects(link_result.output_digest)
 
