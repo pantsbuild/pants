@@ -32,6 +32,12 @@ def test_create_get() -> None:
     assert get.input_types == get2.input_types
     assert get.inputs == get2.inputs
 
+    # And finally the multiple parameter syntax.
+    get3 = Get(AClass, {42: int, "hello": str})
+    assert get3.output_type is AClass
+    assert get3.input_types == [int, str]
+    assert get3.inputs == [42, "hello"]
+
 
 def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
     with pytest.raises(TypeError) as exc:

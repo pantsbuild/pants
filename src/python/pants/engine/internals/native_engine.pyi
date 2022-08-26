@@ -352,6 +352,12 @@ class PyGeneratorResponseGet(Generic[_Output]):
     inputs: Sequence[Any]
 
     @overload
+    def __init__(
+        self,
+        output_type: type[_Output],
+        input_arg0: dict[Any, type],
+    ) -> None: ...
+    @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
     @overload
     def __init__(

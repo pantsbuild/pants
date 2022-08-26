@@ -354,6 +354,22 @@ impl PyGeneratorResponseGet {
           Get(OutputType, InputType(constructor args)), the second argument should be \
           a constructor call, rather than a type, but given {input_arg0}."
         )));
+      } else if let Ok(d) = input_arg0.cast_as::<PyDict>() {
+        let mut input_types = SmallVec::new();
+        let mut inputs = SmallVec::new();
+        for (value, declared_type) in d.iter() {
+          input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
+            |_| {
+              PyTypeError::new_err(format!(
+                "Invalid Get. Because the second argument was a dict, we expected the keys of the \
+              dict to be the Get inputs, and the values of the dict to be the declared \
+              types of those inputs."
+              ))
+            },
+          )?));
+          inputs.push(INTERNS.key_insert(py, value.into())?);
+        }
+        (input_types, inputs)
       } else {
         (
           smallvec![TypeId::new(input_arg0.get_type())],
