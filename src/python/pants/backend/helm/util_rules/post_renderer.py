@@ -53,7 +53,7 @@ async def _obtain_custom_image_tags(
     address: Address, union_membership: UnionMembership
 ) -> DockerImageTags:
     wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infalible>")
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
     )
 
     image_tags_requests = union_membership.get(DockerImageTagsRequest)
