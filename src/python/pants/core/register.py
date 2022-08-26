@@ -37,12 +37,14 @@ from pants.core.util_rules import (
     archive,
     config_files,
     distdir,
+    environments,
     external_tool,
     source_files,
     stripped_source_files,
     subprocess_environment,
     system_binaries,
 )
+from pants.core.util_rules.environments import LocalEnvironmentTarget
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
@@ -71,6 +73,7 @@ def rules():
         *archive.rules(),
         *config_files.rules(),
         *distdir.rules(),
+        *environments.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),
@@ -92,6 +95,7 @@ def target_types():
         ResourceTarget,
         ResourcesGeneratorTarget,
         RelocatedFiles,
+        LocalEnvironmentTarget,
     ]
 
 

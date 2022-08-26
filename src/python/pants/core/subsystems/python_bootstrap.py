@@ -14,6 +14,12 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.environments import (
+    ChosenLocalEnvironment,
+    EnvironmentsSubsystem,
+    PythonBootstrapBinaryNamesField,
+    PythonInterpreterSearchPathsField,
+)
 from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -78,6 +84,20 @@ class PythonBootstrapSubsystem(Subsystem):
         advanced=True,
         metavar="<python-binary-names>",
     )
+
+    # TODO(#7735): Move to `Subsystem`?
+    def error_if_environment_mechanism_ambiguity(self, option: str) -> None:
+        if self.options.is_default(option):
+            return
+        raise ValueError(
+            softwrap(
+                f"""
+                The option `[{self.options_scope}].{option}` is explicitly set at the same time as
+                the option `[{EnvironmentsSubsystem.options_scope}].platforms_to_local_environment`,
+                which makes it ambiguous which values to use. To fix, only set one of these options.
+                """
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -219,8 +239,17 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 
 @rule
-async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
-    interpreter_search_paths = python_bootstrap_subsystem.search_path
+async def python_bootstrap(
+    python_bootstrap_subsystem: PythonBootstrapSubsystem, chosen_environment: ChosenLocalEnvironment
+) -> PythonBootstrap:
+    if chosen_environment.tgt:
+        interpreter_search_paths = chosen_environment.tgt[PythonInterpreterSearchPathsField].value
+        interpreter_names = chosen_environment.tgt[PythonBootstrapBinaryNamesField].value
+        for opt in ("search_path", "names"):
+            python_bootstrap_subsystem.error_if_environment_mechanism_ambiguity(opt)
+    else:
+        interpreter_search_paths = python_bootstrap_subsystem.search_path
+        interpreter_names = python_bootstrap_subsystem.names
 
     has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
         interpreter_search_paths
@@ -238,7 +267,7 @@ async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem)
     )
 
     return PythonBootstrap(
-        interpreter_names=python_bootstrap_subsystem.names,
+        interpreter_names=interpreter_names,
         raw_interpreter_search_paths=interpreter_search_paths,
         environment=result.env,
         asdf_standard_tool_paths=result.standard_tool_paths,
