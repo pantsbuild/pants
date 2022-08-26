@@ -42,7 +42,7 @@ def test_simple() -> None:
     assert union_membership == UnionMembership(
         {
             Fruit: FrozenOrderedSet([Banana, Apple]),
-            CitrusFruit: FrozenOrderedSet([Orange, Banana, Apple]),
+            CitrusFruit: FrozenOrderedSet([Orange]),
             Vegetable: FrozenOrderedSet([Potato]),
         }
     )
