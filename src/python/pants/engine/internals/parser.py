@@ -231,7 +231,18 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
 
 
 def _extract_symbol_from_name_error(err: NameError) -> str:
-    return re.match(r"^name '(\w*)'", err.args[0]).group(1)
+    result = re.match(r"^name '(\w*)'", err.args[0])
+    if result is None:
+        raise AssertionError(
+            softwrap(
+                f"""
+                Failed to extract symbol from NameError: {err}
+
+                Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose
+                """
+            )
+        )
+    return result.group(1)
 
 
 def _unrecognized_symbol_func(**kwargs):
