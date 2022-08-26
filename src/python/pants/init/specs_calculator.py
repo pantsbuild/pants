@@ -8,11 +8,9 @@ from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Spec
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
-from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.internals.selectors import Params
-from pants.engine.rules import QueryRule
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import QueryRule, rule, collect_rules
 from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
@@ -23,10 +21,10 @@ class InvalidSpecConstraint(Exception):
     """Raised when invalid constraints are given via specs and arguments like --changed*."""
 
 
-def calculate_specs(
-    options_bootstrapper: OptionsBootstrapper,
+@rule
+async def calculate_specs(
     options: Options,
-    session: SchedulerSession,
+    maybe_git_worktree: MaybeGitWorktree,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
     global_options = options.for_global_scope()
@@ -53,10 +51,6 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    (git_binary,) = session.product_request(GitBinary, [Params(GitBinaryRequest())])
-    (maybe_git_worktree,) = session.product_request(
-        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
-    )
     if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
             "The `--changed-*` options are only available if Git is used for the repository."
@@ -64,10 +58,12 @@ def calculate_specs(
 
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
-
-    changed_request = ChangedRequest(changed_files, changed_options.dependees)
-    (changed_addresses,) = session.product_request(
-        ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+    changed_addresses = await Get(
+        ChangedAddresses,
+        ChangedRequest(
+            sources=changed_files,
+            dependees=changed_options.dependees,
+        )
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
@@ -100,6 +96,8 @@ def calculate_specs(
 
 def rules():
     return [
+        *collect_rules(),
+        QueryRule(Specs, [Options, MaybeGitWorktree]),
         QueryRule(ChangedAddresses, [ChangedRequest]),
         QueryRule(GitBinary, [GitBinaryRequest]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary]),
