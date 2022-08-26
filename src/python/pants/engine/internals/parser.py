@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 import threading
 import tokenize
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDef
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,8 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
+        *,
+        ignore_unrecognized_symbols: bool,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
@@ -163,15 +167,30 @@ class Parser:
                 v.__globals__.update(global_symbols)
             global_symbols[k] = v
 
+        if ignore_unrecognized_symbols:
+            while True:
+                try:
+                    exec(build_file_content, global_symbols)
+                except NameError as e:
+                    bad_symbol = _extract_symbol_from_name_error(e)
+                    global_symbols[bad_symbol] = _unrecognized_symbol_func
+                    self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+                    continue
+                break
+
+            error_on_imports(build_file_content, filepath)
+            return self._parse_state.parsed_targets()
+
         try:
             exec(build_file_content, global_symbols)
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
-            help_str = (
-                "If you expect to see more symbols activated in the below list,"
-                f" refer to {doc_url('enabling-backends')} for all available"
-                " backends to activate."
+            help_str = softwrap(
+                f"""
+                If you expect to see more symbols activated in the below list, refer to
+                {doc_url('enabling-backends')} for all available backends to activate.
+                """
             )
 
             candidates = get_close_matches(build_file_content, valid_symbols)
@@ -188,7 +207,6 @@ class Parser:
             )
 
         error_on_imports(build_file_content, filepath)
-
         return self._parse_state.parsed_targets()
 
 
@@ -210,3 +228,12 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
             f"writing a plugin ({doc_url('plugins-overview')}."
         )
+
+
+def _extract_symbol_from_name_error(err: NameError) -> str:
+    return re.match(r"^name '(\w*)'", err.args[0]).group(1)
+
+
+def _unrecognized_symbol_func(**kwargs):
+    """Allows us to not choke on unrecognized symbols, including when they're called as
+    functions."""

@@ -143,6 +143,7 @@ class _TargetParametrization:
 class _TargetParametrizationsRequest(EngineAwareParameter):
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+    ignore_unrecognized_build_file_symbols: bool = False
 
     def __post_init__(self) -> None:
         if self.address.is_parametrized or self.address.is_generated_target:

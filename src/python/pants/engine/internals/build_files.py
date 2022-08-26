@@ -120,6 +120,7 @@ class AddressFamilyDir(EngineAwareParameter):
     """
 
     path: str
+    ignore_unrecognized_build_file_symbols: bool = False
 
     def debug_hint(self) -> str:
         return self.path
@@ -167,7 +168,13 @@ async def parse_address_family(
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await MultiGet(
-            Get(OptionalAddressFamily, AddressFamilyDir(str(parent_dir)))
+            Get(
+                OptionalAddressFamily,
+                AddressFamilyDir(
+                    str(parent_dir),
+                    ignore_unrecognized_build_file_symbols=directory.ignore_unrecognized_build_file_symbols,
+                ),
+            )
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
@@ -180,7 +187,12 @@ async def parse_address_family(
     )
     address_maps = [
         AddressMap.parse(
-            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+            fc.path,
+            fc.content.decode(),
+            parser,
+            prelude_symbols,
+            defaults_parser_state,
+            ignore_unrecognized_symbols=directory.ignore_unrecognized_build_file_symbols,
         )
         for fc in digest_contents
     ]
@@ -221,7 +233,13 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             "Generated targets are not defined in BUILD files, and so do not have "
             f"TargetAdaptors: {request}"
         )
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family = await Get(
+        AddressFamily,
+        AddressFamilyDir(
+            address.spec_path,
+            ignore_unrecognized_build_file_symbols=request.ignore_unrecognized_build_file_symbols,
+        ),
+    )
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
         raise ResolveError.did_you_mean(

@@ -181,7 +181,11 @@ async def resolve_target_parametrizations(
 
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(address, description_of_origin=request.description_of_origin),
+        TargetAdaptorRequest(
+            address,
+            description_of_origin=request.description_of_origin,
+            ignore_unrecognized_build_file_symbols=request.ignore_unrecognized_build_file_symbols,
+        ),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -334,7 +338,9 @@ async def resolve_target(
     parametrizations = await Get(
         _TargetParametrizations,
         _TargetParametrizationsRequest(
-            base_address, description_of_origin=request.description_of_origin
+            base_address,
+            description_of_origin=request.description_of_origin,
+            ignore_unrecognized_build_file_symbols=request.ignore_unrecognized_build_file_symbols,
         ),
     )
     target = parametrizations.get(address, target_types_to_generate_requests)

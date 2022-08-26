@@ -7,9 +7,15 @@ import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
-from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
+from pants.engine.internals.parser import (
+    BuildFilePreludeSymbols,
+    ParseError,
+    Parser,
+    _extract_symbol_from_name_error,
+)
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.testutil.pytest_util import no_exception
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
@@ -29,13 +35,13 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
             defaults_parser_state,
+            ignore_unrecognized_symbols=False,
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
 
 def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState) -> None:
     def perform_test(extra_targets: list[str], dym: str) -> None:
-
         parser = Parser(
             build_root="",
             target_type_aliases=["tgt", *extra_targets],
@@ -52,6 +58,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
+                ignore_unrecognized_symbols=False,
             )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
@@ -62,6 +69,15 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             "'obj', 'prelude', 'tgt']"
         )
 
+        with no_exception():
+            parser.parse(
+                "dir/BUILD",
+                "fake",
+                prelude_symbols,
+                defaults_parser_state,
+                ignore_unrecognized_symbols=True,
+            )
+
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]
 
     perform_test([], "")
@@ -71,3 +87,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
     perform_test(test_targs[:2], dym_two)
     dym_many = "Did you mean fake5, fake4, or fake3?\n\n"
     perform_test(test_targs, dym_many)
+
+
+@pytest.mark.parametrize("symbol", ["a", "bad", "BAD", "a___b_c", "a231", "áç"])
+def test_extract_symbol_from_name_error(symbol: str) -> None:
+    assert _extract_symbol_from_name_error(NameError(f"name '{symbol}' is not defined")) == symbol
