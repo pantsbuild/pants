@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from itertools import chain
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.subsystems.docker_options import DockerOptions
+from pants.backend.docker.target_types import DockerImageTags, DockerImageTagsRequest
 from pants.backend.docker.util_rules import (
     docker_binary,
     docker_build_args,
@@ -29,8 +31,9 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupH
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Targets
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.target import Targets, WrappedTarget, WrappedTargetRequest
+from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, softwrap
 
@@ -45,10 +48,29 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
         return self.field_set.address.spec
 
 
+@rule_helper
+async def _obtain_custom_image_tags(
+    address: Address, union_membership: UnionMembership
+) -> DockerImageTags:
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infalible>")
+    )
+
+    image_tags_requests = union_membership.get(DockerImageTagsRequest)
+    found_image_tags = await MultiGet(
+        Get(DockerImageTags, DockerImageTagsRequest, image_tags_request_cls(wrapped_target.target))
+        for image_tags_request_cls in image_tags_requests
+        if image_tags_request_cls.is_applicable(wrapped_target.target)
+    )
+
+    return DockerImageTags(chain.from_iterable(found_image_tags))
+
+
 @rule(desc="Prepare Helm deployment post-renderer", level=LogLevel.DEBUG)
 async def prepare_post_renderer_for_helm_deployment(
     request: HelmDeploymentPostRendererRequest,
     docker_options: DockerOptions,
+    union_membership: UnionMembership,
 ) -> HelmPostRenderer:
     mapping = await Get(
         FirstPartyHelmDeploymentMapping, FirstPartyHelmDeploymentMappingRequest(request.field_set)
@@ -79,16 +101,19 @@ async def prepare_post_renderer_for_helm_deployment(
     docker_targets = await Get(Targets, Addresses(docker_addresses))
     field_sets = [DockerFieldSet.create(tgt) for tgt in docker_targets]
 
-    def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
+    async def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
         docker_field_sets = [fs for fs in field_sets if fs.address == address]
         if not docker_field_sets:
             return None
+
+        additional_image_tags = await _obtain_custom_image_tags(address, union_membership)
 
         docker_field_set = docker_field_sets[0]
         image_refs = docker_field_set.image_refs(
             default_repository=docker_options.default_repository,
             registries=docker_options.registries(),
             interpolation_context=context.interpolation_context,
+            additional_tags=tuple(additional_image_tags),
         )
 
         # Choose first non-latest image reference found, or fallback to 'latest'.
@@ -110,7 +135,7 @@ async def prepare_post_renderer_for_helm_deployment(
         return resolved_ref
 
     docker_addr_ref_mapping = {
-        addr: resolve_docker_image_ref(addr, ctx)
+        addr: await resolve_docker_image_ref(addr, ctx)
         for addr, ctx in zip(docker_addresses, docker_contexts)
     }
 
