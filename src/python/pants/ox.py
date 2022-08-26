@@ -39,24 +39,31 @@ if is_oxidized and not sys.argv[0]:
 
 
 def pex_main() -> bool:
+    """Detect whether some external process is trying to invoke this binary as Pex.
+
+    When bootstrapping a plugin venv, Pants will reinvoke Pex in the binary that Pants was loaded
+    with. Pex will subsequently run a bunch of Python processes in order to run pip, venv, and
+    `python -c` invocations. This looks for certain command line switches, and attempt to invoke the
+    relevant modules that those switches indicate.
+    """
 
     if len(sys.argv) < 2:
         return False
 
     if sys.argv[1] == "./pex":
-        run_as_pex()
+        _run_as_pex()
         return True
 
     if sys.argv[1] == "-sE" and sys.argv[2].endswith("/pex"):
-        run_pex_venv()
+        _run_pex_venv()
         return True
 
     if len(sys.argv) == 4 and sys.argv[1:3] == ["-s", "-c"]:
-        run_as_dash_c()
+        _run_as_dash_c()
         return True
 
     if ("-m", "venv") in zip(sys.argv, sys.argv[1:]):
-        run_as_venv()
+        _run_as_venv()
         return True
 
     return False
@@ -106,7 +113,7 @@ def use_traditional_import_machinery(f):
 
 
 @use_traditional_import_machinery
-def run_as_pex():
+def _run_as_pex():
     g = {}
     f = runpy.run_path("./pex", init_globals=g)
     del sys.argv[1]
@@ -115,7 +122,7 @@ def run_as_pex():
 
 
 @use_traditional_import_machinery
-def run_as_venv():
+def _run_as_venv():
     index = sys.argv.index("-m")
 
     import venv
@@ -132,7 +139,7 @@ def run_as_venv():
 
 
 @use_traditional_import_machinery
-def run_as_dash_c():
+def _run_as_dash_c():
     if "PEX" in os.environ:
         # Get pex into the modules cache
         pex = runpy.run_path(os.environ["PEX"])
@@ -144,7 +151,7 @@ def run_as_dash_c():
 
 
 @use_traditional_import_machinery
-def run_pex_venv():
+def _run_pex_venv():
     path_to_run = sys.argv[2]
     site.PREFIXES = [os.path.dirname(path_to_run)]
     site.addsitepackages(set())
