@@ -10,7 +10,13 @@ from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, DictOption, StrOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    DictOption,
+    StrListOption,
+    StrOption,
+)
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list, softwrap
 
@@ -110,6 +116,15 @@ class HelmSubsystem(TemplatedExternalTool):
             the OCI registry.
             """
         ),
+    )
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            """
+            Additional environment variables that would be made available to all Helm processes
+            or during value interpolation.
+            """
+        ),
+        advanced=True,
     )
     tailor = BoolOption(
         default=True,
