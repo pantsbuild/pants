@@ -300,10 +300,6 @@ def test_subclassed_target_inherits_plugin_fields() -> None:
     class CustomFortranTarget(FortranTarget):
         alias = "custom_fortran"
 
-    # Ensure that any `PluginField` is not lost on subclasses.
-    assert issubclass(CustomFortranTarget._plugin_field_cls, FortranTarget._plugin_field_cls)
-    assert issubclass(FortranTarget._plugin_field_cls, Target._plugin_field_cls)
-
     class CustomField(BoolField):
         alias = "custom_field"
         default = False
