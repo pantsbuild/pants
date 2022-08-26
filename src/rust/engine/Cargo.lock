@@ -2279,6 +2279,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bollard",
+ "bollard-stubs",
  "bytes",
  "cache",
  "concrete_time",

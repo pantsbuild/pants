@@ -216,8 +216,11 @@ impl Core {
       let local_command_runner: Box<dyn LocalCommandRunner> = if use_docker {
         Box::new(docker::CommandRunner::new(
           local_runner_store.clone(),
+          executor.clone(),
+          local_execution_root_dir.to_path_buf(),
           named_caches.clone(),
           immutable_inputs.clone(),
+          exec_strategy_opts.local_keep_sandboxes,
         )?)
       } else {
         Box::new(local::CommandRunner::new(

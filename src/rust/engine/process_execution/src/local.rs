@@ -809,7 +809,7 @@ impl Drop for AsyncDropSandbox {
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
-fn setup_run_sh_script(
+pub fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
   working_directory: &Option<RelativePath>,
   argv: &[String],
