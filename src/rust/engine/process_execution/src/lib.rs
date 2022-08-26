@@ -56,6 +56,8 @@ mod cache_tests;
 
 pub mod children;
 
+pub mod docker;
+
 pub mod immutable_inputs;
 
 pub mod local;
@@ -855,6 +857,47 @@ pub trait CommandRunner: Send + Sync + Debug {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
+}
+
+/// A [`CommandRunner`] that can be used locally. This trait augments [`CommandRunner`] with
+/// methods needed by Nailgun and other users of local execution.
+#[async_trait]
+pub trait LocalCommandRunner: CommandRunner {
+  /// Return a reference to the Store used by this command runner.
+  fn store(&self) -> &Store;
+
+  /// Return a reference to this command runner's [`NamedCaches`] instance.
+  fn named_caches(&self) -> &NamedCaches;
+
+  /// Return a reference to this command runner's [`ImmutableInputs`] instance.
+  fn immutable_inputs(&self) -> &ImmutableInputs;
+}
+
+#[async_trait]
+impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    (**self).run(context, workunit, req).await
+  }
+}
+
+#[async_trait]
+impl<T: LocalCommandRunner + ?Sized> LocalCommandRunner for Box<T> {
+  fn store(&self) -> &Store {
+    (**self).store()
+  }
+
+  fn named_caches(&self) -> &NamedCaches {
+    (**self).named_caches()
+  }
+
+  fn immutable_inputs(&self) -> &ImmutableInputs {
+    (**self).immutable_inputs()
+  }
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?

@@ -26,8 +26,9 @@ use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
+  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
+  ImmutableInputs, LocalCommandRunner, NamedCaches, Platform, ProcessMetadata,
+  RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -114,6 +115,7 @@ pub struct ExecutionStrategyOptions {
   pub child_max_memory: usize,
   pub child_default_memory: usize,
   pub graceful_shutdown_timeout: Duration,
+  pub use_docker: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -189,6 +191,7 @@ impl Core {
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
+    use_docker: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
     let (runner, parallelism): (Box<dyn CommandRunner>, usize) = if remoting_opts.execution_enable {
       (
@@ -210,14 +213,22 @@ impl Core {
         exec_strategy_opts.remote_parallelism,
       )
     } else {
-      let local_command_runner = local::CommandRunner::new(
-        local_runner_store.clone(),
-        executor.clone(),
-        local_execution_root_dir.to_path_buf(),
-        named_caches.clone(),
-        immutable_inputs.clone(),
-        exec_strategy_opts.local_keep_sandboxes,
-      );
+      let local_command_runner: Box<dyn LocalCommandRunner> = if use_docker {
+        Box::new(docker::CommandRunner::new(
+          local_runner_store.clone(),
+          named_caches.clone(),
+          immutable_inputs.clone(),
+        )?)
+      } else {
+        Box::new(local::CommandRunner::new(
+          local_runner_store.clone(),
+          executor.clone(),
+          local_execution_root_dir.to_path_buf(),
+          named_caches.clone(),
+          immutable_inputs.clone(),
+          exec_strategy_opts.local_keep_sandboxes,
+        ))
+      };
 
       let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
         // We set the nailgun pool size to the number of instances that fit within the memory
@@ -342,6 +353,7 @@ impl Core {
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
+      exec_strategy_opts.use_docker,
     )?;
 
     // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly

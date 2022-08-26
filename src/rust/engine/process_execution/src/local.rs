@@ -36,8 +36,8 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError, ProcessResultMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, LocalCommandRunner, NamedCaches,
+  Platform, Process, ProcessError, ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -138,12 +138,18 @@ impl CommandRunner {
     })
     .boxed()
   }
+}
 
-  pub fn named_caches(&self) -> &NamedCaches {
+impl LocalCommandRunner for CommandRunner {
+  fn store(&self) -> &Store {
+    &self.store
+  }
+
+  fn named_caches(&self) -> &NamedCaches {
     &self.named_caches
   }
 
-  pub fn immutable_inputs(&self) -> &ImmutableInputs {
+  fn immutable_inputs(&self) -> &ImmutableInputs {
     &self.immutable_inputs
   }
 }
