@@ -4,7 +4,7 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 3,
+//   "version": 2,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<3.10,>=3.7"
 //   ],
@@ -41,11 +41,7 @@
 //     "types-toml==0.10.8",
 //     "typing-extensions==4.3.0",
 //     "uvicorn[standard]==0.17.6"
-//   ],
-//   "manylinux": "manylinux2014",
-//   "requirement_constraints": [],
-//   "only_binary": [],
-//   "no_binary": []
+//   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -250,13 +246,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "83e9a75d1911279afd89352c68b45348559d1fc0506b054b346651b5e7fee29f",
-              "url": "https://files.pythonhosted.org/packages/db/51/a507c856293ab05cdc1db77ff4bc1268ddd39f29e7dc4919aa497f0adbec/charset_normalizer-2.1.1-py3-none-any.whl"
+              "hash": "5189b6f22b01957427f35b6a08d9a0bc45b46d3788ef5a92e978433c7a35f8a5",
+              "url": "https://files.pythonhosted.org/packages/94/69/64b11e8c2fb21f08634468caef885112e682b0ebe2908e74d3616eb1c113/charset_normalizer-2.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5a3d016c7c547f69d6f81fb0db9449ce888b418b5b9952cc5e6e66843e9dd845",
-              "url": "https://files.pythonhosted.org/packages/a1/34/44964211e5410b051e4b8d2869c470ae8a68ae274953b1c7de6d98bbcf94/charset-normalizer-2.1.1.tar.gz"
+              "hash": "575e708016ff3a5e3681541cb9d79312c416835686d054a23accb873b254f413",
+              "url": "https://files.pythonhosted.org/packages/93/1d/d9392056df6670ae2a29fcb04cfa5cee9f6fbde7311a1bb511d4115e9b7a/charset-normalizer-2.1.0.tar.gz"
             }
           ],
           "project_name": "charset-normalizer",
@@ -264,7 +260,7 @@
             "unicodedata2; extra == \"unicode_backport\""
           ],
           "requires_python": ">=3.6.0",
-          "version": "2.1.1"
+          "version": "2.1"
         },
         {
           "artifacts": [
@@ -1788,19 +1784,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "333e675b188a1c1fd980b4b352f9e40572413a4c1ac689c23cd546e96310070a",
-              "url": "https://files.pythonhosted.org/packages/2f/e5/988bff1d30df1f32d402125fad52235c3214c6827c2b0b3a658ee93a921a/types_urllib3-1.26.23-py3-none-any.whl"
+              "hash": "09a8783e1002472e8d1e1f3792d4c5cca1fffebb9b48ee1512aae6d16fe186bc",
+              "url": "https://files.pythonhosted.org/packages/19/8c/b9f75c5b52f79402baeabbb065067f72e922f96a114fe471ce4069b0cb69/types_urllib3-1.26.22-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b78e819f0e350221d0689a5666162e467ba3910737bafda14b5c2c85e9bb1e56",
-              "url": "https://files.pythonhosted.org/packages/4a/21/ddf7064ff4d10849ded229b2dabc9bfc5f19a7d4531ebf5c3b431267e603/types-urllib3-1.26.23.tar.gz"
+              "hash": "b05af90e73889e688094008a97ca95788db8bf3736e2776fd43fb6b171485d94",
+              "url": "https://files.pythonhosted.org/packages/d2/d8/764ca957d9601d956a87a311b107c9b6171ed5bb0c269e8ae60d91fc0fbf/types-urllib3-1.26.22.tar.gz"
             }
           ],
           "project_name": "types-urllib3",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.26.23"
+          "version": "1.26.22"
         },
         {
           "artifacts": [
@@ -1992,13 +1988,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b930dd878d5a8afb066a637fbb35144fe7901e3b209d1cd4f524bd0e9deee997",
-              "url": "https://files.pythonhosted.org/packages/6f/de/5be2e3eed8426f871b170663333a0f627fc2924cc386cd41be065e7ea870/urllib3-1.26.12-py2.py3-none-any.whl"
+              "hash": "c33ccba33c819596124764c23a97d25f32b28433ba0dedeb77d873a38722c9bc",
+              "url": "https://files.pythonhosted.org/packages/d1/cb/4783c8f1a90f89e260dbf72ebbcf25931f3a28f8f80e2e90f8a589941b19/urllib3-1.26.11-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3fa96cf423e6987997fc326ae8df396db2a8b7c667747d47ddd8ecba91f4a74e",
-              "url": "https://files.pythonhosted.org/packages/b2/56/d87d6d3c4121c0bcec116919350ca05dc3afd2eeb7dc88d07e8083f8ea94/urllib3-1.26.12.tar.gz"
+              "hash": "ea6e8fb210b19d950fab93b60c9009226c63a28808bc8386e05301e25883ac0a",
+              "url": "https://files.pythonhosted.org/packages/6d/d5/e8258b334c9eb8eb78e31be92ea0d5da83ddd9385dc967dd92737604d239/urllib3-1.26.11.tar.gz"
             }
           ],
           "project_name": "urllib3",
@@ -2011,11 +2007,10 @@
             "cryptography>=1.3.4; extra == \"secure\"",
             "idna>=2.0.0; extra == \"secure\"",
             "ipaddress; python_version == \"2.7\" and extra == \"secure\"",
-            "pyOpenSSL>=0.14; extra == \"secure\"",
-            "urllib3-secure-extra; extra == \"secure\""
+            "pyOpenSSL>=0.14; extra == \"secure\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<4,>=2.7",
-          "version": "1.26.12"
+          "version": "1.26.11"
         },
         {
           "artifacts": [
