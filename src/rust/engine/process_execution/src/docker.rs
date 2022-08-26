@@ -224,11 +224,15 @@ impl CapturedWorkdir for CommandRunner {
       ..bollard::container::Config::default()
     };
 
+    log::debug!("creating container with config: {:?}", &config);
+
     let container = self
       .docker
       .create_container::<&str, String>(None, config)
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
+
+    log::debug!("created container {}", &container.id);
 
     // DOCKER-TODO: Consider adding a drop guard to remove the container on error? (Although
     // auto-remove has been disabled if self.keep_sandboxes is "always" or "on failure.")
@@ -243,6 +247,8 @@ impl CapturedWorkdir for CommandRunner {
           &container.id, err
         )
       })?;
+
+    log::debug!("started container {}", &container.id);
 
     let attach_options = bollard::container::AttachContainerOptions::<String> {
       stdout: Some(true),
@@ -263,23 +269,32 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
+    log::debug!("attached to container {}", &container.id);
+
     let output_stream: BoxStream<'static, Result<ChildOutput, String>> = attach_result
       .output
       .filter_map(|log_msg| {
         futures::future::ready(match log_msg {
-          Ok(LogOutput::StdOut { message }) => Some(Ok(ChildOutput::Stdout(message))),
-          Ok(LogOutput::StdErr { message }) => Some(Ok(ChildOutput::Stderr(message))),
+          Ok(LogOutput::StdOut { message }) => {
+            log::debug!("container wrote {} bytes to stdout", message.len());
+            Some(Ok(ChildOutput::Stdout(message)))
+          }
+          Ok(LogOutput::StdErr { message }) => {
+            log::debug!("container wrote {} bytes to stderr", message.len());
+            Some(Ok(ChildOutput::Stderr(message)))
+          }
           _ => None,
         })
       })
       .boxed();
 
     let wait_options = bollard::container::WaitContainerOptions {
-      condition: "next-exit",
+      condition: "not-running",
     };
     let wait_stream = self
       .docker
       .wait_container(&container.id, Some(wait_options))
+      .inspect(|wr| log::debug!("wait_container stream: {:?}", wr))
       .filter_map(|wr| {
         futures::future::ready(match wr {
           Ok(r) => {
