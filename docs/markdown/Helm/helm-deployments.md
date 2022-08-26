@@ -176,7 +176,52 @@ src/deployment/last.yaml
 
 We believe that this approach gives a very consistent and predictable ordering while at the same time total flexibility to the end user to organise their files as they best fit each particular case of a deployment.
 
+Inline values
+-------------
+
 In addition to value files, you can also use inline values in your `helm_deployment` targets by means of the `values` field. All inlines values that are set this way will override any entry that may come from value files.
+
+Inline values are defined as a key-value dictionary, like in the following example:
+
+```python src/deployment/BUILD
+helm_deployment(
+  name="dev",
+  dependencies=["//src/chart"],
+  values={
+    "nameOverride": "my_custom_name",
+    "image.pullPolicy": "Always",
+  },
+)
+```
+
+### Using dynamic values
+
+Inline values also support interpolation of environment variables. Since Pants runs all processes in a hermetic sandbox, to be able to use environment variables you must first tell Pants what variables to make available to the Helm process using the `[helm].extra_env_vars` option. Consider the following example:
+
+```python src/deployment/BUILD
+helm_deployment(
+  name="dev",
+  dependencies=["//src/chart"],
+  values={
+    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+  },
+)
+```
+```toml pants.toml
+[helm]
+extra_env_vars = ["DEPLOY_TIME"]
+```
+
+Now you can launch a deployment using the following command:
+
+```
+DEPLOY_TIME=$(date) ./pants experimental-deploy src/deployment:dev
+```
+
+> 🚧 Ensuring repeatable deployments
+> 
+> You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repetable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
+> Dynamic values are supported to give the option of passing some info or metadata to the software being deployed (i.e. deploy time, commit hash, etc) or some less harmful settings of a deployment (i.e. replica count. etc). Be careful when chossing the values that are going to be calculated dynamically.
 
 Third party chart artifacts
 ---------------------------

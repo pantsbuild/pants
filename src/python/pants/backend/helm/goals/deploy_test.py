@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import pytest
 
@@ -40,9 +40,14 @@ def rule_runner() -> RuleRunner:
 
 
 def _run_deployment(
-    rule_runner: RuleRunner, spec_path: str, target_name: str, *, args: Iterable[str] | None = None
+    rule_runner: RuleRunner,
+    spec_path: str,
+    target_name: str,
+    *,
+    args: Iterable[str] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> DeployProcess:
-    rule_runner.set_options(args or (), env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(args or (), env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     target = rule_runner.get_target(Address(spec_path, target_name=target_name))
     field_set = DeployHelmDeploymentFieldSet.create(target)
@@ -70,6 +75,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                     "key": "foo",
                     "amount": "300",
                     "long_string": "This is a long string",
+                    "build_number": "{env.BUILD_NUMBER}",
                 },
                 timeout=150,
               )
@@ -96,18 +102,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         }
     )
 
-    deploy_args = ["--kubeconfig", "./kubeconfig"]
-    deploy_process = _run_deployment(
-        rule_runner,
-        "src/deployment",
-        "foo",
-        args=[
-            f"--helm-args={repr(deploy_args)}",
-        ],
-    )
-
-    helm = rule_runner.request(HelmBinary, [])
-
+    expected_build_number = "34"
     expected_value_files_order = [
         "common.yaml",
         "bar.yaml",
@@ -118,6 +113,18 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "subdir/foo-override.yaml",
         "subdir/last.yaml",
     ]
+
+    extra_env_vars = ["BUILD_NUMBER"]
+    deploy_args = ["--kubeconfig", "./kubeconfig"]
+    deploy_process = _run_deployment(
+        rule_runner,
+        "src/deployment",
+        "foo",
+        args=[f"--helm-args={repr(deploy_args)}", f"--helm-extra-env-vars={repr(extra_env_vars)}"],
+        env={"BUILD_NUMBER": expected_build_number},
+    )
+
+    helm = rule_runner.request(HelmBinary, [])
 
     assert deploy_process.process
     assert deploy_process.process.process.argv == (
@@ -144,6 +151,8 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "amount=300",
         "--set",
         'long_string="This is a long string"',
+        "--set",
+        f"build_number={expected_build_number}",
         "--install",
         "--timeout",
         "150s",
