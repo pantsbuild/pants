@@ -36,8 +36,9 @@ lazy_static! {
   pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
   static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
   static ref PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
+    case_sensitive: true,
     require_literal_separator: true,
-    ..MatchOptions::default()
+    require_literal_leading_dot: false,
   };
 }
 
