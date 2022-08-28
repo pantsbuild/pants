@@ -37,7 +37,7 @@ lazy_static! {
   static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
   static ref PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
     require_literal_separator: true,
-    ..MatchOptions::default()
+    ..MatchOptions::new()
   };
 }
 
