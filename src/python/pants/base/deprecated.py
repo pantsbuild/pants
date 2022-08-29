@@ -193,7 +193,7 @@ def deprecated(
         def wrapper(*args, **kwargs):
             warn_or_error(
                 removal_version,
-                f"{func.__module__}.{func.__name__}()",
+                f"{func.__module__}.{func.__qualname__}()",
                 hint,
                 start_version=start_version,
             )
