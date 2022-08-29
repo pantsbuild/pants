@@ -25,7 +25,7 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, softwrap
 
 
-class PexRuntimeEnvironment(Subsystem):
+class PexSubsystem(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
@@ -160,17 +160,17 @@ class PexEnvironment(EngineAwareReturnType):
 async def find_pex_python(
     python_bootstrap: PythonBootstrap,
     python_binary: PythonBinary,
-    pex_runtime_env: PexRuntimeEnvironment,
+    pex_subsystem: PexSubsystem,
     subprocess_env_vars: SubprocessEnvironmentVars,
     named_caches_dir: NamedCachesDirOption,
 ) -> PexEnvironment:
     return PexEnvironment(
-        path=pex_runtime_env.path(python_bootstrap.environment),
+        path=pex_subsystem.path(python_bootstrap.environment),
         interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),
-        venv_use_symlinks=pex_runtime_env.venv_use_symlinks,
+        venv_use_symlinks=pex_subsystem.venv_use_symlinks,
     )
 
 

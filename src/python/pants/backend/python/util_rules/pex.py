@@ -30,7 +30,7 @@ from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
-    PexRuntimeEnvironment,
+    PexSubsystem,
     PythonExecutable,
 )
 from pants.backend.python.util_rules.pex_requirements import (
@@ -287,7 +287,7 @@ class OptionalPex:
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(
-    interpreter_constraints: InterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
+    interpreter_constraints: InterpreterConstraints, pex_subsystem: PexSubsystem
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
@@ -334,7 +334,7 @@ async def find_interpreter(
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
-    if pex_runtime_env.verbosity > 0:
+    if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
@@ -502,10 +502,7 @@ async def _setup_pex_requirements(
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
-    request: PexRequest,
-    python_setup: PythonSetup,
-    platform: Platform,
-    pex_runtime_env: PexRuntimeEnvironment,
+    request: PexRequest, python_setup: PythonSetup, platform: Platform, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
     argv = [
@@ -579,7 +576,7 @@ async def build_pex(
     # platform.
     result = await Get(ProcessResult, Process, process)
 
-    if pex_runtime_env.verbosity > 0:
+    if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
