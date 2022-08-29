@@ -140,7 +140,7 @@ async def prepare_shell_command_process(
                 binary_name=tool,
                 search_path=search_path,
             )
-            for tool in {*tools, *["mkdir", "ln"]}
+            for tool in (*tools, *["mkdir", "ln"])
             if tool not in BASH_BUILTIN_COMMANDS
         ]
         tool_paths = await MultiGet(
