@@ -39,18 +39,23 @@ if is_oxidized and not sys.argv[0]:
 
 
 def pex_main() -> bool:
-    """Detect whether some external process is trying to invoke this binary as Pex.
+    """Detect whether some process is trying to invoke this binary as (or as a Child of) Pex:
 
-    When bootstrapping a plugin venv, Pants will reinvoke Pex in the binary that Pants was loaded
-    with. Pex will subsequently run a bunch of Python processes in order to run pip, venv, and
-    `python -c` invocations. This looks for certain command line switches, and attempt to invoke the
-    relevant modules that those switches indicate.
+    In order to fetch 3rd-party plugins that will be compatible with Pants' environment, Pants will
+    invoke Pex using the same binary that Pants was loaded with. In a non-PyOxidized environment,
+    this is a working Python interpreter. In PyOxidized environments, it's the binary itself. Pex
+    subsequently runs a bunch of Python processes in order to invoke `pip`, `venv`, and `python -c`.
+    This looks for certain command line switches, and attempt to invoke the relevant modules that
+    those switches indicate. Each of the functions below will get the import machinery and
+    `sys.modules` content into a state where the relevant invocations will run in a more-or-less
+    "normal" manner (at least as far as `pex` is concerned).
     """
 
     if len(sys.argv) < 2:
         return False
 
     if sys.argv[1] == "./pex":
+        # `pex` itself is being called to assemble a pex package
         _run_as_pex()
         return True
 
@@ -97,10 +102,11 @@ def traditional_import_machinery():
             ),
         ] + sys.path_hooks
 
-    yield
-
-    sys.meta_path = old_sys_meta_path
-    sys.path_hooks = old_sys_path_hooks
+    try:
+        yield
+    finally:
+        sys.meta_path = old_sys_meta_path
+        sys.path_hooks = old_sys_path_hooks
 
 
 def use_traditional_import_machinery(f):

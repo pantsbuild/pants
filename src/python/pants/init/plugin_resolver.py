@@ -12,6 +12,7 @@ from typing import Optional, cast
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
+from pants import ox
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -128,7 +129,6 @@ class PluginResolver:
         env: CompleteEnvironment,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-        from pants import ox
 
         with ox.traditional_import_machinery():
             for resolved_plugin_location in self._resolve_plugins(
