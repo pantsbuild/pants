@@ -34,6 +34,11 @@ For some contributions, such as adding new features, the best place to get start
 
 If you want to contribute but don't have a specific plan or idea, we can help you discover some fruitful areas to focus on. There is plenty to do!
 
+> 📘 Interested in joining Pants team?
+> 
+> Welcome, future colleague! Learn more about the team's composition and eligibility criteria by reading below, then post in the #development channel of the [community Slack](doc:getting-started) to express interest in formally joining the [team](doc:team). We love opportunity to usher in new teammates, and are happy to offer mentorship support to community members who request it and have a track record of commitment to the long-term vitality of the project.
+
+
 How is the community structured?
 --------------------------------
 
