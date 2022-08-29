@@ -198,3 +198,35 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         filename="mychart/templates/configmap.yaml",
     )
     assert template_output == expected_config_map_file
+
+
+def test_ignore_missing_interpolated_keys_during_render(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **_common_workspace_files(),
+            "src/deployment/BUILD": dedent(
+                """\
+                helm_deployment(
+                    name='foo',
+                    dependencies=['//src/mychart'],
+                    values={"foo": "{env.foo}"},
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    rendered = rule_runner.request(
+        RenderedHelmFiles,
+        [
+            HelmDeploymentRequest(
+                field_set,
+                cmd=HelmDeploymentCmd.RENDER,
+                description="Test ignore missing interpolated values",
+            )
+        ],
+    )
+    assert rendered.snapshot.files
