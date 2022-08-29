@@ -182,6 +182,27 @@ fn self_cycle_with_external_dep() {
 }
 
 #[test]
+fn multiple_provided() {
+  let rules = indexset![
+    Rule(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new_with_params("b", vec!["c", "d"])]
+    ),
+    Rule(
+      "b",
+      "b_from_c_and_d",
+      vec![DependencyKey::new("c"), DependencyKey::new("d"),],
+    ),
+  ];
+  let queries = indexset![Query::new("a", vec![])];
+  let graph = RuleGraph::new(rules, queries).unwrap();
+
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![], "a").unwrap();
+}
+
+#[test]
 fn ambiguous_cycle() {
   let _logger = env_logger::try_init();
   let rules = indexset![

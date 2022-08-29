@@ -55,13 +55,18 @@ impl<'x> Params {
   }
 
   ///
-  /// Adds the given param Key to these Params, replacing an existing param with the same type if
-  /// it exists.
+  /// Adds the given param Keys to these Params, replacing existing params with the same type if
+  /// they exist.
   ///
-  pub fn put(&mut self, param: Key) {
-    match self.binary_search(param.type_id) {
-      Ok(idx) => self.0[idx] = param,
-      Err(idx) => self.0.insert(idx, param),
+  /// TODO: This is currently O(N^2 * M) for N existing Params and M added params, but both N and M
+  /// are expected to be small. Should microbenchmark at some point.
+  ///
+  pub fn extend(&mut self, params: impl IntoIterator<Item = Key>) {
+    for param in params {
+      match self.binary_search(param.type_id) {
+        Ok(idx) => self.0[idx] = param,
+        Err(idx) => self.0.insert(idx, param),
+      }
     }
   }
 

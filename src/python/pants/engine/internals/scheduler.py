@@ -663,14 +663,23 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             native_engine.tasks_add_select(tasks, selector)
 
         for the_get in rule.input_gets:
-            if is_union(the_get.input_type):
-                # Register a union. TODO: See #12934: this should involve an explicit interface
+            unions = [t for t in the_get.input_types if is_union(t)]
+            if len(unions) == 1:
+                # Register the union by recording a copy of the Get for each union member.
+                # TODO: See #12934: this should involve an explicit interface
                 # soon, rather than one being implicitly created with only the provided Param.
-                for union_member in union_membership.get(the_get.input_type):
-                    native_engine.tasks_add_union(tasks, the_get.output_type, (union_member,))
+                union = unions[0]
+                for union_member in union_membership.get(union):
+                    native_engine.tasks_add_union(
+                        tasks,
+                        the_get.output_type,
+                        tuple(union_member if t == union else t for t in the_get.input_types),
+                    )
+            elif len(unions) > 1:
+                raise TypeError("Only one @union may be used in a Get.")
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_type)
+                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
 
         native_engine.tasks_task_end(tasks)
 

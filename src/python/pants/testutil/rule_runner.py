@@ -590,17 +590,22 @@ def run_rule_with_mocks(
         return res
 
     def get(res: Get | Effect):
+        if len(res.inputs) != 1:
+            raise AssertionError(
+                f"TODO: `run_rule_with_mocks` does not yet support multiple parameter `Get`s: {res}"
+            )
+        val = res.inputs[0]
         provider = next(
             (
                 mock_get.mock
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
                 and (
-                    mock_get.input_type == type(res.input)  # noqa: E721
+                    mock_get.input_type == type(val)  # noqa: E721
                     or (
                         union_membership
                         and mock_get.input_type in union_membership
-                        and union_membership.is_member(mock_get.input_type, res.input)
+                        and union_membership.is_member(mock_get.input_type, val)
                     )
                 )
             ),
@@ -608,7 +613,7 @@ def run_rule_with_mocks(
         )
         if provider is None:
             raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
-        return provider(res.input)
+        return provider(val)
 
     rule_coroutine = res
     rule_input = None

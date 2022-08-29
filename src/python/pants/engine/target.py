@@ -467,19 +467,8 @@ class Target:
     @final
     @memoized_classproperty
     def _plugin_field_cls(cls) -> type:
-        # Use the `PluginField` of the first `Target`-subclass ancestor as a base to ours, so that
-        # we inherit the registered fields. E.g. If I inherit from `PythonSourceTarget`, I want all
-        # the registered fields on `PythonSourceTarget` to also be registered for me.
-        baseclass = (
-            object
-            if cast("Type[Target]", cls) is Target
-            else next(
-                base for base in cast("Type[Target]", cls).__bases__ if issubclass(base, Target)
-            )._plugin_field_cls
-        )
-
         @union
-        class PluginField(baseclass):  # type: ignore[misc, valid-type]
+        class PluginField:
             pass
 
         return PluginField
@@ -515,7 +504,15 @@ class Target:
     @final
     @classmethod
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
-        return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, Target):
+                result.update(union_membership.get(cls._plugin_field_cls))
+
+        return tuple(result)
 
     @final
     @classmethod
