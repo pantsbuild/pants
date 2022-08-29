@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional, Tuple
 
-from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import (
     PexEnvironment,
-    PexRuntimeEnvironment,
+    PexSubsystem,
     PythonExecutable,
 )
 from pants.core.util_rules import external_tool
@@ -126,15 +126,15 @@ async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_pex: PexPEX,
     pex_env: PexEnvironment,
-    python_native_code: PythonNativeCode,
+    python_native_code_subsystem: PythonNativeCodeSubsystem,
     global_options: GlobalOptions,
-    pex_runtime_env: PexRuntimeEnvironment,
+    pex_subsystem: PexSubsystem,
 ) -> Process:
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
-    # Instead we manually create a FileContent for it.
+    # Instead, we manually create a FileContent for it.
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
@@ -171,9 +171,7 @@ async def setup_pex_cli_process(
     if request.concurrency_available > 0:
         global_args.extend(["--jobs", "{pants_concurrency}"])
 
-    verbosity_args = (
-        [f"-{'v' * pex_runtime_env.verbosity}"] if pex_runtime_env.verbosity > 0 else []
-    )
+    verbosity_args = [f"-{'v' * pex_subsystem.verbosity}"] if pex_subsystem.verbosity > 0 else []
 
     resolve_args = (
         [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
@@ -194,7 +192,7 @@ async def setup_pex_cli_process(
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
-        **python_native_code.environment_dict,
+        **python_native_code_subsystem.environment_dict,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
