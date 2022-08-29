@@ -106,6 +106,7 @@ async def generate_scala_from_protobuf(
     scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
     jdk: InternalJdk,
+    platform: Platform,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -121,7 +122,7 @@ async def generate_scala_from_protobuf(
         transitive_targets,
         inherit_env,
     ) = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),

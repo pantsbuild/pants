@@ -34,7 +34,9 @@ def test_initialises_basic_helm_binary(rule_runner: RuleRunner) -> None:
     helm_binary = rule_runner.request(HelmBinary, [])
 
     assert helm_binary
-    assert helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.current)}"
+    assert (
+        helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.create_for_localhost())}"
+    )
 
 
 def test_create_helm_process(rule_runner: RuleRunner) -> None:

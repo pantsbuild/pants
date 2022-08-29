@@ -109,7 +109,7 @@ class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=A
     def download_myplugin_plugin_request(
         _: MyPluginBinding, subsystem: MyHelmPluginSubsystem
     ) -> ExternalHelmPluginRequest:
-        return ExternalHelmPluginRequest.from_subsystem(subsystem)
+        return ExternalHelmPluginRequest.from_subsystem(subsystem, platform)
 
 
     def rules():
@@ -188,8 +188,9 @@ class ExternalHelmPluginRequest(EngineAwareParameter):
     _tool_request: ExternalToolRequest
 
     @classmethod
-    def from_subsystem(cls, subsystem: ExternalHelmPlugin) -> ExternalHelmPluginRequest:
-        platform = Platform.current
+    def from_subsystem(
+        cls, subsystem: ExternalHelmPlugin, platform: Platform
+    ) -> ExternalHelmPluginRequest:
         return cls(
             plugin_name=subsystem.plugin_name,
             platform=platform,
@@ -360,11 +361,11 @@ class HelmProcess:
 
 
 @rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
-async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) -> HelmBinary:
+async def setup_helm(
+    helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins, platform: Platform
+) -> HelmBinary:
     downloaded_binary, empty_dirs_digest = await MultiGet(
-        Get(
-            DownloadedExternalTool, ExternalToolRequest, helm_subsytem.get_request(Platform.current)
-        ),
+        Get(DownloadedExternalTool, ExternalToolRequest, helm_subsytem.get_request(platform)),
         Get(
             Digest,
             CreateDigest(

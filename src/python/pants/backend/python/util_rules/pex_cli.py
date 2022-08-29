@@ -114,10 +114,8 @@ class PexPEX(DownloadedExternalTool):
 
 
 @rule
-async def download_pex_pex(pex_cli: PexCli) -> PexPEX:
-    pex_pex = await Get(
-        DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(Platform.current)
-    )
+async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
+    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 

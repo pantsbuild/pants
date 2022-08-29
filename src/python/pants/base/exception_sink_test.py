@@ -64,7 +64,7 @@ def test_set_invalid_log_location():
             "denied:"
         ),
     }
-    assert match(Platform.current, err_str) in str(exc.value)
+    assert match(Platform.create_for_localhost(), err_str) in str(exc.value)
 
 
 def test_log_exception():

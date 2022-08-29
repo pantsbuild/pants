@@ -40,7 +40,7 @@ class BufLintRequest(LintTargetsRequest):
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
-async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
+async def run_buf(request: BufLintRequest, buf: BufSubsystem, platform: Platform) -> LintResults:
     if buf.lint_skip:
         return LintResults([], linter_name=request.name)
 
@@ -66,9 +66,7 @@ async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
         ),
     )
 
-    download_buf_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, buf.get_request(Platform.current)
-    )
+    download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
 
     target_sources_stripped, all_sources_stripped, downloaded_buf = await MultiGet(
         target_stripped_sources_request, all_stripped_sources_request, download_buf_get

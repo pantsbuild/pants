@@ -115,14 +115,14 @@ You will need a rule for `fmt` which takes the `FmtRequest` from step 3  (e.g. `
 
 ```python
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
+async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> FmtResult:
     if shfmt.skip:
         return FmtResult.skip(formatter_name=request.name)
 
     download_shfmt_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        shfmt.get_request(Platform.current),
+        shfmt.get_request(platform),
     )
 
     # If the user specified `--shfmt-config`, we must search for the file they specified with
