@@ -169,7 +169,7 @@ async def _setup_pip_args_and_constraints_file(
 ) -> _PipArgsAndConstraintsSetup:
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
-    args = list(resolve_config.indexes_and_find_links_and_manylinux_pex_args())
+    args = list(resolve_config.pex_args())
     digests = []
 
     # This feature only works with Pex lockfiles.
