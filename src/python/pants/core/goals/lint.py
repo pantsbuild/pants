@@ -192,7 +192,14 @@ class LintSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
+        return bool(
+            {
+                LintTargetsRequest,
+                LintFilesRequest,
+                FmtTargetsRequest,
+                _FmtBuildFilesRequest,
+            }.intersection(union_membership.union_rules.keys())
+        )
 
     only = StrListOption(
         help=only_option_help("lint", "linter", "flake8", "shellcheck"),
