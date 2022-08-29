@@ -31,7 +31,7 @@ def rules():
         *collect_rules(),
         UnionRule(UvicornServerSetupRequest, GraphQLUvicornServerSetupRequest),
         # Root query data rules for graphql.
-        QueryRule(AllUnexpandedTargets, ()),
-        QueryRule(TargetDatas, (UnexpandedTargets,)),
-        QueryRule(UnexpandedTargets, (Specs,)),
+        QueryRule(AllUnexpandedTargets, (EnvironmentName,)),
+        QueryRule(TargetDatas, (UnexpandedTargets, EnvironmentName)),
+        QueryRule(UnexpandedTargets, (Specs, EnvironmentName)),
     )

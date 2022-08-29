@@ -222,8 +222,8 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            QueryRule(WrappedTarget, [WrappedTargetRequest]),
-            QueryRule(AllTargets, []),
+            QueryRule(WrappedTarget, [WrappedTargetRequest, EnvironmentName]),
+            QueryRule(AllTargets, [EnvironmentName]),
             QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()

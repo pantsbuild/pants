@@ -28,7 +28,7 @@ class ExplorerServerRequest:
     def rules_for_implementation(cls, impl: type):
         return (
             UnionRule(cls, impl),
-            QueryRule(ExplorerServer, (impl,)),
+            QueryRule(ExplorerServer, (impl, EnvironmentName)),
         )
 
 
