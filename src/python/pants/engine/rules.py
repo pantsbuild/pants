@@ -385,6 +385,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
+
     if not namespaces:
         currentframe = inspect.currentframe()
         assert isinstance(currentframe, FrameType)
