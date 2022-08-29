@@ -108,8 +108,8 @@ impl super::CommandRunner for CommandRunner {
         // Update env, replacing `{chroot}` placeholders with `/pants-work`. This is the mount point
         // for the work directory within the Docker container.
         //
-        // DOCKER-TODO: When dealing with invocations from cached containers, `{chroot}` should be
-        // replaced by the Pants executor process running inside the container.
+        // DOCKER-TODO: With cached containers, the destination in the container
+        // will need to be unique within that container to avoid conflicts.
         apply_chroot("/pants-work", &mut req);
 
         // Prepare the workdir.
@@ -122,6 +122,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           &self.named_caches,
           &self.immutable_inputs,
+          Some(Path::new("/pants-named-caches")),
+          Some(Path::new("/pants-immutable-inputs")),
         )
         .await?;
 
@@ -135,7 +137,10 @@ impl super::CommandRunner for CommandRunner {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            (),
+            (
+              self.immutable_inputs.workdir().to_path_buf(),
+              self.named_caches.base_dir().to_path_buf(),
+            ),
             exclusive_spawn,
             req
               .platform_constraint
@@ -171,15 +176,18 @@ impl super::CommandRunner for CommandRunner {
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  type WorkdirToken = ();
+  type WorkdirToken = (PathBuf, PathBuf);
 
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    _workdir_token: (),
+    (immutable_inputs_workdir, named_caches_workdir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+    log::debug!("immutable_inputs_workdir = {:?}", &immutable_inputs_workdir);
+    log::debug!("named_caches_workdir = {:?}", &named_caches_workdir);
+
     let env = req
       .env
       .iter()
@@ -193,6 +201,26 @@ impl CapturedWorkdir for CommandRunner {
       .map_err(|s| {
         format!(
           "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
+          s
+        )
+      })?;
+
+    let immutable_inputs_workdir_as_string = immutable_inputs_workdir
+      .into_os_string()
+      .into_string()
+      .map_err(|s| {
+        format!(
+          "Unable to convert immutable_inputs_workdir due to non UTF-8 characters: {:?}",
+          s
+        )
+      })?;
+
+    let named_caches_workdir_as_string = named_caches_workdir
+      .into_os_string()
+      .into_string()
+      .map_err(|s| {
+        format!(
+          "Unable to convert named_caches_workdir due to non UTF-8 characters: {:?}",
           s
         )
       })?;
@@ -216,8 +244,17 @@ impl CapturedWorkdir for CommandRunner {
       env: Some(env),
       cmd: Some(req.argv),
       working_dir: Some(working_dir),
+      // user: Some(format!("{}", unsafe { libc::geteuid() })),
+      user: Some("root".to_string()),
       host_config: Some(bollard_stubs::models::HostConfig {
-        binds: Some(vec![format!("{}:/pants-work", workdir_path_as_string)]),
+        binds: Some(vec![
+          format!("{}:/pants-work:rw", workdir_path_as_string),
+          format!(
+            "{}:/pants-immutable-inputs",
+            immutable_inputs_workdir_as_string
+          ),
+          format!("{}:/pants-named-caches:rw", named_caches_workdir_as_string),
+        ]),
         auto_remove: Some(self.keep_sandboxes == KeepSandboxes::Never),
         ..bollard_stubs::models::HostConfig::default()
       }),

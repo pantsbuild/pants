@@ -186,6 +186,8 @@ impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
           self.executor.clone(),
           self.inner.named_caches(),
           self.inner.immutable_inputs(),
+          None,
+          None,
         )
         .await?;
 

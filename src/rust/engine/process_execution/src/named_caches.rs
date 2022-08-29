@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
 use serde::Serialize;
@@ -38,6 +38,10 @@ pub struct NamedCaches {
 impl NamedCaches {
   pub fn new(local_base: PathBuf) -> NamedCaches {
     NamedCaches { local_base }
+  }
+
+  pub fn base_dir(&self) -> &Path {
+    &self.local_base
   }
 
   // This default suffix is also hard-coded into the Python options code in global_options.py

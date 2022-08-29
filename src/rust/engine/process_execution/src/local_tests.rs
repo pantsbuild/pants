@@ -747,6 +747,8 @@ async fn prepare_workdir_exclusive_relative() {
     executor,
     &named_caches,
     &immutable_inputs,
+    None,
+    None,
   )
   .await
   .unwrap();

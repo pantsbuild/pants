@@ -515,6 +515,8 @@ fn interactive_process(
       context.core.executor.clone(),
       &context.core.named_caches,
       &context.core.immutable_inputs,
+      None,
+      None,
     )
     .await?;
     apply_chroot(tempdir.path().to_str().unwrap(), &mut process);

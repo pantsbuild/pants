@@ -37,7 +37,7 @@ use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, LocalCommandRunner, NamedCaches,
-  Platform, Process, ProcessError, ProcessResultMetadata, ProcessResultSource,
+  Platform, Process, ProcessError, ProcessResultMetadata, ProcessResultSource, WorkdirSymlink,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -306,6 +306,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           &self.named_caches,
           &self.immutable_inputs,
+          None,
+          None,
         )
         .await?;
 
@@ -638,22 +640,59 @@ pub async fn prepare_workdir(
   executor: Executor,
   named_caches: &NamedCaches,
   immutable_inputs: &ImmutableInputs,
+  named_caches_prefix: Option<&Path>,
+  immutable_inputs_prefix: Option<&Path>,
 ) -> Result<bool, StoreError> {
   // Collect the symlinks to create for immutable inputs or named caches.
-  let workdir_symlinks = immutable_inputs
-    .local_paths(&req.input_digests.immutable_inputs)
-    .await?
+  let immutable_inputs_symlinks = {
+    let symlinks = immutable_inputs
+      .local_paths(&req.input_digests.immutable_inputs)
+      .await?;
+
+    match immutable_inputs_prefix {
+      Some(prefix) => symlinks
+        .into_iter()
+        .map(|symlink| WorkdirSymlink {
+          src: symlink.src,
+          dst: prefix.join(
+            symlink
+              .dst
+              .strip_prefix(immutable_inputs.workdir())
+              .unwrap(),
+          ),
+        })
+        .collect::<Vec<_>>(),
+      None => symlinks,
+    }
+  };
+  log::debug!(
+    "immutable_inputs_symlinks = {:?}",
+    &immutable_inputs_symlinks
+  );
+  let named_caches_symlinks = {
+    let symlinks = named_caches
+      .local_paths(&req.append_only_caches)
+      .map_err(|err| {
+        StoreError::Unclassified(format!(
+          "Failed to make named cache(s) for local execution: {:?}",
+          err
+        ))
+      })?;
+    match named_caches_prefix {
+      Some(prefix) => symlinks
+        .into_iter()
+        .map(|symlink| WorkdirSymlink {
+          src: symlink.src,
+          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_dir()).unwrap()),
+        })
+        .collect::<Vec<_>>(),
+      None => symlinks,
+    }
+  };
+  log::debug!("named_caches_symlinks = {:?}", &named_caches_symlinks);
+  let workdir_symlinks = immutable_inputs_symlinks
     .into_iter()
-    .chain(
-      named_caches
-        .local_paths(&req.append_only_caches)
-        .map_err(|err| {
-          StoreError::Unclassified(format!(
-            "Failed to make named cache(s) for local execution: {:?}",
-            err
-          ))
-        })?,
-    )
+    .chain(named_caches_symlinks.into_iter())
     .collect::<Vec<_>>();
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
