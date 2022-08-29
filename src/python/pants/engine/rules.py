@@ -268,15 +268,17 @@ def validate_requirements(
                 f"a side-effecting parameter: {ty}."
             )
     for awaitable in awaitables:
-        input_type_side_effecting = issubclass(awaitable.input_type, SideEffecting)
+        input_type_side_effecting = [
+            it for it in awaitable.input_types if issubclass(it, SideEffecting)
+        ]
         if input_type_side_effecting and not awaitable.is_effect:
             raise ValueError(
-                f"A `Get` may not request a side-effecting type ({awaitable.input_type}). "
+                f"A `Get` may not request side-effecting types ({input_type_side_effecting}). "
                 f"Use `Effect` instead: `{awaitable}`."
             )
         if not input_type_side_effecting and awaitable.is_effect:
             raise ValueError(
-                f"An `Effect` should not be used with a pure type ({awaitable.input_type}). "
+                f"An `Effect` should not be used with pure types ({awaitable.input_types}). "
                 f"Use `Get` instead: `{awaitable}`."
             )
         if cacheable and awaitable.is_effect:
@@ -383,6 +385,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
 
     If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
+
     if not namespaces:
         currentframe = inspect.currentframe()
         assert isinstance(currentframe, FrameType)

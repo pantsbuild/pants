@@ -27,16 +27,19 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
     DigestSubset,
     Directory,
     FileDigest,
+    MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, MergeDigests, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -433,15 +436,19 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
 
 
 @rule
-def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
-    env = {**helm_binary.env, **request.extra_env}
+async def helm_process(
+    request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
+) -> Process:
+    global_extra_env = await Get(Environment, EnvironmentRequest(helm_subsytem.extra_env_vars))
 
+    # Helm binary's setup parameters go last to prevent end users overriding any of its values.
+
+    env = {**global_extra_env, **request.extra_env, **helm_binary.env}
     immutable_input_digests = {
-        **helm_binary.immutable_input_digests,
         **request.extra_immutable_input_digests,
+        **helm_binary.immutable_input_digests,
     }
-
-    append_only_caches = {**helm_binary.append_only_caches, **request.extra_append_only_caches}
+    append_only_caches = {**request.extra_append_only_caches, **helm_binary.append_only_caches}
 
     return Process(
         [helm_binary.path, *request.argv],

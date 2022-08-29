@@ -43,10 +43,6 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
-from pants.backend.docker.value_interpolation import (
-    DockerInterpolationContext,
-    DockerInterpolationError,
-)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
@@ -63,6 +59,7 @@ from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
+from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 
 @pytest.fixture
@@ -380,7 +377,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    interpolation_context = DockerInterpolationContext.from_dict(
+    interpolation_context = InterpolationContext.from_dict(
         {
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
@@ -1122,7 +1119,7 @@ ImageRefTest = namedtuple(
             docker_image=dict(repository="{default_repository}/a"),
             default_repository="{target_repository}/b",
             expect_error=pytest.raises(
-                DockerInterpolationError,
+                InterpolationError,
                 match=(
                     r"Invalid value for the `repository` field of the `docker_image` target at "
                     r"src/test/docker:image: '\{default_repository\}/a'\.\n\n"
@@ -1139,7 +1136,7 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
     tgt = DockerImageTarget(test.docker_image, address)
     field_set = DockerFieldSet.create(tgt)
     registries = DockerRegistries.from_dict(test.registries)
-    interpolation_context = DockerInterpolationContext.from_dict({})
+    interpolation_context = InterpolationContext.from_dict({})
     with test.expect_error or no_exception():
         assert (
             field_set.image_refs(test.default_repository, registries, interpolation_context)

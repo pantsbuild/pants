@@ -17,7 +17,6 @@ from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
-from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -85,27 +84,20 @@ class PythonBootstrapSubsystem(Subsystem):
 class PythonBootstrap:
     EXTRA_ENV_VAR_NAMES = ("PATH", "PYENV_ROOT")
 
-    options: OptionValueContainer
+    interpreter_names: tuple[str, ...]
+    raw_interpreter_search_paths: tuple[str, ...]
     environment: Environment
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
 
-    @property
-    def interpreter_names(self) -> tuple[str, ...]:
-        return tuple(self.options.names)
-
     @memoized_method
     def interpreter_search_paths(self):
         return self._expand_interpreter_search_paths(
-            self.raw_search_paths(self.options),
+            self.raw_interpreter_search_paths,
             self.environment,
             self.asdf_standard_tool_paths,
             self.asdf_local_tool_paths,
         )
-
-    @classmethod
-    def raw_search_paths(cls, options: OptionValueContainer) -> tuple[str, ...]:
-        return tuple(options.search_path)
 
     @classmethod
     def _expand_interpreter_search_paths(
@@ -228,7 +220,7 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 @rule
 async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
-    interpreter_search_paths = PythonBootstrap.raw_search_paths(python_bootstrap_subsystem.options)
+    interpreter_search_paths = python_bootstrap_subsystem.search_path
 
     has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
         interpreter_search_paths
@@ -246,7 +238,8 @@ async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem)
     )
 
     return PythonBootstrap(
-        options=python_bootstrap_subsystem.options,
+        interpreter_names=python_bootstrap_subsystem.names,
+        raw_interpreter_search_paths=interpreter_search_paths,
         environment=result.env,
         asdf_standard_tool_paths=result.standard_tool_paths,
         asdf_local_tool_paths=result.local_tool_paths,

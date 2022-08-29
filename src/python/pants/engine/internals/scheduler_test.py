@@ -181,9 +181,9 @@ def test_union_rules() -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [WrappedVehicle("not a vehicle")])  # type: ignore[arg-type]
     assert (
-        "Invalid Get. Because the second argument to `Get(int, Vehicle, not a vehicle)` is "
-        "annotated with `@union`, the third argument should be a member of that union. Did you "
-        "intend to register `UnionRule(Vehicle, str)`?"
+        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
+        "annotated with `@union`, the value for that type should be a member of that union. Did you "
+        "intend to register a `UnionRule`?"
     ) in str(exc.value.args[0])
 
 

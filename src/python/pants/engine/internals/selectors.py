@@ -6,7 +6,6 @@ from __future__ import annotations
 import ast
 import itertools
 from dataclasses import dataclass
-from functools import partial
 from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
@@ -62,65 +61,19 @@ class GetParseError(ValueError):
 @dataclass(unsafe_hash=True)
 class AwaitableConstraints:
     output_type: type
-    input_type: type
+    input_types: tuple[type, ...]
     is_effect: bool
-
-    @classmethod
-    def signature_from_call_node(
-        cls, call_node: ast.Call, *, source_file_name: str
-    ) -> tuple[str, str, bool] | None:
-        if not isinstance(call_node.func, ast.Name):
-            return None
-        if call_node.func.id not in ("Get", "Effect"):
-            return None
-        is_effect = call_node.func.id == "Effect"
-
-        get_args = call_node.args
-
-        parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
-
-        if len(get_args) not in (2, 3):
-            raise parse_error(
-                f"Expected either two or three arguments, but got {len(get_args)} arguments."
-            )
-
-        output_expr = get_args[0]
-        if not isinstance(output_expr, ast.Name):
-            raise parse_error(
-                "The first argument should be the output type, like `Digest` or `ProcessResult`."
-            )
-        output_type = output_expr.id
-
-        input_args = get_args[1:]
-        if len(input_args) == 1:
-            input_constructor = input_args[0]
-            if not isinstance(input_constructor, ast.Call):
-                raise parse_error(
-                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
-                    "InputType(constructor args), the second argument should be a constructor "
-                    "call, like `MergeDigest(...)` or `Process(...)`."
-                )
-            if not hasattr(input_constructor.func, "id"):
-                raise parse_error(
-                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
-                    "InputType(constructor args), the second argument should be a top-level "
-                    "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
-                    "than a method call."
-                )
-            return output_type, input_constructor.func.id, is_effect  # type: ignore[attr-defined]
-
-        input_type, _ = input_args
-        if not isinstance(input_type, ast.Name):
-            raise parse_error(
-                f"Because you are using the longhand form {call_node.func.id}(OutputType, "
-                "InputType, input), the second argument should be a type, like `MergeDigests` or "
-                "`Process`."
-            )
-        return output_type, input_type.id, is_effect
 
     def __repr__(self) -> str:
         name = "Effect" if self.is_effect else "Get"
-        return f"{name}({self.output_type.__name__}, {self.input_type.__name__}, ..)"
+        if len(self.input_types) == 0:
+            inputs = ""
+        elif len(self.input_types) == 1:
+            inputs = f", {self.input_types[0].__name__}, .."
+        else:
+            input_items = ", ".join(f"{t.__name__}: .." for t in self.input_types)
+            inputs = f", {{{input_items}}}"
+        return f"{name}({self.output_type.__name__}{inputs})"
 
     def __str__(self) -> str:
         return repr(self)
@@ -571,7 +524,7 @@ async def MultiGet(  # noqa: F811
         if arg is None:
             return None
         if isinstance(arg, Get):
-            return f"Get({arg.output_type.__name__}, {arg.input_type.__name__}, ...)"
+            return repr(arg)
         return repr(arg)
 
     likely_args_exlicitly_passed = tuple(

@@ -191,7 +191,7 @@ impl<R: Rule> Builder<R> {
           .values()
           .flatten()
           .flat_map(|rule| rule.dependency_keys())
-          .filter_map(|dk| dk.provided_param()),
+          .flat_map(|dk| dk.provided_params.iter().cloned()),
       )
       .collect::<ParamTypes<_>>();
     Builder {
@@ -284,7 +284,7 @@ impl<R: Rule> Builder<R> {
         .into_iter()
         .map(|dependency_key| {
           let mut candidates = Vec::new();
-          if dependency_key.provided_param().is_none()
+          if dependency_key.provided_params.is_empty()
             && graph[node_id].1.contains(&dependency_key.product())
           {
             candidates.push(Node::Param(dependency_key.product()));
@@ -351,12 +351,10 @@ impl<R: Rule> Builder<R> {
             Node::Rule(rule) => {
               // If the key provides a Param for the Rule to consume, include it in the out_set for
               // the dependency node.
-              let out_set = if let Some(provided_param) = dependency_key.provided_param() {
+              let out_set = {
                 let mut out_set = out_set.clone();
-                out_set.insert(provided_param);
+                out_set.extend(dependency_key.provided_params.iter().cloned());
                 out_set
-              } else {
-                out_set.clone()
               };
               let rule_id = rules
                 .entry((rule.clone(), out_set.clone()))
@@ -574,10 +572,7 @@ impl<R: Rule> Builder<R> {
 
           // Compute the out_set of this dependee, plus the provided param, if any.
           let mut out_set = graph[edge_ref.source()].0.out_set.clone();
-          if let Some(p) = edge_ref.weight().0.provided_param() {
-            out_set.insert(p);
-          }
-
+          out_set.extend(edge_ref.weight().0.provided_params.iter().cloned());
           dbos
             .entry(out_set)
             .or_insert_with(Vec::new)
@@ -764,10 +759,10 @@ impl<R: Rule> Builder<R> {
         for (dependency_key, dependee_id) in &dependees {
           // Add a new edge.
           let mut edge = MaybeDeleted::new(dependency_key.clone());
-          if let Some(p) = dependency_key.provided_param() {
+          for p in &dependency_key.provided_params {
             // NB: If the edge is invalid because it does not consume the provide param, we
             // create it as deleted with that reason.
-            if !graph[replacement_id].0.in_set.contains(&p) {
+            if !graph[replacement_id].0.in_set.contains(p) {
               edge.mark_deleted(EdgePrunedReason::DoesNotConsumeProvidedParam);
             }
           }
@@ -944,11 +939,10 @@ impl<R: Rule> Builder<R> {
                 !edge_ref.weight().is_deleted() && !graph[edge_ref.target()].is_deleted()
               })
               .filter(|edge_ref| {
-                if let Some(provided_param) = dependency_key.provided_param() {
-                  graph[edge_ref.target()].0.in_set.contains(&provided_param)
-                } else {
-                  true
-                }
+                dependency_key
+                  .provided_params
+                  .iter()
+                  .all(|p| graph[edge_ref.target()].0.in_set.contains(p))
               })
               .collect()
           }
@@ -1104,7 +1098,7 @@ impl<R: Rule> Builder<R> {
           })
           .collect::<Vec<_>>()
       )
-    } else if dependency_key.provided_param().is_none() {
+    } else if dependency_key.provided_params.is_empty() {
       format!(
         "No installed rules return the type {}, and it was not provided by potential \
         callers of {}.\nIf that type should be computed by a rule, ensure that that \
@@ -1277,7 +1271,7 @@ impl<R: Rule> Builder<R> {
   ///
   fn dependency_in_set<'a>(
     node_id: NodeIndex<u32>,
-    dependency_key: &DependencyKey<R::TypeId>,
+    dependency_key: &'a DependencyKey<R::TypeId>,
     dependency_id: NodeIndex<u32>,
     dependency_in_set: &'a ParamTypes<R::TypeId>,
   ) -> Box<dyn Iterator<Item = R::TypeId> + 'a> {
@@ -1293,16 +1287,16 @@ impl<R: Rule> Builder<R> {
       return Box::new(std::iter::empty());
     }
 
-    if let Some(provided_param) = dependency_key.provided_param() {
+    if dependency_key.provided_params.is_empty() {
+      Box::new(dependency_in_set.iter().cloned())
+    } else {
       // If the DependencyKey "provides" the Param, it does not count toward our in-set.
       Box::new(
         dependency_in_set
           .iter()
-          .filter(move |p| *p != &provided_param)
+          .filter(move |p| !dependency_key.provides(*p))
           .cloned(),
       )
-    } else {
-      Box::new(dependency_in_set.iter().cloned())
     }
   }
 
@@ -1417,9 +1411,9 @@ impl<R: Rule> Builder<R> {
 
           // Any param provided by this key must be consumed.
           dependency_key
-            .provided_param()
-            .map(|p| dependency_in_set.contains(&p))
-            .unwrap_or(true)
+            .provided_params
+            .iter()
+            .all(|p| dependency_in_set.contains(p))
         });
       if !in_set_satisfiable {
         continue;
