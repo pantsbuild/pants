@@ -63,8 +63,7 @@ impl NamedCaches {
     for symlink in &symlinks {
       safe_create_dir_all_ioerror(&symlink.dst).map_err(|err| {
         format!(
-          "Error making symlink {} -> {}: {:?}",
-          symlink.src.display(),
+          "Error creating directory {}: {:?}",
           symlink.dst.display(),
           err
         )
