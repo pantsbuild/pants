@@ -58,6 +58,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ async def prepare_shell_command_process(
                 binary_name=tool,
                 search_path=search_path,
             )
-            for tool in (*tools, *["mkdir", "ln"])
+            for tool in OrderedSet(*tools, *["mkdir", "ln"])
             if tool not in BASH_BUILTIN_COMMANDS
         ]
         tool_paths = await MultiGet(
