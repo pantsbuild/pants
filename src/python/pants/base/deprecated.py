@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 import logging
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 from packaging.version import InvalidVersion, Version
 
@@ -174,12 +174,15 @@ def deprecated_conditional(
         warn_or_error(removal_version, entity, hint, start_version=start_version)
 
 
+ReturnType = TypeVar("ReturnType")
+
+
 def deprecated(
     removal_version: str,
     hint: str | None = None,
     *,
     start_version: str | None = None,
-):
+) -> Callable[[Callable[..., ReturnType]], Callable[..., ReturnType]]:
     """Mark a function or method as deprecated."""
     validate_deprecation_semver(removal_version, "removal version")
 
