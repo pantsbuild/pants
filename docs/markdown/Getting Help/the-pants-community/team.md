@@ -6,7 +6,11 @@ hidden: false
 createdAt: "2022-08-15T22:36:48.659Z"
 updatedAt: "2022-08-28T22:13:54.279Z"
 ---
-Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](docs:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community. Interested in joining our team? Learn more on [The Pants Community](docs:the-pants-community) page.
+> 📘 Interested in joining Pants team?
+>
+> Welcome, future colleague! Learn more about the team's composition and eligibility criteria on the [Pants Community](docs:the-pants-community) page, then post in the #development channel of the [community Slack](doc:getting-started) to express interest in joining the team. We love opportunity to usher in new teammates, and are happy to offer mentorship support to community members who request it and have a track record of commitment to the long-term vitality of the project.
+
+Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](docs:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community.
 
 Maintainers
 -----------
