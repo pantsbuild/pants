@@ -55,7 +55,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
@@ -504,7 +503,6 @@ async def _setup_pex_requirements(
 async def build_pex(
     request: PexRequest,
     python_setup: PythonSetup,
-    platform: Platform,
     pex_runtime_env: PexRuntimeEnvironment,
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
@@ -558,8 +556,8 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             python=pex_python_setup.python,
             subcommand=(),
@@ -571,13 +569,6 @@ async def build_pex(
             concurrency_available=requirements_setup.concurrency_available,
         ),
     )
-
-    process = dataclasses.replace(process, platform=platform)
-
-    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
-    # without cross-building, we specify that our PEX command should be run on the current local
-    # platform.
-    result = await Get(ProcessResult, Process, process)
 
     if pex_runtime_env.verbosity > 0:
         log_output = result.stderr.decode()

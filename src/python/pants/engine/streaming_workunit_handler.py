@@ -15,6 +15,7 @@ from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals.native_engine import PyThreadLocals
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
@@ -102,7 +103,7 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        params = Params(self._specs, self._options_bootstrapper)
+        params = Params(self._specs, self._options_bootstrapper, Platform.create_for_localhost())
         request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
         unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
@@ -307,7 +308,7 @@ class _InnerHandler(threading.Thread):
 def rules():
     return [
         QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
-        QueryRule(Targets, (Specs, OptionsBootstrapper)),
-        QueryRule(Addresses, (Specs, OptionsBootstrapper)),
+        QueryRule(Targets, (Specs, OptionsBootstrapper, Platform)),
+        QueryRule(Addresses, (Specs, OptionsBootstrapper, Platform)),
         *collect_rules(),
     ]

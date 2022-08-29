@@ -15,7 +15,7 @@ from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import system_binaries
-from pants.engine import desktop, environment, fs, platform, process
+from pants.engine import desktop, environment, fs, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
@@ -25,6 +25,7 @@ from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
+from pants.engine.platform import Platform
 from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
@@ -85,7 +86,7 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace)
+    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace, Platform)
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -132,7 +133,7 @@ class GraphSession:
             if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace)
+            params = Params(specs, self.console, workspace, Platform.create_for_localhost())
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -262,7 +263,6 @@ class EngineInitializer:
                 *options_parsing.rules(),
                 *process.rules(),
                 *system_binaries.rules(),
-                *platform.rules(),
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
