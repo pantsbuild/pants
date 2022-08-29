@@ -47,7 +47,12 @@ def test_parse_address_family_empty() -> None:
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
-            Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases()),
+            Parser(
+                build_root="",
+                target_type_aliases=[],
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),

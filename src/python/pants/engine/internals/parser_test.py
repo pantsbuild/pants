@@ -28,27 +28,34 @@ def defaults_parser_state() -> BuildFileDefaultsParserState:
 
 
 def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> None:
-    parser = Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases())
+    parser = Parser(
+        build_root="",
+        target_type_aliases=[],
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=False,
+    )
     with pytest.raises(ParseError) as exc:
         parser.parse(
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
             defaults_parser_state,
-            ignore_unrecognized_symbols=False,
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
 
 def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState) -> None:
+    build_file_aliases = BuildFileAliases(
+        objects={"obj": 0},
+        context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
+    )
+
     def perform_test(extra_targets: list[str], dym: str) -> None:
         parser = Parser(
             build_root="",
             target_type_aliases=["tgt", *extra_targets],
-            object_aliases=BuildFileAliases(
-                objects={"obj": 0},
-                context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
-            ),
+            object_aliases=build_file_aliases,
+            ignore_unrecognized_symbols=False,
         )
         prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}))
         fmt_extra_sym = str(extra_targets)[1:-1] + (", ") if len(extra_targets) != 0 else ""
@@ -58,7 +65,6 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
-                ignore_unrecognized_symbols=False,
             )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
@@ -70,12 +76,17 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
         )
 
         with no_exception():
+            parser = Parser(
+                build_root="",
+                target_type_aliases=["tgt", *extra_targets],
+                object_aliases=build_file_aliases,
+                ignore_unrecognized_symbols=True,
+            )
             parser.parse(
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
-                ignore_unrecognized_symbols=True,
             )
 
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]

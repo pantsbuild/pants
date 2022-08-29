@@ -37,8 +37,6 @@ class AddressMap:
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
-        *,
-        ignore_unrecognized_symbols: bool,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -46,13 +44,7 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(
-                filepath,
-                build_file_content,
-                extra_symbols,
-                defaults,
-                ignore_unrecognized_symbols=ignore_unrecognized_symbols,
-            )
+            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
         name_to_target_adaptors: dict[str, TargetAdaptor] = {}

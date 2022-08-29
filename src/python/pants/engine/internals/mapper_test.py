@@ -29,7 +29,12 @@ from pants.util.frozendict import FrozenDict
 
 def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = False) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(build_root="", target_type_aliases=["thing"], object_aliases=BuildFileAliases())
+    parser = Parser(
+        build_root="",
+        target_type_aliases=["thing"],
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=ignore_unrecognized_symbols,
+    )
     address_map = AddressMap.parse(
         path,
         build_file,
@@ -38,7 +43,6 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         BuildFileDefaultsParserState.create(
             "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
         ),
-        ignore_unrecognized_symbols=ignore_unrecognized_symbols,
     )
     assert path == address_map.path
     return address_map

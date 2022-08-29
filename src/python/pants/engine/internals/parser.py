@@ -83,10 +83,12 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        ignore_unrecognized_symbols: bool,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
             build_root, target_type_aliases, object_aliases
         )
+        self.ignore_unrecognized_symbols = ignore_unrecognized_symbols
 
     @staticmethod
     def _generate_symbols(
@@ -148,8 +150,6 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
-        *,
-        ignore_unrecognized_symbols: bool,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
@@ -167,7 +167,7 @@ class Parser:
                 v.__globals__.update(global_symbols)
             global_symbols[k] = v
 
-        if ignore_unrecognized_symbols:
+        if self.ignore_unrecognized_symbols:
             while True:
                 try:
                     exec(build_file_content, global_symbols)

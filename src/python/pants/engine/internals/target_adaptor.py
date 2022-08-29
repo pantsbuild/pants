@@ -17,7 +17,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 class TargetAdaptorRequest(EngineAwareParameter):
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
-    ignore_unrecognized_build_file_symbols: bool = False
 
     def debug_hint(self) -> str:
         return self.address.spec

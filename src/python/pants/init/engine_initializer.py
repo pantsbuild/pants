@@ -178,6 +178,7 @@ class EngineInitializer:
         build_configuration: BuildConfiguration,
         dynamic_remote_options: DynamicRemoteOptions,
         executor: PyExecutor | None = None,
+        ignore_unrecognized_build_file_symbols: bool = False,
     ) -> GraphScheduler:
         build_root = get_buildroot()
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
@@ -197,6 +198,7 @@ class EngineInitializer:
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
+            ignore_unrecognized_build_file_symbols=ignore_unrecognized_build_file_symbols,
         )
 
     @staticmethod
@@ -215,6 +217,7 @@ class EngineInitializer:
         include_trace_on_error: bool = True,
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
+        ignore_unrecognized_build_file_symbols: bool = False,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -230,6 +233,7 @@ class EngineInitializer:
                 build_root=build_root_path,
                 target_type_aliases=registered_target_types.aliases,
                 object_aliases=build_configuration.registered_aliases,
+                ignore_unrecognized_symbols=ignore_unrecognized_build_file_symbols,
             )
 
         @rule
