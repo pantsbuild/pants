@@ -17,8 +17,8 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  self, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs, Permissions,
+  RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -638,7 +638,16 @@ pub async fn prepare_workdir(
     .local_paths(&req.input_digests.immutable_inputs)
     .await?
     .into_iter()
-    .chain(named_caches.local_paths(&req.append_only_caches))
+    .chain(
+      named_caches
+        .local_paths(&req.append_only_caches)
+        .map_err(|err| {
+          StoreError::Unclassified(format!(
+            "Failed to make named cache(s) for local execution: {:?}",
+            err
+          ))
+        })?,
+    )
     .collect::<Vec<_>>();
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
@@ -702,14 +711,6 @@ pub async fn prepare_workdir(
       }
 
       for workdir_symlink in workdir_symlinks {
-        // TODO: Move initialization of the dst directory into NamedCaches.
-        safe_create_dir_all_ioerror(&workdir_symlink.dst).map_err(|err| {
-          format!(
-            "Error making {} for local execution: {:?}",
-            workdir_symlink.dst.display(),
-            err
-          )
-        })?;
         let src = workdir_path2.join(&workdir_symlink.src);
         symlink(&workdir_symlink.dst, &src).map_err(|err| {
           format!(
