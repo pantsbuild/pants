@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use bollard::image::CreateImageOptions;
 use bollard::Docker;
-use fs::EMPTY_DIRECTORY_DIGEST;
+use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::StreamExt;
 use store::Store;
 use tempfile::TempDir;
@@ -14,7 +14,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
-  CommandRunner, Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessError,
+  CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessError,
 };
 
 /// Docker image to use for most tests in this file.
@@ -208,6 +209,130 @@ async fn output_dirs() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+async fn output_files_many() {
+  let result = run_command_via_docker(
+    Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      format!(
+        "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
+        TestData::roland().string(),
+        TestData::catnip().string()
+      ),
+    ])
+    .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect()),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::recursive().directory_digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+async fn output_files_execution_failure() {
+  let result = run_command_via_docker(
+    Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      format!(
+        "echo -n {} > roland.ext ; exit 1",
+        TestData::roland().string()
+      ),
+    ])
+    .output_files(relative_paths(&["roland.ext"]).collect()),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 1);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::containing_roland().directory_digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+async fn output_files_partial_output() {
+  let result = run_command_via_docker(
+    Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      format!("echo -n {} > roland.ext", TestData::roland().string()),
+    ])
+    .output_files(
+      relative_paths(&["roland.ext", "susannah"])
+        .into_iter()
+        .collect(),
+    ),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::containing_roland().directory_digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+async fn output_overlapping_file_and_dir() {
+  let result = run_command_via_docker(
+    Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
+    ])
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
+    .output_directories(relative_paths(&["cats"]).collect()),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::nested().directory_digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+async fn append_only_cache_created() {
+  let name = "geo";
+  let dest_base = ".cache";
+  let cache_name = CacheName::new(name.to_owned()).unwrap();
+  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
+  let result = run_command_via_docker(
+    Process::new(owned_string_vec(&["/bin/ls", dest_base]))
+      .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
