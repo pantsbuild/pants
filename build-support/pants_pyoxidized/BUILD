@@ -5,8 +5,16 @@
 # EXPERIMENTAL ONLY
 
 pyoxidizer_binary(
-    name="pants_oxidized_experimental",
+    name="pants_pyoxidized_experimental",
+    binary_name="pants",
     dependencies=["src/python/pants:pants-packaged"],
+    output_path="pants",
     entry_point="pants.bin.pants_loader",
 )
 
+archive(
+    description="Archive containing self-contained binary of Pants and its dynamic libraries",
+    name="pants_pyoxidized_distribution_experimental",
+    packages=[":pants_pyoxidized_experimental"],
+    format="zip",
+)
