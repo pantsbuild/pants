@@ -10,7 +10,7 @@ import pytest
 from pants.build_graph.address import Address
 from pants.core.util_rules import environments
 from pants.core.util_rules.environments import (
-    AllEnvironments,
+    AllEnvironmentTargets,
     AmbiguousEnvironmentError,
     ChosenLocalEnvironment,
     LocalEnvironmentTarget,
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *environments.rules(),
-            QueryRule(AllEnvironments, []),
+            QueryRule(AllEnvironmentTargets, []),
             QueryRule(ChosenLocalEnvironment, []),
         ],
         target_types=[LocalEnvironmentTarget],
@@ -44,8 +44,8 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
         }
     )
     rule_runner.set_options(["--environments-preview-aliases={'e1': '//:e1', 'e2': '//:e2'}"])
-    result = rule_runner.request(AllEnvironments, [])
-    assert result == AllEnvironments(
+    result = rule_runner.request(AllEnvironmentTargets, [])
+    assert result == AllEnvironmentTargets(
         {
             "e1": LocalEnvironmentTarget({}, Address("", target_name="e1")),
             "e2": LocalEnvironmentTarget({}, Address("", target_name="e2")),

@@ -146,7 +146,7 @@ class AmbiguousEnvironmentError(Exception):
     pass
 
 
-class AllEnvironments(FrozenDict[str, LocalEnvironmentTarget]):
+class AllEnvironmentTargets(FrozenDict[str, LocalEnvironmentTarget]):
     """A mapping of environment aliases to their corresponding environment target."""
 
 
@@ -158,7 +158,7 @@ class ChosenLocalEnvironment:
 @rule
 async def determine_all_environments(
     environments_subsystem: EnvironmentsSubsystem,
-) -> AllEnvironments:
+) -> AllEnvironmentTargets:
     _description_of_origin = "the option [environments-preview].aliases"
     addresses = await MultiGet(
         Get(
@@ -176,7 +176,7 @@ async def determine_all_environments(
         for address in addresses
     )
     # TODO(#7735): validate the correct target type is used?
-    return AllEnvironments(
+    return AllEnvironmentTargets(
         (alias, cast(LocalEnvironmentTarget, wrapped_tgt.target))
         for alias, wrapped_tgt in zip(environments_subsystem.aliases.keys(), wrapped_targets)
     )
@@ -184,14 +184,13 @@ async def determine_all_environments(
 
 @rule
 async def choose_local_environment(
-    platform: Platform,
-    all_environments: AllEnvironments,
+    platform: Platform, all_environment_targets: AllEnvironmentTargets
 ) -> ChosenLocalEnvironment:
-    if not all_environments:
+    if not all_environment_targets:
         return ChosenLocalEnvironment(None)
     compatible_targets = [
         tgt
-        for tgt in all_environments.values()
+        for tgt in all_environment_targets.values()
         if platform.value in tgt[CompatiblePlatformsField].value
     ]
     if not compatible_targets:
@@ -206,7 +205,7 @@ async def choose_local_environment(
                 `_local_environment` target with `{platform.value}` included in the
                 `{CompatiblePlatformsField.alias}` field. (Current targets from
                 `[environments-preview].aliases`:
-                {sorted(tgt.address.spec for tgt in all_environments.values())})
+                {sorted(tgt.address.spec for tgt in all_environment_targets.values())})
                 """
             )
         )
