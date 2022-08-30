@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import zipfile
@@ -30,7 +31,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 
 
 @pytest.fixture
@@ -104,6 +105,18 @@ def test_merge_embedcfg() -> None:
         _ = a.merge(b)
 
 
+def _assert_test_result_success(test_result: TestResult) -> None:
+    if test_result.exit_code != 0:
+        f = inspect.currentframe()
+        assert f is not None
+        f = f.f_back
+        assert f is not None
+        pytest.fail(
+            f"{f.f_code.co_filename}:{f.f_lineno}: test result error: stdout=`{test_result.stdout}`; stderr=`{test_result.stderr}`"
+        )
+
+
+@logging
 def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -145,7 +158,7 @@ def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    assert result.exit_code == 0
+    _assert_test_result_success(result)
 
 
 def test_embed_in_internal_test(rule_runner: RuleRunner) -> None:
@@ -191,7 +204,7 @@ def test_embed_in_internal_test(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    assert result.exit_code == 0
+    _assert_test_result_success(result)
 
 
 def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
@@ -237,7 +250,7 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    assert result.exit_code == 0
+    _assert_test_result_success(result)
 
 
 def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
@@ -328,4 +341,4 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
-    assert result.exit_code == 0
+    _assert_test_result_success(result)

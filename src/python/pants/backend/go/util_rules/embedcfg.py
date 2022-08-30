@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import strip_prefix
 
 
 @dataclass(unsafe_hash=True)
@@ -38,12 +39,16 @@ class EmbedConfig:
         self.files = FrozenDict(files)
 
     @classmethod
-    def from_json_dict(cls, d: dict[str, Any]) -> EmbedConfig | None:
+    def from_json_dict(
+        cls, d: dict[str, Any], prefix_to_strip: str | None = None
+    ) -> EmbedConfig | None:
+        patterns = d.get("Patterns", {})
+        files = d.get("Files", {})
+        if prefix_to_strip:
+            files = {key: strip_prefix(value, prefix_to_strip) for key, value in files.items()}
         result = cls(
-            patterns=FrozenDict(
-                {key: tuple(value) for key, value in d.get("Patterns", {}).items()}
-            ),
-            files=FrozenDict(d.get("Files", {})),
+            patterns=FrozenDict({key: tuple(value) for key, value in patterns.items()}),
+            files=FrozenDict(files),
         )
         return result if result else None
 
