@@ -3,7 +3,7 @@ title: "The Pants community"
 slug: "the-pants-community"
 hidden: false
 createdAt: "2021-03-13T18:57:07.437Z"
-updatedAt: "2021-08-29T00:28:12.217Z"
+updatedAt: "2022-08-29T00:28:12.217Z"
 ---
 Who is behind Pants?
 --------------------
