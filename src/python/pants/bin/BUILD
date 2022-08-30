@@ -83,10 +83,4 @@ pex_binary(
 )
 
 
-pyoxidizer_binary(
-    name="pants_oxidized_experimental",
-    dependencies=["src/python/pants:pants-packaged"],
-    entry_point="pants.bin.pants_loader",
-)
-
 python_tests(name="tests")

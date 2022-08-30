@@ -1,5 +1,8 @@
 NOTES:
 
+
+Run `./pants` with interpreter constraints that match the PyOxidizer interpreter constraints -- the initial `./pants` run will build `native_engine.so` and produce the pants wheel, which _MUST_ match the PyOxidizer interpreter version.
+
 Run `./pants package --pyoxidizer-interpreter-constraints="['CPython==3.9.*']" src/python/pants/bin:pants_oxidized_experimental`
 
 The binary will be `dist/src.python.pants.bin/pants_oxidized_experimental/aarch64-apple-darwin/debug/install/pants_oxidized_experimental` -- this will not work on the pants repo itself (yet?)
