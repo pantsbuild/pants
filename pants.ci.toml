@@ -4,12 +4,6 @@ colors = true
 remote_cache_read = true
 remote_cache_write = true
 
-[environments-preview.platforms_to_local_environment]
-linux_arm64 = "//:ci_env"
-linux_x86_64 = "//:ci_env"
-macos_arm64 = "//:ci_env"
-macos_x86_64 = "//:ci_env"
-
 [test]
 use_coverage = true
 
