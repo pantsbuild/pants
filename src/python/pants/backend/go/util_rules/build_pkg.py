@@ -39,6 +39,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self,
         *,
         import_path: str,
+        pkg_name: str,
         digest: Digest,
         dir_path: str,
         go_file_names: tuple[str, ...],
@@ -56,6 +57,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         """
 
         self.import_path = import_path
+        self.pkg_name = pkg_name
         self.digest = digest
         self.dir_path = dir_path
         self.go_file_names = go_file_names
@@ -68,6 +70,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self._hashcode = hash(
             (
                 self.import_path,
+                self.pkg_name,
                 self.digest,
                 self.dir_path,
                 self.go_file_names,
@@ -86,6 +89,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         return (
             f"{self.__class__}("
             f"import_path={repr(self.import_path)}, "
+            f"pkg_name={self.pkg_name}, "
             f"digest={self.digest}, "
             f"dir_path={self.dir_path}, "
             f"go_file_names={self.go_file_names}, "
@@ -107,6 +111,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         return (
             self._hashcode == other._hashcode
             and self.import_path == other.import_path
+            and self.pkg_name == other.pkg_name
             and self.digest == other.digest
             and self.dir_path == other.dir_path
             and self.go_file_names == other.go_file_names

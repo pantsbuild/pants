@@ -152,6 +152,7 @@ async def setup_build_go_package_target_request(
         _first_party_pkg_digest = _maybe_first_party_pkg_digest.pkg_digest
 
         digest = _first_party_pkg_digest.digest
+        pkg_name = _first_party_pkg_analysis.name
         import_path = _first_party_pkg_analysis.import_path
         dir_path = _first_party_pkg_analysis.dir_path
         minimum_go_version = _first_party_pkg_analysis.minimum_go_version
@@ -187,6 +188,7 @@ async def setup_build_go_package_target_request(
             raise _third_party_pkg_info.error
 
         dir_path = _third_party_pkg_info.dir_path
+        pkg_name = _third_party_pkg_info.name
         digest = _third_party_pkg_info.digest
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
@@ -223,6 +225,7 @@ async def setup_build_go_package_target_request(
     result = BuildGoPackageRequest(
         digest=digest,
         import_path="main" if request.is_main else import_path,
+        pkg_name=pkg_name,
         dir_path=dir_path,
         go_file_names=go_file_names,
         s_file_names=s_file_names,
