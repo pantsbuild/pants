@@ -14,7 +14,7 @@ from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules import system_binaries
+from pants.core.util_rules import environments, system_binaries
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -265,6 +265,7 @@ class EngineInitializer:
                 *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
+                *environments.rules(),
                 *system_binaries.rules(),
                 *platform.rules(),
                 *changed_rules(),
