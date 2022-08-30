@@ -97,6 +97,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Ian Tabolt
 + Igor Morozov
 + Ikai Lan
++ In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
