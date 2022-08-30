@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.platform import Platform
@@ -176,10 +177,8 @@ async def determine_all_environments(
     )
     # TODO(#7735): validate the correct target type is used?
     return AllEnvironments(
-        {
-            alias: wrapped_tgt.target
-            for alias, wrapped_tgt in zip(environments_subsystem.aliases.keys(), wrapped_targets)
-        }
+        (alias, cast(LocalEnvironmentTarget, wrapped_tgt.target))
+        for alias, wrapped_tgt in zip(environments_subsystem.aliases.keys(), wrapped_targets)
     )
 
 
@@ -219,7 +218,7 @@ async def choose_local_environment(
                 Multiple `_local_environment` targets from `[environments-preview].aliases`
                 are compatible with the current platform `{platform.value}`, so it is ambiguous
                 which to use: {sorted(tgt.address.spec for tgt in compatible_targets)}
-    
+
                 To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
                 targets so that only one includes the value `{platform.value}`, or change
                 `[environments-preview].aliases` so that it does not define some of those targets.
