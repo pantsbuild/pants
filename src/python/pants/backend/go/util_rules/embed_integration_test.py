@@ -31,7 +31,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -116,7 +116,6 @@ def _assert_test_result_success(test_result: TestResult) -> None:
         )
 
 
-@logging
 def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
