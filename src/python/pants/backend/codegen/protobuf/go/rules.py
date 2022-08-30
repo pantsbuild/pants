@@ -345,6 +345,7 @@ async def setup_full_package_build_request(
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path=request.import_path,
+            pkg_name=analysis.name,
             digest=gen_sources.digest,
             dir_path=analysis.dir_path,
             go_file_names=analysis.go_files,
