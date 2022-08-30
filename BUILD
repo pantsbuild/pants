@@ -21,5 +21,4 @@ _local_environment(
 
 _local_environment(
     name="ci_env",
-    python_interpreter_search_paths=["<PATH>"],
 )
