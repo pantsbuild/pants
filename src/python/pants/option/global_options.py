@@ -1378,7 +1378,7 @@ class BootstrapOptions:
     remote_auth_plugin = StrOption(
         default=None,
         advanced=True,
-        deprecation_start_version="2.15.0.dev1",
+        deprecation_start_version="2.15.0.dev2",
         removal_version="2.16.0.dev1",
         removal_hint="Remote Auth plugins should use provide the function via the `remote_auth` entry point.",
         help=softwrap(
