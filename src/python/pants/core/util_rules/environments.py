@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     StringSequenceField,
@@ -17,6 +17,7 @@ from pants.engine.target import (
 )
 from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
@@ -30,6 +31,23 @@ class EnvironmentsSubsystem(Subsystem):
         """
     )
 
+    aliases = DictOption[str](
+        help=softwrap(
+            """
+            A mapping of logical names to addresses to `_local_environment` targets. For example:
+
+                [environments-preview.aliases]
+                linux_local = "//:linux_env"
+                macos_local = "//:macos_env"
+                linux_ci = "build-support:linux_ci_env"
+                macos_ci = "build-support:macos_ci_env"
+
+            TODO(#7735): explain how aliases are used once they are consumed.
+
+            Pants will ignore any environment targets that are not given an alias via this option.
+            """
+        )
+    )
     _platforms_to_local_environment = DictOption[str](
         help=softwrap(
             """
@@ -140,9 +158,42 @@ class LocalEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
+class AllEnvironments(FrozenDict[str, LocalEnvironmentTarget]):
+    """A mapping of environment aliases to their corresponding environment target."""
+
+
 @dataclass(frozen=True)
 class ChosenLocalEnvironment:
     tgt: LocalEnvironmentTarget | None
+
+
+@rule
+async def determine_all_environments(
+    environments_subsystem: EnvironmentsSubsystem,
+) -> AllEnvironments:
+    _description_of_origin = "the option [environments-preview].aliases"
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(raw_address, description_of_origin=_description_of_origin),
+        )
+        for raw_address in environments_subsystem.aliases.values()
+    )
+    wrapped_targets = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(address, description_of_origin=_description_of_origin),
+        )
+        for address in addresses
+    )
+    # TODO(#7735): validate the correct target type is used?
+    return AllEnvironments(
+        {
+            alias: wrapped_tgt.target
+            for alias, wrapped_tgt in zip(environments_subsystem.aliases.keys(), wrapped_targets)
+        }
+    )
 
 
 @rule

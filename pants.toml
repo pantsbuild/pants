@@ -96,6 +96,9 @@ root_patterns = [
   "/",
 ]
 
+[environments-preview.aliases]
+default_env = "//:default_env"
+
 [environments-preview.platforms_to_local_environment]
 linux_arm64 = "//:default_env"
 linux_x86_64 = "//:default_env"
