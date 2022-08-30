@@ -13,6 +13,7 @@ from textwrap import dedent
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.packaging.pyoxidizer.target_types import (
+    PyOxidizerBinaryNameField,
     PyOxidizerConfigSourceField,
     PyOxidizerDependenciesField,
     PyOxidizerEntryPointField,
@@ -58,6 +59,7 @@ logger = logging.getLogger(__name__)
 class PyOxidizerFieldSet(PackageFieldSet):
     required_fields = (PyOxidizerDependenciesField,)
 
+    binary_name: PyOxidizerBinaryNameField
     entry_point: PyOxidizerEntryPointField
     dependencies: PyOxidizerDependenciesField
     unclassified_resources: PyOxidizerUnclassifiedResources
@@ -132,7 +134,7 @@ async def package_pyoxidizer_binary(
         config_template = digest_contents[0].content.decode("utf-8")
 
     config = PyOxidizerConfig(
-        executable_name=field_set.address.target_name,
+        executable_name=field_set.binary_name.value or field_set.address.target_name,
         entry_point=field_set.entry_point.value,
         wheels=wheel_paths,
         template=config_template,
