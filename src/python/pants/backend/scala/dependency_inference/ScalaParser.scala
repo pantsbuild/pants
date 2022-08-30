@@ -11,6 +11,7 @@ import io.circe.syntax._
 import scala.meta._
 import scala.meta.transversers.Traverser
 
+import scala.collection.SortedSet
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.reflect.NameTransformer
 
@@ -25,14 +26,15 @@ case class AnImport(
 )
 
 case class Analysis(
-    providedSymbols: Vector[Analysis.ProvidedSymbol],
-    providedSymbolsEncoded: Vector[Analysis.ProvidedSymbol],
+    providedSymbols: SortedSet[Analysis.ProvidedSymbol],
+    providedSymbolsEncoded: SortedSet[Analysis.ProvidedSymbol],
     importsByScope: HashMap[String, ArrayBuffer[AnImport]],
     consumedSymbolsByScope: HashMap[String, HashSet[String]],
     scopes: Vector[String]
 )
 object Analysis {
   case class ProvidedSymbol(name: String, recursive: Boolean)
+  implicit val providedSymbolOrdering: Ordering[ProvidedSymbol] = Ordering.by(_.name)
 }
 
 case class ProvidedSymbol(
@@ -80,7 +82,7 @@ class SourceAnalysisTraverser extends Traverser {
       case Type.Name(name) => Vector(name)
       case Type.Select(qual, Type.Name(name)) => {
         val qualName = extractName(qual)
-        Vector(s"${qualName}.${name}")
+        Vector(qualifyName(qualName, name))
       }
       case Type.Apply(tpe, args) =>
         extractNamesFromTypeTree(tpe) ++ args.toVector.flatMap(extractNamesFromTypeTree(_))
@@ -404,17 +406,17 @@ class SourceAnalysisTraverser extends Traverser {
     case node => super.apply(node)
   }
 
-  def gatherProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
+  def gatherProvidedSymbols(): SortedSet[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         symbolsForScope.map { case (symbolName, symbol) =>
-          Analysis.ProvidedSymbol(s"${scopeName}.${symbolName}", symbol.recursive)
+          Analysis.ProvidedSymbol(qualifyName(scopeName, symbolName), symbol.recursive)
         }.toVector
       })
-      .toVector
+      .to(SortedSet)
   }
 
-  def gatherEncodedProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
+  def gatherEncodedProvidedSymbols(): SortedSet[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         val encodedSymbolsForScope = symbolsForScope.flatMap({
@@ -433,9 +435,9 @@ class SourceAnalysisTraverser extends Traverser {
           }
         })
 
-        encodedSymbolsForScope.map(symbol => symbol.copy(name = s"${scopeName}.${symbol.name}"))
+        encodedSymbolsForScope.map(symbol => symbol.copy(name = qualifyName(scopeName, symbol.name)))
       })
-      .toVector
+      .to(SortedSet)
   }
 
   def toAnalysis: Analysis = {
@@ -446,6 +448,11 @@ class SourceAnalysisTraverser extends Traverser {
       consumedSymbolsByScope = consumedSymbolsByScope,
       scopes = scopes.toVector
     )
+  }
+
+  private def qualifyName(qualifier: String, name: String): String = {
+    if (qualifier.length > 0) s"$qualifier.$name"
+    else name
   }
 }
 
