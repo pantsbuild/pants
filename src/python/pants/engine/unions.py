@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Mapping, TypeVar
+from typing import DefaultDict, Iterable, Mapping, TypeVar, cast
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -28,6 +28,9 @@ def union(cls):
     """
     assert isinstance(cls, type)
     cls._is_union_for = cls
+    # TODO: this should involve an explicit interface soon, rather than one being implicitly
+    # created with only the provided Param.
+    cls._union_in_scope_types = tuple()
     return cls
 
 
@@ -35,6 +38,16 @@ def is_union(input_type: type) -> bool:
     """Return whether or not a type has been annotated with `@union`."""
     is_union: bool = input_type == getattr(input_type, "_is_union_for", None)
     return is_union
+
+
+def union_in_scope_types(input_type: type) -> tuple[type, ...] | None:
+    """If the given type is a `@union`, return its declared in-scope types.
+
+    This function is also implemented in Rust as `engine::externs::union_in_scope_types`.
+    """
+    if not is_union(input_type):
+        return None
+    return cast("tuple[type, ...]", getattr(input_type, "_union_in_scope_types"))
 
 
 @dataclass(frozen=True)

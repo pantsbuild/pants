@@ -57,7 +57,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.unions import UnionMembership, is_union
+from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
@@ -666,17 +666,20 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             unions = [t for t in the_get.input_types if is_union(t)]
             if len(unions) == 1:
                 # Register the union by recording a copy of the Get for each union member.
-                # TODO: See #12934: this should involve an explicit interface
-                # soon, rather than one being implicitly created with only the provided Param.
                 union = unions[0]
+                in_scope_types = union_in_scope_types(union)
+                assert in_scope_types is not None
                 for union_member in union_membership.get(union):
-                    native_engine.tasks_add_union(
+                    native_engine.tasks_add_get_union(
                         tasks,
                         the_get.output_type,
                         tuple(union_member if t == union else t for t in the_get.input_types),
+                        in_scope_types,
                     )
             elif len(unions) > 1:
-                raise TypeError("Only one @union may be used in a Get.")
+                raise TypeError(
+                    "Only one @union may be used in a Get, but {the_get} used: {unions}."
+                )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
                 native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)

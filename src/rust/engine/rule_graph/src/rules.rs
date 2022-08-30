@@ -23,12 +23,19 @@ pub trait TypeId:
     I: Iterator<Item = Self>;
 }
 
+// NB: Most of our expected usecases for multiple-provided-parameters involve two parameters, hence
+// the SmallVec sizing here. See also `Self::provides`.
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct DependencyKey<T: TypeId> {
   pub product: T,
-  // Most of our expected usecases for multiple-provided-parameters involve two parameters. See
-  // also `Self::provides`.
+  // The param types which are introduced into scope at the callsite ("provided").
   pub provided_params: SmallVec<[T; 2]>,
+  // The param types which must already be in scope at the callsite, regardless of whether they
+  // are consumed in order to produce the product type.
+  //
+  // If a `DependencyKey` declares any `in_scope_params`, then _only_ those params (and provided
+  // params) are available to the callee.
+  pub in_scope_params: Option<SmallVec<[T; 2]>>,
 }
 
 impl<T: TypeId> DependencyKey<T> {
@@ -36,10 +43,11 @@ impl<T: TypeId> DependencyKey<T> {
     DependencyKey {
       product,
       provided_params: SmallVec::default(),
+      in_scope_params: None,
     }
   }
 
-  pub fn new_with_params<I: IntoIterator<Item = T>>(product: T, provided_params: I) -> Self {
+  pub fn provided_params<I: IntoIterator<Item = T>>(self, provided_params: I) -> Self {
     let mut provided_params = provided_params.into_iter().collect::<SmallVec<[T; 2]>>();
     provided_params.sort();
 
@@ -52,9 +60,28 @@ impl<T: TypeId> DependencyKey<T> {
       }
     }
 
-    DependencyKey {
-      product,
+    Self {
       provided_params,
+      ..self
+    }
+  }
+
+  pub fn in_scope_params<I: IntoIterator<Item = T>>(self, in_scope_params: I) -> Self {
+    let mut in_scope_params = in_scope_params.into_iter().collect::<SmallVec<[T; 2]>>();
+    in_scope_params.sort();
+
+    #[cfg(debug_assertions)]
+    {
+      let original_len = in_scope_params.len();
+      in_scope_params.dedup();
+      if original_len != in_scope_params.len() {
+        panic!("Expected unique in_scope params.");
+      }
+    }
+
+    Self {
+      in_scope_params: Some(in_scope_params),
+      ..self
     }
   }
 
@@ -73,6 +100,22 @@ impl<T: TypeId> DependencyKey<T> {
   ///
   pub fn provides(&self, t: &T) -> bool {
     self.provided_params.contains(t)
+  }
+
+  ///
+  /// If this DependencyKey has in_scope_params, returns an equivalent Query,
+  ///
+  pub fn as_reentry_query(&self) -> Option<Query<T>> {
+    self.in_scope_params.as_ref().map(|in_scope_params| {
+      Query::new(
+        self.product,
+        self
+          .provided_params
+          .iter()
+          .chain(in_scope_params.iter())
+          .cloned(),
+      )
+    })
   }
 }
 
@@ -147,13 +190,13 @@ pub trait Rule:
 }
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
-pub struct Query<R: Rule> {
-  pub product: R::TypeId,
-  pub params: ParamTypes<R::TypeId>,
+pub struct Query<T: TypeId> {
+  pub product: T,
+  pub params: ParamTypes<T>,
 }
 
-impl<R: Rule> Query<R> {
-  pub fn new<I: IntoIterator<Item = R::TypeId>>(product: R::TypeId, params: I) -> Query<R> {
+impl<T: TypeId> Query<T> {
+  pub fn new<I: IntoIterator<Item = T>>(product: T, params: I) -> Query<T> {
     Query {
       product,
       params: params.into_iter().collect(),
@@ -161,7 +204,7 @@ impl<R: Rule> Query<R> {
   }
 }
 
-impl<R: Rule> Display for Query<R> {
+impl<T: TypeId> Display for Query<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -171,7 +214,7 @@ impl<R: Rule> Display for Query<R> {
   }
 }
 
-impl<R: Rule> DisplayForGraph for Query<R> {
+impl<T: TypeId> DisplayForGraph for Query<T> {
   fn fmt_for_graph(&self, _: DisplayForGraphArgs) -> String {
     format!("Query({} for {})", self.product, params_str(&self.params))
   }
