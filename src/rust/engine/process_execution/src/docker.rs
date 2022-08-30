@@ -255,7 +255,6 @@ impl CapturedWorkdir for CommandRunner {
           ),
           format!("{}:/pants-named-caches:rw", named_caches_workdir_as_string),
         ]),
-        auto_remove: Some(self.keep_sandboxes == KeepSandboxes::Never),
         ..bollard_stubs::models::HostConfig::default()
       }),
       image: Some(self.image.clone()),
@@ -274,8 +273,10 @@ impl CapturedWorkdir for CommandRunner {
 
     log::debug!("created container {}", &container.id);
 
-    // DOCKER-TODO: Consider adding a drop guard to remove the container on error? (Although
-    // auto-remove has been disabled if self.keep_sandboxes is "always" or "on failure.")
+    // DOCKER-TODO: Use a drop guard to remove the container regardless of success/failure.
+    // We cannot set `.host_config.auto_remove` in `config` above because containers that exit
+    // early will no longer exist for purposes of attaching and capturing the output (which is
+    // the entire point of this executor ...).
 
     self
       .docker

@@ -756,7 +756,9 @@ async fn prepare_workdir_exclusive_relative() {
   assert_eq!(exclusive_spawn, true);
 }
 
-fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
+pub(crate) fn named_caches_and_immutable_inputs(
+  store: Store,
+) -> (TempDir, NamedCaches, ImmutableInputs) {
   let root = TempDir::new().unwrap();
   let root_path = root.path().to_owned();
   let named_cache_dir = root_path.join("named");
