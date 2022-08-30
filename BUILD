@@ -9,16 +9,9 @@ files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 
 python_test_utils(name="test_utils")
 
+# TODO(#7735): Add a macos_local_env that sets `python_interpreter_search_paths=["<PYENV>"]`, after
+#   figuring out why our Build Wheels Mac job is failing when this is set:
+#   https://github.com/pantsbuild/pants/runs/8082954359?check_suite_focus=true#step:9:657
 _local_environment(
-    name="macos_local_env",
-    # Avoid system Python interpreters, which tend to be broken on macOS.
-    python_interpreter_search_paths=["<PYENV>"],
-)
-
-_local_environment(
-    name="linux_local_env",
-)
-
-_local_environment(
-    name="ci_env",
+    name="local_env",
 )
