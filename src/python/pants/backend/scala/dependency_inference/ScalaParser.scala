@@ -235,18 +235,20 @@ class SourceAnalysisTraverser extends Traverser {
       )
     }
 
-    case Defn.Class(mods, nameNode, _tparams, ctor, templ) => {
+    case Defn.Class(mods, nameNode, tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
+      apply(tparams)
       apply(ctor)
       visitTemplate(templ, name)
     }
 
-    case Defn.Trait(mods, nameNode, _tparams, ctor, templ) => {
+    case Defn.Trait(mods, nameNode, tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawTrait = true)
+      apply(tparams)
       apply(ctor)
       visitTemplate(templ, name)
     }
@@ -299,7 +301,7 @@ class SourceAnalysisTraverser extends Traverser {
       super.apply(rhs)
     }
 
-    case Defn.Def(mods, nameNode, _tparams, params, decltpe, body) => {
+    case Defn.Def(mods, nameNode, tparams, params, decltpe, body) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name)
@@ -308,14 +310,16 @@ class SourceAnalysisTraverser extends Traverser {
         extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
 
+      apply(tparams)
       params.foreach(param => apply(param))
 
       withSuppressProvidedNames(() => apply(body))
     }
 
-    case Decl.Def(mods, _nameNode, _tparams, params, decltpe) => {
+    case Decl.Def(mods, _nameNode, tparams, params, decltpe) => {
       visitMods(mods)
       extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      apply(tparams)
       params.foreach(param => apply(param))
     }
 
@@ -364,6 +368,11 @@ class SourceAnalysisTraverser extends Traverser {
       decltpe.foreach(tpe => {
         extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
+    }
+
+    case Type.Param(mods, _name, _tparams, bounds, _vbounds, _cbounds) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(bounds).foreach(recordConsumedSymbol(_))
     }
 
     case Ctor.Primary(mods, _name, params_list) => {

@@ -593,3 +593,31 @@ def test_package_object_extends_trait(rule_runner: RuleRunner) -> None:
     )
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Trait", "foo.bar.Trait"]
+
+
+def test_type_constaint(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+
+            trait Foo[T >: A <: B]
+
+            class Bar[T >: C <: D]
+
+            class Quxx {
+                def doSomething[T >: E <: F]() = ()
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.A",
+        "foo.B",
+        "foo.C",
+        "foo.D",
+        "foo.E",
+        "foo.F",
+    ]
