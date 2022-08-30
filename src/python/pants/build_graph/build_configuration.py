@@ -12,6 +12,7 @@ from typing import Any, Callable, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
@@ -33,7 +34,13 @@ _RESERVED_NAMES = {"api-types", "global", "goals", "subsystems", "targets", "too
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions, FilterSubsystem}
+_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {
+    GlobalOptions,
+    Changed,
+    CliOptions,
+    FilterSubsystem,
+    EnvironmentsSubsystem,
+}
 
 
 @dataclass(frozen=True)

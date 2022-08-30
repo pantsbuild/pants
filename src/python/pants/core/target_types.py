@@ -24,12 +24,12 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DownloadFile,
+    FileDigest,
     FileEntry,
     MergeDigests,
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,

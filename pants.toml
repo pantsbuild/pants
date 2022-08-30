@@ -96,6 +96,15 @@ root_patterns = [
   "/",
 ]
 
+[environments-preview.platforms_to_local_environment]
+linux_arm64 = "//:default_env"
+linux_x86_64 = "//:default_env"
+# TODO(#7735): Set to `//:macos_local_env` after figuring out why our Build Wheels Mac job is
+#  failing when this is set:
+#  https://github.com/pantsbuild/pants/runs/8082954359?check_suite_focus=true#step:9:657
+macos_arm64 = "//:default_env"
+macos_x86_64 = "//:default_env"
+
 [tailor]
 build_file_header = """\
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).

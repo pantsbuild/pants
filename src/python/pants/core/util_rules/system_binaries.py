@@ -645,9 +645,10 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
             )
 
     raise BinaryNotFoundError(
-        "Was not able to locate a Python interpreter to execute rule code.\n"
+        # TODO(#7735): Update error message to mention local_environment.
+        "Was not able to locate a Python interpreter to execute rule code.\n\n"
         "Please ensure that Python is available in one of the locations identified by "
-        "`[python-bootstrap] search_path`, which currently expands to:\n"
+        "`[python-bootstrap].search_path`, which currently expands to:\n"
         f"  {interpreter_search_paths}"
     )
 

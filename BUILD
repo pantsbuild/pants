@@ -8,3 +8,13 @@ shell_sources(name="scripts", sources=["cargo", "pants"])
 files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 
 python_test_utils(name="test_utils")
+
+_local_environment(
+    name="default_env",
+)
+
+_local_environment(
+    name="macos_local_env",
+    # Avoid system Python interpreters, which tend to be broken on macOS.
+    python_interpreter_search_paths=["<PYENV>"],
+)
