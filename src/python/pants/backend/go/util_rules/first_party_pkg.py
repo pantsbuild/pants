@@ -74,6 +74,7 @@ class FirstPartyPkgAnalysis:
     """
 
     import_path: str
+    name: str
     dir_path: str
 
     imports: tuple[str, ...]
@@ -163,6 +164,7 @@ class FallibleFirstPartyPkgAnalysis:
         analysis = FirstPartyPkgAnalysis(
             dir_path=dir_path,
             import_path=import_path,
+            name=metadata["Name"],
             imports=tuple(metadata.get("Imports", [])),
             test_imports=tuple(metadata.get("TestImports", [])),
             xtest_imports=tuple(metadata.get("XTestImports", [])),

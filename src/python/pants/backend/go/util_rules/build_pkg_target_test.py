@@ -74,6 +74,7 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path="codegen.com/gen",
+            pkg_name="gen",
             digest=digest,
             dir_path="codegen",
             go_file_names=("f.go",),

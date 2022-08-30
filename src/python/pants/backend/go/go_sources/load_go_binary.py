@@ -53,6 +53,7 @@ async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
         BuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
+            pkg_name="main",
             dir_path="",
             digest=source_digest,
             go_file_names=tuple(fc.path for fc in file_contents),
