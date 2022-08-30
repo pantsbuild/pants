@@ -252,8 +252,6 @@ impl PyExecutionStrategyOptions {
     child_default_memory: usize,
     child_max_memory: usize,
     graceful_shutdown_timeout: usize,
-    use_docker: bool,
-    docker_image: Option<String>,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -269,8 +267,6 @@ impl PyExecutionStrategyOptions {
       child_default_memory,
       child_max_memory,
       graceful_shutdown_timeout: Duration::from_secs(graceful_shutdown_timeout.try_into().unwrap()),
-      use_docker,
-      docker_image,
     })
   }
 }

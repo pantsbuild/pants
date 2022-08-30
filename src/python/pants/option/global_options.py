@@ -491,8 +491,6 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
     process_execution_graceful_shutdown_timeout: int
-    process_execution_use_docker: bool
-    process_execution_docker_image: str | None
     cache_content_behavior: CacheContentBehavior
 
     process_total_child_memory_usage: int | None
@@ -537,8 +535,6 @@ class ExecutionOptions:
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
-            process_execution_use_docker=bootstrap_options.process_execution_use_docker,
-            process_execution_docker_image=bootstrap_options.process_execution_docker_image,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             cache_content_behavior=GlobalOptions.resolve_cache_content_behavior(bootstrap_options),
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
@@ -627,8 +623,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
     process_execution_graceful_shutdown_timeout=3,
-    process_execution_use_docker=False,
-    process_execution_docker_image=None,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -1304,31 +1298,6 @@ class BootstrapOptions:
             f"""
             The time in seconds to wait when gracefully shutting down an interactive process (such
             as one opened using `{bin_name()} run`) before killing it.
-            """
-        ),
-        advanced=True,
-    )
-    # DOCKER-TODO: Consider moving this to a dedicated "local Docker" subsystem?
-    process_execution_use_docker = BoolOption(
-        default=DEFAULT_EXECUTION_OPTIONS.process_execution_use_docker,
-        help=softwrap(
-            """
-            Enables using Docker for running local execution requests.
-            
-            NOTE: This is an experimental option. It may change as development on this feature continues. 
-            """
-        ),
-        advanced=True,
-    )
-    # DOCKER-TODO: Replace this with an `image` attribute on whatever the "docker environment" construct looks like.
-    process_execution_docker_image = StrOption(
-        default=DEFAULT_EXECUTION_OPTIONS.process_execution_docker_image,
-        help=softwrap(
-            """
-            Image to use for when running local execution requests.
-            
-            NOTE: This is an WIP development option. It will change as development on this feature continues.
-            (Indeed, it will most likely be part of the "docker environment" defined by the user.)  
             """
         ),
         advanced=True,

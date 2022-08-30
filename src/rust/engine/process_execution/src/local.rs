@@ -36,8 +36,8 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, LocalCommandRunner, NamedCaches,
-  Platform, Process, ProcessError, ProcessResultMetadata, ProcessResultSource, WorkdirSymlink,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
+  ProcessError, ProcessResultMetadata, ProcessResultSource, WorkdirSymlink,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -138,18 +138,12 @@ impl CommandRunner {
     })
     .boxed()
   }
-}
 
-impl LocalCommandRunner for CommandRunner {
-  fn store(&self) -> &Store {
-    &self.store
-  }
-
-  fn named_caches(&self) -> &NamedCaches {
+  pub fn named_caches(&self) -> &NamedCaches {
     &self.named_caches
   }
 
-  fn immutable_inputs(&self) -> &ImmutableInputs {
+  pub fn immutable_inputs(&self) -> &ImmutableInputs {
     &self.immutable_inputs
   }
 }
@@ -665,10 +659,6 @@ pub async fn prepare_workdir(
       None => symlinks,
     }
   };
-  log::debug!(
-    "immutable_inputs_symlinks = {:?}",
-    &immutable_inputs_symlinks
-  );
   let named_caches_symlinks = {
     let symlinks = named_caches
       .local_paths(&req.append_only_caches)
@@ -689,7 +679,6 @@ pub async fn prepare_workdir(
       None => symlinks,
     }
   };
-  log::debug!("named_caches_symlinks = {:?}", &named_caches_symlinks);
   let workdir_symlinks = immutable_inputs_symlinks
     .into_iter()
     .chain(named_caches_symlinks.into_iter())

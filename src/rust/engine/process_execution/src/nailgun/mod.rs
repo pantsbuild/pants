@@ -15,8 +15,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, InputDigests, LocalCommandRunner, Platform, Process,
-  ProcessError,
+  Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessError,
 };
 
 #[cfg(test)]
@@ -85,15 +84,15 @@ fn construct_nailgun_client_request(
 /// If that flag is set, it will connect to a running nailgun server and run the command there.
 /// Otherwise, it will just delegate to the regular local runner.
 ///
-pub struct CommandRunner<T> {
-  inner: T,
+pub struct CommandRunner {
+  inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
   executor: Executor,
 }
 
-impl<T: LocalCommandRunner> CommandRunner<T> {
+impl CommandRunner {
   pub fn new(
-    runner: T,
+    runner: crate::local::CommandRunner,
     workdir_base: PathBuf,
     store: Store,
     executor: Executor,
@@ -111,7 +110,7 @@ impl<T: LocalCommandRunner> CommandRunner<T> {
   }
 }
 
-impl<T: LocalCommandRunner> Debug for CommandRunner<T> {
+impl Debug for CommandRunner {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("nailgun::CommandRunner")
       .field("inner", &self.inner)
@@ -120,7 +119,7 @@ impl<T: LocalCommandRunner> Debug for CommandRunner<T> {
 }
 
 #[async_trait]
-impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
+impl super::CommandRunner for CommandRunner {
   async fn run(
     &self,
     context: Context,
@@ -153,7 +152,7 @@ impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
         } = ParsedJVMCommandLines::parse_command_lines(&req.argv)
           .map_err(ProcessError::Unclassified)?;
 
-        let nailgun_name = Self::calculate_nailgun_name(&client_main_class);
+        let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
         let (client_input_digests, server_input_digests) =
           req.input_digests.nailgun_client_and_server();
         let client_req = construct_nailgun_client_request(
@@ -182,7 +181,7 @@ impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
           nailgun_process.workdir_path().to_owned(),
           &client_req,
           client_req.input_digests.input_files.clone(),
-          self.inner.store().clone(),
+          self.inner.store.clone(),
           self.executor.clone(),
           self.inner.named_caches(),
           self.inner.immutable_inputs(),
@@ -195,7 +194,7 @@ impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
           .run_and_capture_workdir(
             client_req,
             context,
-            self.inner.store().clone(),
+            self.inner.store.clone(),
             self.executor.clone(),
             nailgun_process.workdir_path().to_owned(),
             (nailgun_process.name().to_owned(), nailgun_process.address()),
@@ -216,7 +215,7 @@ impl<T: LocalCommandRunner> super::CommandRunner for CommandRunner<T> {
 }
 
 #[async_trait]
-impl<T: LocalCommandRunner> CapturedWorkdir for CommandRunner<T> {
+impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (String, SocketAddr);
 
   async fn run_in_workdir<'a, 'b, 'c>(

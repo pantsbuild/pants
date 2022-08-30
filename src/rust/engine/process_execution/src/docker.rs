@@ -16,8 +16,8 @@ use crate::local::{
   KeepSandboxes,
 };
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, LocalCommandRunner, NamedCaches,
-  Platform, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
+  ProcessError,
 };
 
 /// `CommandRunner` executes processes using a local Docker client.
@@ -54,21 +54,6 @@ impl CommandRunner {
       keep_sandboxes,
       image,
     })
-  }
-}
-
-#[async_trait]
-impl LocalCommandRunner for CommandRunner {
-  fn store(&self) -> &Store {
-    &self.store
-  }
-
-  fn named_caches(&self) -> &NamedCaches {
-    &self.named_caches
-  }
-
-  fn immutable_inputs(&self) -> &ImmutableInputs {
-    &self.immutable_inputs
   }
 }
 
