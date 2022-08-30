@@ -242,10 +242,11 @@ impl CapturedWorkdir for CommandRunner {
 
     let config = bollard::container::Config {
       env: Some(env),
-      cmd: Some(req.argv),
+      entrypoint: Some(req.argv),
       working_dir: Some(working_dir),
+      // DOCKER-TODO: Is this necessary on linux hosts for allowing bind mount?
       // user: Some(format!("{}", unsafe { libc::geteuid() })),
-      user: Some("root".to_string()),
+      // user: Some("0".to_string()),
       host_config: Some(bollard_stubs::models::HostConfig {
         binds: Some(vec![
           format!("{}:/pants-work:rw", workdir_path_as_string),
@@ -255,6 +256,7 @@ impl CapturedWorkdir for CommandRunner {
           ),
           format!("{}:/pants-named-caches:rw", named_caches_workdir_as_string),
         ]),
+        init: Some(true),
         ..bollard_stubs::models::HostConfig::default()
       }),
       image: Some(self.image.clone()),
