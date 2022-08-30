@@ -92,6 +92,10 @@ def test_valid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...
         # Dirs.
         ("dist/", ("not_dist", "cdist", "dist.py", "dist/dist")),
         ("build-support/*.venv/", ("build-support/rbt.venv.but_actually_a_file",)),
+        # Case sensitivity
+        ("A", ("a",)),
+        ("a", ("A",)),
+        ("**/BUILD", ("src/rust/build.rs",)),
     ],
 )
 def test_invalid_matches(rule_runner: RuleRunner, glob: str, paths: Tuple[str, ...]) -> None:
