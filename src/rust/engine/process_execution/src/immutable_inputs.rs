@@ -45,7 +45,7 @@ impl ImmutableInputs {
   }
 
   pub fn workdir(&self) -> &Path {
-    &self.0.workdir.path()
+    self.0.workdir.path()
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
