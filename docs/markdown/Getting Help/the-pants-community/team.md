@@ -4,11 +4,17 @@ slug: "team"
 excerpt: ""
 hidden: false
 createdAt: "2022-08-15T22:36:48.659Z"
-updatedAt: "2022-08-28T22:13:54.279Z"
+updatedAt: "2022-08-29T00:28:12.217Z"
 ---
-Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](docs:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community. Interested in joining our team? Learn more on [The Pants Community](docs:the-pants-community) page.
+Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](docs:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community.
 
-Maintainers
+> 📘 Interested in joining the Pants team?
+>
+> Welcome, future colleague! Learn more about the team's composition and eligibility criteria on the [Pants Community](docs:the-pants-community) page, then post in the #development channel of the [community Slack](doc:getting-started) to express interest in joining the team. We love opportunity to usher in new teammates, and are happy to offer mentorship support to community members who request it and have a track record of commitment to the long-term vitality of the project.
+
+## Current Team
+
+### Maintainers
 -----------
 
 | **NAME**                   | **PROUDEST CONTRIBUTION**                                                                             |
@@ -31,7 +37,7 @@ Maintainers
 | **Tom Dyas**               | Adding the Golang backend and getting remote execution to work with more servers.                     |
 | **Yi Cheng**               | Adding coursier integration to v.1                                                                    |
 
-Contributors
+### Contributors
 ------------
 
 | **NAME**               | **PROUDEST CONTRIBUTION**                                                                               |
@@ -51,9 +57,11 @@ Contributors
 
 ***
 
+## Emeritus
+
 When team members retire from the team in good standing, they are designated emeritus. We are grateful for the many past contributons by our emeritus team members, whose collective work created the strong foundations that modern Pants stands on. We are honored to have had the opportunity to collaborate with them as teammates.
 
-Maintainers Emeritus
+### Maintainers Emeritus
 --------------------
 
 | **NAME**              | **PROUDEST CONTRIBUTION**                                                           |
@@ -80,7 +88,7 @@ Maintainers Emeritus
 | **Travis Crawford**   |                                                                                     |
 | **Yujie Chen**        |                                                                                     |
 
-Contributors Emeritus
+### Contributors Emeritus
 ---------------------
 
 | **NAME**             | **PROUDEST CONTRIBUTION**                                               |

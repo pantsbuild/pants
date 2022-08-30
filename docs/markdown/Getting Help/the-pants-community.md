@@ -3,14 +3,14 @@ title: "The Pants community"
 slug: "the-pants-community"
 hidden: false
 createdAt: "2021-03-13T18:57:07.437Z"
-updatedAt: "2021-11-06T00:28:12.217Z"
+updatedAt: "2022-08-29T00:28:12.217Z"
 ---
 Who is behind Pants?
 --------------------
 
 Pants is developed by a community of people who are passionate about improving the craft of software engineering.  We come from diverse backgrounds and interests, but share the goal of creating the best tools to support more effective and enjoyable software development.
 
- Pants Build is registered as a 501c(6) non-profit in California, whose purpose is to maintain the Pants project's assets, such as its CI resources.
+Pants Build is registered as a 501c(6) non-profit in California, whose purpose is to maintain the Pants project's assets, such as its CI resources.
 
 Can I join this community?
 --------------------------
@@ -37,7 +37,11 @@ If you want to contribute but don't have a specific plan or idea, we can help yo
 How is the community structured?
 --------------------------------
 
-We welcome contributions from anyone, and we recognize consistent contribution with special statuses.
+We welcome contributions from anyone, and we recognize consistent contributions with invitation to join the Pants team. 
+
+> 📘 Interested in joining the Pants team?
+> 
+> Welcome, future colleague! Learn more about the team's composition and eligibility criteria by reading below, then post in the #development channel of the [community Slack](doc:getting-started) to express interest in formally joining the [team](doc:team). We love opportunity to usher in new teammates, and are happy to offer mentorship support to community members who request it and have a track record of commitment to the long-term vitality of the project.
 
 ### Maintainers
 
@@ -49,9 +53,9 @@ Anyone who has made a few contributions of any kind, and has an ongoing interest
 
 Contributors may be granted extra permissions, such as the ability to assign issues, but these stop short of full Maintainer permissions. Contributors do not have any new obligations—for example, you are _not_ expected to make a certain number of changes. However, contributors are expected to respect their extra permissions. Contributors will be eligible to receive more attention and mentorship in activities like code review. Contributors with a continuing track record of contribution may be nominated to become Maintainers.
 
-### Maintainers Emeritus
+### Former team members
 
-Sometimes a Maintainer may need to step back to less intensive involvement. To recognize their past contributions, they retain the honorary _Emeritus_ status.
+Sometimes a team member may need to step back to less intensive involvement. To recognize their past contributions, a former team member in good standing may be granted the honorary _Maintainer Emeritus_ or _Contributor Emeritus_ status.
 
 ### Officers
 
