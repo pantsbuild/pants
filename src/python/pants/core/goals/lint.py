@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
+from typing import Any, Callable, ClassVar, Iterable, Iterator, TypeVar, cast
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.style_request import (
     StyleRequest,
     determine_specified_tool_names,
@@ -21,8 +22,10 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsPaths, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Snapshot, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.build_files import BuildFileOptions
+from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField
@@ -38,13 +41,14 @@ from pants.util.strutil import softwrap, strip_v2_chroot_path
 logger = logging.getLogger(__name__)
 
 _SR = TypeVar("_SR", bound=StyleRequest)
+_T = TypeVar("_T")
 
 
 class AmbiguousRequestNamesError(Exception):
     def __init__(
         self,
         ambiguous_name: str,
-        requests: set[Type[StyleRequest] | Type[LintFilesRequest]],
+        requests: set[type],
     ):
         request_names = {
             f"{request_target.__module__}.{request_target.__qualname__}"
@@ -216,9 +220,12 @@ class Lint(Goal):
 
 
 def _check_ambiguous_request_names(
-    *requests: Type[LintFilesRequest] | Type[StyleRequest],
+    *requests: type,
 ) -> None:
-    for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
+    def key(target: type) -> str:
+        return target.name  # type: ignore[attr-defined,no-any-return]
+
+    for name, request_group in itertools.groupby(requests, key=key):
         request_group_set = set(request_group)
 
         if len(request_group_set) > 1:
@@ -261,6 +268,7 @@ async def lint(
     console: Console,
     workspace: Workspace,
     specs: Specs,
+    build_file_options: BuildFileOptions,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
@@ -271,26 +279,43 @@ async def lint(
     fmt_target_request_types = cast(
         "Iterable[type[FmtTargetsRequest]]", union_membership.get(FmtTargetsRequest)
     )
+    fmt_build_request_types = cast(
+        "Iterable[type[_FmtBuildFilesRequest]]", union_membership.get(_FmtBuildFilesRequest)
+    )
     file_request_types = cast(
         "Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest]
     )
 
+    # NB: Target formatters and build file formatters can share a name, so we can't check them both
+    # for ambiguity at the same time.
     _check_ambiguous_request_names(
-        *lint_target_request_types, *fmt_target_request_types, *file_request_types
+        *lint_target_request_types,
+        *fmt_target_request_types,
+        *file_request_types,
+    )
+
+    _check_ambiguous_request_names(
+        *lint_target_request_types,
+        *fmt_build_request_types,
+        *file_request_types,
     )
 
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
         [*lint_target_request_types, *fmt_target_request_types],
-        extra_valid_names={request.name for request in file_request_types},
+        extra_valid_names={
+            request.name  # type: ignore[attr-defined]
+            for request in [*file_request_types, *fmt_build_request_types]
+        },
     )
 
-    def is_specified(request_type: type[StyleRequest] | type[LintFilesRequest]):
-        return request_type.name in specified_names
+    def is_specified(request_type: type):
+        return request_type.name in specified_names  # type: ignore[attr-defined]
 
     lint_target_request_types = filter(is_specified, lint_target_request_types)
     fmt_target_request_types = filter(is_specified, fmt_target_request_types)
+    fmt_build_request_types = filter(is_specified, fmt_build_request_types)
     file_request_types = filter(is_specified, file_request_types)
 
     _get_targets = Get(
@@ -298,13 +323,22 @@ async def lint(
         Specs,
         specs if lint_target_request_types or fmt_target_request_types else Specs.empty(),
     )
-    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_request_types else Specs.empty())
+    _get_specs_paths = Get(
+        SpecsPaths, Specs, specs if file_request_types or fmt_build_request_types else Specs.empty()
+    )
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
 
-    def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
+    specified_build_files = FilespecMatcher(
+        includes=[os.path.join("**", p) for p in build_file_options.patterns],
+        excludes=build_file_options.ignores,
+    ).matches(specs_paths.files)
+
+    def batch(
+        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
+    ) -> Iterator[list[_T]]:
         partitions = partition_sequentially(
-            field_sets,
-            key=lambda fs: fs.address.spec,
+            iterable,
+            key=key,
             size_target=lint_subsystem.batch_size,
             size_max=4 * lint_subsystem.batch_size,
         )
@@ -314,13 +348,19 @@ async def lint(
     def batch_by_type(
         request_types: Iterable[type[_SR]],
     ) -> tuple[tuple[type[_SR], list[FieldSet]], ...]:
+        def key(fs: FieldSet) -> str:
+            return fs.address.spec
+
         return tuple(
             (request_type, field_set_batch)
             for request_type in request_types
             for field_set_batch in batch(
-                request_type.field_set_type.create(target)
-                for target in targets
-                if request_type.field_set_type.is_applicable(target)
+                (
+                    request_type.field_set_type.create(target)
+                    for target in targets
+                    if request_type.field_set_type.is_applicable(target)
+                ),
+                key=key,
             )
         )
 
@@ -328,9 +368,10 @@ async def lint(
         request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
     )
 
-    fmt_requests: Iterable[FmtTargetsRequest] = ()
+    fmt_target_requests: Iterable[FmtTargetsRequest] = ()
+    fmt_build_requests: Iterable[_FmtBuildFilesRequest] = ()
     if not lint_subsystem.skip_formatters:
-        batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
+        batched_fmt_target_request_pairs = batch_by_type(fmt_target_request_types)
         all_fmt_source_batches = await MultiGet(
             Get(
                 SourceFiles,
@@ -342,16 +383,25 @@ async def lint(
                     for field_set in batch
                 ),
             )
-            for _, batch in batched_fmt_request_pairs
+            for _, batch in batched_fmt_target_request_pairs
         )
-        fmt_requests = (
+        fmt_target_requests = (
             request_type(
                 batch,
                 snapshot=source_files_snapshot.snapshot,
             )
             for (request_type, batch), source_files_snapshot in zip(
-                batched_fmt_request_pairs, all_fmt_source_batches
+                batched_fmt_target_request_pairs, all_fmt_source_batches
             )
+        )
+
+        build_file_batch_snapshots = await MultiGet(
+            Get(Snapshot, PathGlobs(paths_batch)) for paths_batch in batch(specified_build_files)
+        )
+        fmt_build_requests = (
+            fmt_build_request_type(snapshot)
+            for fmt_build_request_type in fmt_build_request_types
+            for snapshot in build_file_batch_snapshots
         )
 
     file_requests = (
@@ -362,7 +412,8 @@ async def lint(
 
     all_requests = [
         *(Get(LintResults, LintTargetsRequest, request) for request in lint_target_requests),
-        *(Get(FmtResult, FmtTargetsRequest, request) for request in fmt_requests),
+        *(Get(FmtResult, FmtTargetsRequest, request) for request in fmt_target_requests),
+        *(Get(FmtResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
         *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
     ]
     all_batch_results = cast(

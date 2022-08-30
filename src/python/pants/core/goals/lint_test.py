@@ -12,7 +12,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Type
 import pytest
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
     Lint,
@@ -26,7 +26,8 @@ from pants.core.goals.lint import (
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import SpecsPaths, Workspace
+from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
+from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
@@ -149,6 +150,14 @@ class FailingFormatter(MockFmtRequest):
         return FmtResult(before, after, "", "", formatter_name=self.name)
 
 
+class BuildFileFormatter(_FmtBuildFilesRequest):
+    name = "BobTheBUILDer"
+
+    @property
+    def fmt_result(self) -> FmtResult:
+        return FmtResult(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, "", "", formatter_name=self.name)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -165,6 +174,7 @@ def run_lint_rule(
     fmt_request_types: Sequence[Type[FmtTargetsRequest]] = (),
     targets: list[Target],
     run_files_linter: bool = False,
+    run_build_formatter: bool = False,
     batch_size: int = 128,
     only: list[str] | None = None,
     skip_formatters: bool = False,
@@ -173,6 +183,7 @@ def run_lint_rule(
         {
             LintTargetsRequest: lint_request_types,
             LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
+            _FmtBuildFilesRequest: [BuildFileFormatter] if run_build_formatter else [],
             FmtTargetsRequest: fmt_request_types,
         }
     )
@@ -189,6 +200,7 @@ def run_lint_rule(
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
                 Specs.empty(),
+                BuildFileOptions(("BUILD",)),
                 lint_subsystem,
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -215,6 +227,11 @@ def run_lint_rule(
                     mock=lambda mock_request: mock_request.fmt_result,
                 ),
                 MockGet(
+                    output_type=FmtResult,
+                    input_type=_FmtBuildFilesRequest,
+                    mock=lambda mock_request: mock_request.fmt_result,
+                ),
+                MockGet(
                     output_type=FilteredTargets,
                     input_type=Specs,
                     mock=lambda _: FilteredTargets(targets),
@@ -222,7 +239,12 @@ def run_lint_rule(
                 MockGet(
                     output_type=SpecsPaths,
                     input_type=Specs,
-                    mock=lambda _: SpecsPaths(("f.txt",), ()),
+                    mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
+                ),
+                MockGet(
+                    output_type=Snapshot,
+                    input_type=PathGlobs,
+                    mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],
             union_membership=union_membership,
@@ -267,11 +289,13 @@ def test_summary(rule_runner: RuleRunner) -> None:
         fmt_request_types=fmt_request_types,
         targets=targets,
         run_files_linter=True,
+        run_build_formatter=True,
     )
     assert exit_code == FailingRequest.exit_code([bad_address])
     assert stderr == dedent(
         """\
 
+        ✓ BobTheBUILDer succeeded.
         ✕ ConditionallySucceedsLinter failed.
         ✕ FailingFormatter failed.
         ✕ FailingLinter failed.
@@ -289,11 +313,18 @@ def test_summary(rule_runner: RuleRunner) -> None:
         fmt_request_types=fmt_request_types,
         targets=targets,
         run_files_linter=True,
-        only=[FailingRequest.name, MockFilesRequest.name, FailingFormatter.name],
+        run_build_formatter=True,
+        only=[
+            FailingRequest.name,
+            MockFilesRequest.name,
+            FailingFormatter.name,
+            BuildFileFormatter.name,
+        ],
     )
     assert stderr == dedent(
         """\
 
+        ✓ BobTheBUILDer succeeded.
         ✕ FailingFormatter failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
@@ -308,6 +339,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         fmt_request_types=fmt_request_types,
         targets=targets,
         run_files_linter=True,
+        run_build_formatter=True,
         skip_formatters=True,
     )
     assert stderr == dedent(
@@ -406,9 +438,30 @@ def test_duplicated_names(rule_runner: RuleRunner) -> None:
     with pytest.raises(AmbiguousRequestNamesError):
         run_lint_rule(
             rule_runner,
-            lint_request_types=[
-                AmbiguousLintTargetsRequest,
-            ],
+            lint_request_types=[AmbiguousLintTargetsRequest],
             run_files_linter=True,  # needed for MockFilesRequest
             targets=[],
         )
+
+    class BuildAndLintTargetType(LintTargetsRequest):
+        name = BuildFileFormatter.name
+
+    with pytest.raises(AmbiguousRequestNamesError):
+        run_lint_rule(
+            rule_runner,
+            lint_request_types=[BuildAndLintTargetType],
+            targets=[],
+            run_build_formatter=True,
+        )
+
+    class BuildAndFmtTargetType(FmtTargetsRequest):
+        name = BuildFileFormatter.name
+
+    # Ambiguity between a target formatter and BUILD formatter are OK
+    run_lint_rule(
+        rule_runner,
+        lint_request_types=[],
+        fmt_request_types=[BuildAndFmtTargetType],
+        run_build_formatter=True,
+        targets=[],
+    )
