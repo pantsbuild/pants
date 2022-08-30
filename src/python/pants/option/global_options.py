@@ -1382,11 +1382,11 @@ class BootstrapOptions:
         removal_version="2.16.0.dev1",
         removal_hint=softwrap(
             """
-            Remote auth plugins should now provide the function by implementing an entry point called remote_auth. 
+            Remote auth plugins should now provide the function by implementing an entry point called remote_auth.
 
-            If you are developing a plugin, switch to using an entry point. 
+            If you are developing a plugin, switch to using an entry point.
 
-            If you are only consuming a plugin from someone else, you can delete the remote_auth_plugin option 
+            If you are only consuming a plugin from someone else, you can delete the remote_auth_plugin option
             and now only need the plugin to be included in [GLOBAL].plugins
             """
         ),
