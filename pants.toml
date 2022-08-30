@@ -97,10 +97,10 @@ root_patterns = [
 ]
 
 [environments-preview.platforms_to_local_environment]
-linux_arm64 = "//:local_env"
-linux_x86_64 = "//:local_env"
-macos_arm64 = "//:local_env"
-macos_x86_64 = "//:local_env"
+linux_arm64 = "//:linux_local_env"
+linux_x86_64 = "//:linux_local_env"
+macos_arm64 = "//:macos_local_env"
+macos_x86_64 = "//:macos_local_env"
 
 [tailor]
 build_file_header = """\
