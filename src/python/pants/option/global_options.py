@@ -1729,7 +1729,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             that exist solely for running Python code (and aren't meant to be packaged).
             """
         ),
-        removal_version="2.15.0.dev0",
+        removal_version="2.15.0.dev1",
         removal_hint=softwrap(
             """
             If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
@@ -1782,7 +1782,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         # removed as well.
         deprecated_conditional(
             lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
-            removal_version="2.15.0.dev0",
+            removal_version="2.15.0.dev1",
             entity="Setting `[GLOBAL].remote_execution` at the same time as `[GLOBAL].remote_cache_eager-fetch`.",
             hint=softwrap(
                 """
@@ -1801,7 +1801,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 opts.remote_execution
                 and (not opts.remote_cache_read or not opts.remote_cache_write)
             ),
-            removal_version="2.15.0.dev0",
+            removal_version="2.15.0.dev1",
             entity="Using `[GLOBAL].remote_execution` without setting `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write`.",
             hint=softwrap(
                 """

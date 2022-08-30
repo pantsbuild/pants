@@ -261,6 +261,7 @@ async def run_go_tests(
 
         xtest_pkg_build_request = BuildGoPackageRequest(
             import_path=f"{import_path}_test",
+            pkg_name=f"{pkg_analysis.name}_test",
             digest=pkg_digest.digest,
             dir_path=pkg_analysis.dir_path,
             go_file_names=pkg_analysis.xtest_go_files,
@@ -307,6 +308,7 @@ async def run_go_tests(
         FallibleBuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
+            pkg_name="main",
             digest=testmain_input_digest,
             dir_path="",
             go_file_names=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),

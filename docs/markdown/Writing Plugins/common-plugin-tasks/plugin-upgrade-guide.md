@@ -6,6 +6,14 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-07-25T20:02:17.695Z"
 ---
+2.15
+----
+
+### Deprecated `convert_dir_literal_to_address_literal` kwarg
+
+The `convert_dir_literal_to_address_literal` keyword argument for `RawSpecs.create()` and
+`SpecsParser.parse_specs()` no longer does anything. It should be deleted.
+
 2.14
 ----
 

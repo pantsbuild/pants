@@ -133,6 +133,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
 def test_build_invalid_package(rule_runner: RuleRunner) -> None:
     request = BuildGoPackageRequest(
         import_path="example.com/assembly",
+        pkg_name="main",
         dir_path="",
         go_file_names=("add_amd64.go", "add_arm64.go"),
         digest=rule_runner.make_snapshot(
