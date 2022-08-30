@@ -18,7 +18,6 @@ from pants.engine.target import (
 from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
 
@@ -48,48 +47,27 @@ class EnvironmentsSubsystem(Subsystem):
             """
         )
     )
-    _platforms_to_local_environment = DictOption[str](
-        help=softwrap(
-            """
-            A mapping of platform strings to addresses to `_local_environment` targets. For example:
-
-                [environments-preview.platforms_to_local_environment]
-                linux_arm64 = "//:linux_arm64_environment"
-                linux_x86_64 = "//:linux_x86_environment"
-                macos_arm64 = "//:macos_environment"
-                macos_x86_64 = "//:macos_environment"
-
-            Pants will detect what platform you are currently on and load the specified
-            environment. If a platform is not defined, then Pants will use legacy options like
-            `[python-bootstrap].search_path`.
-
-            Warning: this feature is experimental and this option may be changed and removed before
-            the first 2.15 alpha release.
-            """
-        )
-    )
-
-    @memoized_property
-    def platforms_to_local_environment(self) -> dict[str, str]:
-        valid_platforms = {plat.value for plat in Platform}
-        invalid_keys = set(self._platforms_to_local_environment.keys()) - valid_platforms
-        if invalid_keys:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    Unrecognized platforms as the keys to the option
-                    `[environments-preview].platforms_to_local_environment`: {sorted(invalid_keys)}
-
-                    All valid platforms: {sorted(valid_platforms)}
-                    """
-                )
-            )
-        return self._platforms_to_local_environment
 
 
 # -------------------------------------------------------------------------------------------
 # Environment targets
 # -------------------------------------------------------------------------------------------
+
+
+class CompatiblePlatformsField(StringSequenceField):
+    alias = "compatible_platforms"
+    default = tuple(plat.value for plat in Platform)
+    valid_choices = Platform
+    value: tuple[str, ...]
+    help = softwrap(
+        """
+        Which platforms this environment can be used with.
+
+        This is used for Pants to automatically determine which which environment target to use for
+        the user's machine. Currently, there must be exactly one environment target for the
+        platform.
+        """
+    )
 
 
 class PythonInterpreterSearchPathsField(StringSequenceField):
@@ -141,6 +119,7 @@ class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        CompatiblePlatformsField,
         PythonInterpreterSearchPathsField,
         PythonBootstrapBinaryNamesField,
     )
@@ -156,6 +135,14 @@ class LocalEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 # Rules
 # -------------------------------------------------------------------------------------------
+
+
+class NoCompatibleEnvironmentError(Exception):
+    pass
+
+
+class AmbiguousEnvironmentError(Exception):
+    pass
 
 
 class AllEnvironments(FrozenDict[str, LocalEnvironmentTarget]):
@@ -198,33 +185,48 @@ async def determine_all_environments(
 
 @rule
 async def choose_local_environment(
-    platform: Platform, environments_subsystem: EnvironmentsSubsystem
+    platform: Platform,
+    all_environments: AllEnvironments,
 ) -> ChosenLocalEnvironment:
-    raw_address = environments_subsystem.platforms_to_local_environment.get(platform.value)
-    if not raw_address:
+    if not all_environments:
         return ChosenLocalEnvironment(None)
-    _description_of_origin = "the option [environments-preview].platforms_to_local_environment"
-    address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(raw_address, description_of_origin=_description_of_origin),
-    )
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(address, description_of_origin=_description_of_origin)
-    )
-    # TODO(#7735): this is not idiomatic to check for the target subclass.
-    if not isinstance(wrapped_target.target, LocalEnvironmentTarget):
-        raise ValueError(
+    compatible_targets = [
+        tgt
+        for tgt in all_environments.values()
+        if platform.value in tgt[CompatiblePlatformsField].value
+    ]
+    if not compatible_targets:
+        raise NoCompatibleEnvironmentError(
             softwrap(
                 f"""
-                Expected to use the address to a `_local_environment` target in the option
-                `[environments-preview].platforms_to_local_environment`, but the platform
-                `{platform.value}` was set to the target {address} with the target type
-                `{wrapped_target.target.alias}`.
+                No `_local_environment` targets from `[environments-preview].aliases` are
+                compatible with the current platform: {platform.value}
+
+                To fix, either adjust the `{CompatiblePlatformsField.alias}` field from the targets
+                in `[environments-preview].aliases` to include `{platform.value}`, or define a new
+                `_local_environment` target with `{platform.value}` included in the
+                `{CompatiblePlatformsField.alias}` field. (Current targets from
+                `[environments-preview].aliases`:
+                {sorted(tgt.address.spec for tgt in all_environments.values())})
                 """
             )
         )
-    return ChosenLocalEnvironment(wrapped_target.target)
+    elif len(compatible_targets) > 1:
+        # TODO(#7735): Allow the user to disambiguate what __local__ means via an option.
+        raise AmbiguousEnvironmentError(
+            softwrap(
+                f"""
+                Multiple `_local_environment` targets from `[environments-preview].aliases`
+                are compatible with the current platform `{platform.value}`, so it is ambiguous
+                which to use: {sorted(tgt.address.spec for tgt in compatible_targets)}
+    
+                To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
+                targets so that only one includes the value `{platform.value}`, or change
+                `[environments-preview].aliases` so that it does not define some of those targets.
+                """
+            )
+        )
+    return ChosenLocalEnvironment(compatible_targets[0])
 
 
 def rules():
