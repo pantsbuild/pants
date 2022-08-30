@@ -1,7 +1,7 @@
 NOTES:
 
 
-Run `./pants` with interpreter constraints that match the PyOxidizer interpreter constraints -- the initial `./pants` run will build `native_engine.so` and produce the pants wheel, which _MUST_ match the PyOxidizer interpreter version.
+Run `./pants` with interpreter constraints that match the PyOxidizer interpreter constraints. `native_engine.so` and the Pants `.whl` file _MUST_ be built with constraints that match the version of Python that PyOxidizer wants to use.
 
 Run `./pants package --pyoxidizer-interpreter-constraints="['CPython==3.9.*']" src/python/pants/bin:pants_oxidized_experimental`
 
