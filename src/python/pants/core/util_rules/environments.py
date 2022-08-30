@@ -10,6 +10,8 @@ from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
+    StringField,
     StringSequenceField,
     Target,
     WrappedTarget,
@@ -52,6 +54,26 @@ class EnvironmentsSubsystem(Subsystem):
 # -------------------------------------------------------------------------------------------
 # Environment targets
 # -------------------------------------------------------------------------------------------
+
+LOCAL_ENVIRONMENT_MATCHER = "__local__"
+
+
+class EnvironmentField(StringField, AsyncFieldMixin):
+    alias = "_environment"
+    default = LOCAL_ENVIRONMENT_MATCHER
+    value: str
+    help = softwrap(
+        f"""
+        What environment to use from the option `[environments-preview].aliases` when building
+        this target.
+
+        Use the special string `{LOCAL_ENVIRONMENT_MATCHER}` for Pants to automatically choose the
+        environment based on the current platform. Otherwise, use a key from the option
+        `[environments-preview].aliases` to force that environment to be used.
+
+        Pants will error if the specified environment is not compatible with the current platform.
+        """
+    )
 
 
 class CompatiblePlatformsField(StringSequenceField):
@@ -145,13 +167,29 @@ class AmbiguousEnvironmentError(Exception):
     pass
 
 
+class UnrecognizedEnvironmentError(Exception):
+    pass
+
+
 class AllEnvironments(FrozenDict[str, LocalEnvironmentTarget]):
     """A mapping of environment aliases to their corresponding environment target."""
 
 
 @dataclass(frozen=True)
 class ChosenLocalEnvironment:
+    f"""Which environment target {LOCAL_ENVIRONMENT_MATCHER} resolves to."""
+
     tgt: LocalEnvironmentTarget | None
+
+
+@dataclass(frozen=True)
+class EnvironmentForTarget:
+    env_tgt: LocalEnvironmentTarget | None
+
+
+@dataclass(frozen=True)
+class EnvironmentForTargetRequest:
+    environment_field: EnvironmentField
 
 
 @rule
@@ -184,7 +222,7 @@ async def determine_all_environments(
 
 
 @rule
-async def choose_local_environment(
+async def determine_local_environment(
     platform: Platform,
     all_environments: AllEnvironments,
 ) -> ChosenLocalEnvironment:
@@ -219,7 +257,7 @@ async def choose_local_environment(
                 Multiple `_local_environment` targets from `[environments-preview].aliases`
                 are compatible with the current platform `{platform.value}`, so it is ambiguous
                 which to use: {sorted(tgt.address.spec for tgt in compatible_targets)}
-    
+
                 To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
                 targets so that only one includes the value `{platform.value}`, or change
                 `[environments-preview].aliases` so that it does not define some of those targets.
@@ -227,6 +265,26 @@ async def choose_local_environment(
             )
         )
     return ChosenLocalEnvironment(compatible_targets[0])
+
+
+@rule
+async def determine_environment_for_target(
+    request: EnvironmentForTargetRequest,
+) -> EnvironmentForTarget:
+    requested_env = request.environment_field.value
+    if requested_env == LOCAL_ENVIRONMENT_MATCHER:
+        local_env = await Get(ChosenLocalEnvironment, {})
+        return EnvironmentForTarget(local_env.tgt)
+    all_envs = await Get(AllEnvironments, {})
+    if requested_env not in all_envs:
+        raise UnrecognizedEnvironmentError(
+            softwrap(
+                """
+                TODO(#7735)
+                """
+            )
+        )
+    return EnvironmentForTarget(all_envs[requested_env])
 
 
 def rules():
