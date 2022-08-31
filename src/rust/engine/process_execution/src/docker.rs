@@ -163,6 +163,52 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+struct ContainerRemovalGuard {
+  docker: Docker,
+  container_id: Option<String>,
+  executor: Executor,
+}
+
+impl ContainerRemovalGuard {
+  pub fn new(docker: Docker, container_id: String, executor: Executor) -> Self {
+    Self {
+      docker,
+      container_id: Some(container_id),
+      executor,
+    }
+  }
+
+  pub fn preserve(&mut self) {
+    self.container_id = None;
+  }
+
+  pub async fn remove(&mut self) -> Result<(), String> {
+    if let Some(container_id) = self.container_id.take() {
+      let remove_options = bollard::container::RemoveContainerOptions {
+        force: true,
+        ..bollard::container::RemoveContainerOptions::default()
+      };
+
+      let _ = self
+        .docker
+        .remove_container(&container_id, Some(remove_options))
+        .await
+        .map_err(|err| format!("Failed to remove container `{}`: {:?}", &container_id, err))?;
+    }
+
+    Ok(())
+  }
+}
+
+impl Drop for ContainerRemovalGuard {
+  fn drop(&mut self) {
+    let executor = self.executor.clone();
+    if let Err(err) = executor.block_on(self.remove()) {
+      log::warn!("Error while removing container: {:?}", err);
+    }
+  }
+}
+
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (PathBuf, PathBuf);
@@ -265,10 +311,22 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("created container {}", &container.id);
 
-    // DOCKER-TODO: Use a drop guard to remove the container regardless of success/failure.
-    // We cannot set `.host_config.auto_remove` in `config` above because containers that exit
-    // early will no longer exist and thus this code will not be able to attach and capture
-    // the output (which is the entire point of this executor ...).
+    // Use a drop guard to remove the container regardless of success/failure. We cannot set
+    // `.host_config.auto_remove` in `config` above because containers that exit early will no
+    // longer exist and thus this code will not be able to attach and capture the output (which
+    // is the entire point of this executor ...).
+    let container_removal_guard = if matches!(
+      self.keep_sandboxes,
+      KeepSandboxes::Never | KeepSandboxes::OnFailure
+    ) {
+      Some(ContainerRemovalGuard::new(
+        self.docker.clone(),
+        container.id.clone(),
+        self.executor.clone(),
+      ))
+    } else {
+      None
+    };
 
     self
       .docker
@@ -315,8 +373,9 @@ impl CapturedWorkdir for CommandRunner {
       .boxed();
 
     let container_id = container.id.to_owned();
+    let keep_sandboxes = self.keep_sandboxes;
     let result_stream = async_stream::stream! {
-      loop {
+      let was_success = loop {
         tokio::select! {
           Some(output_msg) = output_stream.next() => {
             match output_msg {
@@ -339,16 +398,26 @@ impl CapturedWorkdir for CommandRunner {
                 // `ChildResults` to better support exit code vs signal vs error message?
                 let status_code = r.status_code;
                 yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                break;
+                break status_code == 0;
               }
               Err(err) => {
                 // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
                 log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
                 yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                break;
+                break false;
               }
             }
           }
+        }
+      };
+
+      if let Some(mut guard) = container_removal_guard {
+        if keep_sandboxes == KeepSandboxes::OnFailure && !was_success {
+          guard.preserve();
+        }
+
+        if let Err(err) = guard.remove().await {
+          log::warn!("Error while removing container: {:?}", err);
         }
       }
     }
