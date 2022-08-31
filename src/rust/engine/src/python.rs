@@ -147,13 +147,7 @@ impl TypeId {
   pub fn is_union(&self) -> bool {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let unions_module = py.import("pants.engine.unions").unwrap();
-    let is_union_func = unions_module.getattr("is_union").unwrap();
-    is_union_func
-      .call1((self.as_py_type(py),))
-      .unwrap()
-      .extract()
-      .unwrap()
+    externs::is_union(py, self.as_py_type(py)).unwrap()
   }
 
   pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {

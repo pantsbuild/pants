@@ -35,7 +35,10 @@ def union(cls):
 
 
 def is_union(input_type: type) -> bool:
-    """Return whether or not a type has been annotated with `@union`."""
+    """Return whether or not a type has been annotated with `@union`.
+
+    This function is also implemented in Rust as `engine::externs::is_union`.
+    """
     is_union: bool = input_type == getattr(input_type, "_is_union_for", None)
     return is_union
 
