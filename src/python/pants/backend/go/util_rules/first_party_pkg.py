@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
@@ -24,7 +25,7 @@ from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -298,36 +299,36 @@ async def setup_first_party_pkg_digest(
     tgt = wrapped_target.target
     pkg_sources = await Get(HydratedSources, HydrateSourcesRequest(tgt[GoPackageSourcesField]))
     sources_digest = pkg_sources.snapshot.digest
+    dir_path = analysis.dir_path if analysis.dir_path else "."
 
     embed_config = None
     test_embed_config = None
     xtest_embed_config = None
 
-    # TODO(#13795): Error if you depend on resources without corresponding embed patterns?
-    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
-        dependencies = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
-        resources_sources = await Get(
-            SourceFiles,
-            SourceFilesRequest(
-                (
-                    t.get(SourcesField)
-                    for t in dependencies
-                    # You can only embed resources located at or below the directory of the
-                    # `go_package`. This is a restriction from Go.
-                    # TODO(#13795): Error if you depend on resources above the go_package?
-                    if t.address.spec_path.startswith(request.address.spec_path)
-                ),
-                for_sources_types=(ResourceSourceField,),
-                # TODO: Switch to True. We need to be confident though that the generated files
-                #  are located below the go_package.
-                enable_codegen=False,
+    # Add `resources` targets to the package.
+    dependencies = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
+    resources_sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            (
+                t.get(SourcesField)
+                for t in dependencies
+                # You can only embed resources located at or below the directory of the
+                # `go_package`. This is a restriction from Go.
+                # TODO(#13795): Error if you depend on resources above the go_package?
+                if t.address.spec_path.startswith(request.address.spec_path)
             ),
-        )
-        resources_digest = await Get(
-            Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
-        )
-        resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
+            for_sources_types=(ResourceSourceField,),
+            # TODO: Switch to True. We need to be confident though that the generated files
+            #  are located below the go_package.
+            enable_codegen=False,
+        ),
+    )
+    sources_digest = await Get(
+        Digest, MergeDigests([sources_digest, resources_sources.snapshot.digest])
+    )
 
+    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
         patterns_json = json.dumps(
             {
                 "EmbedPatterns": analysis.embed_patterns,
@@ -335,18 +336,23 @@ async def setup_first_party_pkg_digest(
                 "XTestEmbedPatterns": analysis.xtest_embed_patterns,
             }
         ).encode("utf-8")
-        sources_digest, patterns_json_digest = await MultiGet(
-            Get(Digest, MergeDigests((sources_digest, resources_digest))),
+        patterns_json_digest, sources_digest_for_embedder = await MultiGet(
             Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
+            Get(Digest, AddPrefix(sources_digest, "__sources__")),
         )
         input_digest = await Get(
-            Digest, MergeDigests((sources_digest, patterns_json_digest, embedder.digest))
+            Digest,
+            MergeDigests((sources_digest_for_embedder, patterns_json_digest, embedder.digest)),
         )
 
         embed_result = await Get(
             FallibleProcessResult,
             Process(
-                ("./embedder", "patterns.json", "__resources__"),
+                (
+                    "./embedder",
+                    "patterns.json",
+                    os.path.normpath(os.path.join("__sources__", dir_path)),
+                ),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {request.address}",
                 level=LogLevel.DEBUG,
@@ -356,12 +362,19 @@ async def setup_first_party_pkg_digest(
             return FallibleFirstPartyPkgDigest(
                 pkg_digest=None,
                 exit_code=embed_result.exit_code,
-                stderr=embed_result.stdout.decode("utf-8"),
+                stderr=embed_result.stdout.decode() + "\n" + embed_result.stderr.decode(),
             )
+
         metadata = json.loads(embed_result.stdout)
-        embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
-        test_embed_config = EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {}))
-        xtest_embed_config = EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {}))
+        embed_config = EmbedConfig.from_json_dict(
+            metadata.get("EmbedConfig", {}), prefix_to_strip="__sources__/"
+        )
+        test_embed_config = EmbedConfig.from_json_dict(
+            metadata.get("TestEmbedConfig", {}), prefix_to_strip="__sources__/"
+        )
+        xtest_embed_config = EmbedConfig.from_json_dict(
+            metadata.get("XTestEmbedConfig", {}), prefix_to_strip="__sources__/"
+        )
 
     return FallibleFirstPartyPkgDigest(
         FirstPartyPkgDigest(

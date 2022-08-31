@@ -342,20 +342,20 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
     expected_snapshot = rule_runner.make_snapshot(
         {
             **go_sources,
-            **{os.path.join("__resources__", f): content for f, content in resources.items()},
+            **resources,
         }
     )
     assert actual_snapshot == expected_snapshot
 
     assert pkg_digest.embed_config == EmbedConfig(
-        {"grok.txt": ["grok.txt"]}, {"grok.txt": "__resources__/grok.txt"}
+        {"grok.txt": ["grok.txt"]}, {"grok.txt": "grok.txt"}
     )
     assert pkg_digest.test_embed_config == EmbedConfig(
         {"grok.txt": ["grok.txt"], "test_grok.txt": ["test_grok.txt"]},
-        {"grok.txt": "__resources__/grok.txt", "test_grok.txt": "__resources__/test_grok.txt"},
+        {"grok.txt": "grok.txt", "test_grok.txt": "test_grok.txt"},
     )
     assert pkg_digest.xtest_embed_config == EmbedConfig(
-        {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "__resources__/xtest_grok.txt"}
+        {"xtest_grok.txt": ["xtest_grok.txt"]}, {"xtest_grok.txt": "xtest_grok.txt"}
     )
 
 
