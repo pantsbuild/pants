@@ -174,9 +174,6 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    log::debug!("immutable_inputs_workdir = {:?}", &immutable_inputs_workdir);
-    log::debug!("named_caches_workdir = {:?}", &named_caches_workdir);
-
     let env = req
       .env
       .iter()
@@ -258,7 +255,7 @@ impl CapturedWorkdir for CommandRunner {
       ..bollard::container::Config::default()
     };
 
-    log::debug!("creating container with config: {:?}", &config);
+    log::trace!("creating container with config: {:?}", &config);
 
     let container = self
       .docker
@@ -266,12 +263,12 @@ impl CapturedWorkdir for CommandRunner {
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
 
-    log::debug!("created container {}", &container.id);
+    log::trace!("created container {}", &container.id);
 
     // DOCKER-TODO: Use a drop guard to remove the container regardless of success/failure.
     // We cannot set `.host_config.auto_remove` in `config` above because containers that exit
-    // early will no longer exist for purposes of attaching and capturing the output (which is
-    // the entire point of this executor ...).
+    // early will no longer exist and thus this code will not be able to attach and capture
+    // the output (which is the entire point of this executor ...).
 
     self
       .docker
@@ -284,7 +281,7 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
-    log::debug!("started container {}", &container.id);
+    log::trace!("started container {}", &container.id);
 
     let attach_options = bollard::container::AttachContainerOptions::<String> {
       stdout: Some(true),
@@ -305,7 +302,7 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
-    log::debug!("attached to container {}", &container.id);
+    log::trace!("attached to container {}", &container.id);
 
     let mut output_stream = attach_result.output.boxed();
 
@@ -325,18 +322,18 @@ impl CapturedWorkdir for CommandRunner {
           Some(output_msg) = output_stream.next() => {
             match output_msg {
               Ok(LogOutput::StdOut { message }) => {
-                log::debug!("container {} wrote {} bytes to stdout", &container_id, message.len());
+                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
                 yield Ok(ChildOutput::Stdout(message));
               }
               Ok(LogOutput::StdErr { message }) => {
-                log::debug!("container {} wrote {} bytes to stderr", &container_id, message.len());
+                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
                 yield Ok(ChildOutput::Stderr(message));
               }
               _ => (),
             }
           }
           Some(wait_msg) = wait_stream.next() => {
-            log::debug!("wait_container stream ({}): {:?}", &container_id, wait_msg);
+            log::trace!("wait_container stream ({}): {:?}", &container_id, wait_msg);
             match wait_msg {
               Ok(r) => {
                 // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
@@ -347,8 +344,8 @@ impl CapturedWorkdir for CommandRunner {
               }
               Err(err) => {
                 // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
-                log::error!("Docker wait failure: {:?}", err);
-                yield Err(format!("Docker wait_container failure: {:?}", err));
+                log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
+                yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
                 run_stream = false;
               }
             }
