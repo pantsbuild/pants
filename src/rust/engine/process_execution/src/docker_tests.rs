@@ -53,15 +53,21 @@ macro_rules! setup_docker {
     let ping_response = docker.ping().await;
     if ping_response.is_err() {
       if cfg!(target_os = "macos") {
-        println!("Skipping test due to Docker not being available: {:?}", ping_response);
+        println!(
+          "Skipping test due to Docker not being available: {:?}",
+          ping_response
+        );
         return;
       } else {
-        panic!("Docker should have been available for this test: {:?}", ping_response);
+        panic!(
+          "Docker should have been available for this test: {:?}",
+          ping_response
+        );
       }
     }
 
     docker
-  }}
+  }};
 }
 
 #[tokio::test]
