@@ -38,7 +38,7 @@ struct LocalTestResult {
 
 macro_rules! setup_docker {
   () => {{
-    match Docker::connect_with_local_defaults() {
+    let docker = match Docker::connect_with_local_defaults() {
       Ok(docker) => docker,
       Err(err) => {
         if cfg!(target_os = "macos") {
@@ -48,8 +48,20 @@ macro_rules! setup_docker {
           panic!("Docker should have been available for this test: {:?}", err);
         }
       }
+    };
+
+    let ping_response = docker.ping().await;
+    if ping_response.is_err() {
+      if cfg!(target_os = "macos") {
+        println!("Skipping test due to Docker not being available: {:?}", ping_response);
+        return;
+      } else {
+        panic!("Docker should have been available for this test: {:?}", ping_response);
+      }
     }
-  }};
+
+    docker
+  }}
 }
 
 #[tokio::test]
