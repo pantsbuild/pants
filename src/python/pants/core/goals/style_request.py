@@ -7,7 +7,7 @@ import logging
 import os.path
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Generic, Iterable, Sequence, TypeVar
+from typing import Any, ClassVar, Generic, Iterable, Mapping, Sequence, TypeVar
 
 from typing_extensions import Protocol
 
@@ -129,12 +129,11 @@ _R = TypeVar("_R", bound=_ResultsWithReports)
 
 
 def write_reports(
-    all_results: tuple[_ResultsWithReports, ...],
+    results_by_tool_name: Mapping[str, Sequence[_ResultWithReport]],
     workspace: Workspace,
     dist_dir: DistDir,
     *,
     goal_name: str,
-    get_name: Callable[[_R], str],
 ) -> None:
     disambiguated_dirs: set[str] = set()
 
@@ -148,12 +147,11 @@ def write_reports(
         workspace.write_digest(digest, path_prefix=output_dir)
         logger.info(f"Wrote {goal_name} report files to {output_dir}.")
 
-    for results in all_results:
-        tool_name = get_name(results).lower()  # type: ignore[arg-type]
-        if len(results.results) == 1 and results.results[0].report != EMPTY_DIGEST:
-            write_report(results.results[0].report, tool_name)
+    for tool_name, results in results_by_tool_name.items():
+        if len(results) == 1 and results[0].report != EMPTY_DIGEST:
+            write_report(results[0].report, tool_name)
         else:
-            for result in results.results:
+            for result in results:
                 if result.report != EMPTY_DIGEST:
                     write_report(
                         result.report,

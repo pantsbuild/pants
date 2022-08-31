@@ -6,6 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, TypeVar, cast
 
@@ -470,12 +471,15 @@ async def lint(
     def get_name(res: LintResults) -> str:
         return res.linter_name
 
+    results_by_tool: dict[str, list[LintResult]] = defaultdict(list)
+    for results in all_results:
+        results_by_tool[get_name(results)].extend(results.results)
+
     write_reports(
-        all_results,
+        results_by_tool,
         workspace,
         dist_dir,
         goal_name=LintSubsystem.name,
-        get_name=get_name,
     )
 
     _print_results(
