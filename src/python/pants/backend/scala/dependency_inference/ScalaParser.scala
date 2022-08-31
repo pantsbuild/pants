@@ -372,9 +372,10 @@ class SourceAnalysisTraverser extends Traverser {
       })
     }
 
-    case Type.Param(mods, _name, _tparams, bounds, _vbounds, _cbounds) => {
+    case Type.Param(mods, _name, _tparams, bounds, _vbounds, cbounds) => {
       visitMods(mods)
       extractNamesFromTypeTree(bounds).foreach(recordConsumedSymbol(_))
+      cbounds.flatMap(extractNamesFromTypeTree(_)).foreach(recordConsumedSymbol(_))
     }
 
     case Ctor.Primary(mods, _name, params_list) => {
