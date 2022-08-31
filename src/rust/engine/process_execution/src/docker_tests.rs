@@ -174,7 +174,7 @@ async fn env() {
 }
 
 #[tokio::test]
-#[ignore]  // flaky
+#[ignore] // flaky
 #[cfg(unix)]
 async fn env_is_deterministic() {
   let docker = setup_docker!();
