@@ -34,20 +34,20 @@ Maintainers
 Contributors
 ------------
 
-| **NAME**               | **PROUDEST CONTRIBUTION **                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Chris Williams**     |                                                                                                          |
-| **Dan Moran**          | "Enabling automatic usage of `pytest-xdist` in `./pants test`"                                           |
-| **Doron Somech**       |                                                                                                          |
-| **Jacob Floyd**        | Gave the idea for skip_flake8 et al, which grew into a flagship feature: incremental adoption            |
-| **Jonas Stendahl**     | "Adding formatting and linting support for Protobuf"                                                                                                         |
-| **Josh Reed**          | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                      |
-| **Nick Grisafi**       | "Participating in podcasts with maintainers (Eric and Josh) on developer experience and Pants!"          |
+| **NAME**               | **PROUDEST CONTRIBUTION**                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Chris Williams**     |                                                                                                         |
+| **Dan Moran**          | "Enabling automatic usage of `pytest-xdist` in `./pants test`"                                          |
+| **Doron Somech**       |                                                                                                         |
+| **Jacob Floyd**        | Gave the idea for skip_flake8 et al, which grew into a flagship feature: incremental adoption           |
+| **Jonas Stendahl**     | "Adding formatting and linting support for Protobuf"                                                                                                        |
+| **Josh Reed**          | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                     |
+| **Nick Grisafi**       | "Participating in podcasts with maintainers (Eric and Josh) on developer experience and Pants!"         |
 | **Raúl Cuza**          | "The first time I was able to help someone else with pants on the Slack <https://pantsbuild.slack.com>." |
-| **Rhys Madigan**       | "Making unit test run times easier to understand"                                                        |
-| **Suresh Joshi (SJ)**  | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                               |
-| **Tansy Arron-Walker** | "Writing my first task in the new engine was really exciting!"                                           |
-| **Thales Menato**      |                                                                                                          |
+| **Rhys Madigan**       | "Making unit test run times easier to understand"                                                       |
+| **Suresh Joshi (SJ)**  | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                              |
+| **Tansy Arron-Walker** | "Writing my first task in the new engine was really exciting!"                                          |
+| **Thales Menato**      |                                                                                                         |
 
 ***
 
