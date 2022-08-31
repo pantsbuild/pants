@@ -1475,16 +1475,25 @@ impl<R: Rule> Builder<R> {
 ///
 /// Generate all combinations of one element from each input vector.
 ///
-pub(crate) fn combinations_of_one<T: std::fmt::Debug>(
+pub(crate) fn combinations_of_one<T>(input: &[Vec<T>]) -> Box<dyn Iterator<Item = Vec<&T>> + '_> {
+  combinations_of_one_helper(input, input.len())
+}
+
+fn combinations_of_one_helper<T>(
   input: &[Vec<T>],
+  combination_len: usize,
 ) -> Box<dyn Iterator<Item = Vec<&T>> + '_> {
   match input.len() {
     0 => Box::new(std::iter::empty()),
-    1 => Box::new(input[0].iter().map(|item| vec![item])),
+    1 => Box::new(input[0].iter().map(move |item| {
+      let mut output = Vec::with_capacity(combination_len);
+      output.push(item);
+      output
+    })),
     len => {
       let last_idx = len - 1;
       Box::new(input[last_idx].iter().flat_map(move |item| {
-        combinations_of_one(&input[..last_idx]).map(move |mut prefix| {
+        combinations_of_one_helper(&input[..last_idx], combination_len).map(move |mut prefix| {
           prefix.push(item);
           prefix
         })
