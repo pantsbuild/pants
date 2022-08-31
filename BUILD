@@ -15,6 +15,7 @@ _local_environment(
 
 _local_environment(
     name="macos_local_env",
+    compatible_platforms=["macos_arm64", "macos_x86_64"],
     # Avoid system Python interpreters, which tend to be broken on macOS.
     python_interpreter_search_paths=["<PYENV>"],
 )
