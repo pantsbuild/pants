@@ -73,7 +73,6 @@ async fn stdout() {
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
   let docker = setup_docker!();
-  let _ = env_logger::try_init();
   let result = run_command_via_docker(
     &docker,
     Process::new(owned_string_vec(&[
