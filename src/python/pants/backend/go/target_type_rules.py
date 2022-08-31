@@ -78,8 +78,8 @@ class FirstPartyGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook)
     pass
 
 
-@rule(desc="Analyze and map first-party Go import paths for all modules.", level=LogLevel.DEBUG)
-async def go_map_first_party_import_paths_by_module(
+@rule(desc="Analyze and map Go import paths for all modules.", level=LogLevel.DEBUG)
+async def go_map_import_paths_by_module(
     _request: FirstPartyGoModuleImportPathsMappingsHook,
     all_targets: AllTargets,
 ) -> GoModuleImportPathsMappings:
@@ -136,7 +136,7 @@ async def go_map_first_party_import_paths_by_module(
 
 
 @rule(desc="Analyze Go import paths for all modules.", level=LogLevel.DEBUG)
-async def go_map_import_paths_by_module(
+async def go_merge_import_paths_analysis(
     union_membership: UnionMembership,
 ) -> AllGoModuleImportPathsMappings:
     import_path_mappers = union_membership.get(GoModuleImportPathsMappingsHook)
