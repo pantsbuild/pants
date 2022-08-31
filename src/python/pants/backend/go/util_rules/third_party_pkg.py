@@ -55,7 +55,6 @@ class ThirdPartyPkgAnalysis:
 
     name: str
     import_path: str
-    name: str
 
     digest: Digest
     dir_path: str
@@ -441,7 +440,6 @@ async def analyze_go_third_party_package(
 
     analysis = ThirdPartyPkgAnalysis(
         digest=package_digest,
-        name=request.pkg_json.get("Name") or import_path.rpartition("/")[-1],
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,

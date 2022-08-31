@@ -27,12 +27,7 @@ from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
-<<<<<<< HEAD
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-=======
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.internals.native_engine import AddPrefix
->>>>>>> 3d1a33f99 (SRCDIR replacement)
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -81,7 +76,6 @@ class FirstPartyPkgAnalysis:
     `FirstPartyPkgDigest` for the source files and embed config.
     """
 
-    name: str
     import_path: str
     name: str
     dir_path: str
@@ -162,7 +156,6 @@ class FallibleFirstPartyPkgAnalysis:
 
         analysis = FirstPartyPkgAnalysis(
             dir_path=dir_path,
-            name=metadata.get("Name"),
             import_path=import_path,
             name=metadata["Name"],
             imports=tuple(metadata.get("Imports", [])),

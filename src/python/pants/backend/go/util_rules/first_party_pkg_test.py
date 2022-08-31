@@ -336,7 +336,6 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
         FallibleFirstPartyPkgDigest,
         [FirstPartyPkgDigestRequest(Address("", target_name="pkg"))],
     )
-    print(f"maybe_digest = {maybe_digest}")
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest
     actual_snapshot = rule_runner.request(Snapshot, [pkg_digest.digest])

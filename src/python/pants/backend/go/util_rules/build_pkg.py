@@ -53,7 +53,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
         coverage_config: GoCoverageConfig | None = None,
         cgo_file_names: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
-        pkg_name: str | None = None,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -74,7 +73,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.coverage_config = coverage_config
         self.cgo_file_names = cgo_file_names
         self.cgo_flags = cgo_flags
-        self.pkg_name = pkg_name or import_path.rpartition("/")[-1]
         self._hashcode = hash(
             (
                 self.import_path,
@@ -90,7 +88,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.coverage_config,
                 self.cgo_file_names,
                 self.cgo_flags,
-                self.pkg_name,
             )
         )
 
@@ -111,8 +108,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"embed_config={self.embed_config}, "
             f"coverage_config={self.coverage_config}, "
             f"cgo_file_names={self.cgo_file_names}, "
-            f"cgo_flags={self.cgo_flags}, "
-            f"pkg_name={self.pkg_name}"
+            f"cgo_flags={self.cgo_flags}"
             ")"
         )
 
@@ -136,7 +132,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.coverage_config == other.coverage_config
             and self.cgo_file_names == other.cgo_file_names
             and self.cgo_flags == other.cgo_flags
-            and self.pkg_name == other.pkg_name
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
