@@ -6,8 +6,11 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
+bollard = "0.13"
+bollard-stubs = "1.42.0-rc.3"
 walkdir = "2"
 protos = { path = "../protos" }
 bytes = "1.2"

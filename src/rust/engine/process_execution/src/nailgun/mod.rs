@@ -185,6 +185,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           self.inner.named_caches(),
           self.inner.immutable_inputs(),
+          None,
+          None,
         )
         .await?;
 

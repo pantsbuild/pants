@@ -1,25 +1,33 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
-use std::str;
 use std::time::Duration;
 
+use bollard::image::CreateImageOptions;
+use bollard::Docker;
+use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
+use futures::StreamExt;
 use maplit::hashset;
-use shell_quote::bash;
-use spectral::{assert_that, string::StrAssertions};
-use tempfile::TempDir;
-
-use fs::EMPTY_DIRECTORY_DIGEST;
+use spectral::assert_that;
+use spectral::string::StrAssertions;
 use store::Store;
+use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
+use super::docker::SANDBOX_PATH_IN_CONTAINER;
+use crate::local::KeepSandboxes;
+use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
-  local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
-  ProcessError, RelativePath,
+  local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
+  Platform, Process, ProcessError,
 };
+
+/// Docker image to use for most tests in this file.
+const IMAGE: &'static str = "busybox:1.34.1";
+
+/// Path to `sh` within the image.
+const SH_PATH: &'static str = "/bin/sh";
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -28,12 +36,50 @@ struct LocalTestResult {
   stderr_bytes: Vec<u8>,
 }
 
+macro_rules! setup_docker {
+  () => {{
+    let docker = match Docker::connect_with_local_defaults() {
+      Ok(docker) => docker,
+      Err(err) => {
+        if cfg!(target_os = "macos") {
+          println!("Skipping test due to Docker not being available: {:?}", err);
+          return;
+        } else {
+          panic!("Docker should have been available for this test: {:?}", err);
+        }
+      }
+    };
+
+    let ping_response = docker.ping().await;
+    if ping_response.is_err() {
+      if cfg!(target_os = "macos") {
+        println!(
+          "Skipping test due to Docker not being available: {:?}",
+          ping_response
+        );
+        return;
+      } else {
+        panic!(
+          "Docker should have been available for this test: {:?}",
+          ping_response
+        );
+      }
+    }
+
+    docker
+  }};
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let result = run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
-    .await
-    .unwrap();
+  let docker = setup_docker!();
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])),
+  )
+  .await
+  .unwrap();
 
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -44,11 +90,15 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let result = run_command_locally(Process::new(owned_string_vec(&[
-    "/bin/bash",
-    "-c",
-    "echo -n foo ; echo >&2 -n bar ; exit 1",
-  ])))
+  let docker = setup_docker!();
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&[
+      SH_PATH,
+      "-c",
+      "echo -n foo ; echo >&2 -n bar ; exit 1",
+    ])),
+  )
   .await
   .unwrap();
 
@@ -61,36 +111,33 @@ async fn stdout_and_stderr_and_exit_code() {
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
+  let docker = setup_docker!();
+
   // Launch a process that kills itself with a signal.
-  let result = run_command_locally(Process::new(owned_string_vec(&[
-    "/bin/bash",
-    "-c",
-    "kill $$",
-  ])))
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])),
+  )
   .await
   .unwrap();
 
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, -15);
+  // DOCKER-TODO: Figure out a way to capture the signal from the container. Docker does not
+  // seem to make that available. The `143` code comes from the init process in the container.
+  // assert_eq!(result.original.exit_code, -15);
+  assert_eq!(result.original.exit_code, 143);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
-#[cfg(unix)]
-async fn env() {
-  let mut env: BTreeMap<String, String> = BTreeMap::new();
-  env.insert("FOO".to_string(), "foo".to_string());
-  env.insert("BAR".to_string(), "not foo".to_string());
-
-  let result =
-    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone()))
-      .await
-      .unwrap();
-
-  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  let got_env: BTreeMap<String, String> = stdout
+fn extract_env(
+  content: Vec<u8>,
+  exclude_keys: &[&str],
+) -> Result<BTreeMap<String, String>, String> {
+  let content =
+    String::from_utf8(content).map_err(|_| "Invalid UTF-8 in env output".to_string())?;
+  let result = content
     .split("\n")
     .filter(|line| !line.is_empty())
     .map(|line| line.splitn(2, "="))
@@ -100,44 +147,82 @@ async fn env() {
         parts.next().unwrap_or("").to_string(),
       )
     })
-    .filter(|x| x.0 != "PATH")
+    .filter(|x| !exclude_keys.iter().any(|&k| k == x.0))
     .collect();
+  Ok(result)
+}
 
+#[tokio::test]
+#[cfg(unix)]
+async fn env() {
+  let docker = setup_docker!();
+
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("FOO".to_string(), "foo".to_string());
+  env.insert("BAR".to_string(), "not foo".to_string());
+
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&["/bin/env"])).env(env.clone()),
+  )
+  .await
+  .unwrap();
+
+  let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
+  let got_env = extract_env(result.stdout_bytes, exclude_keys).unwrap();
   assert_eq!(env, got_env);
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
+  let docker = setup_docker!();
+
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
-    Process::new(owned_string_vec(&["/usr/bin/env"])).env(env)
+    Process::new(owned_string_vec(&["/bin/env"])).env(env)
   }
 
-  let result1 = run_command_locally(make_request()).await;
-  let result2 = run_command_locally(make_request()).await;
+  let result1 = run_command_via_docker(&docker, make_request())
+    .await
+    .unwrap();
+  let result2 = run_command_via_docker(&docker, make_request())
+    .await
+    .unwrap();
 
-  assert_eq!(result1.unwrap(), result2.unwrap());
+  let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
+  let env1 = extract_env(result1.stdout_bytes, exclude_keys).unwrap();
+  let env2 = extract_env(result2.stdout_bytes, exclude_keys).unwrap();
+  assert_eq!(env1, env2);
 }
 
 #[tokio::test]
 async fn binary_not_found() {
-  let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
-    .await
-    .expect_err("Want Err");
-  assert!(err_string.to_string().contains("Failed to execute"));
-  assert!(err_string.to_string().contains("echo"));
+  let docker = setup_docker!();
+
+  // Use `xyzzy` as a command that should not exist.
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])),
+  )
+  .await
+  .unwrap();
+  let stderr = String::from_utf8(result.stderr_bytes).unwrap();
+  // Note: The error message is dependent on the fact that `tini` is used as the init process
+  // in the container for the execution.
+  assert!(stderr.contains("exec xyzzy failed: No such file or directory"));
 }
 
 #[tokio::test]
 async fn output_files_none() {
-  let result = run_command_locally(Process::new(owned_string_vec(&[
-    &find_bash(),
-    "-c",
-    "exit 0",
-  ])))
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
+    Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])),
+  )
   .await
   .unwrap();
 
@@ -149,9 +234,12 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
@@ -172,9 +260,12 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!(
         "/bin/mkdir cats && echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
@@ -200,9 +291,12 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!(
         "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
@@ -227,9 +321,12 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!(
         "echo -n {} > roland.ext ; exit 1",
@@ -253,9 +350,12 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
@@ -280,9 +380,12 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
     ])
@@ -304,11 +407,14 @@ async fn output_overlapping_file_and_dir() {
 
 #[tokio::test]
 async fn append_only_cache_created() {
+  let docker = setup_docker!();
+
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
   let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
-  let result = run_command_locally(
+  let result = run_command_via_docker(
+    &docker,
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
   )
@@ -316,30 +422,6 @@ async fn append_only_cache_created() {
   .unwrap();
 
   assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
-}
-
-#[tokio::test]
-async fn jdk_symlink() {
-  let preserved_work_tmpdir = TempDir::new().unwrap();
-  let roland = TestData::roland().bytes();
-  std::fs::write(
-    preserved_work_tmpdir.path().join("roland.ext"),
-    roland.clone(),
-  )
-  .expect("Writing temporary file");
-
-  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland.ext".to_owned()]);
-  process.timeout = one_second();
-  process.description = "cat roland.ext".to_string();
-  process.jdk_home = Some(preserved_work_tmpdir.path().to_path_buf());
-
-  let result = run_command_locally(process).await.unwrap();
-
-  assert_eq!(result.stdout_bytes, roland);
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
@@ -363,6 +445,8 @@ async fn test_apply_chroot() {
 
 #[tokio::test]
 async fn test_chroot_placeholder() {
+  let docker = setup_docker!();
+
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
@@ -370,8 +454,9 @@ async fn test_chroot_placeholder() {
   let work_tmpdir = TempDir::new().unwrap();
   let work_root = work_tmpdir.path().to_owned();
 
-  let result = run_command_locally_in_dir(
-    Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
+  let result = run_command_via_docker_in_dir(
+    &docker,
+    Process::new(vec!["/bin/env".to_owned()]).env(env.clone()),
     work_root.clone(),
     KeepSandboxes::Always,
     &mut workunit,
@@ -381,137 +466,22 @@ async fn test_chroot_placeholder() {
   .await
   .unwrap();
 
-  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  let got_env: BTreeMap<String, String> = stdout
-    .split("\n")
-    .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
-    .map(|mut parts| {
-      (
-        parts.next().unwrap().to_string(),
-        parts.next().unwrap_or("").to_string(),
-      )
-    })
-    .collect();
-
-  let path = format!("/usr/bin:{}", work_root.to_str().unwrap());
-  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
-  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
-}
-
-#[tokio::test]
-async fn test_directory_preservation() {
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
-
-  let preserved_work_tmpdir = TempDir::new().unwrap();
-  let preserved_work_root = preserved_work_tmpdir.path().to_owned();
-
-  let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-
-  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
-  // from the ./cats directory.
-  store
-    .store_file_bytes(TestData::roland().bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
-
-  let cp = which("cp").expect("No cp on $PATH.");
-  let bash_contents = format!("echo $PWD && {} roland.ext ..", cp.display());
-  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
-
-  let mut process =
-    Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
-  process.input_digests =
-    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-  process.working_directory = Some(RelativePath::new("cats").unwrap());
-
-  let result = run_command_locally_in_dir(
-    process,
-    preserved_work_root.clone(),
-    KeepSandboxes::Always,
-    &mut workunit,
-    Some(store),
-    Some(executor),
-  )
-  .await;
-  result.unwrap();
-
-  assert!(preserved_work_root.exists());
-
-  // Collect all of the top level sub-dirs under our test workdir.
-  let subdirs = testutil::file::list_dir(&preserved_work_root);
-  assert_eq!(subdirs.len(), 1);
-
-  // Then look for a file like e.g. `/tmp/abc1234/pants-sandbox-7zt4pH/roland.ext`
-  let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
-  assert!(&rolands_path.exists());
-
-  // Ensure that when a directory is preserved, a __run.sh file is created with the process's
-  // command line and environment variables.
-  let run_script_path = preserved_work_root.join(&subdirs[0]).join("__run.sh");
-  assert!(&run_script_path.exists());
-
-  std::fs::remove_file(&rolands_path).expect("Failed to remove roland.");
-
-  // Confirm the script when run directly sets up the proper CWD.
-  let mut child = std::process::Command::new(&run_script_path)
-    .spawn()
-    .expect("Failed to launch __run.sh");
-  let status = child
-    .wait()
-    .expect("Failed to gather the result of __run.sh.");
-  assert_eq!(Some(0), status.code());
-  assert!(rolands_path.exists());
-
-  // Ensure the bash command line is provided.
-  let bytes_quoted_command_line = bash::escape(&bash_contents);
-  let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
-  assert!(std::fs::read_to_string(&run_script_path)
-    .unwrap()
-    .contains(quoted_command_line));
-}
-
-#[tokio::test]
-async fn test_directory_preservation_error() {
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
-
-  let preserved_work_tmpdir = TempDir::new().unwrap();
-  let preserved_work_root = preserved_work_tmpdir.path().to_owned();
-
-  assert!(preserved_work_root.exists());
-  assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
-
-  run_command_locally_in_dir(
-    Process::new(vec!["doesnotexist".to_owned()]),
-    preserved_work_root.clone(),
-    KeepSandboxes::Always,
-    &mut workunit,
-    None,
-    None,
-  )
-  .await
-  .expect_err("Want process to fail");
-
-  assert!(preserved_work_root.exists());
-  // Collect all of the top level sub-dirs under our test workdir.
-  assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 1);
+  let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
+  let actual_path = got_env.get("PATH").unwrap();
+  assert_eq!(
+    *actual_path,
+    format!("/usr/bin:{}/bin", SANDBOX_PATH_IN_CONTAINER)
+  );
 }
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       format!(
         // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
@@ -539,9 +509,12 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let result = run_command_locally(
+  let docker = setup_docker!();
+
+  let result = run_command_via_docker(
+    &docker,
     Process::new(vec![
-      find_bash(),
+      SH_PATH.to_string(),
       "-c".to_owned(),
       "/bin/mkdir falcons".to_string(),
     ])
@@ -562,8 +535,10 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
+  let docker = setup_docker!();
+
   let argv = vec![
-    find_bash(),
+    SH_PATH.to_string(),
     "-c".to_owned(),
     "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
   ];
@@ -572,7 +547,7 @@ async fn timeout() {
   process.timeout = Some(Duration::from_millis(100));
   process.description = "sleepy-cat".to_string();
 
-  let result = run_command_locally(process).await.unwrap();
+  let result = run_command_via_docker(&docker, process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
@@ -582,6 +557,7 @@ async fn timeout() {
 
 #[tokio::test]
 async fn working_directory() {
+  let docker = setup_docker!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -605,15 +581,20 @@ async fn working_directory() {
 
   let work_dir = TempDir::new().unwrap();
 
-  let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
+  let mut process = Process::new(vec![
+    SH_PATH.to_string(),
+    "-c".to_owned(),
+    "/bin/ls".to_string(),
+  ]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
   process.input_digests =
     InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-  process.timeout = one_second();
+  process.timeout = Some(Duration::from_secs(1));
   process.description = "confused-cat".to_string();
 
-  let result = run_command_locally_in_dir(
+  let result = run_command_via_docker_in_dir(
+    &docker,
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
@@ -636,6 +617,7 @@ async fn working_directory() {
 
 #[tokio::test]
 async fn immutable_inputs() {
+  let docker = setup_docker!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -657,7 +639,11 @@ async fn immutable_inputs() {
 
   let work_dir = TempDir::new().unwrap();
 
-  let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
+  let mut process = Process::new(vec![
+    SH_PATH.to_string(),
+    "-c".to_owned(),
+    "/bin/ls".to_string(),
+  ]);
   process.input_digests = InputDigests::new(
     &store,
     TestDirectory::containing_falcons_dir().directory_digest(),
@@ -673,10 +659,11 @@ async fn immutable_inputs() {
   )
   .await
   .unwrap();
-  process.timeout = one_second();
+  process.timeout = Some(Duration::from_secs(1));
   process.description = "confused-cat".to_string();
 
-  let result = run_command_locally_in_dir(
+  let result = run_command_via_docker_in_dir(
+    &docker,
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
@@ -687,7 +674,7 @@ async fn immutable_inputs() {
   .await
   .unwrap();
 
-  let stdout_lines = str::from_utf8(&result.stdout_bytes)
+  let stdout_lines = std::str::from_utf8(&result.stdout_bytes)
     .unwrap()
     .lines()
     .collect::<HashSet<_>>();
@@ -696,96 +683,22 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
-#[tokio::test]
-async fn prepare_workdir_exclusive_relative() {
-  // Test that we detect that we should should exclusive spawn when a relative path that points
-  // outside of a working directory is used.
-  let _ = WorkunitStore::setup_for_tests();
-
-  let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  let (_caches_dir, named_caches, immutable_inputs) =
-    named_caches_and_immutable_inputs(store.clone());
-
-  store
-    .store_file_bytes(TestData::roland().bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-  store
-    .store_file_bytes(TestData::catnip().bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::recursive().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-
-  let work_dir = TempDir::new().unwrap();
-
-  // NB: This path is not marked executable, but that isn't (currently) relevant to the heuristic.
-  let mut process = Process::new(vec!["../treats.ext".to_owned()])
-    .working_directory(Some(RelativePath::new("cats").unwrap()));
-  process.input_digests = InputDigests::new(
-    &store,
-    TestDirectory::recursive().directory_digest(),
-    BTreeMap::new(),
-    BTreeSet::new(),
-  )
-  .await
-  .unwrap();
-
-  let exclusive_spawn = local::prepare_workdir(
-    work_dir.path().to_owned(),
-    &process,
-    TestDirectory::recursive().directory_digest(),
-    store,
-    executor,
-    &named_caches,
-    &immutable_inputs,
-    None,
-    None,
-  )
-  .await
-  .unwrap();
-
-  assert_eq!(exclusive_spawn, true);
+// DOCKER-TODO: We should debounce calls to this method from multiple tests in the same process.
+async fn pull_image(docker: &Docker, image: &str) {
+  let create_image_options = CreateImageOptions::<String> {
+    from_image: image.to_string(),
+    ..CreateImageOptions::default()
+  };
+  let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+  while let Some(msg) = result_stream.next().await {
+    if msg.is_err() {
+      panic!("Unable to pull image `{}` for test: {:?}", image, msg);
+    }
+  }
 }
 
-pub(crate) fn named_caches_and_immutable_inputs(
-  store: Store,
-) -> (TempDir, NamedCaches, ImmutableInputs) {
-  let root = TempDir::new().unwrap();
-  let root_path = root.path().to_owned();
-  let named_cache_dir = root_path.join("named");
-
-  (
-    root,
-    NamedCaches::new(named_cache_dir),
-    ImmutableInputs::new(store, &root_path).unwrap(),
-  )
-}
-
-async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessError> {
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let work_dir = TempDir::new().unwrap();
-  let work_dir_path = work_dir.path().to_owned();
-  run_command_locally_in_dir(
-    req,
-    work_dir_path,
-    KeepSandboxes::Never,
-    &mut workunit,
-    None,
-    None,
-  )
-  .await
-}
-
-async fn run_command_locally_in_dir(
+async fn run_command_via_docker_in_dir(
+  docker: &Docker,
   req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
@@ -799,14 +712,16 @@ async fn run_command_locally_in_dir(
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
-  let runner = crate::local::CommandRunner::new(
+  pull_image(docker, IMAGE).await;
+  let runner = crate::docker::CommandRunner::new(
     store.clone(),
     executor.clone(),
     dir.clone(),
     named_caches,
     immutable_inputs,
     cleanup,
-  );
+    IMAGE.to_string(),
+  )?;
   let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
@@ -821,6 +736,21 @@ async fn run_command_locally_in_dir(
   })
 }
 
-fn one_second() -> Option<Duration> {
-  Some(Duration::from_millis(1000))
+async fn run_command_via_docker(
+  docker: &Docker,
+  req: Process,
+) -> Result<LocalTestResult, ProcessError> {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let work_dir = TempDir::new().unwrap();
+  let work_dir_path = work_dir.path().to_owned();
+  run_command_via_docker_in_dir(
+    docker,
+    req,
+    work_dir_path,
+    KeepSandboxes::Never,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
 }

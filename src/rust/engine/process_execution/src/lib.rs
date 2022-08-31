@@ -56,6 +56,10 @@ mod cache_tests;
 
 pub mod children;
 
+pub mod docker;
+#[cfg(test)]
+mod docker_tests;
+
 pub mod immutable_inputs;
 
 pub mod local;

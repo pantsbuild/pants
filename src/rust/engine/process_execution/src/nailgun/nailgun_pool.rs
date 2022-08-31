@@ -373,6 +373,8 @@ impl NailgunProcess {
       executor.clone(),
       named_caches,
       immutable_inputs,
+      None,
+      None,
     )
     .await?;
     let workdir_include_names = list_workdir(workdir.path()).await?;
