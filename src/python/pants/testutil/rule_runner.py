@@ -22,7 +22,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironment, EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
@@ -32,9 +32,9 @@ from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
-from pants.engine.rules import Rule
+from pants.engine.rules import rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
@@ -56,7 +56,6 @@ from pants.util.dirutil import (
     safe_open,
 )
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -183,6 +182,7 @@ class RuleRunner:
     max_workunit_verbosity: LogLevel
     build_config: BuildConfiguration
     scheduler: SchedulerSession
+    rules: tuple[Any, ...]
 
     def __init__(
         self,
@@ -197,6 +197,7 @@ class RuleRunner:
         bootstrap_args: Iterable[str] = (),
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
+        singleton_environment: EnvironmentName | None = EnvironmentName(),
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -217,11 +218,18 @@ class RuleRunner:
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
 
+        @rule
+        def environment_name_singleton() -> EnvironmentName:
+            assert singleton_environment is not None
+            return singleton_environment
+
         # TODO: Redesign rule registration for tests to be more ergonomic and to make this less
         #  special-cased.
+        self.rules = tuple(rules or ())
         all_rules = (
-            *(rules or ()),
+            *self.rules,
             *source_root.rules(),
+            *([] if singleton_environment is None else [environment_name_singleton]),
             QueryRule(WrappedTarget, [WrappedTargetRequest, EnvironmentName]),
             QueryRule(AllTargets, [EnvironmentName]),
             QueryRule(UnionMembership, []),
@@ -257,6 +265,11 @@ class RuleRunner:
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
+        # TODO: When installed, this has the effect of filtering the EnvironmentName out of all
+        # QueryRules (even those created synthetically in the RuleGraph), which allows the
+        # EnvironmentName to be provided as a singleton instead.
+        query_inputs_filter = [] if singleton_environment is None else [EnvironmentName]
+
         self._set_new_session(
             EngineInitializer.setup_graph_extended(
                 pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
@@ -274,6 +287,7 @@ class RuleRunner:
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
+                query_inputs_filter=query_inputs_filter,
             ).scheduler
         )
 
@@ -296,10 +310,6 @@ class RuleRunner:
     @property
     def pants_workdir(self) -> str:
         return os.path.join(self.build_root, ".pants.d")
-
-    @property
-    def rules(self) -> FrozenOrderedSet[Rule | UnionRule]:
-        return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:

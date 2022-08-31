@@ -114,6 +114,7 @@ class Scheduler:
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
         executor: PyExecutor,
+        query_inputs_filter: Sequence[type] = tuple(),
         include_trace_on_error: bool = True,
         visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
@@ -130,6 +131,8 @@ class Scheduler:
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
         :param local_store_options: Options for the engine's LMDB store(s).
+        :param query_inputs_filter: Types to filter out of all QueryRules which are installed,
+          including those produced synthetically by RuleGraph solving.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
@@ -141,7 +144,7 @@ class Scheduler:
         self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
-        tasks = register_rules(rule_index, union_membership)
+        tasks = register_rules(rule_index, union_membership, query_inputs_filter)
 
         # Create the native Scheduler and Session.
         types = PyTypes(
@@ -642,7 +645,9 @@ class SchedulerSession:
         self.py_session.cancel()
 
 
-def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
+def register_rules(
+    rule_index: RuleIndex, union_membership: UnionMembership, query_inputs_filter: Sequence[type]
+) -> PyTasks:
     """Create a native Tasks object loaded with given RuleIndex."""
     tasks = PyTasks()
 
@@ -694,4 +699,6 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             query.output_type,
             query.input_types,
         )
+    for filtered_type in query_inputs_filter:
+        native_engine.tasks_add_query_inputs_filter(tasks, filtered_type)
     return tasks
