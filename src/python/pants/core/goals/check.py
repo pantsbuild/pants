@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
@@ -182,15 +183,15 @@ async def check(
         Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
     )
 
-    def get_name(res: CheckResults) -> str:
-        return res.checker_name
+    results_by_tool: dict[str, list[CheckResult]] = defaultdict(list)
+    for results in all_results:
+        results_by_tool[results.checker_name].extend(results.results)
 
     write_reports(
-        all_results,
+        results_by_tool,
         workspace,
         dist_dir,
         goal_name=CheckSubsystem.name,
-        get_name=get_name,
     )
 
     exit_code = 0

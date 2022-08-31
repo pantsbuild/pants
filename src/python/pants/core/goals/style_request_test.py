@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from collections import defaultdict
 from pathlib import Path
 
 import pytest
@@ -59,22 +62,22 @@ def test_write_reports() -> None:
         checker_name="partition_duplicate",
     )
 
-    def get_name(res: CheckResults) -> str:
-        return res.checker_name
+    results_by_name: dict[str, list[CheckResult]] = defaultdict(list)
+    for results in (
+        no_results,
+        empty_results,
+        single_results,
+        duplicate_results,
+        partition_results,
+        partition_duplicate_results,
+    ):
+        results_by_name[results.checker_name].extend(results.results)
 
     write_reports(
-        (
-            no_results,
-            empty_results,
-            single_results,
-            duplicate_results,
-            partition_results,
-            partition_duplicate_results,
-        ),
+        results_by_name,
         Workspace(rule_runner.scheduler, _enforce_effects=False),
         DistDir(Path("dist")),
         goal_name="check",
-        get_name=get_name,
     )
 
     check_dir = Path(rule_runner.build_root, "dist", "check")
