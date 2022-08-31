@@ -12,9 +12,11 @@ from pants.core.util_rules import environments
 from pants.core.util_rules.environments import (
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
-    ChosenLocalEnvironment,
+    ChosenLocalEnvironmentAlias,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
+    ResolvedEnvironmentAlias,
+    ResolvedEnvironmentTarget,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -25,7 +27,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
-            QueryRule(ChosenLocalEnvironment, []),
+            QueryRule(ChosenLocalEnvironmentAlias, []),
+            QueryRule(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias]),
         ],
         target_types=[LocalEnvironmentTarget],
     )
@@ -66,14 +69,15 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def get_env() -> ChosenLocalEnvironment:
-        return rule_runner.request(ChosenLocalEnvironment, [])
+    def get_env() -> ResolvedEnvironmentTarget:
+        alias = rule_runner.request(ChosenLocalEnvironmentAlias, [])
+        return rule_runner.request(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias(alias.val)])
 
     # If `--aliases` is not set, do not choose an environment.
-    assert get_env().tgt is None
+    assert get_env().val is None
 
     rule_runner.set_options(["--environments-preview-aliases={'e': '//:e1'}"])
-    assert get_env().tgt == LocalEnvironmentTarget({}, Address("", target_name="e1"))
+    assert get_env().val == LocalEnvironmentTarget({}, Address("", target_name="e1"))
 
     # Error if `--aliases` set, but no compatible platforms
     rule_runner.set_options(["--environments-preview-aliases={'e': '//:not-compatible'}"])

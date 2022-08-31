@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from pants.build_graph.address import Address, AddressInput
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -53,6 +54,8 @@ class EnvironmentsSubsystem(Subsystem):
 # -------------------------------------------------------------------------------------------
 # Environment targets
 # -------------------------------------------------------------------------------------------
+
+LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
 class CompatiblePlatformsField(StringSequenceField):
@@ -146,13 +149,53 @@ class AmbiguousEnvironmentError(Exception):
     pass
 
 
+class UnrecognizedEnvironmentError(Exception):
+    pass
+
+
 class AllEnvironmentTargets(FrozenDict[str, LocalEnvironmentTarget]):
     """A mapping of environment aliases to their corresponding environment target."""
 
 
 @dataclass(frozen=True)
-class ChosenLocalEnvironment:
-    tgt: LocalEnvironmentTarget | None
+class ChosenLocalEnvironmentAlias:
+    f"""Which environment alias from `[environments-preview].aliases` that
+    {LOCAL_ENVIRONMENT_MATCHER} resolves to."""
+
+    val: str | None
+
+
+@dataclass(frozen=True)
+class ResolvedEnvironmentAlias(EngineAwareParameter):
+    f"""The normalized alias for an environment, from `[environments-preview].aliases`, after
+    applying things like {LOCAL_ENVIRONMENT_MATCHER}.
+
+    Note that we have this type, rather than only `ResolvedEnvironmentTarget`, for a more efficient
+    rule graph. This node impacts the equality of many downstream nodes, so we want its identity
+    to only be a single string, rather than a Target instance.
+    """
+
+    val: str | None
+
+    def debug_hint(self) -> str:
+        return self.val or "<none>"
+
+
+@dataclass(frozen=True)
+class ResolvedEnvironmentTarget:
+    val: LocalEnvironmentTarget | None
+
+
+@dataclass(frozen=True)
+class ResolvedEnvironmentRequest(EngineAwareParameter):
+    f"""Normalize the value into an alias from `[environments-preview].aliases`, such as by
+    applying {LOCAL_ENVIRONMENT_MATCHER}."""
+
+    raw_value: str
+    description_of_origin: str
+
+    def debug_hint(self) -> str:
+        return self.raw_value
 
 
 @rule
@@ -183,17 +226,17 @@ async def determine_all_environments(
 
 
 @rule
-async def choose_local_environment(
+async def determine_local_environment(
     platform: Platform, all_environment_targets: AllEnvironmentTargets
-) -> ChosenLocalEnvironment:
+) -> ChosenLocalEnvironmentAlias:
     if not all_environment_targets:
-        return ChosenLocalEnvironment(None)
-    compatible_targets = [
-        tgt
-        for tgt in all_environment_targets.values()
+        return ChosenLocalEnvironmentAlias(None)
+    compatible_alias_and_targets = [
+        (alias, tgt)
+        for alias, tgt in all_environment_targets.items()
         if platform.value in tgt[CompatiblePlatformsField].value
     ]
-    if not compatible_targets:
+    if not compatible_alias_and_targets:
         raise NoCompatibleEnvironmentError(
             softwrap(
                 f"""
@@ -209,14 +252,15 @@ async def choose_local_environment(
                 """
             )
         )
-    elif len(compatible_targets) > 1:
+    elif len(compatible_alias_and_targets) > 1:
         # TODO(#7735): Allow the user to disambiguate what __local__ means via an option.
         raise AmbiguousEnvironmentError(
             softwrap(
                 f"""
                 Multiple `_local_environment` targets from `[environments-preview].aliases`
                 are compatible with the current platform `{platform.value}`, so it is ambiguous
-                which to use: {sorted(tgt.address.spec for tgt in compatible_targets)}
+                which to use:
+                {sorted(tgt.address.spec for _alias, tgt in compatible_alias_and_targets)}
 
                 To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
                 targets so that only one includes the value `{platform.value}`, or change
@@ -224,7 +268,51 @@ async def choose_local_environment(
                 """
             )
         )
-    return ChosenLocalEnvironment(compatible_targets[0])
+    result_alias, _tgt = compatible_alias_and_targets[0]
+    return ChosenLocalEnvironmentAlias(result_alias)
+
+
+@rule
+async def resolve_environment_alias(
+    request: ResolvedEnvironmentRequest, environments_subsystem: EnvironmentsSubsystem
+) -> ResolvedEnvironmentAlias:
+    if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
+        local_env_alias = await Get(ChosenLocalEnvironmentAlias, {})
+        return ResolvedEnvironmentAlias(local_env_alias.val)
+    if request.raw_value not in environments_subsystem.aliases:
+        raise UnrecognizedEnvironmentError(
+            softwrap(
+                f"""
+                Unrecognized environment alias `{request.raw_value}` from
+                {request.description_of_origin}.
+
+                The value must either be `{LOCAL_ENVIRONMENT_MATCHER}` or an alias from the option
+                `[environments-preview].aliases`: {sorted(environments_subsystem.aliases.keys())}
+                """
+            )
+        )
+    return ResolvedEnvironmentAlias(request.raw_value)
+
+
+@rule
+def get_target_for_environment_alias(
+    alias: ResolvedEnvironmentAlias, all_targets: AllEnvironmentTargets
+) -> ResolvedEnvironmentTarget:
+    if alias.val is None:
+        return ResolvedEnvironmentTarget(None)
+    if alias.val not in all_targets:
+        raise AssertionError(
+            softwrap(
+                f"""
+                The alias `{alias.val}` is not defined. The alias should have been normalized and
+                validated in the rule `ResolvedEnvironmentRequest -> ResolvedEnvironmentAlias`
+                already. If you directly wrote
+                `Get(ResolvedEnvironmentTarget, ResolvedEnvironmentAlias(my_alias))`, refactor to
+                `Get(ResolvedEnvironmentTarget, ResolvedEnvironmentRequest(my_alias, ...))`.
+                """
+            )
+        )
+    return ResolvedEnvironmentTarget(all_targets[alias.val])
 
 
 def rules():

@@ -15,10 +15,12 @@ from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import (
-    ChosenLocalEnvironment,
+    ChosenLocalEnvironmentAlias,
     EnvironmentsSubsystem,
     PythonBootstrapBinaryNamesField,
     PythonInterpreterSearchPathsField,
+    ResolvedEnvironmentAlias,
+    ResolvedEnvironmentTarget,
 )
 from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
@@ -240,11 +242,16 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 @rule
 async def python_bootstrap(
-    python_bootstrap_subsystem: PythonBootstrapSubsystem, chosen_environment: ChosenLocalEnvironment
+    python_bootstrap_subsystem: PythonBootstrapSubsystem,
+    chosen_environment: ChosenLocalEnvironmentAlias,
 ) -> PythonBootstrap:
-    if chosen_environment.tgt:
-        interpreter_search_paths = chosen_environment.tgt[PythonInterpreterSearchPathsField].value
-        interpreter_names = chosen_environment.tgt[PythonBootstrapBinaryNamesField].value
+    if chosen_environment.val:
+        env_tgt = await Get(
+            ResolvedEnvironmentTarget, ResolvedEnvironmentAlias(chosen_environment.val)
+        )
+        assert env_tgt.val is not None
+        interpreter_search_paths = env_tgt.val[PythonInterpreterSearchPathsField].value
+        interpreter_names = env_tgt.val[PythonBootstrapBinaryNamesField].value
         for opt in ("search_path", "names"):
             python_bootstrap_subsystem.error_if_environment_mechanism_ambiguity(opt)
     else:
