@@ -14,6 +14,7 @@ from typing import ClassVar, Iterable, Iterator, Sequence
 from pants.core.target_types import FilesGeneratingSourcesField, FileSourceField
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
@@ -57,7 +58,7 @@ class _ClasspathEntryRequestClassification(Enum):
     INCOMPATIBLE = auto()
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ClasspathEntryRequest(metaclass=ABCMeta):
     """A request for a ClasspathEntry for the given CoarsenedTarget and resolve.

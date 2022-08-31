@@ -57,7 +57,7 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -272,7 +272,7 @@ class SetupKwargs:
 # Note: This only exists as a hook for additional logic for the `setup()` kwargs, e.g. for plugin
 # authors. To resolve `SetupKwargs`, call `await Get(SetupKwargs, ExportedTarget)`, which handles
 # running any custom implementations vs. using the default implementation.
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)  # type: ignore[misc]
 class SetupKwargsRequest(ABC):
     """A request to allow setting the kwargs passed to the `setup()` function.
@@ -385,7 +385,7 @@ class NoDistTypeSelected(ValueError):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class DistBuildEnvironmentRequest:
     target_addresses: tuple[Address, ...]

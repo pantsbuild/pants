@@ -11,7 +11,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironment, EnvironmentName
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError

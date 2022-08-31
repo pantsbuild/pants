@@ -31,6 +31,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.graph import AmbiguousCodegenImplementationsException
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -63,7 +64,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
         return str(self.address)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GoCodegenBuildRequest:
     """The plugin hook to build/compile Go code.

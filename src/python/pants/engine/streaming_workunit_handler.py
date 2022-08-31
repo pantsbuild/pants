@@ -169,7 +169,7 @@ class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
     """A list of registered factories for WorkunitsCallback instances."""
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 

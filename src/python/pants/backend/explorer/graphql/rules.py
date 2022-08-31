@@ -9,6 +9,7 @@ from pants.backend.explorer.graphql.subsystem import GraphQLSubsystem
 from pants.backend.explorer.server.uvicorn import UvicornServerSetup, UvicornServerSetupRequest
 from pants.backend.project_info.peek import TargetDatas
 from pants.base.specs import Specs
+from pants.engine.environment import EnvironmentName
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.engine.unions import UnionRule

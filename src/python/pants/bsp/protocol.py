@@ -16,6 +16,7 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -41,7 +42,7 @@ class BSPResponseTypeProtocol(Protocol):
         ...
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class BSPHandlerMapping:
     """Union type for rules to register handlers for BSP methods."""
 
