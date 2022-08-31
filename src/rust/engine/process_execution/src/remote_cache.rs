@@ -285,7 +285,6 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.cache_content_behavior,
-        self.read_timeout,
       )
       .await;
       match response {
@@ -583,7 +582,6 @@ async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
-  timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
