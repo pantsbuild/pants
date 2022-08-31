@@ -21,13 +21,6 @@ from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMain
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput
-from pants.core.target_types import (
-    FilesGeneratingSourcesField,
-    FileSourceField,
-    ResourcesGeneratingSourcesField,
-    ResourceSourceField,
-    TargetGeneratorSourcesHelperSourcesField,
-)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
@@ -182,31 +175,26 @@ async def find_owning_go_mod(
 
     if target.has_field(GoModDependenciesField):
         return OwningGoMod(request.address)
-    elif (
-        target.has_field(GoPackageSourcesField)
-        or target.has_field(FileSourceField)
-        or target.has_field(FilesGeneratingSourcesField)
-        or target.has_field(ResourceSourceField)
-        or target.has_field(ResourcesGeneratingSourcesField)
-    ):
-        # For `go_package`, `file`, and `resource` targets, use the nearest ancestor `go_mod` target.
+
+    if target.has_field(GoPackageSourcesField):
         nearest_go_mod_result = await Get(
             NearestAncestorGoModResult, NearestAncestorGoModRequest(request.address)
         )
         return OwningGoMod(nearest_go_mod_result.address)
-    elif target.has_field(GoThirdPartyPackageDependenciesField) or target.has_field(
-        TargetGeneratorSourcesHelperSourcesField
-    ):
+
+    if target.has_field(GoThirdPartyPackageDependenciesField):
         # For `go_third_party_package` targets, use the generator which is the owning `go_mod` target.
         generator_address = target.address.maybe_convert_to_target_generator()
         return OwningGoMod(generator_address)
-    elif target.has_field(GoBinaryMainPackageField):
+
+    if target.has_field(GoBinaryMainPackageField):
         main_pkg = await Get(
             GoBinaryMainPackage, GoBinaryMainPackageRequest(target.get(GoBinaryMainPackageField))
         )
         owning_go_mod_for_main_pkg = await Get(OwningGoMod, OwningGoModRequest(main_pkg.address))
         return owning_go_mod_for_main_pkg
-    elif target.has_field(GoOwningGoModAddressField):
+
+    if target.has_field(GoOwningGoModAddressField):
         # Otherwise, find any explicitly defined go_mod address (e.g., for `protobuf_sources` targets).
         explicit_go_mod_address = await _find_explict_owning_go_mod_address(
             address=request.address,
@@ -215,12 +203,12 @@ async def find_owning_go_mod(
             all_go_mod_targets=all_go_mod_targets,
         )
         return OwningGoMod(explicit_go_mod_address)
-    else:
-        raise AssertionError(
-            "Internal error: Unable to determine how to determine the owning `go_mod` target "
-            f"for `{target.alias}` target `{target.address}`. Please file an issue at "
-            "https://github.com/pantsbuild/pants/issues/new."
-        )
+
+    raise AssertionError(
+        f"Internal error: Unable to determine how to determine the owning `{GoModTarget.alias}` target "
+        f"for `{target.alias}` target `{target.address}`. Please file an issue at "
+        "https://github.com/pantsbuild/pants/issues/new."
+    )
 
 
 @dataclass(frozen=True)
