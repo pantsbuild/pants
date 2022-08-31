@@ -20,6 +20,10 @@ use crate::{
   ProcessError,
 };
 
+pub(crate) const SANDBOX_PATH_IN_CONTAINER: &str = "/pants-sandbox";
+pub(crate) const NAMED_CACHES_PATH_IN_CONTAINER: &str = "/pants-named-caches";
+pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
+
 /// `CommandRunner` executes processes using a local Docker client.
 pub struct CommandRunner {
   docker: Docker,
@@ -90,12 +94,12 @@ impl super::CommandRunner for CommandRunner {
         // Start working on a mutable version of the process.
         let mut req = req;
 
-        // Update env, replacing `{chroot}` placeholders with `/pants-work`. This is the mount point
-        // for the work directory within the Docker container.
+        // Update env, replacing `{chroot}` placeholders with `/pants-sandbox`. This is the mount point
+        // for the sandbox directory within the Docker container.
         //
         // DOCKER-TODO: With cached containers, the destination in the container
         // will need to be unique within that container to avoid conflicts.
-        apply_chroot("/pants-work", &mut req);
+        apply_chroot(SANDBOX_PATH_IN_CONTAINER, &mut req);
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -107,8 +111,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           &self.named_caches,
           &self.immutable_inputs,
-          Some(Path::new("/pants-named-caches")),
-          Some(Path::new("/pants-immutable-inputs")),
+          Some(Path::new(NAMED_CACHES_PATH_IN_CONTAINER)),
+          Some(Path::new(IMMUTABLE_INPUTS_PATH_IN_CONTAINER)),
         )
         .await?;
 
@@ -212,8 +216,8 @@ impl CapturedWorkdir for CommandRunner {
 
     let working_dir = req
       .working_directory
-      .map(|relpath| Path::new("/pants-work").join(&relpath))
-      .unwrap_or_else(|| Path::new("/pants-work").to_path_buf())
+      .map(|relpath| Path::new(SANDBOX_PATH_IN_CONTAINER).join(&relpath))
+      .unwrap_or_else(|| Path::new(SANDBOX_PATH_IN_CONTAINER).to_path_buf())
       .into_os_string()
       .into_string()
       .map_err(|s| {
@@ -234,12 +238,16 @@ impl CapturedWorkdir for CommandRunner {
       // user: Some("0".to_string()),
       host_config: Some(bollard_stubs::models::HostConfig {
         binds: Some(vec![
-          format!("{}:/pants-work:rw", workdir_path_as_string),
+          format!("{}:{}", workdir_path_as_string, SANDBOX_PATH_IN_CONTAINER),
+          // DOCKER-TODO: Consider making this bind mount read-only.
           format!(
-            "{}:/pants-immutable-inputs",
-            immutable_inputs_workdir_as_string
+            "{}:{}",
+            immutable_inputs_workdir_as_string, IMMUTABLE_INPUTS_PATH_IN_CONTAINER
           ),
-          format!("{}:/pants-named-caches:rw", named_caches_workdir_as_string),
+          format!(
+            "{}:{}",
+            named_caches_workdir_as_string, NAMED_CACHES_PATH_IN_CONTAINER
+          ),
         ]),
         init: Some(true),
         ..bollard_stubs::models::HostConfig::default()

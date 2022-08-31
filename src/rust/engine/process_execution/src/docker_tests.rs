@@ -15,6 +15,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
+use super::docker::SANDBOX_PATH_IN_CONTAINER;
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -36,21 +37,19 @@ struct LocalTestResult {
 }
 
 macro_rules! setup_docker {
-  () => {
-    {
-      match Docker::connect_with_local_defaults() {
-        Ok(docker) => docker,
-        Err(err) => {
-          if cfg!(target_os = "macos") {
-            println!("Skipping test due to Docker not being available: {:?}", err);
-            return;
-          } else {
-            panic!("Docker should have been available for this test: {:?}", err);
-          }
+  () => {{
+    match Docker::connect_with_local_defaults() {
+      Ok(docker) => docker,
+      Err(err) => {
+        if cfg!(target_os = "macos") {
+          println!("Skipping test due to Docker not being available: {:?}", err);
+          return;
+        } else {
+          panic!("Docker should have been available for this test: {:?}", err);
         }
       }
     }
-  };
+  }};
 }
 
 #[tokio::test]
@@ -452,7 +451,10 @@ async fn test_chroot_placeholder() {
 
   let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
   let actual_path = got_env.get("PATH").unwrap();
-  assert_eq!(actual_path, "/usr/bin:/pants-work/bin");
+  assert_eq!(
+    *actual_path,
+    format!("/usr/bin:{}/bin", SANDBOX_PATH_IN_CONTAINER)
+  );
 }
 
 #[tokio::test]
