@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -202,26 +201,14 @@ class ResolvedEnvironmentRequest(EngineAwareParameter):
 async def determine_all_environments(
     environments_subsystem: EnvironmentsSubsystem,
 ) -> AllEnvironmentTargets:
-    _description_of_origin = "the option [environments-preview].aliases"
-    addresses = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(raw_address, description_of_origin=_description_of_origin),
-        )
-        for raw_address in environments_subsystem.aliases.values()
+    resolved_tgts = await MultiGet(
+        Get(ResolvedEnvironmentTarget, ResolvedEnvironmentAlias(alias))
+        for alias in environments_subsystem.aliases
     )
-    wrapped_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            WrappedTargetRequest(address, description_of_origin=_description_of_origin),
-        )
-        for address in addresses
-    )
-    # TODO(#7735): validate the correct target type is used?
     return AllEnvironmentTargets(
-        (alias, cast(LocalEnvironmentTarget, wrapped_tgt.target))
-        for alias, wrapped_tgt in zip(environments_subsystem.aliases.keys(), wrapped_targets)
+        (alias, resolved_tgt.val)
+        for alias, resolved_tgt in zip(environments_subsystem.aliases.keys(), resolved_tgts)
+        if resolved_tgt.val is not None
     )
 
 
@@ -295,12 +282,12 @@ async def resolve_environment_alias(
 
 
 @rule
-def get_target_for_environment_alias(
-    alias: ResolvedEnvironmentAlias, all_targets: AllEnvironmentTargets
+async def get_target_for_environment_alias(
+    alias: ResolvedEnvironmentAlias, environments_subsystem: EnvironmentsSubsystem
 ) -> ResolvedEnvironmentTarget:
     if alias.val is None:
         return ResolvedEnvironmentTarget(None)
-    if alias.val not in all_targets:
+    if alias.val not in environments_subsystem.aliases:
         raise AssertionError(
             softwrap(
                 f"""
@@ -312,7 +299,31 @@ def get_target_for_environment_alias(
                 """
             )
         )
-    return ResolvedEnvironmentTarget(all_targets[alias.val])
+    _description_of_origin = "the option [environments-preview].aliases"
+    address = await Get(
+        Address,
+        AddressInput,
+        AddressInput.parse(
+            environments_subsystem.aliases[alias.val], description_of_origin=_description_of_origin
+        ),
+    )
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(address, description_of_origin=_description_of_origin),
+    )
+    # TODO(#7735): it's not idiomatic to check target type with the Target API.
+    if not isinstance(wrapped_target.target, LocalEnvironmentTarget):
+        raise ValueError(
+            softwrap(
+                f"""
+                Expected to use the address to a `_local_environment` target in the option
+                `[environments-preview].aliases`, but the alias
+                `{alias.val}` was set to the target {address.spec} with the target type
+                `{wrapped_target.target.alias}`.
+                """
+            )
+        )
+    return ResolvedEnvironmentTarget(wrapped_target.target)
 
 
 def rules():
