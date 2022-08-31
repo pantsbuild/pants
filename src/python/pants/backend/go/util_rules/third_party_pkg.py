@@ -436,7 +436,7 @@ async def analyze_go_third_party_package(
     analysis = ThirdPartyPkgAnalysis(
         digest=package_digest,
         import_path=import_path,
-        name=request.pkg_json.get("Name") or import_path.rpartition("/")[-1],
+        name=request.pkg_json["Name"],
         dir_path=request.package_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
