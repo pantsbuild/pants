@@ -15,7 +15,7 @@ futures = "0.3"
 libc = "0.2"
 log = "0.4"
 nailgun = { path = "../nailgun" }
-nix = "0.24"
+nix = "0.25"
 options = { path = "../options" }
 sha2 = "0.10"
 strum = "0.24"
