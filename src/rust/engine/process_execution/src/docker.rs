@@ -316,8 +316,7 @@ impl CapturedWorkdir for CommandRunner {
 
     let container_id = container.id.to_owned();
     let result_stream = async_stream::stream! {
-      let mut run_stream = true;
-      while run_stream {
+      loop {
         tokio::select! {
           Some(output_msg) = output_stream.next() => {
             match output_msg {
@@ -340,13 +339,13 @@ impl CapturedWorkdir for CommandRunner {
                 // `ChildResults` to better support exit code vs signal vs error message?
                 let status_code = r.status_code;
                 yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                run_stream = false;
+                break;
               }
               Err(err) => {
                 // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
                 log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
                 yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                run_stream = false;
+                break;
               }
             }
           }
