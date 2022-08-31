@@ -28,10 +28,10 @@
 mod builder;
 mod rules;
 
-use std::collections::{HashMap, HashSet};
 use std::io;
 
 use deepsize::DeepSizeOf;
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
 
@@ -271,7 +271,7 @@ impl<R: Rule> RuleGraph<R> {
 
     // Walk the graph, starting from root entries.
     let mut entry_stack: Vec<_> = vec![root];
-    let mut reachable = HashMap::new();
+    let mut reachable = HashMap::default();
     while let Some(entry) = entry_stack.pop() {
       if reachable.contains_key(&entry) {
         continue;

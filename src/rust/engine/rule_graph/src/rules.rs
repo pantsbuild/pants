@@ -1,12 +1,12 @@
 // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use smallvec::SmallVec;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use deepsize::DeepSizeOf;
+use smallvec::SmallVec;
 
 use super::{params_str, Palette};
 
