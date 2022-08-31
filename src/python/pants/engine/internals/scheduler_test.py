@@ -126,7 +126,12 @@ def test_strict_equals() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@dataclass(frozen=True)
+class Fuel:
+    pass
+
+
+@union(in_scope_types=[Fuel])
 class Vehicle(ABC):
     @abstractmethod
     def num_wheels(self) -> int:
@@ -144,7 +149,7 @@ class Motorcycle(Vehicle):
 
 
 @rule
-def car_num_wheels(car: Car) -> int:
+def car_num_wheels(car: Car, _: Fuel) -> int:
     return car.num_wheels()
 
 
@@ -163,7 +168,7 @@ async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
     return await Get(int, Vehicle, wrapped_vehicle.vehicle)
 
 
-def test_union_rules() -> None:
+def test_union_rules_in_scope_via_query() -> None:
     rule_runner = RuleRunner(
         rules=[
             car_num_wheels,
@@ -171,20 +176,45 @@ def test_union_rules() -> None:
             UnionRule(Vehicle, Car),
             UnionRule(Vehicle, Motorcycle),
             generic_num_wheels,
+            QueryRule(int, [WrappedVehicle, Fuel]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehicle(Car()), Fuel()]) == 4
+    assert rule_runner.request(int, [WrappedVehicle(Motorcycle()), Fuel()]) == 2
+
+    # Fails due to no union relationship between Vehicle -> str.
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(int, [WrappedVehicle("not a vehicle"), Fuel()])  # type: ignore[arg-type]
+    assert (
+        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
+        "annotated with `@union`, the value for that type should be a member of that union. Did you "
+        "intend to register a `UnionRule`?"
+    ) in str(exc.value.args[0])
+
+
+def test_union_rules_in_scope_computed() -> None:
+    @rule
+    def fuel_singleton() -> Fuel:
+        return Fuel()
+
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            generic_num_wheels,
+            fuel_singleton,
             QueryRule(int, [WrappedVehicle]),
         ],
     )
     assert rule_runner.request(int, [WrappedVehicle(Car())]) == 4
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
 
-    # Fails due to no union relationship between Vehicle -> str.
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [WrappedVehicle("not a vehicle")])  # type: ignore[arg-type]
-    assert (
-        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
-        "annotated with `@union`, the value for that type should be a member of that union. Did you "
-        "intend to register a `UnionRule`?"
-    ) in str(exc.value.args[0])
+
+# -----------------------------------------------------------------------------------------------
+# Test invalid Gets
+# -----------------------------------------------------------------------------------------------
 
 
 def create_outlined_get() -> Get[int]:

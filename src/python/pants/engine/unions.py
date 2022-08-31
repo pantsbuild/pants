@@ -12,7 +12,7 @@ from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-def union(cls):
+def union(cls: type | None = None, in_scope_types: list[type] | None = None):
     """A class decorator to allow a class to be a union base in the engine's mechanism for
     polymorphism.
 
@@ -24,14 +24,29 @@ def union(cls):
 
     Often, union bases are abstract classes, but they need not be.
 
+    By default, in order to provide a stable extension API, when a `@union` is used in a `Get`,
+    _only_ the provided parameter is available to callees, But in order to expand its API, a
+    `@union` declaration may optionally include additional "in_scope_types", which are types
+    which must already be in scope at callsites where the `@union` is used in a `Get`, and
+    which are propagated to the callee.
+
     See https://www.pantsbuild.org/docs/rules-api-unions.
     """
-    assert isinstance(cls, type)
-    cls._is_union_for = cls
-    # TODO: this should involve an explicit interface soon, rather than one being implicitly
-    # created with only the provided Param.
-    cls._union_in_scope_types = tuple()
-    return cls
+
+    def decorator(cls):
+        assert isinstance(cls, type)
+        cls._is_union_for = cls
+        # TODO: this should involve an explicit interface soon, rather than one being implicitly
+        # created with only the provided Param.
+        cls._union_in_scope_types = tuple(in_scope_types) if in_scope_types else tuple()
+        return cls
+
+    if isinstance(cls, type):
+        # This was a decorator call, ex: `@union`.
+        return decorator(cls)
+    else:
+        # This was a factory call, ex: `@union(..)`.
+        return decorator
 
 
 def is_union(input_type: type) -> bool:
