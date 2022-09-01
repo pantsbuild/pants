@@ -8,9 +8,15 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackage,
     GoBinaryMainPackageField,
     GoBinaryMainPackageRequest,
+    GoBinaryTarget,
+    GoPackageTarget,
 )
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
+)
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.core.goals.package import (
@@ -38,6 +44,20 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+    main_pkg_analysis = await Get(
+        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(main_pkg.address)
+    )
+    analysis = main_pkg_analysis.analysis
+    if not analysis:
+        raise ValueError(
+            f"Unable to analyze main package `{main_pkg.address}` for go_binary target {field_set.address}: {main_pkg_analysis.stderr}"
+        )
+    if analysis.name != "main":
+        raise ValueError(
+            f"{GoPackageTarget.alias} target `{main_pkg.address}` is used as the main package for "
+            f"{GoBinaryTarget.address} target `{field_set.address}` but uses package name `{analysis.name}` "
+            "instead of `main`. Go requires that main packages actually use `main` as the package name."
+        )
     built_package = await Get(
         BuiltGoPackage, BuildGoPackageTargetRequest(main_pkg.address, is_main=True)
     )
