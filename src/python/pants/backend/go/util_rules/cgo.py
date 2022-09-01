@@ -277,7 +277,7 @@ async def make_cgo_compile_wrapper_script(
                     content=textwrap.dedent(
                         """\
                 sandbox_root="$(/bin/pwd)"
-                args=("${@//__SANDBOX_ROOT__/$sandbox_root}")
+                args=("${@//__PANTS_SANDBOX_ROOT__/$sandbox_root}")
                 exec "${args[@]}"
                 """
                     ).encode(),
@@ -583,7 +583,7 @@ async def _ensure_only_allowed_link_args(
 
 def _replace_srcdir_in_arg(flag: str, dir_path: str) -> str:
     if "${SRCDIR}" in flag:
-        return flag.replace("${SRCDIR}", f"__SANDBOX_ROOT__/{dir_path}")
+        return flag.replace("${SRCDIR}", f"__PANTS_SANDBOX_ROOT__/{dir_path}")
     else:
         return flag
 

@@ -185,7 +185,7 @@ func buildEmbedTree(embedSrcs, embedRootDirs []string) (root *embedNode, err err
 			// Embedded path cannot be matched by any valid pattern. Ignore.
 			continue
 		}
-		rel := filepath.ToSlash(src[len(rootDir):])
+		rel := filepath.ToSlash(src[len(rootDir)+1:])
 		if err := root.add(rootDir, rel); err != nil {
 			return nil, err
 		}

@@ -53,8 +53,8 @@ class ThirdPartyPkgAnalysis:
     The digest only contains the files for the package, with all prefixes stripped.
     """
 
-    name: str
     import_path: str
+    name: str
 
     digest: Digest
     dir_path: str
