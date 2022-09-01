@@ -43,7 +43,7 @@ from pants.core.util_rules import (
     subprocess_environment,
     system_binaries,
 )
-from pants.core.util_rules.environments import LocalEnvironmentTarget
+from pants.core.util_rules.environments import DockerEnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
@@ -94,6 +94,7 @@ def target_types():
         ResourcesGeneratorTarget,
         RelocatedFiles,
         LocalEnvironmentTarget,
+        DockerEnvironmentTarget,
     ]
 
 

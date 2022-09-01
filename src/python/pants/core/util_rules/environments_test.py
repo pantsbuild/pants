@@ -14,6 +14,8 @@ from pants.core.util_rules.environments import (
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentAlias,
+    DockerEnvironmentTarget,
+    DockerImageField,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
     ResolvedEnvironmentAlias,
@@ -34,7 +36,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias]),
             QueryRule(ResolvedEnvironmentAlias, [ResolvedEnvironmentRequest]),
         ],
-        target_types=[LocalEnvironmentTarget],
+        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
     )
 
 
@@ -46,16 +48,22 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='no-alias')
+                _docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
     )
-    rule_runner.set_options(["--environments-preview-aliases={'e1': '//:e1', 'e2': '//:e2'}"])
+    rule_runner.set_options(
+        ["--environments-preview-aliases={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
+    )
     result = rule_runner.request(AllEnvironmentTargets, [])
     assert result == AllEnvironmentTargets(
         {
             "e1": LocalEnvironmentTarget({}, Address("", target_name="e1")),
             "e2": LocalEnvironmentTarget({}, Address("", target_name="e2")),
+            "docker": DockerEnvironmentTarget(
+                {DockerImageField.alias: "centos6:latest"}, Address("", target_name="docker")
+            ),
         }
     )
 
@@ -68,6 +76,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='not-compatible', compatible_platforms=[])
+                _docker_environment(name='docker', docker_image="centos6:latest")
                 """
             )
         }
@@ -102,6 +111,7 @@ def test_resolve_environment_alias(rule_runner: RuleRunner) -> None:
                 _local_environment(name='local')
                 # Intentionally set this to no platforms so that it cannot be autodiscovered.
                 _local_environment(name='hardcoded', compatible_platforms=[])
+                _docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
@@ -119,10 +129,13 @@ def test_resolve_environment_alias(rule_runner: RuleRunner) -> None:
         get_alias("hardcoded")
 
     rule_runner.set_options(
-        ["--environments-preview-aliases={'local': '//:local', 'hardcoded': '//:hardcoded'}"]
+        [
+            "--environments-preview-aliases={'local': '//:local', 'hardcoded': '//:hardcoded', 'docker': '//:docker'}"
+        ]
     )
     assert get_alias(LOCAL_ENVIRONMENT_MATCHER).val == "local"
     assert get_alias("hardcoded").val == "hardcoded"
+    assert get_alias("docker").val == "docker"
     with engine_error(UnrecognizedEnvironmentError):
         get_alias("fake")
 
