@@ -4,8 +4,9 @@
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
 use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
@@ -255,13 +256,13 @@ impl<R: Rule> Builder<R> {
       .collect::<HashMap<_, _>>();
 
     // Rules are created on the fly based on the out_set of dependees.
-    let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::new();
-    let mut satisfiable_nodes: HashSet<Node<R>> = HashSet::new();
+    let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
+    let mut satisfiable_nodes: HashSet<Node<R>> = HashSet::default();
     let mut unsatisfiable_nodes: HashMap<NodeIndex<u32>, Vec<DependencyKey<R::TypeId>>> =
-      HashMap::new();
+      HashMap::default();
 
     // Starting from Queries, visit all reachable nodes in the graph.
-    let mut visited = HashSet::new();
+    let mut visited = HashSet::default();
     let mut to_visit = queries.values().cloned().collect::<Vec<_>>();
     let mut iteration = 0;
     while let Some(node_id) = to_visit.pop() {
@@ -452,7 +453,7 @@ impl<R: Rule> Builder<R> {
     // additionally prune dependencies transitively in cases where in_sets contain things that are
     // not in a node's out_set (since the out_set will not grow, and the minimal in_set represents
     // the node's true requirements).
-    let mut minimal_in_set = HashSet::new();
+    let mut minimal_in_set = HashSet::default();
 
     // Should be called after a Node has been successfully reduced (regardless of whether it became
     // monomorphic) to maybe mark it minimal.
@@ -476,10 +477,10 @@ impl<R: Rule> Builder<R> {
 
     // If a node splits the same way multiple times without becoming minimal, we mark it ambiguous
     // the second time.
-    let mut suspected_ambiguous = HashSet::new();
+    let mut suspected_ambiguous = HashSet::default();
 
     let mut iteration = 0;
-    let mut maybe_in_loop = HashSet::new();
+    let mut maybe_in_loop = HashSet::default();
     let mut looping = false;
     while let Some(node_id) = to_visit.pop() {
       let node = if let Some(node) = graph[node_id].inner() {
@@ -564,7 +565,7 @@ impl<R: Rule> Builder<R> {
         ParamTypes<R::TypeId>,
         Vec<(DependencyKey<R::TypeId>, _)>,
       > = {
-        let mut dbos = HashMap::new();
+        let mut dbos = HashMap::default();
         for edge_ref in graph.edges_directed(node_id, Direction::Incoming) {
           if edge_ref.weight().is_deleted() || graph[edge_ref.source()].is_deleted() {
             continue;
@@ -611,7 +612,7 @@ impl<R: Rule> Builder<R> {
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
-      let mut monomorphizations = HashMap::new();
+      let mut monomorphizations = HashMap::default();
       for (out_set, dependees) in dependees_by_out_set {
         for (node, dependencies) in Self::monomorphizations(
           &graph,
@@ -622,7 +623,7 @@ impl<R: Rule> Builder<R> {
         ) {
           let entry = monomorphizations
             .entry(node)
-            .or_insert_with(|| (HashSet::new(), HashSet::new()));
+            .or_insert_with(|| (HashSet::default(), HashSet::default()));
           entry.0.extend(dependees.iter().cloned());
           entry.1.extend(dependencies);
         }
@@ -892,7 +893,7 @@ impl<R: Rule> Builder<R> {
   fn prune_edges(&self, mut graph: MonomorphizedGraph<R>) -> Result<InLabeledGraph<R>, String> {
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
-    let mut errored = HashMap::new();
+    let mut errored = HashMap::default();
     // NB: We visit any node that is enqueued, even if it is deleted.
     let mut to_visit = graph
       .node_references()
@@ -1179,7 +1180,7 @@ impl<R: Rule> Builder<R> {
     };
 
     // Visit the reachable portion of the graph to create Edges, starting from roots.
-    let mut rule_dependency_edges = HashMap::new();
+    let mut rule_dependency_edges = HashMap::default();
     let mut visited = graph.visit_map();
     let mut to_visit = graph.externals(Direction::Incoming).collect::<Vec<_>>();
     while let Some(node_id) = to_visit.pop() {
@@ -1351,7 +1352,7 @@ impl<R: Rule> Builder<R> {
     minimal_in_set: &HashSet<NodeIndex<u32>>,
     deps: &[Vec<(DependencyKey<R::TypeId>, NodeIndex<u32>)>],
   ) -> HashMap<ParamsLabeled<R>, HashSet<(DependencyKey<R::TypeId>, NodeIndex<u32>)>> {
-    let mut combinations = HashMap::new();
+    let mut combinations = HashMap::default();
 
     // We start by computing per-dependency in_sets, and filtering out dependencies that will be
     // illegal in any possible combination.
@@ -1463,7 +1464,7 @@ impl<R: Rule> Builder<R> {
       };
       combinations
         .entry(entry)
-        .or_insert_with(HashSet::new)
+        .or_insert_with(HashSet::default)
         .extend(combination.into_iter().map(|(dk, di, _)| (dk.clone(), *di)));
     }
 
@@ -1474,16 +1475,25 @@ impl<R: Rule> Builder<R> {
 ///
 /// Generate all combinations of one element from each input vector.
 ///
-pub(crate) fn combinations_of_one<T: std::fmt::Debug>(
+pub(crate) fn combinations_of_one<T>(input: &[Vec<T>]) -> Box<dyn Iterator<Item = Vec<&T>> + '_> {
+  combinations_of_one_helper(input, input.len())
+}
+
+fn combinations_of_one_helper<T>(
   input: &[Vec<T>],
+  combination_len: usize,
 ) -> Box<dyn Iterator<Item = Vec<&T>> + '_> {
   match input.len() {
     0 => Box::new(std::iter::empty()),
-    1 => Box::new(input[0].iter().map(|item| vec![item])),
+    1 => Box::new(input[0].iter().map(move |item| {
+      let mut output = Vec::with_capacity(combination_len);
+      output.push(item);
+      output
+    })),
     len => {
       let last_idx = len - 1;
       Box::new(input[last_idx].iter().flat_map(move |item| {
-        combinations_of_one(&input[..last_idx]).map(move |mut prefix| {
+        combinations_of_one_helper(&input[..last_idx], combination_len).map(move |mut prefix| {
           prefix.push(item);
           prefix
         })

@@ -2747,6 +2747,7 @@ version = "0.0.1"
 dependencies = [
  "deepsize",
  "env_logger",
+ "fnv",
  "indexmap",
  "internment",
  "log",
