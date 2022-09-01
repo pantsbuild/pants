@@ -21,16 +21,14 @@ from pants.backend.codegen.protobuf.target_types import rules as target_types_ru
 from pants.backend.experimental.kotlin.register import rules as kotlin_backend_rules
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc_test import KOTLIN_STDLIB_REQUIREMENTS
+from pants.backend.kotlin.goals.check import KotlincCheckRequest
 from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget, KotlinSourceTarget
+from pants.core.goals.check import CheckResults
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import testutil
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.testutil import (
-    RenderedClasspath,
-    expect_single_expanded_coarsened_target,
-    make_resolve,
-)
+from pants.jvm.testutil import RenderedClasspath, expect_single_expanded_coarsened_target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 
 
@@ -60,6 +58,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateKotlinFromProtobufRequest]),
             QueryRule(RenderedClasspath, (CompileKotlinSourceRequest,)),
+            QueryRule(CheckResults, (KotlincCheckRequest,)),
         ],
         target_types=[
             ProtobufSourcesGeneratorTarget,
@@ -191,10 +190,10 @@ def test_generates_kotlin(
         ["tests/protobuf/test_protos/F.java", "tests/protobuf/test_protos/FKt.kt"],
     )
 
-    request = CompileKotlinSourceRequest(
-        component=expect_single_expanded_coarsened_target(
-            rule_runner, Address(spec_path="src/jvm")
-        ),
-        resolve=make_resolve(rule_runner),
+    ctgt = expect_single_expanded_coarsened_target(rule_runner, Address(spec_path="src/jvm"))
+    check_result = rule_runner.request(
+        CheckResults,
+        (KotlincCheckRequest([KotlincCheckRequest.field_set_type.create(ctgt.representative)]),),
     )
-    _ = rule_runner.request(RenderedClasspath, [request])
+    print(f"check_result={check_result}")
+    assert False
