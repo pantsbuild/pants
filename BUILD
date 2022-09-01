@@ -19,3 +19,9 @@ _local_environment(
     # Avoid system Python interpreters, which tend to be broken on macOS.
     python_interpreter_search_paths=["<PYENV>"],
 )
+
+# Used for experimenting with the new Docker support.
+_docker_environment(
+    name="docker_env",
+    image="python:3.9",
+)

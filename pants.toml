@@ -101,6 +101,7 @@ default_env = "//:default_env"
 # TODO(#7735): Define `//:macos_local_env` after figuring out why our Build Wheels Mac job is
 #  failing when this is set:
 #  https://github.com/pantsbuild/pants/runs/8082954359?check_suite_focus=true#step:9:657
+docker = "//:docker_env"
 
 [tailor]
 build_file_header = """\
