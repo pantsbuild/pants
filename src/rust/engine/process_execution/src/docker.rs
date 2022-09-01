@@ -265,11 +265,6 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("created container {}", &container.id);
 
-    // DOCKER-TODO: Use a drop guard to remove the container regardless of success/failure.
-    // We cannot set `.host_config.auto_remove` in `config` above because containers that exit
-    // early will no longer exist and thus this code will not be able to attach and capture
-    // the output (which is the entire point of this executor ...).
-
     self
       .docker
       .start_container::<String>(&container.id, None)
@@ -315,8 +310,10 @@ impl CapturedWorkdir for CommandRunner {
       .boxed();
 
     let container_id = container.id.to_owned();
+    let keep_sandboxes = self.keep_sandboxes;
+    let docker = self.docker.clone();
     let result_stream = async_stream::stream! {
-      loop {
+      let was_success = loop {
         tokio::select! {
           Some(output_msg) = output_stream.next() => {
             match output_msg {
@@ -339,16 +336,38 @@ impl CapturedWorkdir for CommandRunner {
                 // `ChildResults` to better support exit code vs signal vs error message?
                 let status_code = r.status_code;
                 yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                break;
+                break status_code == 0;
               }
               Err(err) => {
                 // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
                 log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
                 yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                break;
+                break false;
               }
             }
           }
+        }
+      };
+
+      let do_remove_container = match keep_sandboxes {
+        KeepSandboxes::Always => false,
+        KeepSandboxes::Never => true,
+        KeepSandboxes::OnFailure => !was_success,
+      };
+
+      if do_remove_container {
+        let remove_options = bollard::container::RemoveContainerOptions {
+          force: true,
+          ..bollard::container::RemoveContainerOptions::default()
+        };
+
+        let remove_result = docker
+          .remove_container(&container_id, Some(remove_options))
+          .await
+          .map_err(|err| format!("Failed to remove container `{}`: {:?}", &container_id, err));
+
+        if let Err(err) = remove_result {
+          log::warn!("{}", err);
         }
       }
     }
