@@ -206,6 +206,18 @@ listopt = [
 ]
 ```
 
+You can append elements to any existing elements that may have been defined in lower-precedence sources. In this example, having the config file above, there will be a list of three elements at the runtime:
+
+```bash
+./pants --scope-listopt=baz
+```
+
+It is also possible to override any existing list values provided. In this example, having the config file above, there will be a list of one element at the runtime:
+
+```bash
+./pants --scope-listopt="['baz']"
+```
+
 ### Add/remove semantics
 
 List values have some extra semantics:
