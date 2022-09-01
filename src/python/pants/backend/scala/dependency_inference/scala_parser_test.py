@@ -655,3 +655,25 @@ def test_type_constaint(rule_runner: RuleRunner) -> None:
         "foo.E",
         "foo.F",
     ]
+
+
+def test_type_context_bounds(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+
+            class Foo[F[_] : Functor]
+
+            class Bar {
+                def doSomething[F[_] : Applicative]() = ()
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.Applicative",
+        "foo.Functor",
+    ]
