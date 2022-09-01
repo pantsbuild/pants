@@ -22,11 +22,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.utils import get_hash, suggest_renames
-from pants.backend.docker.value_interpolation import (
-    DockerBuildArgsInterpolationValue,
-    DockerInterpolationContext,
-    DockerInterpolationValue,
-)
+from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
@@ -49,6 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
+from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +102,7 @@ class DockerBuildContext:
     build_env: DockerBuildEnvironment
     upstream_image_ids: tuple[str, ...]
     dockerfile: str
-    interpolation_context: DockerInterpolationContext
+    interpolation_context: InterpolationContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
     stages: tuple[str, ...]
 
@@ -118,7 +115,7 @@ class DockerBuildContext:
         upstream_image_ids: Iterable[str],
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
-        interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
+        interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
         if build_args:
             interpolation_context["build_args"] = cls._merge_build_args(
@@ -148,7 +145,7 @@ class DockerBuildContext:
             dockerfile=dockerfile_info.source,
             build_env=build_env,
             upstream_image_ids=tuple(sorted(upstream_image_ids)),
-            interpolation_context=DockerInterpolationContext.from_dict(interpolation_context),
+            interpolation_context=InterpolationContext.from_dict(interpolation_context),
             copy_source_vs_context_source=tuple(
                 suggest_renames(
                     tentative_paths=(

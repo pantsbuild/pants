@@ -26,11 +26,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
-from pants.backend.docker.value_interpolation import (
-    DockerBuildArgsInterpolationValue,
-    DockerInterpolationContext,
-    DockerInterpolationValue,
-)
+from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -47,6 +43,7 @@ from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 
 def create_rule_runner() -> RuleRunner:
@@ -91,7 +88,7 @@ def assert_build_context(
     *,
     build_upstream_images: bool = False,
     expected_files: list[str],
-    expected_interpolation_context: dict[str, str | dict[str, str] | DockerInterpolationValue]
+    expected_interpolation_context: dict[str, str | dict[str, str] | InterpolationValue]
     | None = None,
     expected_num_upstream_images: int = 0,
     pants_args: list[str] | None = None,
@@ -125,7 +122,7 @@ def assert_build_context(
 
         # Converting to `dict` to avoid the fact that FrozenDict is sensitive to the order of the keys.
         assert dict(context.interpolation_context) == dict(
-            DockerInterpolationContext.from_dict(expected_interpolation_context)
+            InterpolationContext.from_dict(expected_interpolation_context)
         )
 
     if build_upstream_images:
