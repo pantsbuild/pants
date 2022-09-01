@@ -514,3 +514,166 @@ impl CapturedWorkdir for CommandRunner {
     Ok(stream.boxed())
   }
 }
+
+/// Caches running containers so that build actions can be invoked by running executions
+/// within those cached containers.
+struct ContainerCache {
+  docker: Docker,
+  work_dir_base: String,
+  named_caches_base_dir: String,
+  immutable_inputs_base_dir: String,
+  /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
+  /// multiple tasks trying to access an initializing container do not try to start multiple
+  /// containers.
+  containers: Mutex<BTreeMap<String, Arc<OnceCell<String>>>>,
+}
+
+impl ContainerCache {
+  pub fn new(
+    docker: Docker,
+    work_dir_base: &Path,
+    named_caches: &NamedCaches,
+    immutable_inputs: &ImmutableInputs,
+  ) -> Result<Self, String> {
+    let work_dir_base = work_dir_base
+      .to_path_buf()
+      .into_os_string()
+      .into_string()
+      .map_err(|s| {
+        format!(
+          "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
+          s
+        )
+      })?;
+
+    let named_caches_base_dir = named_caches
+      .base_dir()
+      .to_path_buf()
+      .into_os_string()
+      .into_string()
+      .map_err(|s| {
+        format!(
+          "Unable to convert named_caches workdir due to non UTF-8 characters: {:?}",
+          s
+        )
+      })?;
+
+    let immutable_inputs_base_dir = immutable_inputs
+      .workdir()
+      .to_path_buf()
+      .into_os_string()
+      .into_string()
+      .map_err(|s| {
+        format!(
+          "Unable to convert immutable_inputs base dir due to non UTF-8 characters: {:?}",
+          s
+        )
+      })?;
+
+    Ok(Self {
+      docker,
+      work_dir_base,
+      named_caches_base_dir,
+      immutable_inputs_base_dir,
+      containers: Mutex::default(),
+    })
+  }
+
+  async fn make_container(
+    docker: Docker,
+    image: String,
+    work_dir_base: String,
+    named_caches_base_dir: String,
+    immutable_inputs_base_dir: String,
+  ) -> Result<String, String> {
+    let config = bollard::container::Config {
+      entrypoint: Some(vec!["/bin/sh".to_string()]),
+      host_config: Some(bollard_stubs::models::HostConfig {
+        binds: Some(vec![
+          format!("{}:{}", work_dir_base, SANDBOX_PATH_IN_CONTAINER),
+          // DOCKER-TODO: Consider making this bind mount read-only.
+          format!(
+            "{}:{}",
+            named_caches_base_dir, IMMUTABLE_INPUTS_PATH_IN_CONTAINER
+          ),
+          format!(
+            "{}:{}",
+            immutable_inputs_base_dir, NAMED_CACHES_PATH_IN_CONTAINER
+          ),
+        ]),
+        // The init process ensures that child processes are properly reaped.
+        init: Some(true),
+        ..bollard_stubs::models::HostConfig::default()
+      }),
+      image: Some(image.clone()),
+      tty: Some(true),
+      open_stdin: Some(true),
+      ..bollard::container::Config::default()
+    };
+
+    log::trace!(
+      "creating cached container with config for image `{}`: {:?}",
+      image,
+      &config
+    );
+
+    let container = docker
+      .create_container::<&str, String>(None, config)
+      .await
+      .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
+
+    log::trace!(
+      "created container `{}` for image `{}`",
+      &container.id,
+      image
+    );
+
+    docker
+      .start_container::<String>(&container.id, None)
+      .await
+      .map_err(|err| {
+        format!(
+          "Failed to start Docker container `{}` for image `{}`: {:?}",
+          &container.id, image, err
+        )
+      })?;
+
+    log::trace!(
+      "started container `{}` for image `{}`",
+      &container.id,
+      image
+    );
+
+    Ok(container.id)
+  }
+
+  /// Return the container ID of a container running `image` for use as a place to invoke
+  /// build actions as executions within the cached container.
+  pub async fn container_id_for_image(&self, image: &str) -> Result<&String, String> {
+    let container_id_cell = {
+      let mut containers = self.containers.lock();
+      let cell = containers
+        .entry(image.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()));
+      cell.clone()
+    };
+
+    let docker = self.docker.clone();
+    let work_dir_base = self.work_dir_base.clone();
+    let named_caches_base_dir = self.named_caches_base_dir.clone();
+    let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
+
+    container_id_cell
+      .get_or_try_init(async move {
+        Self::make_container(
+          docker,
+          image.to_string(),
+          work_dir_base,
+          named_caches_base_dir,
+          immutable_inputs_base_dir,
+        )
+        .await
+      })
+      .await
+  }
+}
