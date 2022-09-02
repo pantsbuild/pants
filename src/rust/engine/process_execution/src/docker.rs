@@ -10,6 +10,7 @@ use nails::execution::ExitCode;
 use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, RunningWorkunit};
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
@@ -313,47 +314,105 @@ impl CapturedWorkdir for CommandRunner {
     let container_id = container.id.to_owned();
     let keep_sandboxes = self.keep_sandboxes;
     let docker = self.docker.clone();
-    let result_stream = async_stream::stream! {
-      let was_success = loop {
+
+    let (sender, receiver) = tokio::sync::mpsc::channel(10);
+    tokio::spawn(async move {
+      let mut status_code: Option<i32> = None;
+
+      loop {
+        // Read from each stream and emit events to the output collector that will be monitoring
+        // `result_stream`. Note that this stream does not exit immediately upon receiving an
+        // exit status via `wait_stream` because we must ensure that all output is captured
+        // from `output_stream` first.
+
         tokio::select! {
+          // Monitor for stdout/stderr output events.
           Some(output_msg) = output_stream.next() => {
             match output_msg {
               Ok(LogOutput::StdOut { message }) => {
                 log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
-                yield Ok(ChildOutput::Stdout(message));
+                if sender.send(Ok(ChildOutput::Stdout(message))).await.is_err() {
+                  log::trace!("Child results monitor went away for container {}", &container_id);
+                  break;
+                }
               }
               Ok(LogOutput::StdErr { message }) => {
                 log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
-                yield Ok(ChildOutput::Stderr(message));
+                if sender.send(Ok(ChildOutput::Stderr(message))).await.is_err() {
+                  log::trace!("Child results monitor went away for container {}", &container_id);
+                  break;
+                }
               }
               _ => (),
             }
           }
-          Some(wait_msg) = wait_stream.next() => {
+
+          // Monitor for container exit.
+          Some(wait_msg) = wait_stream.next(), if status_code.is_none() => {
             log::trace!("wait_container stream ({}): {:?}", &container_id, wait_msg);
             match wait_msg {
               Ok(r) => {
-                // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
-                // `ChildResults` to better support exit code vs signal vs error message?
-                let status_code = r.status_code;
-                yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                break status_code == 0;
+                // DOCKER-TODO: There does not seem to be a way to differentiate between the
+                // container exiting due to a regular exit versus a signal. Probably bears
+                // further investigation.
+
+                // Set the status_code so that this branch of the tokio::select is disabled.
+                // This will allow continuing to monitor for output to capture.
+                status_code = Some(r.status_code as i32);
               }
               Err(err) => {
-                // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
-                log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
-                yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                break false;
+                let msg = format!("Docker wait_container failure for container {}: {:?}", &container_id, err);
+                log::error!("{}", &msg);
+                if sender.send(Err(msg)).await.is_err() {
+                  log::trace!("Child results monitor went away for container {}", &container_id);
+                  break;
+                }
+                // DOCKER-TODO: Should we exit the monitoring loop at this point? Does this
+                // error mean that `wait_stream` should be re-made to re-connect to the Docker
+                // daemon?
               }
             }
           }
+        }
+      }
+
+      // Finally output the child's exit status now that all output has been captured.
+      let successful = match status_code {
+        Some(status_code) => {
+          if sender
+            .send(Ok(ChildOutput::Exit(ExitCode(status_code))))
+            .await
+            .is_ok()
+          {
+            status_code == 0
+          } else {
+            log::trace!(
+              "Child results monitor went away for container {}",
+              &container_id
+            );
+            false
+          }
+        }
+        None => {
+          let msg = format!(
+            "Monitoring loop exited for container `{}` but no result code was extracted",
+            &container_id
+          );
+          log::error!("{}", &msg);
+          if sender.send(Err(msg)).await.is_err() {
+            log::trace!(
+              "Child results monitor went away for container {}",
+              &container_id
+            );
+          }
+          false
         }
       };
 
       let do_remove_container = match keep_sandboxes {
         KeepSandboxes::Always => false,
         KeepSandboxes::Never => true,
-        KeepSandboxes::OnFailure => !was_success,
+        KeepSandboxes::OnFailure => !successful,
       };
 
       if do_remove_container {
@@ -371,9 +430,9 @@ impl CapturedWorkdir for CommandRunner {
           log::warn!("{}", err);
         }
       }
-    }
-    .boxed();
+    });
 
-    Ok(result_stream)
+    let result_stream = ReceiverStream::new(receiver);
+    Ok(result_stream.boxed())
   }
 }

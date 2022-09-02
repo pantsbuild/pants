@@ -2317,6 +2317,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
+ "tokio-stream",
  "tokio-util 0.7.2",
  "tonic",
  "tryfuture",
