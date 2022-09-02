@@ -137,37 +137,8 @@ class LintResult(EngineAwareReturnType):
         return False
 
 
-_PartitionElementT = TypeVar("_PartitionElementT", FieldSet, str)
 _MetadataT = TypeVar("_MetadataT")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
-
-
-class _PartitionsBase(
-    Generic[_PartitionElementT, _MetadataT],
-    Collection[Tuple[Tuple[_PartitionElementT, ...], _MetadataT]],
-):
-    """A collection containing pairs of (tuple(<elements>), arbitrary metadata).
-
-    When implementing a linter, one of your rules will return a subclass of this type, taking in a
-    `PartitionRequest` specific to your linter. The specific return type will either be
-    `TargetsPartition` or `FilesPartition`.
-
-    The return likely will fit into one of:
-        - Returning an empty partition: E.g. if your tool is being skipped.
-        - Returning one partition (with optional metadata). The return value may contain all of
-            the inputs (as will likely be the case for target linters) or a subset (which will likely
-            be the case for targetless linters).
-        - Returning >1 partition (with optional metadata). This might be the case if you can't run
-            the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
-            and files ABC with Py2.
-
-    The "arbitrary metadata" in the pair solely exists to pass information from your "partition" rule
-    to your "runner" rule. It can be `None` (no metadata), or any other object the engine allows in
-    a rule input/output (i.e. hashable+equatable+immutable types).
-    NOTE: The partition may be divided further into multiple batches, with each batch getting the same
-        metadata object. Therefore your metadata should be applicable to possible sub-slices of the
-        partition.
-    """
 
 
 @union
@@ -297,8 +268,35 @@ class LintTargetsRequest(LintRequest, StyleRequest):
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
+_PARTITIONS_DOC = """A collection containing pairs of (tuple(<elements>), arbitrary metadata).
+
+    When implementing a linter, one of your rules will return a subclass of this type, taking in a
+    `PartitionRequest` specific to your linter. The specific return type will either be
+    `TargetsPartition` or `FilesPartition`.
+
+    The return likely will fit into one of:
+        - Returning an empty partition: E.g. if your tool is being skipped.
+        - Returning one partition (with optional metadata). The return value may contain all of
+            the inputs (as will likely be the case for target linters) or a subset (which will likely
+            be the case for targetless linters).
+        - Returning >1 partition (with optional metadata). This might be the case if you can't run
+            the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
+            and files ABC with Py2.
+
+    The "arbitrary metadata" in the pair solely exists to pass information from your "partition" rule
+    to your "runner" rule. It can be `None` (no metadata), or any other object the engine allows in
+    a rule input/output (i.e. hashable+equatable+immutable types).
+
+    NOTE: The partition may be divided further into multiple batches, with each batch getting the same
+        metadata object. Therefore your metadata should be applicable to possible sub-slices of the
+        partition.
+    """
+
+
 @runtime_subscriptable
-class TargetPartitions(Generic[_MetadataT], _PartitionsBase[FieldSet, _MetadataT]):
+class TargetPartitions(Generic[_MetadataT], Collection[Tuple[Tuple[FieldSet, ...], _MetadataT]]):
+    __doc__ = _PARTITIONS_DOC
+
     @classmethod
     def from_field_set_partitions(
         cls: type[TargetPartitions], field_set_partitions: Iterable[Iterable[FieldSet]]
@@ -356,7 +354,9 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
         yield UnionRule(LintFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FilePartitions(Generic[_MetadataT], _PartitionsBase[str, _MetadataT]):
+class FilePartitions(Generic[_MetadataT], Collection[Tuple[Tuple[str, ...], _MetadataT]]):
+    __doc__ = _PARTITIONS_DOC
+
     @classmethod
     def from_file_partitions(
         cls: type[FilePartitions], file_path_partitions: Iterable[Iterable[str]]
