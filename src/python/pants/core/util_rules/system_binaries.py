@@ -15,6 +15,11 @@ from typing import Iterable, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
+from pants.core.util_rules.environments import (
+    LOCAL_ENVIRONMENT_MATCHER,
+    ResolvedEnvironmentRequest,
+    ResolvedEnvironmentTarget,
+)
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
@@ -440,6 +445,11 @@ async def create_binary_shims(
             ),
         )
     )
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
     result = await Get(
         ProcessResult,
         Process(
@@ -447,6 +457,7 @@ async def create_binary_shims(
             description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
             output_directories=(bin_relpath,),
             level=LogLevel.DEBUG,
+            docker_image=env_tgt.docker_image,
         ),
     )
     return BinaryShims(bin_relpath, result.output_digest)
@@ -530,6 +541,12 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
+
     # Some subtle notes about executing this script:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
@@ -549,6 +566,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             argv=[script_path, request.binary_name],
             env={"PATH": search_path},
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            docker_image=env_tgt.docker_image,
         ),
     )
 
@@ -567,6 +585,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 # NB: Since a failure is a valid result for this script, we always cache it for
                 # `pantsd`'s lifetime, regardless of success or failure.
                 cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
+                docker_image=env_tgt.docker_image,
             ),
         )
         for path in found_paths

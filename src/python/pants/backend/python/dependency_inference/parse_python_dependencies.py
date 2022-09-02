@@ -102,6 +102,7 @@ async def parse_python_dependencies(
                 "ASSETS_MIN_SLASHES": str(request.assets_min_slashes),
             },
             level=LogLevel.DEBUG,
+            docker_image=None,  # TODO(#7735): is this right?
         ),
     )
     # See above for where we explicitly encoded as utf8. Even though utf8 is the

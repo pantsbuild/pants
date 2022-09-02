@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import go_bootstrap
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
+from pants.core.util_rules.environments import (
+    LOCAL_ENVIRONMENT_MATCHER,
+    ResolvedEnvironmentRequest,
+    ResolvedEnvironmentTarget,
+)
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
@@ -79,6 +84,11 @@ async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootst
 
     # `go env GOVERSION` does not work in earlier Go versions (like 1.15), so we must run
     # `go version` and `go env GOROOT` to calculate both the version and GOROOT.
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
     version_results = await MultiGet(
         Get(
             ProcessResult,
@@ -87,6 +97,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootst
                 description=f"Determine Go version for {binary_path.path}",
                 level=LogLevel.DEBUG,
                 cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                docker_image=env_tgt.docker_image,
             ),
         )
         for binary_path in all_go_binary_paths.paths
@@ -119,6 +130,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootst
                     level=LogLevel.DEBUG,
                     cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
                     env={"GOPATH": "/does/not/matter"},
+                    docker_image=env_tgt.docker_image,
                 ),
             )
             sdk_metadata = json.loads(env_result.stdout.decode())

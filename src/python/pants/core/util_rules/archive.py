@@ -105,6 +105,7 @@ async def create_archive(request: CreateArchive) -> Digest:
             description=f"Create {request.output_filename}",
             level=LogLevel.DEBUG,
             output_files=(request.output_filename,),
+            docker_image=None,  # TODO(#7735): Is this right?
         ),
     )
     return result.output_digest
@@ -197,6 +198,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
             output_directories=(extract_archive_dir,),
+            docker_image=None,  # TODO(#7735): Is this right?
         ),
     )
     resulting_digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))

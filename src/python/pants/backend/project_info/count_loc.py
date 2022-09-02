@@ -83,6 +83,7 @@ async def count_loc(
             input_digest=input_digest,
             description=f"Count lines of code for {pluralize(len(specs_paths.files), 'file')}",
             level=LogLevel.DEBUG,
+            docker_image=None,
         ),
     )
     console.print_stdout(result.stdout.decode())

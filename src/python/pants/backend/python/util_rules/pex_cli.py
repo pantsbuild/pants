@@ -17,6 +17,11 @@ from pants.backend.python.util_rules.pex_environment import (
     PythonExecutable,
 )
 from pants.core.util_rules import external_tool
+from pants.core.util_rules.environments import (
+    LOCAL_ENVIRONMENT_MATCHER,
+    ResolvedEnvironmentRequest,
+    ResolvedEnvironmentTarget,
+)
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -198,6 +203,11 @@ async def setup_pex_cli_process(
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
 
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
     return Process(
         normalized_argv,
         description=request.description,
@@ -209,6 +219,7 @@ async def setup_pex_cli_process(
         level=request.level,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
+        docker_image=env_tgt.docker_image,
     )
 
 

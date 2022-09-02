@@ -48,6 +48,11 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import (
+    LOCAL_ENVIRONMENT_MATCHER,
+    ResolvedEnvironmentRequest,
+    ResolvedEnvironmentTarget,
+)
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -976,6 +981,11 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         if request.input_digest
         else pex.digest
     )
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
     return Process(
         argv,
         description=request.description,
@@ -990,6 +1000,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
+        docker_image=env_tgt.docker_image,
     )
 
 
@@ -1067,6 +1078,11 @@ async def setup_venv_pex_process(
         ).append_only_caches,
         **request.append_only_caches,
     )
+    # TODO(#7735): request this as a rule argument.
+    env_tgt = await Get(
+        ResolvedEnvironmentTarget,
+        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+    )
     return Process(
         argv=argv,
         description=request.description,
@@ -1081,6 +1097,7 @@ async def setup_venv_pex_process(
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
+        docker_image=env_tgt.docker_image,
     )
 
 

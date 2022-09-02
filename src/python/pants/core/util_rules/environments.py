@@ -215,6 +215,13 @@ class ResolvedEnvironmentAlias(EngineAwareParameter):
 class ResolvedEnvironmentTarget:
     val: Target | None
 
+    @property
+    def docker_image(self) -> str | None:
+        """Return the docker image if the environment is set to a docker_environment target."""
+        if self.val is None:
+            return None
+        return self.val[DockerImageField].value if self.val.has_field(DockerImageField) else None
+
 
 @dataclass(frozen=True)
 class ResolvedEnvironmentRequest(EngineAwareParameter):

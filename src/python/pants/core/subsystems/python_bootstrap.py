@@ -242,6 +242,7 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 @rule
 async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
+    # TODO(#7735): request this as a rule argument.
     env_tgt = await Get(
         ResolvedEnvironmentTarget,
         ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),

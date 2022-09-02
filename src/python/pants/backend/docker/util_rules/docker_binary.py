@@ -91,6 +91,7 @@ class DockerBinary(BinaryPath):
             # We must run the docker build commands every time, even if nothing has changed,
             # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,
+            docker_image=None,  # TODO(#7735): what should this be?
         )
 
     def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process:
@@ -100,6 +101,7 @@ class DockerBinary(BinaryPath):
             description=f"Pushing docker image {tag}",
             env=self._get_process_environment(env or {}),
             immutable_input_digests=self.extra_input_digests,
+            docker_image=None,  # TODO(#7735): what should this be?
         )
 
     def run_image(
@@ -116,6 +118,7 @@ class DockerBinary(BinaryPath):
             description=f"Running docker image {tag}",
             env=self._get_process_environment(env or {}),
             immutable_input_digests=self.extra_input_digests,
+            docker_image=None,  # TODO(#7735): what should this be?
         )
 
 
