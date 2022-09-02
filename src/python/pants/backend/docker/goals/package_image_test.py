@@ -124,7 +124,7 @@ def assert_build(
             stderr=b"stderr",
             stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
-            platform=Platform.current,
+            platform=Platform.create_for_localhost(),
             metadata=ProcessResultMetadata(0, "ran_locally", 0),
         )
 

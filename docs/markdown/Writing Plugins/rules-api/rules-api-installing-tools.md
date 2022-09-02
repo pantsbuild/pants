@@ -125,7 +125,7 @@ async def demo(shellcheck: Shellcheck, ...) -> Foo:
     shellcheck = await Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        shellcheck.get_request(Platform.current)
+        shellcheck.get_request(platform)
     )
     result = await Get(
         ProcessResult,

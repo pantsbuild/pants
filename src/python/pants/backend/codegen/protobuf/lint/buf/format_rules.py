@@ -45,11 +45,11 @@ class BufFormatRequest(FmtTargetsRequest):
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Process:
+async def setup_buf_format(
+    request: BufFormatRequest, buf: BufSubsystem, platform: Platform
+) -> Process:
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
-    download_buf_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, buf.get_request(Platform.current)
-    )
+    download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
         BinaryShims,
         BinaryShimsRequest,

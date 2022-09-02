@@ -94,13 +94,13 @@ PATH_FROM_SHELLCHECK_ERROR = re.compile(r"Not following: (.+) was not specified 
 
 @rule
 async def parse_shell_imports(
-    request: ParseShellImportsRequest, shellcheck: Shellcheck
+    request: ParseShellImportsRequest, shellcheck: Shellcheck, platform: Platform
 ) -> ParsedShellImports:
     # We use Shellcheck to parse for us by running it against each file in isolation, which means
     # that all `source` statements will error. Then, we can extract the problematic paths from the
     # JSON output.
     downloaded_shellcheck = await Get(
-        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(platform)
     )
     input_digest = await Get(Digest, MergeDigests([request.digest, downloaded_shellcheck.digest]))
     process_result = await Get(
