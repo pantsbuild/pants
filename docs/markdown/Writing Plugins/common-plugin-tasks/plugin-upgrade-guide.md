@@ -9,6 +9,11 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### Deprecated `Platform.current`
+
+The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To
+get the correct `Platform`, a `@rule` should request a `Platform` as a positional argument.
+
 ### Deprecated `convert_dir_literal_to_address_literal` kwarg
 
 The `convert_dir_literal_to_address_literal` keyword argument for `RawSpecs.create()` and
