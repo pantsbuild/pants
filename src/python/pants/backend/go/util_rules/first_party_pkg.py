@@ -14,6 +14,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
+from pants.backend.go.util_rules.context import GoBuildContext
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -240,7 +241,7 @@ async def compute_first_party_package_import_path(
 async def analyze_first_party_package(
     request: FirstPartyPkgAnalysisRequest,
     analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    go_build_context: GoBuildContext,
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(
@@ -267,7 +268,7 @@ async def analyze_first_party_package(
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={"CGO_ENABLED": "1" if go_build_context.cgo_allowed else "0"},
         ),
     )
     return FallibleFirstPartyPkgAnalysis.from_process_result(

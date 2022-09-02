@@ -100,12 +100,12 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
 
-    cgo_enabled = BoolOption(
-        "--cgo-enabled",
+    cgo_allowed = BoolOption(
+        "--cgo-allowed",
         default=False,
         help=softwrap(
             """\
-            Enable Cgos support, which allows Go and C code to interact. This option must be enabled for any
+            Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
             packages making use of Cgo to actually be compiled with Cgo support.
 
             TODO: Future Pants changes may also require enabling Cgo via fields on relevant Go targets.

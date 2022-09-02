@@ -16,6 +16,7 @@ from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoB
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
+from pants.backend.go.util_rules.context import GoBuildContext
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
@@ -271,7 +272,7 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
     analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    go_build_context: GoBuildContext,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -338,7 +339,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={"CGO_ENABLED": "1" if go_build_context.cgo_allowed else "0"},
         ),
     )
 

@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
-from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig
+from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig, context
 from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest
 from pants.backend.go.util_rules.cgo_pkgconfig import (
     CGoPkgConfigFlagsRequest,
@@ -876,4 +876,5 @@ def rules():
         *collect_rules(),
         *cgo_binaries.rules(),
         *cgo_pkgconfig.rules(),
+        *context.rules(),
     )

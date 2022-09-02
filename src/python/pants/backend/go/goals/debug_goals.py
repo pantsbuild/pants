@@ -17,6 +17,7 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import first_party_pkg, third_party_pkg
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult
+from pants.backend.go.util_rules.context import GoBuildContext
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
@@ -193,7 +194,7 @@ async def go_export_cgo_codegen(
     workspace: Workspace,
     golang_subsystem: GolangSubsystem,
 ) -> GoExportCgoCodegen:
-    if not golang_subsystem.cgo_enabled:
+    if not golang_subsystem.cgo_allowed:
         raise ValueError(
             "Nothing to export since cgo is disabled, which is set by the option [golang].cgo_enabled"
         )

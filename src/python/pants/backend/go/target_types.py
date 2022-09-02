@@ -22,7 +22,7 @@ from pants.engine.target import (
     Target,
     TargetGenerator,
     ValidNumbers,
-    generate_multiple_sources_field_help_message,
+    generate_multiple_sources_field_help_message, TriBoolField,
 )
 from pants.util.strutil import softwrap
 
@@ -230,6 +230,19 @@ class GoBinaryDependenciesField(Dependencies):
     alias = "_dependencies"
 
 
+class GoPureField(BoolField):
+    alias = "pure"
+    help = softwrap(
+        """
+        Controls whether Pants will build "pure" Go binaries with only Go code. That is, Cgo support will be disabled
+        for all packages which comprise the binary, regardless of whether they are first-party or third-party code.
+        
+        Setting this field to `True` is the equivalent of setting the `CGO_ENABLED` environment variable to `0`
+        when using `go build`. 
+        """
+    )
+
+
 class GoBinaryTarget(Target):
     alias = "go_binary"
     core_fields = (
@@ -237,6 +250,7 @@ class GoBinaryTarget(Target):
         OutputPathField,
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
+        GoPureField,
         RestartableField,
     )
     help = "A Go binary."
