@@ -15,12 +15,14 @@ from pants.base.specs import Specs
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
+    FilePartitions,
     Lint,
     LintFilesRequest,
+    LintRequest,
     LintResult,
-    LintResults,
     LintSubsystem,
     LintTargetsRequest,
+    TargetPartitions,
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -60,9 +62,9 @@ class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def lint_results(self) -> LintResults:
+    def lint_result(self) -> LintResult:
         addresses = [config.address for config in self.field_sets]
-        return LintResults([LintResult(self.exit_code(addresses), "", "")], linter_name=self.name)
+        return LintResult(self.exit_code(addresses), "", "", self.name)
 
 
 class SuccessfulRequest(MockLintRequest):
@@ -99,8 +101,8 @@ class SkippedRequest(MockLintRequest):
         return 0
 
     @property
-    def lint_results(self) -> LintResults:
-        return LintResults([], linter_name=self.name)
+    def lint_results(self) -> LintResult:
+        assert False
 
 
 class InvalidField(MultipleSourcesField):
@@ -120,12 +122,27 @@ class InvalidRequest(MockLintRequest):
         return -1
 
 
+def mock_target_partitioner(request: MockLintRequest.PartitionRequest) -> TargetPartitions:
+    if type(request) is SkippedRequest.PartitionRequest:
+        return TargetPartitions()
+
+    return TargetPartitions.from_elements([request.field_sets])
+
+
 class MockFilesRequest(LintFilesRequest):
     name = "FilesLinter"
 
-    @property
-    def lint_results(self) -> LintResults:
-        return LintResults([LintResult(0, "", "")], linter_name=self.name)
+
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> FilePartitions:
+    return FilePartitions.from_elements([request.file_paths])
+
+
+def mock_lint_partition(request: MockLintRequest.Batch) -> LintResult:
+    if type(request) is MockFilesRequest.Batch:
+        return LintResult(0, "", "", MockFilesRequest.name)
+
+    request_type = {cls.Batch: cls for cls in MockLintRequest.__subclasses__()}[type(request)]
+    return request_type(request.inputs).lint_result
 
 
 class MockFmtRequest(FmtTargetsRequest):
@@ -181,8 +198,15 @@ def run_lint_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
-            LintTargetsRequest: lint_request_types,
-            LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
+            LintRequest: lint_request_types + ([MockFilesRequest] if run_files_linter else []),
+            LintRequest.Batch: (
+                [rt.Batch for rt in lint_request_types]
+                + ([MockFilesRequest.Batch] if run_files_linter else [])
+            ),
+            LintTargetsRequest.PartitionRequest: [rt.PartitionRequest for rt in lint_request_types],
+            LintFilesRequest.PartitionRequest: (
+                [MockFilesRequest.PartitionRequest] if run_files_linter else []
+            ),
             _FmtBuildFilesRequest: [BuildFileFormatter] if run_build_formatter else [],
             FmtTargetsRequest: fmt_request_types,
         }
@@ -212,29 +236,34 @@ def run_lint_rule(
                     mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
                 ),
                 MockGet(
-                    output_type=LintResults,
-                    input_type=LintTargetsRequest,
-                    mock=lambda mock_request: mock_request.lint_results,
+                    output_type=TargetPartitions,
+                    input_type=LintTargetsRequest.PartitionRequest,
+                    mock=mock_target_partitioner,
                 ),
                 MockGet(
-                    output_type=LintResults,
-                    input_type=LintFilesRequest,
-                    mock=lambda mock_request: mock_request.lint_results,
+                    output_type=FilePartitions,
+                    input_type=LintFilesRequest.PartitionRequest,
+                    mock=mock_file_partitioner,
+                ),
+                MockGet(
+                    output_type=LintResult,
+                    input_type=LintRequest.Batch,
+                    mock=mock_lint_partition,
                 ),
                 MockGet(
                     output_type=FmtResult,
                     input_type=FmtTargetsRequest,
-                    mock=lambda mock_request: mock_request.fmt_result,
+                    mock=lambda request: request.fmt_result,
                 ),
                 MockGet(
                     output_type=FmtResult,
                     input_type=_FmtBuildFilesRequest,
-                    mock=lambda mock_request: mock_request.fmt_result,
+                    mock=lambda request: request.fmt_result,
                 ),
                 MockGet(
                     output_type=FilteredTargets,
                     input_type=Specs,
-                    mock=lambda _: FilteredTargets(targets),
+                    mock=lambda _: FilteredTargets(tuple(targets)),
                 ),
                 MockGet(
                     output_type=SpecsPaths,
@@ -377,16 +406,10 @@ def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
     )
 
 
-def test_streaming_output_skip() -> None:
-    results = LintResults([], linter_name="linter")
-    assert results.level() == LogLevel.DEBUG
-    assert results.message() == "linter skipped."
-
-
 def test_streaming_output_success() -> None:
-    results = LintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
-    assert results.level() == LogLevel.INFO
-    assert results.message() == dedent(
+    result = LintResult(0, "stdout", "stderr", linter_name="linter")
+    assert result.level() == LogLevel.INFO
+    assert result.message() == dedent(
         """\
         linter succeeded.
         stdout
@@ -397,9 +420,9 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = LintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
-    assert results.level() == LogLevel.ERROR
-    assert results.message() == dedent(
+    result = LintResult(18, "stdout", "stderr", linter_name="linter")
+    assert result.level() == LogLevel.ERROR
+    assert result.message() == dedent(
         """\
         linter failed (exit code 18).
         stdout
@@ -410,20 +433,14 @@ def test_streaming_output_failure() -> None:
 
 
 def test_streaming_output_partitions() -> None:
-    results = LintResults(
-        [
-            LintResult(21, "", "", partition_description="ghc8.1"),
-            LintResult(0, "stdout", "stderr", partition_description="ghc9.2"),
-        ],
-        linter_name="linter",
+    result = LintResult(
+        21, "stdout", "stderr", linter_name="linter", partition_description="ghc9.2"
     )
-    assert results.level() == LogLevel.ERROR
-    assert results.message() == dedent(
+    assert result.level() == LogLevel.ERROR
+    assert result.message() == dedent(
         """\
         linter failed (exit code 21).
-        Partition #1 - ghc8.1:
-
-        Partition #2 - ghc9.2:
+        Partition: ghc9.2
         stdout
         stderr
 
