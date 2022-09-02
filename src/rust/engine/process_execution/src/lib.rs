@@ -613,6 +613,14 @@ impl Process {
     self.append_only_caches = append_only_caches;
     self
   }
+
+  ///
+  /// Replaces the docker_image used for this process.
+  ///
+  pub fn docker_image(mut self, docker_image: String) -> Process {
+    self.docker_image = Some(docker_image);
+    self
+  }
 }
 
 ///
