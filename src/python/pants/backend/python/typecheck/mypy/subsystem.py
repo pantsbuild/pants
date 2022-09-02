@@ -20,12 +20,15 @@ from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
     PythonRequirementsField,
+    PythonResolveField,
     PythonSourceField,
 )
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
-from pants.backend.python.util_rules import partition
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
+from pants.backend.python.util_rules.partition import (
+    _find_all_unique_interpreter_constraints,
+    _partition_by_interpreter_constraints_and_resolve,
+)
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -73,6 +76,7 @@ class MyPyFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     sources: PythonSourceField
+    resolve: PythonResolveField
     interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
@@ -412,11 +416,11 @@ async def setup_mypy_extra_type_stubs_lockfile(
     all_field_sets = [
         MyPyFieldSet.create(tgt) for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)
     ]
-    resolve_and_interpreter_constraints_to_coarsened_targets = (
-        await partition._by_interpreter_constraints_and_resolve(all_field_sets, python_setup)
+    resolve_and_interpreter_constraints_to_field_sets = (
+        _partition_by_interpreter_constraints_and_resolve(all_field_sets, python_setup)
     )
     unique_constraints = {
-        ics for resolve, ics in resolve_and_interpreter_constraints_to_coarsened_targets.keys()
+        ics for resolve, ics in resolve_and_interpreter_constraints_to_field_sets.keys()
     }
     interpreter_constraints = InterpreterConstraints(
         itertools.chain.from_iterable(unique_constraints)
