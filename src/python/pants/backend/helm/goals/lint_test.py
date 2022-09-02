@@ -56,10 +56,9 @@ def run_helm_lint(
     extra_options: Iterable[str] = [],
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(extra_options)
-    field_sets = tuple(HelmLintFieldSet.create(tgt) for tgt in targets)
     partition = rule_runner.request(
         TargetPartitions,
-        [HelmLintRequest.PartitionRequest(field_sets)],
+        [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for field_sets, metadata in partition:
@@ -68,7 +67,7 @@ def run_helm_lint(
             [HelmLintRequest.Batch(field_sets, metadata)],
         )
         results.append(result)
-    return results
+    return tuple(results)
 
 
 def test_lint_non_strict_chart_passing(rule_runner: RuleRunner) -> None:

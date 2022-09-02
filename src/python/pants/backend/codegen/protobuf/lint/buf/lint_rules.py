@@ -40,16 +40,18 @@ class BufLintRequest(LintTargetsRequest):
 
 @rule
 async def partition_buf(
-    request: BufLintRequest.PartitionRequest, buf: BufSubsystem
-) -> TargetPartitions:
+    request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
+) -> TargetPartitions[None]:
     if buf.lint_skip:
         return TargetPartitions()
 
-    return TargetPartitions.from_elements([request.field_sets])
+    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
-async def run_buf(request: BufLintRequest.Batch, buf: BufSubsystem) -> LintResult:
+async def run_buf(
+    request: BufLintRequest.Batch[BufFieldSet, None], buf: BufSubsystem
+) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
         TransitiveTargetsRequest((field_set.address for field_set in request.field_sets)),
@@ -106,7 +108,9 @@ async def run_buf(request: BufLintRequest.Batch, buf: BufSubsystem) -> LintResul
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(process_result)
+    result = LintResult.from_fallible_process_result(
+        process_result, linter_name=BufLintRequest.name
+    )
     return result
 
 

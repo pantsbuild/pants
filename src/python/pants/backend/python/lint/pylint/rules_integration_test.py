@@ -9,11 +9,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import (
-    PylintPartition,
-    PylintRequest,
-    PytargetPartitions,
-)
+from pants.backend.python.lint.pylint.rules import PylintPartition, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -74,10 +70,9 @@ def run_pylint(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    field_sets = tuple(PylintFieldSet.create(tgt) for tgt in targets)
     partition = rule_runner.request(
         TargetPartitions,
-        [PylintRequest.PartitionRequest(field_sets)],
+        [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for field_sets, metadata in partition:
@@ -86,7 +81,7 @@ def run_pylint(
             [PylintRequest.Batch(field_sets, metadata)],
         )
         results.append(result)
-    return results
+    return tuple(results)
 
 
 def assert_success(
@@ -514,7 +509,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
     resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
     resolve_b_root2 = rule_runner.get_target(Address("resolveB_2", target_name="root"))
-    request = PylintRequest(
+    request = PylintRequest.PartitionRequest(
         PylintFieldSet.create(t)
         for t in (
             resolve_a_py38_root,
@@ -524,10 +519,11 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = rule_runner.request(PytargetPartitions, [request])
+    partitions: TargetPartitions[PylintPartition] = rule_runner.request(TargetPartitions, [request])
     assert len(partitions) == 3
 
     def assert_partition(
+        root_field_sets: tuple[PylintFieldSet, ...],
         partition: PylintPartition,
         roots: list[Target],
         deps: list[Target],
@@ -535,7 +531,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {fs.address for fs in partition.root_field_sets} == root_addresses
+        assert {fs.address for fs in root_field_sets} == root_addresses
         assert {t.address for t in partition.closure} == {
             *root_addresses,
             *(t.address for t in deps),
@@ -544,10 +540,10 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         assert partition.interpreter_constraints == InterpreterConstraints(ics)
         assert partition.description() == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
+    assert_partition(*partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(*partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        partitions[2],
+        *partitions[2],
         [resolve_b_root1, resolve_b_root2],
         [resolve_b_dep1, resolve_b_dep2],
         "3.9",

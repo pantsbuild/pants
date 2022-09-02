@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -43,11 +43,11 @@ def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
 
 @rule
 async def partition_flake8(
-    request: Flake8Request.PartitionRequest,
+    request: Flake8Request.PartitionRequest[Flake8FieldSet],
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> TargetPartitions:
+) -> TargetPartitions[InterpreterConstraints]:
     if flake8.skip:
         return TargetPartitions()
 
@@ -67,11 +67,11 @@ async def partition_flake8(
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def flake8_lint_partition(
-    request: Flake8Request.Batch,
+    request: Flake8Request.Batch[Flake8FieldSet, InterpreterConstraints],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = cast("InterpreterConstraints", request.metadata)
+    interpreter_constraints = request.metadata
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,

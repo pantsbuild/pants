@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Optional, Sequence, Tuple, Type
+from typing import Any, Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
@@ -126,7 +126,7 @@ def mock_target_partitioner(request: MockLintRequest.PartitionRequest) -> Target
     if type(request) is SkippedRequest.PartitionRequest:
         return TargetPartitions()
 
-    return TargetPartitions.from_elements([request.field_sets])
+    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
 
 class MockFilesRequest(LintFilesRequest):
@@ -134,15 +134,15 @@ class MockFilesRequest(LintFilesRequest):
 
 
 def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> FilePartitions:
-    return FilePartitions.from_elements([request.file_paths])
+    return FilePartitions.from_file_partitions([request.file_paths])
 
 
-def mock_lint_partition(request: MockLintRequest.Batch) -> LintResult:
+def mock_lint_partition(request: Any) -> LintResult:
     if type(request) is MockFilesRequest.Batch:
         return LintResult(0, "", "", MockFilesRequest.name)
 
     request_type = {cls.Batch: cls for cls in MockLintRequest.__subclasses__()}[type(request)]
-    return request_type(request.inputs).lint_result
+    return request_type(request.inputs).lint_result  # type: ignore[abstract]
 
 
 class MockFmtRequest(FmtTargetsRequest):
@@ -188,7 +188,7 @@ def run_lint_rule(
     rule_runner: RuleRunner,
     *,
     lint_request_types: Sequence[Type[LintTargetsRequest]],
-    fmt_request_types: Sequence[Type[FmtTargetsRequest]] = (),
+    fmt_request_types: Sequence[Type[FmtTargetsRequest]] = [],
     targets: list[Target],
     run_files_linter: bool = False,
     run_build_formatter: bool = False,
@@ -198,10 +198,12 @@ def run_lint_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
-            LintRequest: lint_request_types + ([MockFilesRequest] if run_files_linter else []),
+            LintRequest: (
+                list(lint_request_types) + ([MockFilesRequest] if run_files_linter else [])  # type: ignore[list-item]
+            ),
             LintRequest.Batch: (
                 [rt.Batch for rt in lint_request_types]
-                + ([MockFilesRequest.Batch] if run_files_linter else [])
+                + ([MockFilesRequest.Batch] if run_files_linter else [])  # type: ignore[list-item]
             ),
             LintTargetsRequest.PartitionRequest: [rt.PartitionRequest for rt in lint_request_types],
             LintFilesRequest.PartitionRequest: (

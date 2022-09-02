@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -40,7 +40,6 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class PylintPartition:
-    root_field_sets: FrozenOrderedSet[PylintFieldSet]
     closure: FrozenOrderedSet[Target]
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
@@ -55,23 +54,23 @@ class PylintRequest(LintTargetsRequest):
     name = Pylint.options_scope
 
 
-def generate_argv(source_files: tuple[str, ...], pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
-    args.extend(source_files)
+    args.extend(source_files.files)
     return tuple(args)
 
 
 @rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
 async def partition_pylint(
-    request: PylintRequest.PartitionRequest,
+    request: PylintRequest.PartitionRequest[PylintFieldSet],
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> TargetPartitions:
+) -> TargetPartitions[PylintPartition]:
     if pylint.skip:
         return TargetPartitions()
 
@@ -87,7 +86,6 @@ async def partition_pylint(
         (
             tuple(fs for fs in roots),
             PylintPartition(
-                FrozenOrderedSet(roots),
                 FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
                 resolve if len(python_setup.resolves) > 1 else None,
                 InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
@@ -101,13 +99,15 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def pylint_lint_partition(
-    request: PylintRequest.Batch, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
+    request: PylintRequest.Batch[PylintFieldSet, PylintPartition],
+    pylint: Pylint,
+    first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
-    partition = cast("PylintPartition", request.metadata)
+    partition = request.metadata
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (fs.address for fs in partition.root_field_sets),
+            (fs.address for fs in request.field_sets),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -126,7 +126,7 @@ async def pylint_lint_partition(
 
     prepare_python_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(fs.source for fs in partition.root_field_sets)
+        SourceFiles, SourceFilesRequest(fs.source for fs in request.field_sets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -191,8 +191,8 @@ async def pylint_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            concurrency_available=len(partition.root_field_sets),
-            description=f"Run Pylint on {pluralize(len(partition.root_field_sets), 'file')}.",
+            concurrency_available=len(request.field_sets),
+            description=f"Run Pylint on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

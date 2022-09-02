@@ -49,16 +49,18 @@ def generate_argv(
 
 @rule
 async def partition_hadolint(
-    request: HadolintRequest.PartitionRequest, hadolint: Hadolint
-) -> TargetPartitions:
+    request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
+) -> TargetPartitions[None]:
     if hadolint.skip:
         return TargetPartitions()
 
-    return TargetPartitions.from_elements([request.field_sets])
+    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
-async def run_hadolint(request: HadolintRequest.Batch, hadolint: Hadolint) -> LintResult:
+async def run_hadolint(
+    request: HadolintRequest.Batch[HadolintFieldSet, None], hadolint: Hadolint
+) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),

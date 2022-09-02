@@ -54,10 +54,9 @@ def run_buf(
         ],
         env_inherit={"PATH"},
     )
-    field_sets = tuple(BufFieldSet.create(tgt) for tgt in targets)
     partition = rule_runner.request(
         TargetPartitions,
-        [BufLintRequest.PartitionRequest(field_sets)],
+        [BufLintRequest.PartitionRequest(BufFieldSet.create(tgt) for tgt in targets)],
     )
     results = []
     for field_sets, metadata in partition:
@@ -66,7 +65,7 @@ def run_buf(
             [BufLintRequest.Batch(field_sets, metadata)],
         )
         results.append(result)
-    return results
+    return tuple(results)
 
 
 def assert_success(

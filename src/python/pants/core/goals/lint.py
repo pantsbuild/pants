@@ -8,7 +8,19 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Generic, Iterable, Iterator, Tuple, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Generic,
+    Iterable,
+    Iterator,
+    Sequence,
+    Tuple,
+    TypeVar,
+    cast,
+)
 
 from typing_extensions import final
 
@@ -31,7 +43,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -39,6 +51,7 @@ from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classproperty
+from pants.util.meta import runtime_subscriptable
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -124,14 +137,14 @@ class LintResult(EngineAwareReturnType):
         return False
 
 
-PartitionElementT = TypeVar("PartitionElementT", FieldSet, str)
-Metadata = TypeVar("Metadata")
-
-_PartitionsBaseT = TypeVar("_PartitionsBaseT", bound="_PartitionsBase")
+_PartitionElementT = TypeVar("_PartitionElementT", FieldSet, str)
+_MetadataT = TypeVar("_MetadataT")
+_FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
 
 class _PartitionsBase(
-    Generic[PartitionElementT, Metadata], Collection[Tuple[Tuple[PartitionElementT], Metadata]]
+    Generic[_PartitionElementT, _MetadataT],
+    Collection[Tuple[Tuple[_PartitionElementT, ...], _MetadataT]],
 ):
     """A collection containing pairs of (tuple(<elements>), arbitrary metadata).
 
@@ -151,14 +164,10 @@ class _PartitionsBase(
     The "arbitrary metadata" in the pair solely exists to pass information from your "partition" rule
     to your "runner" rule. It can be `None` (no metadata), or any other object the engine allows in
     a rule input/output (i.e. hashable+equatable+immutable types).
+    NOTE: The partition may be divided further into multiple batches, with each batch getting the same
+        metadata object. Therefore your metadata should be applicable to possible sub-slices of the
+        partition.
     """
-
-    @classmethod
-    def from_elements(
-        cls: type[_PartitionsBaseT], iterable: Iterable[PartitionElementT]
-    ) -> _PartitionsBaseT[PartitionElementT, None]:
-        """Helper for instantiating without any metadata."""
-        return cls((element, None) for element in iterable)
 
 
 @union
@@ -174,27 +183,26 @@ class LintRequest:
 
     Then, define 2 `@rule`s:
         1. A rule which takes an instance of your request type's `PartitionRequest` class property,
-            and returns a `LintPartitions` instance.
+            and returns a `TargetPartitions`/`FilePartitions` instance.
             E.g.
                 @rule
                 async def partition(
-                    request: DryCleaningRequest.PartitionRequest,
+                    request: DryCleaningRequest.PartitionRequest[DryCleaningFieldSet]
+                    # or `request: DryCleaningRequest.PartitionRequest` if file linter
                     subsystem: DryCleaningSubsystem,
-                ) -> LintPartitions:
+                ) -> TargetPartitions:
                     if subsystem.skip:
-                        return LintPartitions()
+                        return TargetPartitions()
 
-                    # One possibility of implementation
-                    return LintPartitions(
-                        (field_set.source.file_path, None) for field_set in request.field_sets
-                    )
+                    # One possible implementation
+                    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
-        2. A rule which takes an instance of your request type's `Partition` class property, and
+        2. A rule which takes an instance of your request type's `Batch` class property, and
             returns a `LintResult instance.
             E.g.
                 @rule
                 async def dry_clean(
-                    request: DryCleaningRequest.Partition,
+                    request: DryCleaningRequest.Batch,
                 ) -> LintResult:
                     ...
 
@@ -206,9 +214,9 @@ class LintRequest:
                 *DryCleaningRequest.registration_rules()
             ]
 
-    NOTE: For more information about the `PartitionRequest` and `Partition` types, see
+    NOTE: For more information about the `PartitionRequest` and `Batch` types, see
         `LintTargetsRequest.PartitionRequest`/`LintFilesRequest.PartitionRequest` and
-        `LintRequest.Partition` respectively.
+        `LintTargetsRequest.Batch`/`LintFilesRequest.Batch` respectively.
     """
 
     name: ClassVar[str]
@@ -218,20 +226,10 @@ class LintRequest:
 
     @memoized_classproperty
     def Batch(cls) -> type:
-        """Returns a unique `Batch` type per calling type.
-
-        This serves us 2 purposes:
-            1. `LintRequest.Batch` is the unique type used as a union base for plugin registration.
-            2. `<Plugin Defined Subclass>.Batch` is the unique type used as the union member.
-
-        The class contains the inputs (a subset of the partition FieldSets/files) and the  `metadata`
-        attached to the partition. (See `LintPartitions` for more detail).
-        """
-
         @union
         class Batch:
             # NB: Fields declared for exposition, actual fields may vary in name but should contain
-            # their first 2 members of these types.
+            # their first 2 members of these types. See subclass implementations for field info.
             inputs: tuple
             metadata: Any = None
 
@@ -239,11 +237,11 @@ class LintRequest:
 
     @final
     @classmethod
-    def registration_rules(cls) -> Iterable[Rule]:
+    def registration_rules(cls) -> Iterable[UnionRule]:
         yield from cls._get_registration_rules()
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[Rule]:
+    def _get_registration_rules(cls) -> Iterable[UnionRule]:
         yield UnionRule(LintRequest, cls)
         yield UnionRule(LintRequest.Batch, cls.Batch)
 
@@ -252,42 +250,61 @@ class LintRequest:
 class LintTargetsRequest(LintRequest, StyleRequest):
     """The entry point for linters that operate on targets."""
 
-    @final
-    @memoized_classproperty
-    def PartitionRequest(cls) -> type:
-        """Returns a unique `PartitionRequest` type per calling type.
+    if TYPE_CHECKING:
 
-        This serves us 2 purposes:
-            1. `LintTargetsRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-        """
-
-        @union
         @dataclass(frozen=True)
-        class PartitionRequest:
-            field_sets: tuple[FieldSet, ...]
+        class PartitionRequest(Generic[_FieldSetT]):
+            field_sets: tuple[_FieldSetT, ...]
 
-        return PartitionRequest
-
-    @final
-    @memoized_classproperty
-    def Batch(cls) -> type:
-        @union
         @dataclass(frozen=True)
-        class Batch:
-            field_sets: tuple[FieldSet, ...]
-            metadata: Any
+        class Batch(Generic[_FieldSetT, _MetadataT]):
+            field_sets: tuple[_FieldSetT, ...]
+            metadata: _MetadataT
 
-        return Batch
+    else:
+
+        @memoized_classproperty
+        def PartitionRequest(cls):
+            """Returns a unique `PartitionRequest` type per calling type.
+
+            This serves us 2 purposes:
+                1. `LintTargetsRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+                2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
+            """
+
+            @union
+            @dataclass(frozen=True)
+            @runtime_subscriptable
+            class PartitionRequest:
+                field_sets: tuple
+
+            return PartitionRequest
+
+        @memoized_classproperty
+        def Batch(cls):
+            @union
+            @dataclass(frozen=True)
+            @runtime_subscriptable
+            class Batch:
+                field_sets: tuple
+                metadata: Any
+
+            return Batch
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[Rule]:
+    def _get_registration_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_registration_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class TargetPartitions(Generic[Metadata], _PartitionsBase[FieldSet, Metadata]):
-    pass
+@runtime_subscriptable
+class TargetPartitions(Generic[_MetadataT], _PartitionsBase[FieldSet, _MetadataT]):
+    @classmethod
+    def from_field_set_partitions(
+        cls: type[TargetPartitions], field_set_partitions: Iterable[Iterable[FieldSet]]
+    ) -> TargetPartitions[None]:
+        """Helper for instantiating without any metadata."""
+        return cls((tuple(partition), None) for partition in field_set_partitions)
 
 
 @union
@@ -295,42 +312,57 @@ class TargetPartitions(Generic[Metadata], _PartitionsBase[FieldSet, Metadata]):
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
-    @final
-    @memoized_classproperty
-    def PartitionRequest(cls) -> type:
-        """Returns a unique `PartitionRequest` type per calling type.
+    if TYPE_CHECKING:
 
-        This serves us 2 purposes:
-            1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-        """
-
-        @union
         @dataclass(frozen=True)
         class PartitionRequest:
             file_paths: tuple[str, ...]
 
-        return PartitionRequest
-
-    @final
-    @memoized_classproperty
-    def Batch(cls) -> type:
-        @union
         @dataclass(frozen=True)
         class Batch:
             file_paths: tuple[str, ...]
             metadata: Any
 
-        return Batch
+    else:
+
+        @memoized_classproperty
+        def PartitionRequest(cls):
+            """Returns a unique `PartitionRequest` type per calling type.
+
+            This serves us 2 purposes:
+                1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+                2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
+            """
+
+            @union
+            @dataclass(frozen=True)
+            class PartitionRequest:
+                file_paths: tuple
+
+            return PartitionRequest
+
+        @memoized_classproperty
+        def Batch(cls):
+            @union
+            class Batch:
+                file_paths: tuple[str, ...]
+                metadata: Any
+
+            return Batch
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[Rule]:
+    def _get_registration_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_registration_rules()
         yield UnionRule(LintFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FilePartitions(Generic[Metadata], _PartitionsBase[str, Metadata]):
-    pass
+class FilePartitions(Generic[_MetadataT], _PartitionsBase[str, _MetadataT]):
+    @classmethod
+    def from_file_partitions(
+        cls: type[FilePartitions], file_path_partitions: Iterable[Iterable[str]]
+    ) -> FilePartitions[None]:
+        """Helper for instantiating without any metadata."""
+        return cls((tuple(partition), None) for partition in file_path_partitions)
 
 
 # If a user wants linter reports to show up in dist/ they must ensure that the reports
@@ -414,7 +446,7 @@ def _print_results(
         console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
 
 
-def _get_error_code(results: Iterable[LintResult]) -> int:
+def _get_error_code(results: Sequence[LintResult]) -> int:
     for result in reversed(results):
         if result.exit_code:
             return result.exit_code
@@ -462,10 +494,8 @@ async def lint(
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
-        [*lint_request_types, *fmt_target_request_types],
-        extra_valid_names={
-            request.name for request in fmt_build_request_types  # type: ignore[attr-defined]
-        },
+        [*lint_request_types, *fmt_target_request_types],  # type: ignore[list-item]
+        extra_valid_names={request.name for request in fmt_build_request_types},
     )
 
     def is_specified(request_type: type):
@@ -521,27 +551,31 @@ async def lint(
             )
         )
 
-    all_partitions = await MultiGet(
-        (
-            Get(
+    def partition_request_get(request_type: type[LintRequest]) -> Get[_PartitionsBase]:
+        partition_request_type: type = getattr(request_type, "PartitionRequest")
+        if partition_request_type in target_partitioners:
+            lint_targets_request_type = cast("type[LintTargetsRequest]", request_type)
+            return Get(
                 TargetPartitions,
                 _LintTargetsPartitionRequest,
-                request_type.PartitionRequest(
+                lint_targets_request_type.PartitionRequest(
                     tuple(
-                        request_type.field_set_type.create(target)
+                        lint_targets_request_type.field_set_type.create(target)
                         for target in targets
-                        if request_type.field_set_type.is_applicable(target)
+                        if lint_targets_request_type.field_set_type.is_applicable(target)
                     )
                 ),
             )
-            if request_type.PartitionRequest in target_partitioners
-            else Get(
+        else:
+            assert partition_request_type in file_partitioners
+            return Get(
                 FilePartitions,
                 _LintFilesPartitionRequest,
-                request_type.PartitionRequest(specs_paths.files),
+                cast("type[LintFilesRequest]", request_type).PartitionRequest(specs_paths.files),
             )
-        )
-        for request_type in lint_request_types
+
+    all_partitions = await MultiGet(
+        partition_request_get(request_type) for request_type in lint_request_types
     )
     lint_partitions_by_rt = defaultdict(list)
     for request_type, lint_partition in zip(lint_request_types, all_partitions):

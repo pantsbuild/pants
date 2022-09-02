@@ -45,16 +45,16 @@ class GoVetRequest(LintTargetsRequest):
 
 @rule
 async def partition_go_vet(
-    request: GoVetRequest.PartitionRequest, go_vet_subsystem: GoVetSubsystem
-) -> TargetPartitions:
-    if go_vet_subsystem.lint_skip:
+    request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
+) -> TargetPartitions[None]:
+    if go_vet_subsystem.skip:
         return TargetPartitions()
 
-    return TargetPartitions.from_elements([request.field_sets])
+    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
 
 @rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest.Batch) -> LintResult:
+async def run_go_vet(request: GoVetRequest.Batch[GoVetFieldSet, None]) -> LintResult:
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in request.field_sets),

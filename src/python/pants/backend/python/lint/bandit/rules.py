@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -34,8 +34,10 @@ def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
 
 @rule
 async def partition_bandit(
-    request: BanditRequest.PartitionRequest, bandit: Bandit, python_setup: PythonSetup
-) -> TargetPartitions:
+    request: BanditRequest.PartitionRequest[BanditFieldSet],
+    bandit: Bandit,
+    python_setup: PythonSetup,
+) -> TargetPartitions[InterpreterConstraints]:
     if bandit.skip:
         return TargetPartitions()
 
@@ -52,13 +54,15 @@ async def partition_bandit(
             field_sets,
             interpreter_constraints,
         )
-        for interpreter_constraints, field_sets in constraints_to_field_sets
+        for interpreter_constraints, field_sets in constraints_to_field_sets.items()
     )
 
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
-async def bandit_lint(request: BanditRequest.Batch, bandit: Bandit) -> LintResult:
-    interpreter_constraints = cast("InterpreterConstraints", request.metadata)
+async def bandit_lint(
+    request: BanditRequest.Batch[BanditFieldSet, InterpreterConstraints], bandit: Bandit
+) -> LintResult:
+    interpreter_constraints = request.metadata
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,

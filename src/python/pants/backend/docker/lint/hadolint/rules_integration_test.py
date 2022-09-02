@@ -47,10 +47,9 @@ def run_hadolint(
         extra_args or (),
         env_inherit={"PATH"},
     )
-    field_sets = tuple(HadolintFieldSet.create(tgt) for tgt in targets)
     partition = rule_runner.request(
         TargetPartitions,
-        [HadolintRequest.PartitionRequest(field_sets)],
+        [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for field_sets, metadata in partition:
@@ -59,7 +58,7 @@ def run_hadolint(
             [HadolintRequest.Batch(field_sets, metadata)],
         )
         results.append(result)
-    return results
+    return tuple(results)
 
 
 def assert_success(

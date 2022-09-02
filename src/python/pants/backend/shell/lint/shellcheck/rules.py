@@ -38,16 +38,18 @@ class ShellcheckRequest(LintTargetsRequest):
 
 @rule
 async def partition_shellcheck(
-    request: ShellcheckRequest.PartitionRequest, shellcheck: Shellcheck
-) -> TargetPartitions:
+    request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
+) -> TargetPartitions[None]:
     if shellcheck.skip:
         return TargetPartitions()
 
-    return TargetPartitions.from_elements([request.field_sets])
+    return TargetPartitions.from_field_set_partitions([request.field_sets])
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
-async def run_shellcheck(request: ShellcheckRequest.Batch, shellcheck: Shellcheck) -> LintResult:
+async def run_shellcheck(
+    request: ShellcheckRequest.Batch[ShellcheckFieldSet, None], shellcheck: Shellcheck
+) -> LintResult:
     # Shellcheck looks at direct dependencies to make sure that every symbol is defined, so we must
     # include those in the run.
     all_dependencies = await MultiGet(
