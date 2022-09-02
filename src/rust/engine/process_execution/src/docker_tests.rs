@@ -66,8 +66,31 @@ macro_rules! setup_docker {
       }
     }
 
-    docker
+    Some(docker)
   }};
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn use_local_runner_if_docker_not_set() {
+  // Because Docker is not set up, and docker_image is set, the process should fail.
+  run_command_via_docker(
+    &None,
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
+  )
+  .await
+  .unwrap_err();
+
+  // Otherwise, if docker_image is not set, use the local runner.
+  let result = run_command_via_docker(
+    &None,
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])),
+  )
+  .await
+  .unwrap();
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
 }
 
 #[tokio::test]
@@ -721,7 +744,7 @@ async fn pull_image(docker: &Docker, image: &str) {
 }
 
 async fn run_command_via_docker_in_dir(
-  docker: &Docker,
+  docker_opt: &Option<Docker>,
   req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
@@ -735,8 +758,21 @@ async fn run_command_via_docker_in_dir(
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
-  pull_image(docker, IMAGE).await;
+  let local_runner = local::CommandRunner::new(
+    store.clone(),
+    executor.clone(),
+    dir.clone(),
+    named_caches.clone(),
+    immutable_inputs.clone(),
+    cleanup,
+  );
+
+  if let Some(docker) = docker_opt {
+    pull_image(docker, IMAGE).await;
+  }
+
   let runner = crate::docker::CommandRunner::new(
+    Box::new(local_runner),
     store.clone(),
     executor.clone(),
     dir.clone(),
@@ -759,14 +795,14 @@ async fn run_command_via_docker_in_dir(
 }
 
 async fn run_command_via_docker(
-  docker: &Docker,
+  docker_opt: &Option<Docker>,
   req: Process,
 ) -> Result<LocalTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
   run_command_via_docker_in_dir(
-    docker,
+    docker_opt,
     req,
     work_dir_path,
     KeepSandboxes::Never,
