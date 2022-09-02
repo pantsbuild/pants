@@ -158,6 +158,10 @@ def test_invalid_fields_rejected() -> None:
         FortranTarget({"invalid_field": True}, Address("", target_name="lib"))
     assert "Unrecognized field `invalid_field=True`" in str(exc)
     assert "//:lib" in str(exc)
+    with no_exception():
+        FortranTarget(
+            {"invalid_field": True}, Address("", target_name="lib"), ignore_unrecognized_fields=True
+        )
 
 
 def test_get_field() -> None:
