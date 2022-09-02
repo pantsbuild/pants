@@ -9,7 +9,11 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import PylintPartition, PylintPartitions, PylintRequest
+from pants.backend.python.lint.pylint.rules import (
+    PylintPartition,
+    PylintRequest,
+    PytargetPartitions,
+)
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -19,7 +23,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -40,8 +44,8 @@ def rule_runner() -> RuleRunner:
             *subsystem.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, [PylintRequest]),
-            QueryRule(PylintPartitions, [PylintRequest]),
+            QueryRule(TargetPartitions, [PylintRequest.PartitionRequest]),
+            QueryRule(LintResult, [PylintRequest.Batch]),
         ],
         target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
@@ -70,11 +74,19 @@ def run_pylint(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [PylintRequest(PylintFieldSet.create(tgt) for tgt in targets)],
+    field_sets = tuple(PylintFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [PylintRequest.PartitionRequest(field_sets)],
     )
-    return results.results
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [PylintRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def assert_success(
@@ -512,7 +524,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = rule_runner.request(PylintPartitions, [request])
+    partitions = rule_runner.request(PytargetPartitions, [request])
     assert len(partitions) == 3
 
     def assert_partition(

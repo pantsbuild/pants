@@ -15,7 +15,7 @@ from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -36,7 +36,8 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, [Flake8Request]),
+            QueryRule(TargetPartitions, [Flake8Request.PartitionRequest]),
+            QueryRule(LintResult, [Flake8Request.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -53,13 +54,19 @@ def run_flake8(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [
-            Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
-        ],
+    field_sets = tuple(Flake8FieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [Flake8Request.PartitionRequest(field_sets)],
     )
-    return results.results
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [Flake8Request.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def assert_success(

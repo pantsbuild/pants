@@ -16,14 +16,13 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -44,11 +43,18 @@ class GoVetRequest(LintTargetsRequest):
     name = GoVetSubsystem.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) -> LintResults:
-    if go_vet_subsystem.skip:
-        return LintResults([], linter_name=request.name)
+@rule
+async def partition_go_vet(
+    request: GoVetRequest.PartitionRequest, go_vet_subsystem: GoVetSubsystem
+) -> TargetPartitions:
+    if go_vet_subsystem.lint_skip:
+        return TargetPartitions()
 
+    return TargetPartitions.from_elements([request.field_sets])
+
+
+@rule(level=LogLevel.DEBUG)
+async def run_go_vet(request: GoVetRequest.Batch) -> LintResult:
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in request.field_sets),
@@ -80,12 +86,14 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         ),
     )
 
-    result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name=request.name)
+    result = LintResult.from_fallible_process_result(
+        process_result, linter_name=GoVetSubsystem.options_scope
+    )
+    return result
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, GoVetRequest),
+        *GoVetRequest.registration_rules(),
     ]

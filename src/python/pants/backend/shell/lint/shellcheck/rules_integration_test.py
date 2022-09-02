@@ -11,7 +11,7 @@ from pants.backend.shell.lint.shellcheck.rules import ShellcheckFieldSet, Shellc
 from pants.backend.shell.lint.shellcheck.rules import rules as shellcheck_rules
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -27,7 +27,8 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [ShellcheckRequest]),
+            QueryRule(TargetPartitions, [ShellcheckRequest.PartitionRequest]),
+            QueryRule(LintResult, [ShellcheckRequest.Batch]),
         ],
         target_types=[ShellSourcesGeneratorTarget],
     )
@@ -44,11 +45,19 @@ def run_shellcheck(
         ["--backend-packages=pants.backend.shell.lint.shellcheck", *(extra_args or ())],
         env_inherit={"PATH"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [ShellcheckRequest(ShellcheckFieldSet.create(tgt) for tgt in targets)],
+    field_sets = tuple(ShellcheckFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [ShellcheckRequest.PartitionRequest(field_sets)],
     )
-    return results.results
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [ShellcheckRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def assert_success(

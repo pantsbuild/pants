@@ -8,7 +8,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
 )
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -17,7 +17,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -39,11 +38,18 @@ class BufLintRequest(LintTargetsRequest):
     name = "buf-lint"
 
 
-@rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
-async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
+@rule
+async def partition_buf(
+    request: BufLintRequest.PartitionRequest, buf: BufSubsystem
+) -> TargetPartitions:
     if buf.lint_skip:
-        return LintResults([], linter_name=request.name)
+        return TargetPartitions()
 
+    return TargetPartitions.from_elements([request.field_sets])
+
+
+@rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
+async def run_buf(request: BufLintRequest.Batch, buf: BufSubsystem) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
         TransitiveTargetsRequest((field_set.address for field_set in request.field_sets)),
@@ -101,9 +107,8 @@ async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
         ),
     )
     result = LintResult.from_fallible_process_result(process_result)
-
-    return LintResults([result], linter_name=request.name)
+    return result
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, BufLintRequest)]
+    return [*collect_rules(), *BufLintRequest.registration_rules()]

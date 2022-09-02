@@ -23,7 +23,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintPartitions, LintResult
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -49,7 +49,8 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             *build_pkg.rules(),
             *assembly.rules(),
-            QueryRule(LintResults, (GoVetRequest,)),
+            QueryRule(LintPartitions, [GoVetRequest.PartitionRequest]),
+            QueryRule(LintResult, [GoVetRequest.Batch]),
             SubsystemRule(GoVetSubsystem),
         ],
     )
@@ -94,9 +95,19 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    field_sets = [GoVetFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [GoVetRequest(field_sets)])
-    return lint_results.results
+    field_sets = tuple(GoVetFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        LintPartitions,
+        [GoVetRequest.PartitionRequest(field_sets)],
+    )
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [GoVetRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:

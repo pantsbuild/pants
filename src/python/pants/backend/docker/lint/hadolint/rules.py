@@ -8,7 +8,7 @@ from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -16,7 +16,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -48,11 +47,18 @@ def generate_argv(
     return tuple(args)
 
 
-@rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
-async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResults:
+@rule
+async def partition_hadolint(
+    request: HadolintRequest.PartitionRequest, hadolint: Hadolint
+) -> TargetPartitions:
     if hadolint.skip:
-        return LintResults([], linter_name=request.name)
+        return TargetPartitions()
 
+    return TargetPartitions.from_elements([request.field_sets])
+
+
+@rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
+async def run_hadolint(request: HadolintRequest.Batch, hadolint: Hadolint) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
@@ -96,13 +102,13 @@ async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResu
         ),
     )
 
-    return LintResults(
-        [LintResult.from_fallible_process_result(process_result)], linter_name=request.name
+    return LintResult.from_fallible_process_result(
+        process_result, linter_name=Hadolint.options_scope
     )
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, HadolintRequest),
+        *HadolintRequest.registration_rules(),
     ]

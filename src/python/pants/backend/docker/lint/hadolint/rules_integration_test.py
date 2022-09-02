@@ -12,7 +12,7 @@ from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.core.goals import package
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -29,7 +29,8 @@ def rule_runner() -> RuleRunner:
             *hadolint_rules(),
             package.find_all_packageable_targets,
             *source_files.rules(),
-            QueryRule(LintResults, [HadolintRequest]),
+            QueryRule(TargetPartitions, [HadolintRequest.PartitionRequest]),
+            QueryRule(LintResult, [HadolintRequest.Batch]),
         ],
         target_types=[DockerImageTarget],
     )
@@ -46,11 +47,19 @@ def run_hadolint(
         extra_args or (),
         env_inherit={"PATH"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [HadolintRequest(HadolintFieldSet.create(tgt) for tgt in targets)],
+    field_sets = tuple(HadolintFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [HadolintRequest.PartitionRequest(field_sets)],
     )
-    return results.results
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [HadolintRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def assert_success(

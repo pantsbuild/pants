@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -26,15 +26,13 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, TargetPartitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
@@ -52,29 +50,60 @@ class PylintPartition:
         return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
 
 
-class PylintPartitions(Collection[PylintPartition]):
-    pass
-
-
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
     name = Pylint.options_scope
 
 
-def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(source_files: tuple[str, ...], pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
-    args.extend(source_files.files)
+    args.extend(source_files)
     return tuple(args)
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
+async def partition_pylint(
+    request: PylintRequest.PartitionRequest,
+    pylint: Pylint,
+    python_setup: PythonSetup,
+    first_party_plugins: PylintFirstPartyPlugins,
+) -> TargetPartitions:
+    if pylint.skip:
+        return TargetPartitions()
+
+    resolve_and_interpreter_constraints_to_coarsened_targets = (
+        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    )
+
+    first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
+        first_party_plugins.interpreter_constraints_fields, python_setup
+    )
+
+    return TargetPartitions(
+        (
+            tuple(fs for fs in roots),
+            PylintPartition(
+                FrozenOrderedSet(roots),
+                FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
+                resolve if len(python_setup.resolves) > 1 else None,
+                InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
+            ),
+        )
+        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
+            resolve_and_interpreter_constraints_to_coarsened_targets.items()
+        )
+    )
+
+
+@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def pylint_lint_partition(
-    partition: PylintPartition, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
+    request: PylintRequest.Batch, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
 ) -> LintResult:
+    partition = cast("PylintPartition", request.metadata)
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
@@ -171,50 +200,14 @@ async def pylint_lint_partition(
     return LintResult.from_fallible_process_result(
         result,
         partition_description=partition.description(),
+        linter_name=Pylint.options_scope,
         report=report,
     )
-
-
-@rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
-async def pylint_determine_partitions(
-    request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
-) -> PylintPartitions:
-    resolve_and_interpreter_constraints_to_coarsened_targets = (
-        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
-    )
-
-    first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
-        first_party_plugins.interpreter_constraints_fields, python_setup
-    )
-
-    return PylintPartitions(
-        PylintPartition(
-            FrozenOrderedSet(roots),
-            FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
-            resolve if len(python_setup.resolves) > 1 else None,
-            InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
-        )
-        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
-            resolve_and_interpreter_constraints_to_coarsened_targets.items()
-        )
-    )
-
-
-@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
-async def pylint_lint(request: PylintRequest, pylint: Pylint) -> LintResults:
-    if pylint.skip:
-        return LintResults([], linter_name=request.name)
-
-    partitions = await Get(PylintPartitions, PylintRequest, request)
-    partitioned_results = await MultiGet(
-        Get(LintResult, PylintPartition, partition) for partition in partitions
-    )
-    return LintResults(partitioned_results, linter_name=request.name)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, PylintRequest),
+        *PylintRequest.registration_rules(),
         *pex_from_targets.rules(),
     ]

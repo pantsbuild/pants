@@ -12,7 +12,7 @@ from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufL
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -28,7 +28,8 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufLintRequest]),
+            QueryRule(TargetPartitions, [BufLintRequest.PartitionRequest]),
+            QueryRule(LintResult, [BufLintRequest.Batch]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
     )
@@ -53,11 +54,19 @@ def run_buf(
         ],
         env_inherit={"PATH"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [BufLintRequest(BufFieldSet.create(tgt) for tgt in targets)],
+    field_sets = tuple(BufFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [BufLintRequest.PartitionRequest(field_sets)],
     )
-    return results.results
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [BufLintRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def assert_success(

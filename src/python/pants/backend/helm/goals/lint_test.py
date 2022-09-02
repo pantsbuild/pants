@@ -21,7 +21,7 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart, sources
 from pants.build_graph.address import Address
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, TargetPartitions
 from pants.core.util_rules import config_files, source_files
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.engine.target import Target
@@ -42,7 +42,8 @@ def rule_runner() -> RuleRunner:
             *sources.rules(),
             *target_types_rules(),
             SubsystemRule(HelmSubsystem),
-            QueryRule(LintResults, (HelmLintRequest,)),
+            QueryRule(TargetPartitions, [HelmLintRequest.PartitionRequest]),
+            QueryRule(LintResult, [HelmLintRequest.Batch]),
         ],
     )
     return rule_runner
@@ -54,12 +55,20 @@ def run_helm_lint(
     *,
     extra_options: Iterable[str] = [],
 ) -> tuple[LintResult, ...]:
-    field_sets = [HelmLintFieldSet.create(tgt) for tgt in targets]
-
     rule_runner.set_options(extra_options)
-
-    lint_results = rule_runner.request(LintResults, [HelmLintRequest(field_sets)])
-    return lint_results.results
+    field_sets = tuple(HelmLintFieldSet.create(tgt) for tgt in targets)
+    partition = rule_runner.request(
+        TargetPartitions,
+        [HelmLintRequest.PartitionRequest(field_sets)],
+    )
+    results = []
+    for field_sets, metadata in partition:
+        result = rule_runner.request(
+            LintResult,
+            [HelmLintRequest.Batch(field_sets, metadata)],
+        )
+        results.append(result)
+    return results
 
 
 def test_lint_non_strict_chart_passing(rule_runner: RuleRunner) -> None:
