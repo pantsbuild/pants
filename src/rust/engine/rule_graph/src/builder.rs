@@ -57,6 +57,10 @@ impl<R: Rule> Node<R> {
     }
   }
 
+  ///
+  /// Add the parameter types which are always required to satisfy this Node (regardless of what
+  /// its dependencies require) to the given set.
+  ///
   fn add_inherent_in_set(&self, in_set: &mut ParamTypes<R::TypeId>) {
     match self {
       Node::Reentry(query, in_scope_params) => {
