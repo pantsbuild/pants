@@ -64,7 +64,6 @@ class Process:
     concurrency_available: int
     cache_scope: ProcessCacheScope
     platform: str | None
-    docker_image: str | None
 
     def __init__(
         self,
