@@ -89,6 +89,7 @@ async fn make_execute_request() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let want_command = remexec::Command {
@@ -166,6 +167,7 @@ async fn make_execute_request_with_instance_name() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let want_command = remexec::Command {
@@ -256,6 +258,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let mut want_command = remexec::Command {
@@ -493,6 +496,7 @@ async fn make_execute_request_with_timeout() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let want_command = remexec::Command {
@@ -598,6 +602,7 @@ async fn make_execute_request_using_immutable_inputs() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let want_command = remexec::Command {

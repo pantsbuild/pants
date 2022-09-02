@@ -359,6 +359,8 @@ impl ExecuteProcess {
         None
       };
 
+    let docker_image = externs::getattr_as_optional_string(value, "docker_image");
+
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -375,6 +377,7 @@ impl ExecuteProcess {
       execution_slot_variable,
       concurrency_available,
       cache_scope,
+      docker_image,
     })
   }
 

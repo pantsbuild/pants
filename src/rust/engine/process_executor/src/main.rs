@@ -455,6 +455,7 @@ async fn make_request_from_flat_args(
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let metadata = ProcessMetadata {
@@ -548,6 +549,7 @@ async fn extract_request_from_action_digest(
     jdk_home: None,
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
+    docker_image: None,
   };
 
   let metadata = ProcessMetadata {
