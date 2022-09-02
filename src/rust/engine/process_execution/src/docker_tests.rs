@@ -663,6 +663,7 @@ async fn immutable_inputs() {
   .unwrap();
   process.timeout = Some(Duration::from_secs(1));
   process.description = "confused-cat".to_string();
+  process.docker_image = Some(IMAGE.to_string());
 
   let result = run_command_via_docker_in_dir(
     &docker,
@@ -722,7 +723,6 @@ async fn run_command_via_docker_in_dir(
     named_caches,
     immutable_inputs,
     cleanup,
-    IMAGE.to_string(),
   )?;
   let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes = store

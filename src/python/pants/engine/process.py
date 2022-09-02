@@ -132,6 +132,8 @@ class Process:
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.platform = platform.value if platform is not None else None
+        # TODO(#7735): Figure out how this should be set by callers, e.g. automatically.
+        self.docker_image = None
 
 
 @dataclass(frozen=True)

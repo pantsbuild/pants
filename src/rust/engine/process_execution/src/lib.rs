@@ -534,6 +534,9 @@ pub struct Process {
   pub platform_constraint: Option<Platform>,
 
   pub cache_scope: ProcessCacheScope,
+
+  /// The docker image to run the process with.
+  pub docker_image: Option<String>,
 }
 
 impl Process {
@@ -564,6 +567,7 @@ impl Process {
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
+      docker_image: None,
     }
   }
 
