@@ -177,7 +177,7 @@ class LintRequest:
                 ) -> LintResult:
                     ...
 
-    Lastly, register the rules which tells Pants about your plugin.
+    Lastly, register the rules which tell Pants about your plugin.
     E.g.
         def rules():
             return [
