@@ -534,6 +534,9 @@ pub struct Process {
   pub platform_constraint: Option<Platform>,
 
   pub cache_scope: ProcessCacheScope,
+
+  /// The docker image to run the process with.
+  pub docker_image: Option<String>,
 }
 
 impl Process {
@@ -564,6 +567,7 @@ impl Process {
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
+      docker_image: None,
     }
   }
 
@@ -607,6 +611,14 @@ impl Process {
     append_only_caches: BTreeMap<CacheName, RelativePath>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
+    self
+  }
+
+  ///
+  /// Replaces the docker_image used for this process.
+  ///
+  pub fn docker_image(mut self, docker_image: String) -> Process {
+    self.docker_image = Some(docker_image);
     self
   }
 }

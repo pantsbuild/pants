@@ -33,7 +33,6 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  image: String,
 }
 
 impl CommandRunner {
@@ -44,7 +43,6 @@ impl CommandRunner {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
-    image: String,
   ) -> Result<Self, String> {
     let docker = Docker::connect_with_local_defaults()
       .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
@@ -56,7 +54,6 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
-      image,
     })
   }
 }
@@ -224,6 +221,10 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
+    let image = req
+      .docker_image
+      .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
+
     // DOCKER-TODO: Set creation options so we can set platform.
 
     let config = bollard::container::Config {
@@ -249,7 +250,7 @@ impl CapturedWorkdir for CommandRunner {
         init: Some(true),
         ..bollard_stubs::models::HostConfig::default()
       }),
-      image: Some(self.image.clone()),
+      image: Some(image),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
       ..bollard::container::Config::default()

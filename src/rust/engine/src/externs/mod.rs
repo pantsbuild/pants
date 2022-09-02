@@ -58,6 +58,9 @@ pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   h1.eq(h2).unwrap()
 }
 
+/// Return true if the given type is a @union.
+///
+/// This function is also implemented in Python as `pants.engine.union.is_union`.
 pub fn is_union(py: Python, v: &PyType) -> PyResult<bool> {
   let is_union_for_attr = intern!(py, "_is_union_for");
   if !v.hasattr(is_union_for_attr)? {
@@ -66,6 +69,22 @@ pub fn is_union(py: Python, v: &PyType) -> PyResult<bool> {
 
   let is_union_for = v.getattr(is_union_for_attr)?;
   Ok(is_union_for.is(v))
+}
+
+/// If the given type is a @union, return its in-scope types.
+///
+/// This function is also implemented in Python as `pants.engine.union.union_in_scope_types`.
+pub fn union_in_scope_types<'p>(
+  py: Python<'p>,
+  v: &'p PyType,
+) -> PyResult<Option<Vec<&'p PyType>>> {
+  if !is_union(py, v)? {
+    return Ok(None);
+  }
+
+  let union_in_scope_types: Vec<&PyType> =
+    v.getattr(intern!(py, "_union_in_scope_types"))?.extract()?;
+  Ok(Some(union_in_scope_types))
 }
 
 pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {

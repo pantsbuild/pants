@@ -5,14 +5,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Mapping, TypeVar
+from typing import DefaultDict, Iterable, Mapping, TypeVar, cast
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-def union(cls):
+def union(cls: type | None = None, in_scope_types: list[type] | None = None):
     """A class decorator to allow a class to be a union base in the engine's mechanism for
     polymorphism.
 
@@ -24,17 +24,48 @@ def union(cls):
 
     Often, union bases are abstract classes, but they need not be.
 
+    By default, in order to provide a stable extension API, when a `@union` is used in a `Get`,
+    _only_ the provided parameter is available to callees, But in order to expand its API, a
+    `@union` declaration may optionally include additional "in_scope_types", which are types
+    which must already be in scope at callsites where the `@union` is used in a `Get`, and
+    which are propagated to the callee.
+
     See https://www.pantsbuild.org/docs/rules-api-unions.
     """
-    assert isinstance(cls, type)
-    cls._is_union_for = cls
-    return cls
+
+    def decorator(cls):
+        assert isinstance(cls, type)
+        cls._is_union_for = cls
+        # TODO: this should involve an explicit interface soon, rather than one being implicitly
+        # created with only the provided Param.
+        cls._union_in_scope_types = tuple(in_scope_types) if in_scope_types else tuple()
+        return cls
+
+    if isinstance(cls, type):
+        # This was a decorator call, ex: `@union`.
+        return decorator(cls)
+    else:
+        # This was a factory call, ex: `@union(..)`.
+        return decorator
 
 
 def is_union(input_type: type) -> bool:
-    """Return whether or not a type has been annotated with `@union`."""
+    """Return whether or not a type has been annotated with `@union`.
+
+    This function is also implemented in Rust as `engine::externs::is_union`.
+    """
     is_union: bool = input_type == getattr(input_type, "_is_union_for", None)
     return is_union
+
+
+def union_in_scope_types(input_type: type) -> tuple[type, ...] | None:
+    """If the given type is a `@union`, return its declared in-scope types.
+
+    This function is also implemented in Rust as `engine::externs::union_in_scope_types`.
+    """
+    if not is_union(input_type):
+        return None
+    return cast("tuple[type, ...]", getattr(input_type, "_union_in_scope_types"))
 
 
 @dataclass(frozen=True)

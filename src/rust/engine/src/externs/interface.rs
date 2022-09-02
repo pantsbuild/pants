@@ -100,7 +100,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
-  m.add_function(wrap_pyfunction!(tasks_add_union, m)?)?;
+  m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_select, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
 
@@ -1140,11 +1140,17 @@ fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
 }
 
 #[pyfunction]
-fn tasks_add_union(py_tasks: &PyTasks, output_type: &PyType, input_types: Vec<&PyType>) {
+fn tasks_add_get_union(
+  py_tasks: &PyTasks,
+  output_type: &PyType,
+  input_types: Vec<&PyType>,
+  in_scope_types: Vec<&PyType>,
+) {
   let product = TypeId::new(output_type);
-  let params = input_types.into_iter().map(TypeId::new).collect();
+  let input_types = input_types.into_iter().map(TypeId::new).collect();
+  let in_scope_types = in_scope_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_union(product, params);
+  tasks.add_get_union(product, input_types, in_scope_types);
 }
 
 #[pyfunction]
