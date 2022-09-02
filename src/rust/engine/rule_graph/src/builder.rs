@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
-use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
+use crate::{
+  params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
+};
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -15,8 +17,17 @@ use petgraph::Direction;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 enum Node<R: Rule> {
-  Query(Query<R>),
+  // A root node in the rule graph.
+  Query(Query<R::TypeId>),
+  // An inner node in the rule graph.
   Rule(R),
+  // An inner node in the rule graph which must first locate its `in_scope_params`, and will then
+  // execute the given Query.
+  //
+  // This is a leaf rather than an actual connection to the Query node to avoid introducing
+  // unnecessary graph cycles.
+  Reentry(Query<R::TypeId>, ParamTypes<R::TypeId>),
+  // A leaf node in the rule graph which is satisfied by consuming a single parameter.
   Param(R::TypeId),
 }
 
@@ -26,6 +37,7 @@ impl<R: Rule> std::fmt::Display for Node<R> {
       Node::Query(q) => write!(f, "{}", q),
       Node::Rule(r) => write!(f, "{}", r),
       Node::Param(p) => write!(f, "Param({})", p),
+      Node::Reentry(q, in_scope) => write!(f, "Reentry({}, {})", q.product, params_str(in_scope)),
     }
   }
 }
@@ -35,8 +47,35 @@ impl<R: Rule> Node<R> {
     // TODO: Give Query an internal DependencyKey to avoid cloning here.
     match self {
       Node::Rule(r) => r.dependency_keys().into_iter().cloned().collect(),
+      Node::Reentry(_, in_scope_params) => in_scope_params
+        .iter()
+        .cloned()
+        .map(DependencyKey::new)
+        .collect(),
       Node::Query(q) => vec![DependencyKey::new(q.product)],
       Node::Param(_) => vec![],
+    }
+  }
+
+  fn add_inherent_in_set(&self, in_set: &mut ParamTypes<R::TypeId>) {
+    match self {
+      Node::Reentry(query, in_scope_params) => {
+        // Reentry nodes include in_sets computed from their Query and their dependencies.
+        in_set.extend(
+          query
+            .params
+            .iter()
+            .filter(|p| !in_scope_params.contains(p))
+            .cloned(),
+        );
+      }
+      Node::Param(p) => {
+        // Params are always leaves with an in-set of their own value, and no out-set.
+        in_set.insert(*p);
+      }
+      Node::Rule(_) | Node::Query(_) => {
+        // Rules and Queries only have in_sets computed from their dependencies.
+      }
     }
   }
 }
@@ -168,12 +207,20 @@ type InLabeledGraph<R> =
 ///
 pub struct Builder<R: Rule> {
   rules: BTreeMap<R::TypeId, Vec<R>>,
-  queries: IndexSet<Query<R>>,
+  queries: IndexSet<Query<R::TypeId>>,
   params: ParamTypes<R::TypeId>,
 }
 
 impl<R: Rule> Builder<R> {
-  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Builder<R> {
+  pub fn new(rules: IndexSet<R>, mut queries: IndexSet<Query<R::TypeId>>) -> Builder<R> {
+    // Extend the Queries with those assumed by Reentry nodes.
+    queries.extend(rules.iter().flat_map(|rule| {
+      rule
+        .dependency_keys()
+        .into_iter()
+        .filter_map(|dk| dk.as_reentry_query())
+    }));
+
     // Group rules by product/return type.
     let mut rules_by_type = BTreeMap::new();
     for rule in rules {
@@ -182,6 +229,7 @@ impl<R: Rule> Builder<R> {
         .or_insert_with(Vec::new)
         .push(rule);
     }
+
     // The set of all input Params in the graph: ie, those provided either via Queries, or via
     // a Rule with a DependencyKey that provides a Param.
     let params = queries
@@ -195,6 +243,7 @@ impl<R: Rule> Builder<R> {
           .flat_map(|dk| dk.provided_params.iter().cloned()),
       )
       .collect::<ParamTypes<_>>();
+
     Builder {
       rules: rules_by_type,
       queries,
@@ -229,7 +278,7 @@ impl<R: Rule> Builder<R> {
   fn initial_polymorphic(&self) -> OutLabeledGraph<R> {
     let mut graph: Graph<R> = DiGraph::new();
 
-    // Initialize the graph with nodes for Queries and Params
+    // Initialize the graph with nodes for Queries, Params, and Reentries.
     let queries = self
       .queries
       .iter()
@@ -255,8 +304,17 @@ impl<R: Rule> Builder<R> {
       })
       .collect::<HashMap<_, _>>();
 
-    // Rules are created on the fly based on the out_set of dependees.
+    // Rules and Reentries are created on the fly based on the out_set of dependees.
     let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
+    #[allow(clippy::type_complexity)]
+    let mut reentries: HashMap<
+      (
+        Query<R::TypeId>,
+        ParamTypes<R::TypeId>,
+        ParamTypes<R::TypeId>,
+      ),
+      NodeIndex<u32>,
+    > = HashMap::default();
     let mut satisfiable_nodes: HashSet<Node<R>> = HashSet::default();
     let mut unsatisfiable_nodes: HashMap<NodeIndex<u32>, Vec<DependencyKey<R::TypeId>>> =
       HashMap::default();
@@ -284,9 +342,25 @@ impl<R: Rule> Builder<R> {
         .dependency_keys()
         .into_iter()
         .map(|dependency_key| {
+          if let Some(in_scope_params) = dependency_key.in_scope_params.as_ref() {
+            // If a DependencyKey has `in_scope_params`, it is solved by re-entering the graph with
+            // a Query.
+            let query = Query::new(
+              dependency_key.product,
+              dependency_key
+                .provided_params
+                .iter()
+                .chain(in_scope_params.iter())
+                .cloned(),
+            );
+            let in_scope_params = in_scope_params.into_iter().cloned().collect();
+            return (dependency_key, vec![Node::Reentry(query, in_scope_params)]);
+          }
+
           let mut candidates = Vec::new();
           if dependency_key.provided_params.is_empty()
             && graph[node_id].1.contains(&dependency_key.product())
+            && params.contains_key(&dependency_key.product())
           {
             candidates.push(Node::Param(dependency_key.product()));
           }
@@ -342,12 +416,22 @@ impl<R: Rule> Builder<R> {
       for (dependency_key, candidates) in candidates_by_key {
         for candidate in candidates {
           match candidate {
-            Node::Param(_) => {
-              graph.add_edge(
-                node_id,
-                *params.get(&dependency_key.product()).unwrap(),
-                dependency_key.clone(),
-              );
+            Node::Param(p) => {
+              graph.add_edge(node_id, *params.get(&p).unwrap(), dependency_key.clone());
+            }
+            Node::Reentry(query, in_scope_params) => {
+              // A Reentry node currently can _not_ consume any provided params from its dependee.
+              // This can be revisited in future.
+              let reentry_id = reentries
+                .entry((query.clone(), in_scope_params.clone(), out_set.clone()))
+                .or_insert_with(|| {
+                  graph.add_node((
+                    Node::Reentry(query.clone(), in_scope_params),
+                    out_set.clone(),
+                  ))
+                });
+              graph.add_edge(node_id, *reentry_id, dependency_key.clone());
+              to_visit.push(*reentry_id);
             }
             Node::Rule(rule) => {
               // If the key provides a Param for the Rule to consume, include it in the out_set for
@@ -489,11 +573,11 @@ impl<R: Rule> Builder<R> {
         continue;
       };
       match node.node {
-        Node::Rule(_) => {
-          // Fall through to visit the rule.
+        Node::Rule(_) | Node::Reentry { .. } => {
+          // Fall through to visit the Rule or Reentry node.
         }
         Node::Param(_) => {
-          // Ensure that the Param is marked minimal, but don't bother to visit.
+          // Ensure that the leaf is marked minimal, but don't bother to visit.
           minimal_in_set.insert(node_id);
           continue;
         }
@@ -817,64 +901,37 @@ impl<R: Rule> Builder<R> {
       |_edge_id, edge_weight| edge_weight.clone(),
     );
 
-    // Because the leaves of the graph (generally Param nodes) are the most significant source of
-    // information, we start there. But we will eventually visit all reachable nodes, possibly
-    // multiple times. Information flows up (the in_sets) this graph.
+    // Information flows up (the in_sets) this graph.
     let mut to_visit = graph
-      .externals(Direction::Outgoing)
+      .node_references()
+      .map(|nr| nr.id())
       .collect::<VecDeque<_>>();
     while let Some(node_id) = to_visit.pop_front() {
       if graph[node_id].is_deleted() {
         continue;
       }
 
-      let new_in_set = match &graph[node_id].0.node {
-        Node::Rule(_) => {
-          // Rules have in_sets computed from their dependencies.
-          Some(Self::dependencies_in_set(
-            node_id,
-            graph
-              .edges_directed(node_id, Direction::Outgoing)
-              .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
-              .map(|edge_ref| {
-                (
-                  edge_ref.weight().clone(),
-                  edge_ref.target(),
-                  &graph[edge_ref.target()].0.in_set,
-                )
-              }),
-          ))
-        }
-        Node::Param(p) => {
-          // Params are always leaves with an in-set of their own value, and no out-set.
-          let mut in_set = ParamTypes::new();
-          in_set.insert(*p);
-          Some(in_set)
-        }
-        Node::Query(_) => {
-          // Queries are always roots which declare some parameters.
-          let in_set = Self::dependencies_in_set(
-            node_id,
-            graph
-              .edges_directed(node_id, Direction::Outgoing)
-              .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
-              .map(|edge_ref| {
-                (
-                  edge_ref.weight().clone(),
-                  edge_ref.target(),
-                  &graph[edge_ref.target()].0.in_set,
-                )
-              }),
-          );
-          Some(in_set)
-        }
-      };
+      // Compute an initial in_set from the Node's dependencies.
+      let mut in_set = Self::dependencies_in_set(
+        node_id,
+        graph
+          .edges_directed(node_id, Direction::Outgoing)
+          .filter(|edge_ref| !graph[edge_ref.target()].is_deleted())
+          .map(|edge_ref| {
+            (
+              edge_ref.weight().clone(),
+              edge_ref.target(),
+              &graph[edge_ref.target()].0.in_set,
+            )
+          }),
+      );
 
-      if let Some(in_set) = new_in_set {
-        if in_set != graph[node_id].0.in_set {
-          to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
-          graph[node_id].0.in_set = in_set;
-        }
+      // Then extend it with Node-specific params.
+      graph[node_id].0.node.add_inherent_in_set(&mut in_set);
+
+      if in_set != graph[node_id].0.in_set {
+        to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
+        graph[node_id].0.in_set = in_set;
       }
     }
 
@@ -932,7 +989,7 @@ impl<R: Rule> Builder<R> {
               })
               .collect()
           }
-          Node::Rule(_) => {
+          Node::Rule(_) | Node::Reentry { .. } => {
             // If there is a provided param, only dependencies that consume it can be used.
             edge_refs
               .iter()
@@ -947,9 +1004,9 @@ impl<R: Rule> Builder<R> {
               })
               .collect()
           }
-          Node::Param(p) => {
+          p @ Node::Param(_) => {
             panic!(
-              "A Param node should not have dependencies: {} had {:#?}",
+              "A Param should not have dependencies: {:?} had {:#?}",
               p,
               edge_refs
                 .iter()
@@ -1170,12 +1227,16 @@ impl<R: Rule> Builder<R> {
     let entry_for = |node_id| -> Entry<R> {
       let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
       match node {
-        Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Inner(InnerEntry {
+        Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Rule(RuleEntry {
           params: in_set.clone(),
           rule: rule.clone(),
         }))),
         Node::Query(q) => Entry::WithDeps(Intern::new(EntryWithDeps::Root(RootEntry(q.clone())))),
         Node::Param(p) => Entry::Param(*p),
+        Node::Reentry(q, _) => Entry::WithDeps(Intern::new(EntryWithDeps::Reentry(Reentry {
+          params: in_set.clone(),
+          query: q.clone(),
+        }))),
       }
     };
 
@@ -1211,8 +1272,7 @@ impl<R: Rule> Builder<R> {
         Entry::Param(p) => {
           if !dependencies.is_empty() {
             return Err(format!(
-              "Param entry for {} should not have had dependencies, but had: {:#?}",
-              p, dependencies
+              "Param {p} should not have had dependencies, but had: {dependencies:#?}",
             ));
           }
         }
@@ -1392,12 +1452,17 @@ impl<R: Rule> Builder<R> {
     // Then generate the combinations of possibly valid deps.
     for combination in combinations_of_one(&filtered_deps) {
       // Union the pre-filtered per-dependency in_sets.
-      let in_set = combination
-        .iter()
-        .fold(ParamTypes::new(), |mut in_set, (_, _, dep_in_set)| {
-          in_set.extend(dep_in_set.iter().cloned());
-          in_set
-        });
+      let in_set = {
+        let mut in_set =
+          combination
+            .iter()
+            .fold(ParamTypes::new(), |mut in_set, (_, _, dep_in_set)| {
+              in_set.extend(dep_in_set.iter().cloned());
+              in_set
+            });
+        graph[node_id].0.node.add_inherent_in_set(&mut in_set);
+        in_set
+      };
 
       // Confirm that this combination of deps is satisfiable in terms of the in_set.
       let in_set_satisfiable = combination

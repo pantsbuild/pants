@@ -39,7 +39,7 @@ use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
-use rule_graph::DependencyKey;
+use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -143,8 +143,8 @@ impl Select {
     entry: Intern<rule_graph::Entry<Rule>>,
   ) -> Select {
     params.retain(|k| match entry.as_ref() {
-      &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
-      &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
+      rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
+      rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
     });
     Select {
       params,
@@ -167,9 +167,30 @@ impl Select {
     Select::new(params, dependency_key.product(), entry)
   }
 
+  fn reenter<'a>(
+    &self,
+    context: Context,
+    query: &'a Query<TypeId>,
+  ) -> BoxFuture<'a, NodeResult<Value>> {
+    let edges = context
+      .core
+      .rule_graph
+      .find_root(query.params.iter().cloned(), query.product)
+      .map(|(_, edges)| edges);
+
+    let params = self.params.clone();
+    async move {
+      let edges = edges?;
+      Select::new_from_edges(params, &DependencyKey::new(query.product), &edges)
+        .run_node(context)
+        .await
+    }
+    .boxed()
+  }
+
   fn select_product<'a>(
     &self,
-    context: &'a Context,
+    context: Context,
     dependency_key: &'a DependencyKey<TypeId>,
     caller_description: &str,
   ) -> BoxFuture<'a, NodeResult<Value>> {
@@ -184,7 +205,6 @@ impl Select {
         ))
       });
     let params = self.params.clone();
-    let context = context.clone();
     async move {
       let edges = edges?;
       Select::new_from_edges(params, dependency_key, &edges)
@@ -197,7 +217,7 @@ impl Select {
   async fn run_node(self, context: Context) -> NodeResult<Value> {
     match self.entry.as_ref() {
       &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
-        rule_graph::EntryWithDeps::Inner(ref inner) => match inner.rule() {
+        rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
           &tasks::Rule::Task(ref task) => {
             context
               .get(Task {
@@ -213,7 +233,9 @@ impl Select {
               intrinsic
                 .inputs
                 .iter()
-                .map(|dependency_key| self.select_product(&context, dependency_key, "intrinsic"))
+                .map(|dependency_key| {
+                  self.select_product(context.clone(), dependency_key, "intrinsic")
+                })
                 .collect::<Vec<_>>(),
             )
             .await?;
@@ -224,6 +246,17 @@ impl Select {
               .await
           }
         },
+        &rule_graph::EntryWithDeps::Reentry(ref reentry) => {
+          // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
+          // implemented: doing so would involve doing something similar to what we do for
+          // intrinsics above, and waiting to compute inputs before executing the query here.
+          //
+          // That doesn't block using a singleton to provide an API type, but it would block a more
+          // complex use case.
+          //
+          // see https://github.com/pantsbuild/pants/issues/16751
+          self.reenter(context, &reentry.query).await
+        }
         &rule_graph::EntryWithDeps::Root(_) => {
           panic!("Not a runtime-executable entry! {:?}", self.entry)
         }
@@ -233,8 +266,8 @@ impl Select {
           Ok(key.to_value())
         } else {
           Err(throw(format!(
-            "Expected a Param of type {} to be present.",
-            type_id
+            "Expected a Param of type {} to be present, but had only: {}",
+            type_id, self.params,
           )))
         }
       }
@@ -1005,7 +1038,7 @@ impl Task {
         let mut params = params.clone();
         async move {
           let dependency_key =
-            DependencyKey::new_with_params(get.output, get.inputs.iter().map(|t| *t.type_id()));
+            DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
           params.extend(get.inputs.iter().cloned());
 
           let edges = context
@@ -1014,31 +1047,28 @@ impl Task {
             .edges_for_inner(&entry)
             .ok_or_else(|| throw(format!("No edges for task {:?} exist!", entry)))?;
 
-          // See if there is a Get: otherwise, a union (which is executed as a Query).
-          // See #12934 for further cleanup of this API.
+          // Find the entry for the Get.
           let select = edges
             .entry_for(&dependency_key)
             .map(|entry| {
-              // The subject of the get is a new parameter that replaces an existing param of the same
+              // The subject of the Get is a new parameter that replaces an existing param of the same
               // type.
               Select::new(params.clone(), get.output, entry)
             })
             .or_else(|| {
-              if get.input_types.iter().any(|t| t.is_union()) {
-                // Is a union.
-                let (_, rule_edges) = context
-                  .core
-                  .rule_graph
-                  .find_root(get.inputs.iter().map(|t| *t.type_id()), get.output)
-                  .ok()?;
-                Some(Select::new_from_edges(
-                  params,
-                  &DependencyKey::new(get.output),
-                  &rule_edges,
-                ))
-              } else {
-                None
-              }
+              // The Get might have involved a @union: if so, include its in_scope types in the
+              // lookup.
+              let in_scope_types = get
+                .input_types
+                .iter()
+                .find_map(|t| t.union_in_scope_types())?;
+              edges
+                .entry_for(
+                  &DependencyKey::new(get.output)
+                    .provided_params(get.inputs.iter().map(|k| *k.type_id()))
+                    .in_scope_params(in_scope_types),
+                )
+                .map(|entry| Select::new(params.clone(), get.output, entry))
             })
             .ok_or_else(|| {
               if get.input_types.iter().any(|t| t.is_union()) {

@@ -142,9 +142,6 @@ pub struct Task {
   pub engine_aware_return_type: bool,
   pub args: Vec<DependencyKey<TypeId>>,
   pub gets: Vec<DependencyKey<TypeId>>,
-  // TODO: This is a preliminary implementation of #12934: we should overhaul naming to
-  // align Query and @union/Protocol as described there.
-  pub unions: Vec<Query<Rule>>,
   pub func: Function,
   pub cacheable: bool,
   pub display_info: DisplayInfo,
@@ -180,7 +177,7 @@ pub struct Tasks {
   rules: IndexSet<Rule>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
-  queries: IndexSet<Query<Rule>>,
+  queries: IndexSet<Query<TypeId>>,
 }
 
 ///
@@ -206,7 +203,7 @@ impl Tasks {
     &self.rules
   }
 
-  pub fn queries(&self) -> &IndexSet<Query<Rule>> {
+  pub fn queries(&self) -> &IndexSet<Query<TypeId>> {
     &self.queries
   }
 
@@ -244,7 +241,6 @@ impl Tasks {
       engine_aware_return_type,
       args: Vec::new(),
       gets: Vec::new(),
-      unions: Vec::new(),
       func,
       display_info: DisplayInfo { name, desc, level },
     });
@@ -256,18 +252,20 @@ impl Tasks {
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(DependencyKey::new_with_params(output, inputs));
+      .push(DependencyKey::new(output).provided_params(inputs));
   }
 
-  pub fn add_union(&mut self, output: TypeId, inputs: Vec<TypeId>) {
-    let query = Query::new(output, inputs);
-    self.queries.insert(query.clone());
+  pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {
     self
       .preparing
       .as_mut()
-      .expect("Must `begin()` a task creation before adding unions!")
-      .unions
-      .push(query);
+      .expect("Must `begin()` a task creation before adding a union get!")
+      .gets
+      .push(
+        DependencyKey::new(output)
+          .provided_params(inputs)
+          .in_scope_params(in_scope),
+      );
   }
 
   pub fn add_select(&mut self, type_id: TypeId) {
