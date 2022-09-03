@@ -574,7 +574,6 @@ async def find_valid_field_sets_for_target_roots(
             result,
             cast(
                 "type[FieldSet]",
-                PexBinaryFieldSet,
                 PythonSourceFieldSet,
             ),
         )

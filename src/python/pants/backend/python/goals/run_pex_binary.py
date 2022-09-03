@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.goals.run_helper import (
@@ -9,9 +8,8 @@ from pants.backend.python.goals.run_helper import (
     _create_python_source_run_request,
 )
 from pants.backend.python.subsystems.debugpy import DebugPy
-from pants.backend.python.target_types import PexBinaryDefaults, PexLayout
+from pants.backend.python.target_types import PexBinaryDefaults
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.rules import Get, collect_rules, rule

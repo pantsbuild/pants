@@ -3,16 +3,10 @@
 
 from dataclasses import dataclass
 
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import (
-    GlobalOptions,
-    KeepSandboxes,
-    NamedCachesDirOption,
-    ProcessCleanupOption,
-)
+from pants.option.global_options import GlobalOptions, KeepSandboxes, NamedCachesDirOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
