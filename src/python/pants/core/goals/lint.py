@@ -200,6 +200,7 @@ class LintRequest:
     def Batch(cls) -> type:
         @union
         class Batch:
+            # See subclasses' properties for field info
             pass
 
         return Batch
@@ -339,6 +340,7 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
         @memoized_classproperty
         def Batch(cls):
             @union(in_scope_types=[EnvironmentName])
+            @dataclass(frozen=True)
             class Batch:
                 file_paths: tuple[str, ...]
                 metadata: Any
