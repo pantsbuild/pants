@@ -70,14 +70,5 @@ def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCache
     return NamedCachesDirOption(global_options.named_caches_dir)
 
 
-@rule
-def extract_use_deprecated_pex_binary_run_semantics(
-    global_options: GlobalOptions,
-) -> UseDeprecatedPexBinaryRunSemanticsOption:
-    return UseDeprecatedPexBinaryRunSemanticsOption(
-        global_options.use_deprecated_pex_binary_run_semantics
-    )
-
-
 def rules():
     return collect_rules()

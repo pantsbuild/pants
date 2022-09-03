@@ -1929,13 +1929,3 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
-
-
-@dataclass(frozen=True)
-class UseDeprecatedPexBinaryRunSemanticsOption:
-    """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
-
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
-    """
-
-    val: bool
