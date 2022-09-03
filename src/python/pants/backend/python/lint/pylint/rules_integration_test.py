@@ -24,7 +24,7 @@ from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.target import Target
+from pants.engine.target import FieldSet, Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
@@ -509,13 +509,15 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
     resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
     resolve_b_root2 = rule_runner.get_target(Address("resolveB_2", target_name="root"))
-    request = PylintRequest.PartitionRequest(
-        PylintFieldSet.create(t)
-        for t in (
-            resolve_a_py38_root,
-            resolve_a_py39_root,
-            resolve_b_root1,
-            resolve_b_root2,
+    request: PylintRequest.PartitionRequest[PylintFieldSet] = PylintRequest.PartitionRequest(
+        tuple(
+            PylintFieldSet.create(t)
+            for t in (
+                resolve_a_py38_root,
+                resolve_a_py39_root,
+                resolve_b_root1,
+                resolve_b_root2,
+            )
         )
     )
 
@@ -523,27 +525,26 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     assert len(partitions) == 3
 
     def assert_partition(
-        root_field_sets: tuple[PylintFieldSet, ...],
-        partition: PylintPartition,
+        partition: tuple[tuple[FieldSet, ...], PylintPartition],
         roots: list[Target],
         deps: list[Target],
         interpreter: str,
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {fs.address for fs in root_field_sets} == root_addresses
-        assert {t.address for t in partition.closure} == {
+        assert {fs.address for fs in partition[0]} == root_addresses
+        assert {t.address for t in partition[1].closure} == {
             *root_addresses,
             *(t.address for t in deps),
         }
         ics = [f"CPython=={interpreter}.*"]
-        assert partition.interpreter_constraints == InterpreterConstraints(ics)
-        assert partition.description() == f"{resolve}, {ics}"
+        assert partition[1].interpreter_constraints == InterpreterConstraints(ics)
+        assert partition[1].description() == f"{resolve}, {ics}"
 
-    assert_partition(*partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
-    assert_partition(*partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        *partitions[2],
+        partitions[2],
         [resolve_b_root1, resolve_b_root2],
         [resolve_b_dep1, resolve_b_dep2],
         "3.9",

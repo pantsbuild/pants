@@ -56,7 +56,7 @@ def run_buf(
     )
     partition = rule_runner.request(
         TargetPartitions,
-        [BufLintRequest.PartitionRequest(BufFieldSet.create(tgt) for tgt in targets)],
+        [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for field_sets, metadata in partition:

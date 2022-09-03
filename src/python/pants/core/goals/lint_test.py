@@ -142,7 +142,7 @@ def mock_lint_partition(request: Any) -> LintResult:
         return LintResult(0, "", "", MockFilesRequest.name)
 
     request_type = {cls.Batch: cls for cls in MockLintRequest.__subclasses__()}[type(request)]
-    return request_type(request.inputs).lint_result  # type: ignore[abstract]
+    return request_type(request.field_sets).lint_result  # type: ignore[abstract]
 
 
 class MockFmtRequest(FmtTargetsRequest):

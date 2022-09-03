@@ -66,7 +66,9 @@ async def run_helm_lint(
         ),
     )
     return LintResult.from_fallible_process_result(
-        process_result, linter_name=HelmSubsystem.options_scope
+        process_result,
+        linter_name=HelmSubsystem.options_scope,
+        partition_description=chart.info.name,
     )
 
 

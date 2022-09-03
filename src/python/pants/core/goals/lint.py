@@ -548,7 +548,9 @@ async def lint(
             )
         )
 
-    def partition_request_get(request_type: type[LintRequest]) -> Get[_PartitionsBase]:
+    def partition_request_get(
+        request_type: type[LintRequest],
+    ) -> Get[TargetPartitions | FilePartitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")
         if partition_request_type in target_partitioners:
             lint_targets_request_type = cast("type[LintTargetsRequest]", request_type)
