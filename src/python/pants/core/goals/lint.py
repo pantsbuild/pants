@@ -146,7 +146,7 @@ class LintRequest:
     """Base class for plugin types wanting to be run as part of `lint`.
 
     Plugins should define a new type which subclasses either `LintTargetsRequest` (to lint targets)
-    or `LintFilesRequest` (to lint arbitrary files), and set the approrpiate class variables.
+    or `LintFilesRequest` (to lint arbitrary files), and set the appropriate class variables.
     E.g.
         class DryCleaningRequest(LintTargetsRequest):
             name = DryCleaningSubsystem.options_scope
@@ -177,7 +177,7 @@ class LintRequest:
                 ) -> LintResult:
                     ...
 
-    Lastly, register the rules which tells Pants about your plugin.
+    Lastly, register the rules which tell Pants about your plugin.
     E.g.
         def rules():
             return [
