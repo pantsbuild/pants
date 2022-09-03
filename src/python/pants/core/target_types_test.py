@@ -306,8 +306,7 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-@pytest.mark.parametrize("asset_type", ("resource",))
-def test_url_assets(asset_type) -> None:
+def test_url_assets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
@@ -329,13 +328,13 @@ def test_url_assets(asset_type) -> None:
         {
             "assets/BUILD": dedent(
                 f"""\
-                {asset_type}(
+                resource(
                     name='antigravity',
                     source=http_source(
                         {http_source_info},
                     ),
                 )
-                {asset_type}(
+                resource(
                     name='antigravity_renamed',
                     source=http_source(
                         {http_source_info},
