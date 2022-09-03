@@ -536,7 +536,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            cache_content_behavior=GlobalOptions.resolve_cache_content_behavior(bootstrap_options),
+            cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
@@ -1797,29 +1797,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         return PyExecutor(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
-
-    @staticmethod
-    def resolve_cache_content_behavior(
-        bootstrap_options: OptionValueContainer,
-    ) -> CacheContentBehavior:
-        resolved_value = resolve_conflicting_options(
-            old_option="remote_cache_eager_fetch",
-            new_option="cache_content_behavior",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
-        )
-
-        if isinstance(resolved_value, bool):
-            # Is `remote_cache_eager_fetch`.
-            return CacheContentBehavior.fetch if resolved_value else CacheContentBehavior.defer
-        elif isinstance(resolved_value, CacheContentBehavior):
-            return resolved_value
-        else:
-            raise TypeError(
-                f"Unexpected option value for `cache_content_behavior`: {resolved_value}"
-            )
 
     @staticmethod
     def resolve_keep_sandboxes(
