@@ -42,6 +42,7 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
@@ -376,6 +377,7 @@ class Target:
         *,
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
+        ignore_unrecognized_fields: bool = False,
     ) -> None:
         """Create a target.
 
@@ -391,6 +393,8 @@ class Target:
             its file. A file-less target like `go_third_party_package` should keep the default of
             `address.spec_path`. This field impacts how command line specs work, so that globs
             like `dir:` know whether to match the target or not.
+        :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
+            intended for when Pants is bootstrapping itself.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -408,18 +412,26 @@ class Target:
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
         self.name_explicitly_set = name_explicitly_set
-        self.field_values = self._calculate_field_values(unhydrated_values, address)
+        self.field_values = self._calculate_field_values(
+            unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
+        )
         self.validate()
 
     @final
     def _calculate_field_values(
-        self, unhydrated_values: dict[str, Any], address: Address
+        self,
+        unhydrated_values: dict[str, Any],
+        address: Address,
+        *,
+        ignore_unrecognized_fields: bool,
     ) -> FrozenDict[type[Field], Field]:
         field_values = {}
         aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if ignore_unrecognized_fields:
+                    continue
                 valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
@@ -1070,7 +1082,7 @@ class TargetFilesGenerator(TargetGenerator):
             )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class TargetFilesGeneratorSettingsRequest:
     """An optional union to provide dynamic settings for a `TargetFilesGenerator`.
 
@@ -1096,7 +1108,7 @@ class TargetFilesGeneratorSettings:
 _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
     generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
@@ -2308,7 +2320,7 @@ class HydratedSources:
     sources_type: type[SourcesField] | None
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
@@ -2614,7 +2626,7 @@ class ExplicitlyProvidedDependencies:
 FS = TypeVar("FS", bound="FieldSet")
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
@@ -2669,7 +2681,7 @@ class InferredDependencies:
         self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.

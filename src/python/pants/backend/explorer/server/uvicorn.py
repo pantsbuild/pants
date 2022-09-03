@@ -12,6 +12,7 @@ from uvicorn import Config, Server  # type: ignore
 
 from pants.backend.explorer.browser import BrowserRequest
 from pants.base.exiter import ExitCode
+from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
@@ -68,7 +69,7 @@ class UvicornServer:
         return 0
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class UvicornServerSetupRequest:
     server: UvicornServerRequest

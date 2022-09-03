@@ -24,6 +24,7 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
+from pants.engine.internals.build_files import IgnoreUnrecognizedBuildFileSymbols
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -176,6 +177,7 @@ async def resolve_target_parametrizations(
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
+    ignore_unrecognized_build_file_symbols: IgnoreUnrecognizedBuildFileSymbols,
 ) -> _TargetParametrizations:
     address = request.address
 
@@ -298,6 +300,7 @@ async def resolve_target_parametrizations(
                         parameterized_address,
                         name_explicitly_set=target_adaptor.name_explicitly_set,
                         union_membership=union_membership,
+                        ignore_unrecognized_fields=ignore_unrecognized_build_file_symbols.val,
                     ),
                 )
                 for parameterized_address, parameterized_fields in (first, *rest)
@@ -310,6 +313,7 @@ async def resolve_target_parametrizations(
                 address,
                 name_explicitly_set=target_adaptor.name_explicitly_set,
                 union_membership=union_membership,
+                ignore_unrecognized_fields=ignore_unrecognized_build_file_symbols.val,
             )
             parametrizations.append(_TargetParametrization(target, FrozenDict()))
 

@@ -16,6 +16,7 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
@@ -37,7 +38,7 @@ class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ValidateJvmArtifactsForResolveRequest:
     """Hook for backends to validate the artifact requirements requested for a resolve.

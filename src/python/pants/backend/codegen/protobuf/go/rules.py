@@ -185,6 +185,7 @@ async def setup_full_package_build_request(
     package_mapping: ImportPathToPackages,
     go_protobuf_mapping: GoProtobufImportPathMapping,
     analyzer: PackageAnalyzerSetup,
+    platform: Platform,
 ) -> FallibleBuildGoPackageRequest:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -192,7 +193,7 @@ async def setup_full_package_build_request(
 
     transitive_targets, downloaded_protoc_binary, empty_output_dir = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
     )
 
@@ -405,13 +406,14 @@ async def generate_go_from_protobuf(
     request: GenerateGoFromProtobufRequest,
     protoc: Protoc,
     go_protoc_plugin: _SetupGoProtocPlugin,
+    platform: Platform,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
 
     downloaded_protoc_binary, empty_output_dir, transitive_targets = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
     )

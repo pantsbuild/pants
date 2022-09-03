@@ -25,6 +25,7 @@ from pants.core.goals.export import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
@@ -51,7 +52,7 @@ class _ExportVenvRequest(EngineAwareParameter):
         return self.resolve
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class ExportPythonToolSentinel:
     """Python tools use this as an entry point to say how to export their tool virtualenv.
 

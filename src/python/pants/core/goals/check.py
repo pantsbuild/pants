@@ -18,6 +18,7 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
@@ -131,7 +132,7 @@ class CheckResults(EngineAwareReturnType):
         return False
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class CheckRequest(StyleRequest):
     """A union for StyleRequests that should be type-checkable.
 

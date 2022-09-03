@@ -38,6 +38,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Snapshot, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
@@ -250,7 +251,7 @@ class LintTargetsRequest(LintRequest, StyleRequest):
 
         @memoized_classproperty
         def Batch(cls):
-            @union
+            @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
             @runtime_subscriptable
             class Batch:
@@ -302,7 +303,6 @@ class TargetPartitions(Generic[_MetadataT], Collection[Tuple[Tuple[FieldSet, ...
         return cls((tuple(partition), None) for partition in field_set_partitions)
 
 
-@union
 @dataclass(frozen=True)
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
@@ -338,7 +338,7 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
 
         @memoized_classproperty
         def Batch(cls):
-            @union
+            @union(in_scope_types=[EnvironmentName])
             class Batch:
                 file_paths: tuple[str, ...]
                 metadata: Any

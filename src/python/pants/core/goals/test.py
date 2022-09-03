@@ -19,7 +19,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
@@ -193,7 +193,7 @@ class TestDebugAdapterRequest(TestDebugRequest):
     """
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
@@ -214,7 +214,7 @@ class CoverageData(ABC):
 _CD = TypeVar("_CD", bound=CoverageData)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class CoverageDataCollection(Collection[_CD]):
     element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 

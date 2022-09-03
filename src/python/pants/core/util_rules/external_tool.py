@@ -102,11 +102,11 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool) -> Foo:
+    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
         downloaded_tool = await Get(
             DownloadedExternalTool,
             ExternalToolRequest,
-            my_external_tool.get_request(Platform.current)
+            my_external_tool.get_request(platform)
         )
         ...
     """

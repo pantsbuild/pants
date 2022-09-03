@@ -57,7 +57,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.unions import UnionMembership, is_union
+from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
@@ -114,6 +114,7 @@ class Scheduler:
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
         executor: PyExecutor,
+        query_inputs_filter: Sequence[type] = tuple(),
         include_trace_on_error: bool = True,
         visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
@@ -130,6 +131,8 @@ class Scheduler:
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
         :param local_store_options: Options for the engine's LMDB store(s).
+        :param query_inputs_filter: Types to filter out of all QueryRules which are installed,
+          including those produced synthetically by RuleGraph solving.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
@@ -141,7 +144,7 @@ class Scheduler:
         self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
-        tasks = register_rules(rule_index, union_membership)
+        tasks = register_rules(rule_index, union_membership, query_inputs_filter)
 
         # Create the native Scheduler and Session.
         types = PyTypes(
@@ -642,7 +645,9 @@ class SchedulerSession:
         self.py_session.cancel()
 
 
-def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
+def register_rules(
+    rule_index: RuleIndex, union_membership: UnionMembership, query_inputs_filter: Sequence[type]
+) -> PyTasks:
     """Create a native Tasks object loaded with given RuleIndex."""
     tasks = PyTasks()
 
@@ -666,17 +671,20 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             unions = [t for t in the_get.input_types if is_union(t)]
             if len(unions) == 1:
                 # Register the union by recording a copy of the Get for each union member.
-                # TODO: See #12934: this should involve an explicit interface
-                # soon, rather than one being implicitly created with only the provided Param.
                 union = unions[0]
+                in_scope_types = union_in_scope_types(union)
+                assert in_scope_types is not None
                 for union_member in union_membership.get(union):
-                    native_engine.tasks_add_union(
+                    native_engine.tasks_add_get_union(
                         tasks,
                         the_get.output_type,
                         tuple(union_member if t == union else t for t in the_get.input_types),
+                        in_scope_types,
                     )
             elif len(unions) > 1:
-                raise TypeError("Only one @union may be used in a Get.")
+                raise TypeError(
+                    "Only one @union may be used in a Get, but {the_get} used: {unions}."
+                )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
                 native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
@@ -691,4 +699,6 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             query.output_type,
             query.input_types,
         )
+    for filtered_type in query_inputs_filter:
+        native_engine.tasks_add_query_inputs_filter(tasks, filtered_type)
     return tasks

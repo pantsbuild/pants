@@ -33,9 +33,8 @@ mod node;
 pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, NodeResult, RunToken};
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::fs::File;
-use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Weak};
@@ -43,7 +42,7 @@ use std::time::Duration;
 
 use async_value::AsyncValueSender;
 use fixedbitset::FixedBitSet;
-use fnv::FnvHasher;
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use futures::future;
 use log::info;
 use parking_lot::Mutex;
@@ -54,8 +53,6 @@ use task_executor::Executor;
 use tokio::time::sleep;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
-
-type Fnv = BuildHasherDefault<FnvHasher>;
 
 type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
@@ -245,7 +242,7 @@ impl<N: Node> InnerGraph<N> {
     predicate: P,
   ) -> InvalidationResult {
     // Collect all entries that will be cleared.
-    let root_ids: HashSet<_, Fnv> = self
+    let root_ids: HashSet<_> = self
       .nodes
       .iter()
       .filter_map(|(node, &entry_id)| {

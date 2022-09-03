@@ -50,7 +50,7 @@ async def partition_buf(
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(
-    request: BufLintRequest.Batch[BufFieldSet, None], buf: BufSubsystem
+    request: BufLintRequest.Batch[BufFieldSet, None], buf: BufSubsystem, platform: Platform
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
@@ -74,9 +74,7 @@ async def run_buf(
         ),
     )
 
-    download_buf_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, buf.get_request(Platform.current)
-    )
+    download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
 
     target_sources_stripped, all_sources_stripped, downloaded_buf = await MultiGet(
         target_stripped_sources_request, all_stripped_sources_request, download_buf_get

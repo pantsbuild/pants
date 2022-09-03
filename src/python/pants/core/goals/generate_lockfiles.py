@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -33,7 +34,7 @@ class GenerateLockfileResult:
     path: str
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
@@ -55,7 +56,7 @@ class WrappedGenerateLockfile:
     request: GenerateLockfile
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class GenerateToolLockfileSentinel:
     """Tools use this as an entry point to say how to generate their tool lockfile.
 
@@ -106,7 +107,7 @@ class KnownUserResolveNames:
     requested_resolve_names_cls: type[RequestedUserResolveNames]
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class RequestedUserResolveNames(Collection[str]):
     """The user resolves requested for a particular language ecosystem.
 

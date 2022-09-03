@@ -25,6 +25,7 @@ from pants.backend.python.util_rules import pex
 from pants.base.specs import Specs
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -68,7 +69,7 @@ class Formatter(Enum):
     BLACK = "black"
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class RewrittenBuildFileRequest(EngineAwareParameter):
     path: str

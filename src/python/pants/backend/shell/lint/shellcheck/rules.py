@@ -48,7 +48,9 @@ async def partition_shellcheck(
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(
-    request: ShellcheckRequest.Batch[ShellcheckFieldSet, None], shellcheck: Shellcheck
+    request: ShellcheckRequest.Batch[ShellcheckFieldSet, None],
+    shellcheck: Shellcheck,
+    platform: Platform,
 ) -> LintResult:
     # Shellcheck looks at direct dependencies to make sure that every symbol is defined, so we must
     # include those in the run.
@@ -74,7 +76,7 @@ async def run_shellcheck(
     )
 
     download_shellcheck_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(platform)
     )
 
     direct_sources, dependency_sources, downloaded_shellcheck = await MultiGet(

@@ -11,6 +11,7 @@ from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    StringField,
     StringSequenceField,
     Target,
     WrappedTarget,
@@ -34,11 +35,12 @@ class EnvironmentsSubsystem(Subsystem):
     aliases = DictOption[str](
         help=softwrap(
             """
-            A mapping of logical names to addresses to `_local_environment` targets. For example:
+            A mapping of logical names to addresses to environment targets. For example:
 
                 [environments-preview.aliases]
                 linux_local = "//:linux_env"
                 macos_local = "//:macos_env"
+                centos6 = "//:centos6_docker_env"
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
@@ -55,22 +57,6 @@ class EnvironmentsSubsystem(Subsystem):
 # -------------------------------------------------------------------------------------------
 
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
-
-
-class CompatiblePlatformsField(StringSequenceField):
-    alias = "compatible_platforms"
-    default = tuple(plat.value for plat in Platform)
-    valid_choices = Platform
-    value: tuple[str, ...]
-    help = softwrap(
-        """
-        Which platforms this environment can be used with.
-
-        This is used for Pants to automatically determine which which environment target to use for
-        the user's machine. Currently, there must be exactly one environment target for the
-        platform.
-        """
-    )
 
 
 class PythonInterpreterSearchPathsField(StringSequenceField):
@@ -118,19 +104,64 @@ class PythonBootstrapBinaryNamesField(StringSequenceField):
     )
 
 
+_COMMON_ENV_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    PythonInterpreterSearchPathsField,
+    PythonBootstrapBinaryNamesField,
+)
+
+
+class CompatiblePlatformsField(StringSequenceField):
+    alias = "compatible_platforms"
+    default = tuple(plat.value for plat in Platform)
+    valid_choices = Platform
+    value: tuple[str, ...]
+    help = softwrap(
+        """
+        Which platforms this environment can be used with.
+
+        This is used for Pants to automatically determine which which environment target to use for
+        the user's machine. Currently, there must be exactly one environment target for the
+        platform.
+        """
+    )
+
+
 class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CompatiblePlatformsField,
-        PythonInterpreterSearchPathsField,
-        PythonBootstrapBinaryNamesField,
-    )
+    core_fields = (*_COMMON_ENV_FIELDS, CompatiblePlatformsField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
 
-        TODO(#7735): Explain how this gets used once we settle on the modeling.
+        TODO(#7735): Explain how this gets used once we allow targets to set environment.
+        """
+    )
+
+
+class DockerImageField(StringField):
+    alias = "image"
+    required = True
+    value: str
+    help = softwrap(
+        """
+        The docker image ID to use when this environment is loaded, e.g. `centos6:latest`.
+
+        TODO: expectations about what are valid IDs, e.g. if they must come from DockerHub vs other
+        registries.
+        """
+    )
+
+
+class DockerEnvironmentTarget(Target):
+    alias = "_docker_environment"
+    core_fields = (*_COMMON_ENV_FIELDS, DockerImageField)
+    help = softwrap(
+        """
+        Configuration of a Docker image used for building your code, including the environment
+        variables and search paths used by Pants.
+
+        TODO(#7735): Explain how this gets used once we allow targets to set environment.
         """
     )
 
@@ -152,7 +183,7 @@ class UnrecognizedEnvironmentError(Exception):
     pass
 
 
-class AllEnvironmentTargets(FrozenDict[str, LocalEnvironmentTarget]):
+class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment aliases to their corresponding environment target."""
 
 
@@ -182,7 +213,7 @@ class ResolvedEnvironmentAlias(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class ResolvedEnvironmentTarget:
-    val: LocalEnvironmentTarget | None
+    val: Target | None
 
 
 @dataclass(frozen=True)
@@ -221,7 +252,8 @@ async def determine_local_environment(
     compatible_alias_and_targets = [
         (alias, tgt)
         for alias, tgt in all_environment_targets.items()
-        if platform.value in tgt[CompatiblePlatformsField].value
+        if tgt.has_field(CompatiblePlatformsField)
+        and platform.value in tgt[CompatiblePlatformsField].value
     ]
     if not compatible_alias_and_targets:
         raise NoCompatibleEnvironmentError(
@@ -311,19 +343,19 @@ async def get_target_for_environment_alias(
         WrappedTarget,
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
-    # TODO(#7735): it's not idiomatic to check target type with the Target API.
-    if not isinstance(wrapped_target.target, LocalEnvironmentTarget):
+    tgt = wrapped_target.target
+    if not tgt.has_field(CompatiblePlatformsField) and not tgt.has_field(DockerImageField):
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `_local_environment` target in the option
-                `[environments-preview].aliases`, but the alias
+                Expected to use the address to a `_local_environment` or `_docker_environment`
+                target in the option `[environments-preview].aliases`, but the alias
                 `{alias.val}` was set to the target {address.spec} with the target type
                 `{wrapped_target.target.alias}`.
                 """
             )
         )
-    return ResolvedEnvironmentTarget(wrapped_target.target)
+    return ResolvedEnvironmentTarget(tgt)
 
 
 def rules():

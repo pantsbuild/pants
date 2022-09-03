@@ -59,10 +59,10 @@ async def partition_hadolint(
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(
-    request: HadolintRequest.Batch[HadolintFieldSet, None], hadolint: Hadolint
+    request: HadolintRequest.Batch[HadolintFieldSet, None], hadolint: Hadolint, platform: Platform
 ) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
     )
 

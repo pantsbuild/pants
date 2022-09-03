@@ -126,11 +126,13 @@ class TerraformProcess:
 
 
 @rule
-async def setup_terraform_process(request: TerraformProcess, terraform: TerraformTool) -> Process:
+async def setup_terraform_process(
+    request: TerraformProcess, terraform: TerraformTool, platform: Platform
+) -> Process:
     downloaded_terraform = await Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        terraform.get_request(Platform.current),
+        terraform.get_request(platform),
     )
 
     immutable_input_digests = {"__terraform": downloaded_terraform.digest}

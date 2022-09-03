@@ -32,6 +32,11 @@ from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
+class IgnoreUnrecognizedBuildFileSymbols:
+    val: bool
+
+
+@dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
     ignores: tuple[str, ...] = ()
