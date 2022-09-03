@@ -198,7 +198,7 @@ class LintRequest:
 
     @memoized_classproperty
     def Batch(cls) -> type:
-        @union
+        @union(in_scope_types=[EnvironmentName])
         class Batch:
             # See subclasses' properties for field info
             pass
@@ -242,7 +242,7 @@ class LintTargetsRequest(LintRequest, StyleRequest):
                 2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
             """
 
-            @union
+            @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
             @runtime_subscriptable
             class PartitionRequest:
@@ -252,7 +252,6 @@ class LintTargetsRequest(LintRequest, StyleRequest):
 
         @memoized_classproperty
         def Batch(cls):
-            @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
             @runtime_subscriptable
             class Batch:
@@ -330,7 +329,7 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
                 2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
             """
 
-            @union
+            @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
             class PartitionRequest:
                 file_paths: tuple
@@ -339,7 +338,6 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
 
         @memoized_classproperty
         def Batch(cls):
-            @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
             class Batch:
                 file_paths: tuple[str, ...]
