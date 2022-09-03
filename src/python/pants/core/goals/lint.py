@@ -199,10 +199,7 @@ class LintRequest:
     def Batch(cls) -> type:
         @union
         class Batch:
-            # NB: Fields declared for exposition, actual fields may vary in name but should contain
-            # their first 2 members of these types. See subclass implementations for field info.
-            inputs: tuple
-            metadata: Any = None
+            pass
 
         return Batch
 
