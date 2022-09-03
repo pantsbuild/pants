@@ -12,7 +12,6 @@ from pants.option.global_options import (
     KeepSandboxes,
     NamedCachesDirOption,
     ProcessCleanupOption,
-    UseDeprecatedPexBinaryRunSemanticsOption,
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper

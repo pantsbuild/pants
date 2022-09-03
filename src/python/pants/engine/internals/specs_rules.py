@@ -55,7 +55,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, UseDeprecatedPexBinaryRunSemanticsOption
+from pants.option.global_options import GlobalOptions
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -511,7 +511,6 @@ def _handle_ambiguous_result(
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    use_deprecated_pex_binary_run_semantics: UseDeprecatedPexBinaryRunSemanticsOption,
     specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
@@ -575,9 +574,8 @@ async def find_valid_field_sets_for_target_roots(
             result,
             cast(
                 "type[FieldSet]",
-                PexBinaryFieldSet
-                if use_deprecated_pex_binary_run_semantics.val
-                else PythonSourceFieldSet,
+                PexBinaryFieldSet,
+                PythonSourceFieldSet,
             ),
         )
     if len(result.field_sets) > 1:
