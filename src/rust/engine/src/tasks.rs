@@ -175,9 +175,10 @@ impl Intrinsic {
 #[derive(Clone, Debug)]
 pub struct Tasks {
   rules: IndexSet<Rule>,
+  queries: IndexSet<Query<TypeId>>,
+  query_inputs_filter: IndexSet<TypeId>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
-  queries: IndexSet<Query<TypeId>>,
 }
 
 ///
@@ -196,6 +197,7 @@ impl Tasks {
       rules: IndexSet::default(),
       preparing: None,
       queries: IndexSet::default(),
+      query_inputs_filter: IndexSet::default(),
     }
   }
 
@@ -207,12 +209,20 @@ impl Tasks {
     &self.queries
   }
 
+  pub fn query_inputs_filter(&self) -> &IndexSet<TypeId> {
+    &self.query_inputs_filter
+  }
+
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
       self
         .rules
         .insert(Rule::Intrinsic(Intern::new(intrinsic.clone())));
     }
+  }
+
+  pub fn add_query_inputs_filter(&mut self, type_id: TypeId) {
+    self.query_inputs_filter.insert(type_id);
   }
 
   ///

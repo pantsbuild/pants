@@ -29,6 +29,7 @@ from pants.backend.python.target_types import (
 )
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -116,7 +117,7 @@ class FirstPartyPythonMappingImpl(
         )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class FirstPartyPythonMappingImplMarker:
     """An entry point for a specific implementation of mapping module names to owning targets for
     Python import dependency inference.

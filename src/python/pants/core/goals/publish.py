@@ -33,6 +33,7 @@ from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
@@ -57,7 +58,7 @@ class PublishOutputData(FrozenDict[str, ImmutableValue]):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class PublishRequest(Generic[_F]):
     """Implement a union member subclass of this union class along with a PublishFieldSet subclass
@@ -86,7 +87,7 @@ class PublishRequest(Generic[_F]):
 _T = TypeVar("_T", bound=PublishRequest)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """FieldSet for PublishRequest.

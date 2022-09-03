@@ -21,6 +21,7 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     Digest,
     MergeDigests,
@@ -150,7 +151,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class FmtTargetsRequest(StyleRequest[_FS]):
@@ -161,7 +162,7 @@ class FmtTargetsRequest(StyleRequest[_FS]):
         super().__init__(field_sets)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 # Prefixed with `_` because we aren't sure if this union will stick long-term, or be subsumed when
 # we implement https://github.com/pantsbuild/pants/issues/16480.

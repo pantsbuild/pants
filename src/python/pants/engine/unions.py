@@ -12,7 +12,7 @@ from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-def union(cls: type | None = None, in_scope_types: list[type] | None = None):
+def union(cls: type | None = None, *, in_scope_types: list[type] | None = None):
     """A class decorator to allow a class to be a union base in the engine's mechanism for
     polymorphism.
 

@@ -8,6 +8,7 @@ from typing import Any, Callable, Iterable, TypeVar, cast
 
 from pants.base.exiter import ExitCode
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
@@ -17,7 +18,7 @@ from pants.help.help_info_extracter import AllHelpInfo
 T = TypeVar("T")
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ExplorerServerRequest:
     address: str
@@ -28,7 +29,7 @@ class ExplorerServerRequest:
     def rules_for_implementation(cls, impl: type):
         return (
             UnionRule(cls, impl),
-            QueryRule(ExplorerServer, (impl,)),
+            QueryRule(ExplorerServer, (impl, EnvironmentName)),
         )
 
 

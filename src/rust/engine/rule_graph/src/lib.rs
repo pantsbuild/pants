@@ -263,7 +263,15 @@ impl<R: Rule> RuleGraph<R> {
     rules: IndexSet<R>,
     queries: IndexSet<Query<R::TypeId>>,
   ) -> Result<RuleGraph<R>, String> {
-    Builder::new(rules, queries).graph()
+    Builder::new(rules, queries, ParamTypes::new()).graph()
+  }
+
+  pub fn with_query_inputs_filter(
+    rules: IndexSet<R>,
+    queries: IndexSet<Query<R::TypeId>>,
+    query_inputs_filter: ParamTypes<R::TypeId>,
+  ) -> Result<RuleGraph<R>, String> {
+    Builder::new(rules, queries, query_inputs_filter).graph()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(

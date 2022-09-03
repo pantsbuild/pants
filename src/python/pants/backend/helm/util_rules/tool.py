@@ -25,7 +25,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine import process
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -163,7 +163,7 @@ _ExternalHelmPlugin = TypeVar("_ExternalHelmPlugin", bound=ExternalHelmPlugin)
 _EHPB = TypeVar("_EHPB", bound="ExternalHelmPluginBinding")
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta):
     """Union type allowing Pants to discover global external Helm plugins."""

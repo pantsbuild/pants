@@ -17,14 +17,21 @@ logger = logging.getLogger(__name__)
 name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
 shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 
-"""
-Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
-environment should use APIs from this module instead.
 
-Wherever possible, the `Environment` type should be consumed rather than the
-`CompleteEnvironment`, as it represents a filtered/relevant subset of the environment, rather
-than the entire unfiltered environment.
 """
+TODO: This module currently contains two concepts:
+
+1. environment variable matching (CompleteEnvironment, Environment, EnvironmentRequest)
+2. the new "environment" concept from #13682.
+
+If the second use case gains steam as #13682 proceeds, we should move and rename the
+environment-variable matching APIs to remove ambiguity.
+"""
+
+
+@dataclass(frozen=True)
+class EnvironmentName:
+    """TODO: Replace with `pants.core.util_rules.environments.ResolvedEnvironmentAlias`."""
 
 
 class CompleteEnvironment(FrozenDict):
@@ -94,7 +101,18 @@ class EnvironmentRequest:
 
 
 class Environment(FrozenDict[str, str]):
-    """A subset of the variables set in the environment."""
+    """A subset of the variables set in the environment.
+
+    TODO: Rename to include "variables" in the name to avoid ambiguity with the new `Environment`
+    concept from #13682.
+
+    Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
+    environment should use APIs from this module instead.
+
+    Wherever possible, the `Environment` type should be consumed rather than the
+    `CompleteEnvironment`, as it represents a filtered/relevant subset of the environment, rather
+    than the entire unfiltered environment.
+    """
 
 
 @rule

@@ -40,7 +40,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -90,7 +90,7 @@ class PytestPluginSetup:
     digest: Digest = EMPTY_DIGEST
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)  # type: ignore[misc]
 class PytestPluginSetupRequest(ABC):
     """A request to set up the test environment before Pytest runs, e.g. to set up databases.

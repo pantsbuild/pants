@@ -23,6 +23,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Snapshot, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
@@ -163,12 +164,12 @@ class LintResults(EngineAwareReturnType):
         return False
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class LintTargetsRequest(StyleRequest):
     """The entry point for linters that need targets."""
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class LintFilesRequest(EngineAwareParameter):
     """The entry point for linters that do not use targets."""
