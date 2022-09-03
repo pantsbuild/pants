@@ -611,7 +611,7 @@ async fn working_directory() {
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
   process.input_digests =
     InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-  process.timeout = Some(Duration::from_secs(1));
+  process.timeout = Some(Duration::from_secs(5));
   process.description = "confused-cat".to_string();
   process.docker_image = Some(IMAGE.to_owned());
 
@@ -639,6 +639,7 @@ async fn working_directory() {
 
 #[tokio::test]
 async fn immutable_inputs() {
+  let _ = env_logger::try_init().unwrap();
   let docker = setup_docker!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
@@ -681,7 +682,7 @@ async fn immutable_inputs() {
   )
   .await
   .unwrap();
-  process.timeout = Some(Duration::from_secs(1));
+  process.timeout = Some(Duration::from_secs(5));
   process.description = "confused-cat".to_string();
   process.docker_image = Some(IMAGE.to_string());
 

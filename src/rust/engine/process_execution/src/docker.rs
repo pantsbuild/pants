@@ -2,15 +2,15 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use bollard::container::LogOutput;
+use bollard::container::{AttachContainerResults, LogOutput};
 use bollard::Docker;
 use futures::stream::BoxStream;
-use futures::{StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use nails::execution::ExitCode;
 use store::Store;
 use task_executor::Executor;
-use workunit_store::{in_workunit, RunningWorkunit};
 use tokio_stream::wrappers::ReceiverStream;
+use workunit_store::{in_workunit, RunningWorkunit};
 
 use crate::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
@@ -252,6 +252,7 @@ impl CapturedWorkdir for CommandRunner {
         ..bollard_stubs::models::HostConfig::default()
       }),
       image: Some(image),
+      attach_stdin: Some(false),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
       ..bollard::container::Config::default()
@@ -281,6 +282,7 @@ impl CapturedWorkdir for CommandRunner {
     log::trace!("started container {}", &container.id);
 
     let attach_options = bollard::container::AttachContainerOptions::<String> {
+      stdin: Some(false),
       stdout: Some(true),
       stderr: Some(true),
       logs: Some(true), // stream any output that was missed between the start_container call and now
@@ -301,7 +303,8 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("attached to container {}", &container.id);
 
-    let mut output_stream = attach_result.output.boxed();
+    let AttachContainerResults { output: output_stream, .. } = attach_result;
+    let mut output_stream = output_stream.boxed();
 
     let wait_options = bollard::container::WaitContainerOptions {
       condition: "not-running",
@@ -321,9 +324,7 @@ impl CapturedWorkdir for CommandRunner {
 
       loop {
         // Read from each stream and emit events to the output collector that will be monitoring
-        // `result_stream`. Note that this stream does not exit immediately upon receiving an
-        // exit status via `wait_stream` because we must ensure that all output is captured
-        // from `output_stream` first.
+        // `result_stream`.
 
         tokio::select! {
           // Monitor for stdout/stderr output events.
@@ -348,7 +349,7 @@ impl CapturedWorkdir for CommandRunner {
           }
 
           // Monitor for container exit.
-          Some(wait_msg) = wait_stream.next(), if status_code.is_none() => {
+          Some(wait_msg) = wait_stream.next() => {
             log::trace!("wait_container stream ({}): {:?}", &container_id, wait_msg);
             match wait_msg {
               Ok(r) => {
@@ -356,9 +357,10 @@ impl CapturedWorkdir for CommandRunner {
                 // container exiting due to a regular exit versus a signal. Probably bears
                 // further investigation.
 
-                // Set the status_code so that this branch of the tokio::select is disabled.
-                // This will allow continuing to monitor for output to capture.
+                // Set the status_code but do not emit an event yet. This will allow collecting
+                // any remaining output on `output_stream`.
                 status_code = Some(r.status_code as i32);
+                break;
               }
               Err(err) => {
                 let msg = format!("Docker wait_container failure for container {}: {:?}", &container_id, err);
@@ -375,6 +377,47 @@ impl CapturedWorkdir for CommandRunner {
           }
         }
       }
+
+      log::trace!("monitoring loop ended for container {}", &container_id);
+
+      // Note that there still may be items to read from `output_stream`.
+      // exit status via `wait_stream` because we must ensure that all output is captured
+      // from `output_stream` first.
+      while let Ok(Some(output_msg)) = output_stream.try_next().await {
+        match output_msg {
+          LogOutput::StdOut { message } => {
+            log::trace!(
+              "container {} wrote {} bytes to stdout",
+              &container_id,
+              message.len()
+            );
+            if sender.send(Ok(ChildOutput::Stdout(message))).await.is_err() {
+              log::trace!(
+                "Child results monitor went away for container {}",
+                &container_id
+              );
+              break;
+            }
+          }
+          LogOutput::StdErr { message } => {
+            log::trace!(
+              "container {} wrote {} bytes to stderr",
+              &container_id,
+              message.len()
+            );
+            if sender.send(Ok(ChildOutput::Stderr(message))).await.is_err() {
+              log::trace!(
+                "Child results monitor went away for container {}",
+                &container_id
+              );
+              break;
+            }
+          }
+          _ => (),
+        }
+      }
+
+      log::trace!("finished collecting output for container {}", &container_id);
 
       // Finally output the child's exit status now that all output has been captured.
       let successful = match status_code {
@@ -408,6 +451,8 @@ impl CapturedWorkdir for CommandRunner {
           false
         }
       };
+
+      drop(sender);
 
       let do_remove_container = match keep_sandboxes {
         KeepSandboxes::Always => false,

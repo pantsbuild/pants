@@ -1196,7 +1196,7 @@ dependencies = [
  "rustls-pemfile 0.2.1",
  "tokio",
  "tokio-rustls 0.22.0",
- "tokio-util 0.6.9",
+ "tokio-util 0.6.10",
  "tonic",
  "tonic-build",
  "tower",
@@ -1221,7 +1221,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.6.9",
+ "tokio-util 0.6.10",
  "tracing",
 ]
 
@@ -1807,7 +1807,7 @@ dependencies = [
  "futures",
  "log",
  "tokio",
- "tokio-util 0.6.9",
+ "tokio-util 0.6.10",
 ]
 
 [[package]]
@@ -2286,6 +2286,7 @@ dependencies = [
  "concrete_time",
  "deepsize",
  "derivative",
+ "env_logger",
  "fs",
  "futures",
  "grpc_util",
@@ -3497,9 +3498,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.9"
+version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
+checksum = "36943ee01a6d67977dd3f84a5a1d2efeb4ada3a1ae771cadfaa535d9d9fc6507"
 dependencies = [
  "bytes",
  "futures-core",
@@ -3557,7 +3558,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.22.0",
  "tokio-stream",
- "tokio-util 0.6.9",
+ "tokio-util 0.6.10",
  "tower",
  "tower-layer",
  "tower-service",
@@ -3591,7 +3592,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-stream",
- "tokio-util 0.6.9",
+ "tokio-util 0.6.10",
  "tower-layer",
  "tower-service",
  "tracing",
