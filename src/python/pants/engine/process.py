@@ -333,11 +333,6 @@ class InteractiveProcess(SideEffecting):
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
         if cleanup is not None:
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="InteractiveProcess.cleanup",
-                hint="Use `InteractiveProcess.keep_sandboxes` instead.",
-            )
             if keep_sandboxes is not None:
                 raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
             self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always

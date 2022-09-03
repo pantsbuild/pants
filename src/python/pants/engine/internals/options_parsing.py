@@ -61,16 +61,6 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
 
 
 @rule
-def extract_process_cleanup_option(keep_sandboxes: KeepSandboxes) -> ProcessCleanupOption:
-    warn_or_error(
-        removal_version="2.15.0.dev1",
-        entity="ProcessCleanupOption",
-        hint="Instead, use `KeepSandboxes`.",
-    )
-    return ProcessCleanupOption(keep_sandboxes == KeepSandboxes.never)
-
-
-@rule
 def extract_keep_sandboxes(global_options: GlobalOptions) -> KeepSandboxes:
     return GlobalOptions.resolve_keep_sandboxes(global_options.options)
 
