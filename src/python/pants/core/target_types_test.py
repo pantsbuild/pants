@@ -306,7 +306,7 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-@pytest.mark.parametrize("asset_type", ("file", "resource"))
+@pytest.mark.parametrize("asset_type", ("resource",))
 def test_url_assets(asset_type) -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -373,7 +373,6 @@ def test_url_assets(asset_type) -> None:
             run.Run,
             args=[
                 "app/app.py",
-                f"--use-deprecated-pex-binary-run-semantics={asset_type == 'file'}",
             ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )

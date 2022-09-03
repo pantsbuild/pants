@@ -13,10 +13,7 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 use_deprecated_semantics_args = pytest.mark.parametrize(
     "use_deprecated_semantics_args",
-    [
-        (),
-        ("--use-deprecated-pex-binary-run-semantics",),
-    ],
+    [],
 )
 
 
