@@ -9,7 +9,7 @@ from typing import Iterable
 
 from typing_extensions import Literal
 
-from pants.backend.cc.subsystems.toolchain import CCToolchain, CCToolchainRequest
+from pants.backend.cc.util_rules.toolchain import CCToolchain, CCToolchainRequest
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule

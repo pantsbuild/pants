@@ -10,9 +10,8 @@ import pytest
 from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
 from pants.backend.cc.goals import check
 from pants.backend.cc.goals.check import CCCheckRequest
-from pants.backend.cc.subsystems import toolchain
 from pants.backend.cc.target_types import CCFieldSet, CCSourcesGeneratorTarget
-from pants.backend.cc.util_rules import compile
+from pants.backend.cc.util_rules import compile, toolchain
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address

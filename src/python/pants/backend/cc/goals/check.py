@@ -56,17 +56,6 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         checker_name=request.name,
     )
 
-    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
-    # exit_code = next(
-    #     (
-    #         result.process_result.exit_code
-    #         for result in compile_results
-    #         if result.process_result.exit_code != 0
-    #     ),
-    #     0,
-    # )
-    # return CheckResults([CheckResult(exit_code, result.process_result, "")], checker_name=request.name)
-
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
