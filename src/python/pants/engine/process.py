@@ -359,26 +359,5 @@ class InteractiveProcess(SideEffecting):
         )
 
 
-@dataclass(frozen=True)
-class InteractiveProcessRequest:
-    process: Process
-    forward_signals_to_process: bool = True
-    restartable: bool = False
-
-
-@rule
-async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    warn_or_error(
-        removal_version="2.15.0.dev1",
-        entity="InteractiveProcessRequest",
-        hint="Instead, use `InteractiveProcess.from_process`.",
-    )
-    return InteractiveProcess.from_process(
-        req.process,
-        forward_signals_to_process=req.forward_signals_to_process,
-        restartable=req.restartable,
-    )
-
-
 def rules():
     return collect_rules()
