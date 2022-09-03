@@ -8,13 +8,11 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from typing_extensions import Literal
-
 from pants.backend.cc.subsystems.compiler import CCSubsystem, ExternalCCSubsystem
+from pants.backend.cc.target_types import CCLanguage
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
-    BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
@@ -32,10 +30,9 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-# TODO: What's a good way to grab the compiler (filename or target language) and linker (... language of compiled objects?)
 @dataclass(frozen=True)
 class CCToolchainRequest:
-    language: Literal["c", "c++"]
+    language: CCLanguage
 
 
 @dataclass(frozen=True)
@@ -57,30 +54,17 @@ class CCToolchain:
 
     @property
     def compile_command(self) -> tuple[str, ...]:
-        return filter(
-            None,
-            (
-                *self.compiler.split(" "),
-                "-v",
-                *self.compile_defines,
-                *self.compile_flags,
-            ),
-        )
+        command = [self.compiler, *self.compile_defines, *self.compile_flags]
+        return tuple(filter(None, command))
 
     @property
     def link_command(self) -> tuple[str, ...]:
-        return filter(
-            None,
-            (
-                self.compiler.path,
-                "-v",
-                *self.link_flags,
-            ),
-        )
+        command = [self.compiler, *self.link_flags]
+        return tuple(filter(None, command))
 
 
 @rule_helper
-async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> BinaryPath:
+async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> str:
     for name in binary_names:
         binary_paths = await Get(
             BinaryPaths,
@@ -107,7 +91,7 @@ async def _setup_downloadable_toolchain(
     extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
 
     # Populate the toolchain for C or C++ accordingly
-    if request.language == "c++":
+    if request.language == CCLanguage.CPP:
         return CCToolchain(
             compiler=subsystem.cpp_executable,
             compile_flags=tuple(subsystem.cpp_compile_options),
@@ -138,7 +122,7 @@ async def _setup_system_toolchain(
     search_paths = tuple(OrderedSet(raw_search_paths))
 
     # Populate the toolchain for C or C++ accordingly
-    if request.language == "c++":
+    if request.language == CCLanguage.CPP:
         cpp_executable = await _executable_path(tuple(subsystem.cpp_executable), search_paths)
         return CCToolchain(
             cpp_executable,
@@ -167,7 +151,7 @@ async def setup_cc_toolchain(
 @dataclass(frozen=True)
 class CCProcess:
     args: tuple[str, ...]
-    language: Literal["c", "c++"]
+    language: CCLanguage
     description: str
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()

@@ -18,18 +18,18 @@ class CCOptions:
         default=["-std=c11"],
         help=softwrap(
             """
-            Flags passed to the C++ compiler.
-            These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
+            Flags passed to the C compiler.
+            These flags are merged with the target-level defines, with the target-level flags taking precedence.
             """
         ),
     )
 
     c_defines = StrListOption(
-        default=[""],
+        default=None,
         help=softwrap(
             """
             A list of strings to define in the C preprocessor. Will be prefixed by -D at the command line.
-            These defines are merged with the target-level defines, with target-level definitions taking precedence.
+            These defines are merged with the target-level defines, with the target-level definitions taking precedence.
             """
         ),
     )
@@ -39,17 +39,17 @@ class CCOptions:
         help=softwrap(
             """
             Flags passed to the C++ compiler.
-            These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
+            These flags are merged with the target-level defines, with the target-level flags taking precedence.
             """
         ),
     )
 
     cpp_defines = StrListOption(
-        default=[""],
+        default=None,
         help=softwrap(
             """
             A list of strings to define in the C++ preprocessor. Will be prefixed by -D at the command line.
-            These defines are merged with the target-level defines, with target-level definitions taking precedence.
+            These defines are merged with the target-level defines, with the target-level definitions taking precedence.
             """
         ),
     )
@@ -58,13 +58,13 @@ class CCOptions:
 class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
     options_scope = "cc-external"
     name = "cc-external"
-    help = """TODO"""
+    help = """Options for downloaded CC toolchain support."""
 
     c_executable = StrOption(
         default="gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc",
         help=softwrap(
             """
-            The relative path to the C compiler from the downloaded source.
+            The relative path to the C compiler binary from the downloaded source.
             E.g. For the ARM gcc-rm toolchain, this value would be: `gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc`
             """
         ),
@@ -74,7 +74,7 @@ class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
         default="gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++",
         help=softwrap(
             """
-            The relative path to the C compiler from the downloaded source.
+            The relative path to the C++ compiler binary from the downloaded source.
             E.g. For the ARM gcc-rm toolchain, this value would be: `gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++`
             """
         ),
@@ -95,14 +95,13 @@ class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
 class CCSubsystem(Subsystem, CCOptions):
     options_scope = "cc"
     name = "cc"
-    help = """TODO"""
+    help = """Options for system CC toolchain support."""
 
     c_executable = StrListOption(
         default=["clang", "gcc"],
         help=softwrap(
             """
             A list of binary names for the C compiler (in the `search_paths`).
-
             The list is searched in order until a compiler is found.
             """
         ),
@@ -113,7 +112,6 @@ class CCSubsystem(Subsystem, CCOptions):
         help=softwrap(
             """
             A list of binary names for the C compiler (in the `search_paths`).
-
             The list is searched in order until a compiler is found.
             """
         ),

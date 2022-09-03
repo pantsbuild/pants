@@ -43,7 +43,6 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
         for field_set in source_file_field_sets
     )
 
-    # For some reason, using the commented out code wasn't returning the actual errors
     return CheckResults(
         [
             CheckResult(

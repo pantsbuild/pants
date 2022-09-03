@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import PurePath
 
 from pants.core.goals.package import OutputPathField
@@ -77,7 +78,7 @@ class CCCompileFlagsField(StringSequenceField):
     help = softwrap(
         """
         Flags passed to the compiler.
-        These flags are merged with the toolchain-level defines, with target-level flags taking precedence.
+        These flags are merged with the toolchain-level defines, with the target-level flags taking precedence.
         """
     )
 
@@ -87,35 +88,40 @@ class CCDefinesField(StringSequenceField):
     help = softwrap(
         """
         A list of strings to define in the preprocessor. Will be prefixed by -D at the command line.
-        These defines are merged with the toolchain-level defines, with target-level definitions taking precedence.
+        These defines are merged with the toolchain-level defines, with the target-level definitions taking precedence.
         """
     )
+
+
+class CCLanguage(Enum):
+    C = "c"
+    CPP = "c++"
 
 
 # TODO: Alternatively, can this just be left as None, using that to know we should auto determine?
 class CCLanguageField(StringField, AsyncFieldMixin):
     alias = "language"
-    default = "<AUTO>"
-    valid_choices = ("<AUTO>", "c", "c++")
+    default = None
+    valid_choices = CCLanguage
     help = softwrap(
         """
         A field to indicate what programming language the source is written in.
 
-        The default selection is `<AUTO>` which attempts to determine the correct compiler based on file extension.
+        The default selection is `None`, in which case we attempt to determine the correct compiler based on file extension.
         Alternatively, `c` or `c++` may be specified to force compilation with the specified toolchains/flags.
         """
     )
 
-    def normalized_value(self) -> str:
+    def normalized_value(self) -> CCLanguage:
         """Get the value after applying the default and validating that the key is recognized."""
-        compile_language = self.value
-        if compile_language == "<AUTO>":
+        if self.value is None:
             filename = self.address.filename
-            compile_language = (
-                "c++" if PurePath(filename).suffix in CPP_SOURCE_FILE_EXTENSIONS else "c"
+            return (
+                CCLanguage.CPP
+                if PurePath(filename).suffix in CPP_SOURCE_FILE_EXTENSIONS
+                else CCLanguage.C
             )
-
-        return compile_language
+        return CCLanguage(self.value)
 
 
 class CCSourceTarget(Target):
@@ -164,19 +170,28 @@ class CCLinkTypeField(StringField):
     alias = "link_type"
     default = "shared"
     valid_choices = ("shared", "static")
-    help = "How are libraries linked"
+    help = softwrap(
+        """
+        This field determines the link basis for `cc_library` targets.
+        """
+    )
 
 
 class CCLinkFlagsField(StringSequenceField):
     alias = "link_flags"
-    help = "TODO"
+    help = softwrap(
+        """
+        TODO
+        """
+    )
 
 
 class CCHeadersField(Dependencies):
     alias = "headers"
     help = softwrap(
         """
-        Public headers which are made available to dependent targets.
+        This field specifies public headers which are made available to dependent targets.
+        The headers should be specified as `cc_source` or `cc_sources` targets.
         """
     )
 
@@ -187,11 +202,15 @@ class CCLibraryTarget(Target):
         *COMMON_TARGET_FIELDS,
         CCDependenciesField,
         CCHeadersField,
-        # CCLinkFlagsField,
+        # CCLinkFlagsField, # TODO
         CCLinkTypeField,
         OutputPathField,
     )
-    help = "TODO"
+    help = softwrap(
+        """
+        A static or shared cc library (depending on `link_type`).
+        """
+    )
 
 
 # TODO: Need this so building a binary doesn't build a library too
@@ -211,10 +230,14 @@ class CCBinaryTarget(Target):
         *COMMON_TARGET_FIELDS,
         CCContrivedField,
         CCDependenciesField,
-        # CCLinkFlagsField,
+        # CCLinkFlagsField, # TODO
         OutputPathField,
     )
-    help = "TODO"
+    help = softwrap(
+        """
+        A cc binary.
+        """
+    )
 
 
 def rules():

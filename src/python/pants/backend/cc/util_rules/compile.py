@@ -48,7 +48,9 @@ class FallibleCompiledCCObject:
 
 @rule_helper
 async def _infer_source_files(field_set: CCFieldSet) -> SourceFiles:
-    # Try to determine what this file needs in its digest to compile correctly (i.e. which header files)
+    """Try to determine what this file needs in its digest to compile correctly (i.e. which header
+    files)"""
+
     # TODO: Switching to fieldsets makes this inference request weirder
     inferred_dependencies = await Get(
         InferredDependencies,
@@ -103,15 +105,10 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
 
     include_directories = _extract_include_directories(inferred_source_files)
 
-    # Generate compilation args
+    # Generate target compilation args
     target_file = target_source_file.files[0]
     compiled_object_name = f"{target_file}.o"
 
-    # toolchain = await Get(
-    #     CCToolchain, CCToolchainRequest(request.field_set.language.normalized_value())
-    # )
-
-    # argv = list(toolchain.compile_argv)
     argv = []
     for d in include_directories:
         argv += ["-I", f"{d}/include"]
@@ -122,8 +119,6 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
     argv += field_set.compile_flags.value or []
     argv += field_set.defines.value or []
     argv += ["-c", target_file, "-o", compiled_object_name]
-
-    logger.warning(f"Compilation args for {target_file}: {argv}")
 
     compile_result = await Get(
         FallibleProcessResult,
@@ -137,17 +132,6 @@ async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiled
         ),
     )
 
-    # compile_result = await Get(
-    #     FallibleProcessResult,
-    #     Process(
-    #         argv=argv,
-    #         input_digest=input_digest,
-    #         description=f"Compile CC source file: {target_file}",
-    #         output_files=(compiled_object_name,),
-    #         level=LogLevel.DEBUG,
-    #         env={"__PANTS_CC_COMPILER_FINGERPRINT": toolchain.compiler.fingerprint},
-    #     ),
-    # )
     logger.debug(compile_result.stderr)
     return FallibleCompiledCCObject(compiled_object_name, compile_result)
 

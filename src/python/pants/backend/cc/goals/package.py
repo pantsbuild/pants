@@ -14,6 +14,7 @@ from pants.backend.cc.target_types import (
     CCDependenciesField,
     CCFieldSet,
     CCHeadersField,
+    CCLanguage,
     CCLinkTypeField,
 )
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
@@ -49,8 +50,11 @@ logger = logging.getLogger(__name__)
 
 @rule_helper
 async def _transitive_field_sets(address: Address) -> list[CCFieldSet]:
-    # Grab all dependency targets for this binary (i.e. CCSourceTarget(s) + CCLibraryTarget(s))
-    # TODO: Handle cc_library when it become availables, right now, sources are only allowable input
+    """Grab all dependency targets for this address (i.e. CCSourceTarget(s) + CCLibraryTarget(s))
+
+    At the moment, only CCSourceTargets are supported. TODO CCLibraryTarget.
+    """
+
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([address]))
 
     # Create Field Sets from transitive source targets, in order to pass to compilation
@@ -58,7 +62,9 @@ async def _transitive_field_sets(address: Address) -> list[CCFieldSet]:
 
 
 @rule_helper
-async def _compile_transitive_targets(cc_field_sets: Iterable[CCFieldSet]) -> Digest:
+async def _compile_sources(cc_field_sets: Iterable[CCFieldSet]) -> Digest:
+    """Compile all incoming files and merge their digests."""
+
     # TODO: Should this be Fallible, or just Compiled?
     compiled_objects = await MultiGet(
         Get(FallibleCompiledCCObject, CompileCCSourceRequest(field_set))
@@ -68,6 +74,24 @@ async def _compile_transitive_targets(cc_field_sets: Iterable[CCFieldSet]) -> Di
     # Merge all individual compiled objects into a single digest
     return await Get(
         Digest, MergeDigests([obj.process_result.output_digest for obj in compiled_objects])
+    )
+
+
+def _determine_link_language(cc_field_sets: Iterable[CCFieldSet]) -> CCLanguage:
+    """From the set of input sources, determine what the the std library for linking needs to be.
+
+    C/C++ compiled objects can be mixed, so use each target's compiled language to determine which
+    libraries we should link again. If any objects were compiled in C++, they need to be linked with
+    C++ libraries.
+    """
+
+    return next(
+        (
+            language
+            for field_set in cc_field_sets
+            if (language := field_set.language.normalized_value()) == CCLanguage.CPP
+        ),
+        CCLanguage.C,
     )
 
 
@@ -91,24 +115,16 @@ async def package_cc_library(
     field_set: CCLibraryFieldSet,
 ) -> BuiltPackage:
     cc_field_sets = await _transitive_field_sets(field_set.address)
-    digest = await _compile_transitive_targets(cc_field_sets)
+    digest = await _compile_sources(cc_field_sets)
+    link_language = _determine_link_language(cc_field_sets)
 
-    # If any objects were compiled in c++, they need to be linked in c++
-    language = next(
-        (
-            language
-            for field_set in cc_field_sets
-            if (language := field_set.language.normalized_value()) == "c++"
-        ),
-        "c",
-    )
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     library = await Get(
         LinkedCCObjects,
         LinkCCObjectsRequest(
             digest,
             output_filename.name,
-            compile_language=language,
+            compile_language=link_language,
             link_type=field_set.link_type.value,
         ),
     )
@@ -153,21 +169,13 @@ async def package_cc_binary(
     field_set: CCBinaryFieldSet,
 ) -> BuiltPackage:
     cc_field_sets = await _transitive_field_sets(field_set.address)
-    digest = await _compile_transitive_targets(cc_field_sets)
+    digest = await _compile_sources(cc_field_sets)
+    link_language = _determine_link_language(cc_field_sets)
 
-    # If any objects were compiled in c++, they need to be linked in c++
-    language = next(
-        (
-            language
-            for field_set in cc_field_sets
-            if (language := field_set.language.normalized_value()) == "c++"
-        ),
-        "c",
-    )
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     binary = await Get(
         LinkedCCObjects,
-        LinkCCObjectsRequest(digest, output_filename.name, compile_language=language),
+        LinkCCObjectsRequest(digest, output_filename.name, compile_language=link_language),
     )
 
     renamed_output_digest = await Get(Digest, AddPrefix(binary.digest, str(output_filename.parent)))
