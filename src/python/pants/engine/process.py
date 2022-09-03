@@ -304,10 +304,9 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
-        cleanup: bool | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
-        keep_sandboxes: KeepSandboxes | None = None,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -331,14 +330,7 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
-        if cleanup is not None:
-            if keep_sandboxes is not None:
-                raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
-            self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always
-        elif keep_sandboxes is not None:
-            self.keep_sandboxes = keep_sandboxes
-        else:
-            self.keep_sandboxes = KeepSandboxes.never
+        self.keep_sandboxes = keep_sandboxes
 
     @classmethod
     def from_process(
