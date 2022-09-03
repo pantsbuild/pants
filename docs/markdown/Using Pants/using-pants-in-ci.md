@@ -196,6 +196,43 @@ args = ["-vv", "--no-header"]
 
 Then, in your CI script or config, set the environment variable `PANTS_CONFIG_FILES=pants.ci.toml` to use this new config file, in addition to `pants.toml`.
 
+Using with pre-commit
+---------------------
+
+To allow developers to check code before committing or pushing, you can supply a [pre-commit](https://pre-commit.com/) hook that will run Pants commands before.  This can help have a faster feedback loop and reduce load and cost on your CI systems.
+
+However, using `--changed-since=origin/main` is not as useful locally.  Developers my have unstaged or untracked files lying around in their working directory, or their Git references may be out of date or named differently than the ones you use in CI.  Instead, it's better to leverage pre-commit's ability to pass changed filenames to commands to Pants, and tell Pants to ignore files it's been told not to track:
+
+```yaml .pre-commit-config.yaml
+# Sample pre-commit config for pants
+- repo: local
+  hooks:
+    - id: pants-fast-checks
+      name: Check BUILD metadata and lint code
+      language: system
+      stages: [ commit, push ]
+      pass_filenames: true
+      entry: >-
+        ./pants
+          --unmatched-cli-globs=ignore
+          tailor --check
+          update-build-files --check
+          lint
+    - id: pants-tests
+      name: Run tests on change code and dependees
+      language: system
+      stages: [ push ]
+      pass_filenames: true
+      entry: >-
+        sh -c '
+          ./pants
+            --unmatched-cli-globs=ignore
+            dependees --closed --transitive
+            "$@"
+          | xargs ./pants check test
+          ' sh
+```
+
 ### Tuning resource consumption (advanced)
 
 Pants allows you to control its resource consumption. These options all have sensible defaults. In most cases, there is no need to change them. However, you may benefit from tuning these options.
