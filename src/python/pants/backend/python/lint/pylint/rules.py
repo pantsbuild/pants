@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
