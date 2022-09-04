@@ -352,7 +352,7 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
         yield UnionRule(LintFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FilePartitions(Generic[_MetadataT], Collection[Tuple[Tuple[str, ...], _MetadataT]]):
+class FilePartitions(Collection[Tuple[Tuple[str, ...], _MetadataT]]):
     __doc__ = _PARTITIONS_DOC
 
     @classmethod
