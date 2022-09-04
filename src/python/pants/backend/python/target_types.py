@@ -52,7 +52,6 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -291,8 +290,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(

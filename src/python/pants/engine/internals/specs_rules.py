@@ -8,12 +8,9 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -60,7 +57,7 @@ from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -454,60 +451,6 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
-# NOTE: When this is removed in 2.15, also remove the `SecondaryOwnerMixin` of `PexBinaryEntryPoint`
-def _handle_ambiguous_result(
-    request: TargetRootsToFieldSetsRequest,
-    result: TargetRootsToFieldSets,
-    field_set_to_default_to: type[FieldSet],
-) -> TargetRootsToFieldSets:
-    assert len(result.targets) > 1
-    field_set_types = [type(field_set) for field_set in result.field_sets]
-
-    # NB: See https://github.com/pantsbuild/pants/pull/15849. We don't want to break clients as
-    # we shift behavior, so we add this temporary hackery here.
-    if (
-        # (We check for 2 targets because 3 would've been ambiguous pre-our-change)
-        len(result.targets) == 2
-        and PexBinaryFieldSet in field_set_types
-        and PythonSourceFieldSet in field_set_types
-    ):
-        if field_set_to_default_to is PexBinaryFieldSet:
-            warn_or_error(
-                "2.15.0.dev1",
-                "referring to a `pex_binary` by using the filename specified in `entry_point`",
-                softwrap(
-                    """
-                        In Pants 2.15, a `pex_binary` can no longer be referred to by the filename that
-                        the `entry_point` field uses.
-
-                        This is due to a change in Pants 2.13, which allows you to use the `run` goal
-                        directly on a `python_source` target without requiring a `pex_binary`. As a
-                        consequence the ability to refer to the `pex_binary` via its `entry_point` is
-                        being removed, as otherwise it would be ambiguous which target to use.
-
-                        Note that because of this change you are able to remove any `pex_binary` targets
-                        you have declared just to support the `run` goal
-                        (usually these are developer scripts), as using `run` on the `python_source` will
-                        have the equivalent behavior.
-
-                        To fix this deprecation, you can use the `pex_binary`'s address to refer to
-                        the `pex_binary`, or set the `[GLOBAL].use_deprecated_pex_binary_run_semantics`
-                        option to `false` (which, among other things, will have `run` on a Python
-                        filename run the `python_source`).
-                        """
-                ),
-            )
-        # Otherwise, the appropriate flag was set to select the new behavior, so roll with that.
-        return TargetRootsToFieldSets(
-            {
-                target: field_sets
-                for target, field_sets in result.mapping.items()
-                if field_set_to_default_to in {type(field_set) for field_set in field_sets}
-            }
-        )
-    raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-
-
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
@@ -569,14 +512,7 @@ async def find_valid_field_sets_for_target_roots(
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:
-        return _handle_ambiguous_result(
-            request,
-            result,
-            cast(
-                "type[FieldSet]",
-                PythonSourceFieldSet,
-            ),
-        )
+        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
     if len(result.field_sets) > 1:
         raise AmbiguousImplementationsException(
             result.targets[0], result.field_sets, goal_description=request.goal_description
