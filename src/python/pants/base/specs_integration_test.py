@@ -14,7 +14,7 @@ SOURCES = {
     # target is "resident" to.
     "py/BUILD": dedent(
         """\
-        pex_binary(name="bin", entry_point="app.py")
+        python_awslambda(name="lambda", handler="app.py:main", runtime="python3.9")
         python_sources(name="lib", sources=["**/*.py", "!**/*_test.py"])
         python_tests(name="tests", sources=["**/*_test.py"])
         """
@@ -58,6 +58,7 @@ def run(args: list[str]) -> PantsResult:
     result = run_pants(
         [
             "--backend-packages=pants.backend.python",
+            "--backend-packages=pants.backend.awslambda.python",
             "--backend-packages=pants.backend.experimental.go",
             "--python-interpreter-constraints=['==3.9.*']",
             "--pants-ignore=__pycache__",
@@ -154,8 +155,7 @@ def test_file_arg() -> None:
         assert run(
             ["list", f"{tmpdir}/py/app.py", f"{tmpdir}/py/utils/strutil_test.py"]
         ).stdout.splitlines() == [
-            # Uncomment once https://github.com/pantsbuild/pants/issues/16772 is resolved
-            # f"{tmpdir}/py:bin",
+            f"{tmpdir}/py:lambda",
             f"{tmpdir}/py/app.py:lib",
             f"{tmpdir}/py/utils/strutil_test.py:../tests",
         ]
