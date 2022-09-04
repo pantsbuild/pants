@@ -371,7 +371,7 @@ def test_url_assets() -> None:
         rule_runner.run_goal_rule(
             run.Run,
             args=[
-                "app/app.py",
+                "app:app.py",
             ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
