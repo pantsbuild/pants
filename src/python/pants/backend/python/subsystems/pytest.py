@@ -34,7 +34,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, IntOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -80,38 +80,6 @@ class PyTest(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
-    timeouts = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            Enable test target timeouts. If timeouts are enabled then test targets with a
-            timeout= parameter set on their target will time out after the given number of
-            seconds if not completed. If no timeout is set, then either the default timeout
-            is used or no timeout is configured.
-            """
-        ),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeouts` option in the `test` scope instead.",
-    )
-    timeout_default = IntOption(
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            The default timeout (in seconds) for a test target if the `timeout` field is not
-            set on the target.
-            """
-        ),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeout_default` option in the `test` scope instead.",
-    )
-    timeout_maximum = IntOption(
-        default=None,
-        advanced=True,
-        help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeout_maximum` option in the `test` scope instead.",
-    )
     junit_family = StrOption(
         default="xunit2",
         advanced=True,

@@ -41,9 +41,8 @@ def test_run_then_edit(use_pantsd: bool) -> None:
         client_handle = run_pants_with_workdir_without_waiting(
             [
                 "--backend-packages=['pants.backend.python']",
-                "--use-deprecated-pex-binary-run-semantics",
                 "run",
-                f"{dirname}/slow.py",
+                f"{dirname}:bin",
             ],
             workdir=workdir,
             use_pantsd=use_pantsd,

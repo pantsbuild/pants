@@ -25,7 +25,6 @@ from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Remov
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
 )
@@ -188,11 +187,9 @@ async def run_junit_test(
 async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
-    interactive_process = await Get(
-        InteractiveProcess,
-        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
+    return TestDebugRequest(
+        InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
     )
-    return TestDebugRequest(interactive_process)
 
 
 @rule

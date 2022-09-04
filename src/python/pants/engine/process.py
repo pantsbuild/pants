@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.session import RunId
@@ -305,10 +304,9 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
-        cleanup: bool | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
-        keep_sandboxes: KeepSandboxes | None = None,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -332,19 +330,7 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
-        if cleanup is not None:
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="InteractiveProcess.cleanup",
-                hint="Use `InteractiveProcess.keep_sandboxes` instead.",
-            )
-            if keep_sandboxes is not None:
-                raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
-            self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always
-        elif keep_sandboxes is not None:
-            self.keep_sandboxes = keep_sandboxes
-        else:
-            self.keep_sandboxes = KeepSandboxes.never
+        self.keep_sandboxes = keep_sandboxes
 
     @classmethod
     def from_process(
@@ -363,27 +349,6 @@ class InteractiveProcess(SideEffecting):
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
         )
-
-
-@dataclass(frozen=True)
-class InteractiveProcessRequest:
-    process: Process
-    forward_signals_to_process: bool = True
-    restartable: bool = False
-
-
-@rule
-async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    warn_or_error(
-        removal_version="2.15.0.dev1",
-        entity="InteractiveProcessRequest",
-        hint="Instead, use `InteractiveProcess.from_process`.",
-    )
-    return InteractiveProcess.from_process(
-        req.process,
-        forward_signals_to_process=req.forward_signals_to_process,
-        restartable=req.restartable,
-    )
 
 
 def rules():

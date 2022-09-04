@@ -154,7 +154,8 @@ def test_file_arg() -> None:
         assert run(
             ["list", f"{tmpdir}/py/app.py", f"{tmpdir}/py/utils/strutil_test.py"]
         ).stdout.splitlines() == [
-            f"{tmpdir}/py:bin",
+            # Uncomment once https://github.com/pantsbuild/pants/issues/16772 is resolved
+            # f"{tmpdir}/py:bin",
             f"{tmpdir}/py/app.py:lib",
             f"{tmpdir}/py/utils/strutil_test.py:../tests",
         ]
