@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 from pants.testutil.python_interpreter_selection import skip_unless_python39_present
 
@@ -143,6 +145,7 @@ def test_descendent_addresses() -> None:
 
 
 @skip_unless_python39_present
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/16772")
 def test_file_arg() -> None:
     """Semantics: find the 'owning' target, using generated target rather than target generator
     when possible (regardless of project introspection vs. "build" goal).
