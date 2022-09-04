@@ -98,7 +98,6 @@ class CCLanguage(Enum):
     CPP = "c++"
 
 
-# TODO: Alternatively, can this just be left as None, using that to know we should auto determine?
 class CCLanguageField(StringField, AsyncFieldMixin):
     alias = "language"
     default = None

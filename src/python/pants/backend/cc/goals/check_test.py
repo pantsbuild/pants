@@ -16,6 +16,7 @@ from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
+from pants.source import source_root
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -27,6 +28,7 @@ def rule_runner() -> RuleRunner:
             *compile.rules(),
             *dep_inf_rules(),
             *source_files.rules(),
+            *source_root.rules(),
             *toolchain.rules(),
             QueryRule(CheckResults, [CCCheckRequest]),
         ],

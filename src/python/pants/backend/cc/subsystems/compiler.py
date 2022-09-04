@@ -81,7 +81,8 @@ class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
     )
 
     default_version = "10.3-2021.10"
-    default_url_template = "https://developer.arm.com/-/media/Files/downloads/gnu-rm/{version}/gcc-arm-none-eabi-{version}-{platform}.tar.bz2"
+    # NOTE: This is only fully populated for testing - will be emptied before PR
+    default_url_template = ""  # "https://developer.arm.com/-/media/Files/downloads/gnu-rm/{version}/gcc-arm-none-eabi-{version}-{platform}.tar.bz2"
     default_url_platform_mapping = {
         # "macos_arm64": "darwin_arm64",
         "macos_x86_64": "mac",
