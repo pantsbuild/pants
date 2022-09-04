@@ -52,6 +52,7 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
+    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -290,7 +291,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(

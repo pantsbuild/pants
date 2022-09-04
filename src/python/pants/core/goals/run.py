@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
@@ -13,16 +14,20 @@ from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.environment import CompleteEnvironment, EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.specs_rules import (
+    AmbiguousImplementationsException,
+    TooManyTargetsException,
+)
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule, rule_helper
 from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
+    SecondaryOwnerMixin,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions, KeepSandboxes
@@ -143,6 +148,43 @@ class Run(Goal):
     subsystem_cls = RunSubsystem
 
 
+@rule_helper
+async def _find_primary(
+    goal_description: str,
+) -> tuple[RunFieldSet, Target]:
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            RunFieldSet,
+            goal_description=goal_description,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        ),
+    )
+
+    candidates = {}
+    for target, field_sets in targets_to_valid_field_sets.mapping.items():
+        primary_field_sets = tuple(
+            field_set
+            for field_set in field_sets
+            if not any(
+                isinstance(field, SecondaryOwnerMixin) for field in dataclasses.astuple(field_set)
+            )
+        )
+        if primary_field_sets:
+            candidates[target] = primary_field_sets
+
+    if len(candidates) > 1:
+        raise TooManyTargetsException(candidates, goal_description=goal_description)
+
+    target, field_sets = next(iter(candidates.items()))
+    if len(field_sets) > 1:
+        raise AmbiguousImplementationsException(
+            target, field_sets, goal_description=goal_description
+        )
+
+    return field_sets[0], target
+
+
 @goal_rule
 async def run(
     run_subsystem: RunSubsystem,
@@ -152,25 +194,14 @@ async def run(
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
 ) -> Run:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            RunFieldSet,
-            goal_description="the `run` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            expect_single_field_set=True,
-        ),
-    )
-    field_set = targets_to_valid_field_sets.field_sets[0]
+    field_set, target = await _find_primary("the `run` goal")
+
     request = await (
         Get(RunRequest, RunFieldSet, field_set)
         if not run_subsystem.debug_adapter
         else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
     )
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
-    )
-    restartable = wrapped_target.target.get(RestartableField).value
+    restartable = target.get(RestartableField).value
     keep_sandboxes = (
         global_options.keep_sandboxes
         if run_subsystem.options.is_default("cleanup")

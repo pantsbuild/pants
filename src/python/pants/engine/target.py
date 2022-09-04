@@ -1479,7 +1479,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
-    expect_single_field_set: bool
     shard: int
     num_shards: int
 
@@ -1489,19 +1488,12 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
-        expect_single_field_set: bool = False,
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        if expect_single_field_set and num_shards != -1:
-            raise ValueError(
-                "At most one of shard_spec and expect_single_field_set may be set"
-                " on a TargetRootsToFieldSetsRequest instance"
-            )
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.expect_single_field_set = expect_single_field_set
         self.shard = shard
         self.num_shards = num_shards
 

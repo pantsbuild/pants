@@ -30,11 +30,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.specs_rules import (
-    AmbiguousImplementationsException,
-    NoApplicableTargetsException,
-    TooManyTargetsException,
-)
+from pants.engine.internals.specs_rules import NoApplicableTargetsException
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -894,13 +890,11 @@ def test_find_valid_field_sets(caplog) -> None:
         specs: Iterable[Spec],
         *,
         no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
-        expect_single_config: bool = False,
     ) -> TargetRootsToFieldSets:
         request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
             no_applicable_targets_behavior=no_applicable_behavior,
-            expect_single_field_set=expect_single_config,
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
@@ -919,18 +913,6 @@ def test_find_valid_field_sets(caplog) -> None:
         FieldSetSubclass1.create(valid_tgt),
         FieldSetSubclass2.create(valid_tgt),
     )
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(FieldSetSuperclass, [valid_spec], expect_single_config=True)
-    assert AmbiguousImplementationsException.__name__ in str(exc.value)
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass,
-            [valid_spec, AddressLiteralSpec("", "valid2")],
-            expect_single_config=True,
-        )
-    assert TooManyTargetsException.__name__ in str(exc.value)
 
     no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_spec])
     assert no_valid_targets.targets == ()
