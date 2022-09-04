@@ -266,7 +266,8 @@ class LintTargetsRequest(LintRequest, StyleRequest):
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-_PARTITIONS_DOC = """A collection containing pairs of (tuple(<elements>), arbitrary metadata).
+_PARTITIONS_DOC = """
+    A collection containing pairs of (tuple(<elements>), arbitrary metadata).
 
     When implementing a linter, one of your rules will return a subclass of this type, taking in a
     `PartitionRequest` specific to your linter. The specific return type will either be
@@ -292,7 +293,7 @@ _PARTITIONS_DOC = """A collection containing pairs of (tuple(<elements>), arbitr
 
 
 @runtime_subscriptable
-class TargetPartitions(Generic[_MetadataT], Collection[Tuple[Tuple[FieldSet, ...], _MetadataT]]):
+class TargetPartitions(Collection[Tuple[Tuple[FieldSet, ...], _MetadataT]]):
     __doc__ = _PARTITIONS_DOC
 
     @classmethod
