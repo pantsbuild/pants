@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
@@ -26,9 +25,8 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import Rule, collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -130,13 +128,10 @@ async def package_cc_library(
     )
 
     # Export headers as-is
-    logger.debug(field_set.headers)
-
     header_targets = await Get(Targets, DependenciesRequest(field_set.headers))
     header_files = await Get(
         SourceFiles, SourceFilesRequest([tgt[SourcesField] for tgt in header_targets])
     )
-
     renamed_output_digest = await Get(
         Digest, AddPrefix(library.digest, str(output_filename.parent))
     )
@@ -144,8 +139,15 @@ async def package_cc_library(
         Digest, MergeDigests([renamed_output_digest, header_files.snapshot.digest])
     )
 
-    library_artifact = BuiltPackageArtifact(relpath=str(output_filename))
-    return BuiltPackage(renamed_output_digest, (library_artifact,))
+    final_snapshot = await Get(
+        Snapshot,
+        Digest,
+        renamed_output_digest,
+    )
+    return BuiltPackage(
+        renamed_output_digest,
+        artifacts=tuple(BuiltPackageArtifact(file) for file in final_snapshot.files),
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -154,7 +156,7 @@ async def package_cc_library(
 
 
 @dataclass(frozen=True)
-class CCBinaryFieldSet(PackageFieldSet, RunFieldSet):
+class CCBinaryFieldSet(PackageFieldSet):
     required_fields = (
         CCContrivedField,
         CCDependenciesField,
@@ -183,27 +185,9 @@ async def package_cc_binary(
     return BuiltPackage(renamed_output_digest, (artifact,))
 
 
-@rule(level=LogLevel.DEBUG)
-async def run_cc_binary(field_set: CCBinaryFieldSet) -> RunRequest:
-    binary = await Get(BuiltPackage, PackageFieldSet, field_set)
-    artifact_relpath = binary.artifacts[0].relpath
-    assert artifact_relpath is not None
-    return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact_relpath),))
-
-
-@rule(level=LogLevel.DEBUG)
-async def cc_binary_run_debug_adapter_request(
-    field_set: CCBinaryFieldSet,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a CC binary using a debug adapter has not yet been implemented."
-    )
-
-
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         UnionRule(PackageFieldSet, CCLibraryFieldSet),
         UnionRule(PackageFieldSet, CCBinaryFieldSet),
-        UnionRule(RunFieldSet, CCBinaryFieldSet),
     )

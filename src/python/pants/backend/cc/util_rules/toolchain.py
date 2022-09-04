@@ -11,6 +11,7 @@ from typing import Iterable
 from pants.backend.cc.subsystems.compiler import CCSubsystem, ExternalCCSubsystem
 from pants.backend.cc.target_types import CCLanguage
 from pants.core.util_rules.archive import ExtractedArchive
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
@@ -184,4 +185,7 @@ async def setup_cc_process(request: CCProcess) -> Process:
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *archive_rules(),
+    )

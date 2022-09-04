@@ -12,7 +12,6 @@ from pants.backend.cc.util_rules import toolchain
 from pants.backend.cc.util_rules.compile import CompileCCSourceRequest, FallibleCompiledCCObject
 from pants.backend.cc.util_rules.compile import rules as cc_compile_rules
 from pants.core.util_rules import source_files
-from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
 from pants.engine.process import Process
 from pants.engine.target import Target
@@ -23,7 +22,6 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *archive_rules(),
             *cc_compile_rules(),
             *cc_target_type_rules(),
             *dep_inf_rules(),

@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
-from pants.backend.cc.goals import check, package, tailor
+from pants.backend.cc.goals import check, package, run, tailor
 from pants.backend.cc.target_types import (
     CCBinaryTarget,
     CCLibraryTarget,
@@ -35,6 +35,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         *dep_inf_rules(),
         *link.rules(),
         *package.rules(),
+        *run.rules(),
         *tailor.rules(),
         *toolchain.rules(),
         *target_type_rules(),
