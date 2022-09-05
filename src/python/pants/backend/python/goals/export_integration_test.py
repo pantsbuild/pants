@@ -30,9 +30,13 @@ class _ToolConfig:
     experimental: bool = False
     backend_prefix: str | None = "lint"
 
+    @property
+    def package(self) -> str:
+        return self.name.replace("-", "_")
+
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
-    _ToolConfig(name="add_trailing_comma", version="2.2.3", experimental=True),
+    _ToolConfig(name="add-trailing-comma", version="2.2.3", experimental=True),
     _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
     _ToolConfig(name="bandit", version="1.6.2"),
     _ToolConfig(name="black", version="22.3.0"),
@@ -70,7 +74,7 @@ def build_config(tmpdir: str) -> Mapping:
         if not tool_config.backend_prefix:
             continue
 
-        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.name}"
+        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.package}"
 
         if tool_config.experimental:
             plugin_suffix = f"experimental.{plugin_suffix}"
@@ -107,7 +111,7 @@ def test_export() -> None:
         # NOTE: Not every tool implements --version so this is the best we can do.
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
         expected_tool_dir = os.path.join(
-            lib_dir, f"{tool_config.name}-{tool_config.version}.dist-info"
+            lib_dir, f"{tool_config.package}-{tool_config.version}.dist-info"
         )
         assert os.path.isdir(
             expected_tool_dir
