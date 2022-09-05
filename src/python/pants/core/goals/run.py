@@ -7,7 +7,8 @@ import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, Tuple
+from itertools import filterfalse, tee
+from typing import Callable, Iterable, Mapping, Optional, Tuple, TypeVar
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -148,8 +149,18 @@ class Run(Goal):
     subsystem_cls = RunSubsystem
 
 
+_T = TypeVar("_T")
+
+
+def _partition(
+    iterable: Iterable[_T], pred: Callable[[_T], bool]
+) -> tuple[tuple[_T, ...], tuple[_T, ...]]:
+    t1, t2 = tee(iterable)
+    return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
+
+
 @rule_helper
-async def _find_primary(
+async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
     targets_to_valid_field_sets = await Get(
@@ -163,15 +174,18 @@ async def _find_primary(
 
     candidates = {}
     for target, field_sets in targets_to_valid_field_sets.mapping.items():
-        primary_field_sets = tuple(
-            field_set
-            for field_set in field_sets
-            if not any(
+        primary_field_sets, secondary_field_sets = _partition(
+            field_sets,
+            lambda field_set: not any(
                 isinstance(field, SecondaryOwnerMixin) for field in dataclasses.astuple(field_set)
-            )
+            ),
         )
-        if primary_field_sets:
+        # If there's both primary and secondary field sets, choose the primary ones.
+        # E.g. if we match both a `python_source` and a `pex_binary` choose the `python_source`.
+        if primary_field_sets and secondary_field_sets:
             candidates[target] = primary_field_sets
+        else:
+            candidates[target] = primary_field_sets or secondary_field_sets
 
     if len(candidates) > 1:
         raise TooManyTargetsException(candidates, goal_description=goal_description)
@@ -194,7 +208,7 @@ async def run(
     build_root: BuildRoot,
     complete_env: CompleteEnvironment,
 ) -> Run:
-    field_set, target = await _find_primary("the `run` goal")
+    field_set, target = await _find_what_to_run("the `run` goal")
 
     request = await (
         Get(RunRequest, RunFieldSet, field_set)

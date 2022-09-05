@@ -35,6 +35,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.source.filespec import Filespec
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
@@ -70,6 +71,13 @@ class TestRunFieldSet(RunFieldSet):
     required_fields = ()
 
 
+@dataclass(frozen=True)
+class TestRunSecondaryFieldSet(RunFieldSet):
+    required_fields = ()
+
+    just_borrowing: SecondaryOwnerField
+
+
 class TestBinaryTarget(Target):
     alias = "binary"
     core_fields = ()
@@ -84,6 +92,7 @@ def single_target_run(
     *,
     program_text: bytes,
     targets_to_field_sets: Mapping[Target, Iterable[FieldSet]] = {A_TARGET: [A_FIELD_SET]},
+    run_field_set_types=[TestRunFieldSet],
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
 
@@ -114,13 +123,13 @@ def single_target_run(
                 ),
                 MockGet(
                     output_type=RunRequest,
-                    input_type=TestRunFieldSet,
+                    input_type=RunFieldSet,
                     mock=lambda _: create_mock_run_request(rule_runner, program_text),
                 ),
                 MockGet(
                     output_type=RunDebugAdapterRequest,
-                    input_type=TestRunFieldSet,
-                    mock=lambda _: create_mock_run_debug_adapter_request(rule_runner, program_text),
+                    input_type=RunFieldSet,
+                    mock=lambda _: create_mock_run_request(rule_runner, program_text),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
@@ -128,6 +137,12 @@ def single_target_run(
                     mock=rule_runner.run_interactive_process,
                 ),
             ],
+            union_membership=UnionMembership(
+                {
+                    RunFieldSet: [TestRunFieldSet, TestRunSecondaryFieldSet],
+                    RunDebugAdapterRequest: [TestRunFieldSet, TestRunSecondaryFieldSet],
+                },
+            ),
         )
         return cast(Run, res)
 
@@ -185,17 +200,11 @@ def test_multi_field_set_error(rule_runner: RuleRunner) -> None:
 
 
 class SecondaryOwnerField(SecondaryOwnerMixin, Field):
+    alias = "borrowed"
     default = None
 
     def filespec(self) -> Filespec:
         return Filespec(includes=[])
-
-
-@dataclass(frozen=True)
-class TestRunSecondaryFieldSet(RunFieldSet):
-    required_fields = ()
-
-    just_borrowing: SecondaryOwnerField
 
 
 def test_filters_secondary_owners(rule_runner: RuleRunner) -> None:
@@ -204,6 +213,22 @@ def test_filters_secondary_owners(rule_runner: RuleRunner) -> None:
     fs1 = TestRunFieldSet.create(target)
     fs2 = TestRunSecondaryFieldSet.create(target)
     res = single_target_run(
-        rule_runner, program_text=program_text, targets_to_field_sets={target: [fs1, fs2]}
+        rule_runner,
+        program_text=program_text,
+        targets_to_field_sets={target: [fs1, fs2]},
+        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
+    )
+    assert res.exit_code == 0
+
+
+def test_only_secondary_owner_ok(rule_runner: RuleRunner) -> None:
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
+    target = TestBinaryTarget({}, Address("some/addr"))
+    field_set = TestRunSecondaryFieldSet.create(target)
+    res = single_target_run(
+        rule_runner,
+        program_text=program_text,
+        targets_to_field_sets={target: [field_set]},
+        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
     )
     assert res.exit_code == 0
