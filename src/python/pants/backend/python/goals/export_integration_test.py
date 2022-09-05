@@ -32,6 +32,7 @@ class _ToolConfig:
 
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
+    _ToolConfig(name="add_trailing_comma", version="2.2.3", experimental=True),
     _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
     _ToolConfig(name="bandit", version="1.6.2"),
     _ToolConfig(name="black", version="22.3.0"),
