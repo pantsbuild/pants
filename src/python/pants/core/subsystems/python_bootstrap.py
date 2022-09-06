@@ -16,11 +16,11 @@ from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import (
     LOCAL_ENVIRONMENT_MATCHER,
+    EnvironmentRequest,
     EnvironmentsSubsystem,
+    EnvironmentTarget,
     PythonBootstrapBinaryNamesField,
     PythonInterpreterSearchPathsField,
-    ResolvedEnvironmentRequest,
-    ResolvedEnvironmentTarget,
 )
 from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
@@ -243,8 +243,8 @@ def get_pyenv_root(env: Environment) -> str | None:
 @rule
 async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
     env_tgt = await Get(
-        ResolvedEnvironmentTarget,
-        ResolvedEnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
+        EnvironmentTarget,
+        EnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
     )
     if env_tgt.val is not None:
         interpreter_search_paths = env_tgt.val[PythonInterpreterSearchPathsField].value

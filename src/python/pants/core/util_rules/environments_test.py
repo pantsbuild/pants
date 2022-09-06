@@ -13,14 +13,14 @@ from pants.core.util_rules.environments import (
     LOCAL_ENVIRONMENT_MATCHER,
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
-    ChosenLocalEnvironmentAlias,
+    ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
     DockerImageField,
+    EnvironmentName,
+    EnvironmentRequest,
+    EnvironmentTarget,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
-    ResolvedEnvironmentAlias,
-    ResolvedEnvironmentRequest,
-    ResolvedEnvironmentTarget,
     UnrecognizedEnvironmentError,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
@@ -32,9 +32,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
-            QueryRule(ChosenLocalEnvironmentAlias, []),
-            QueryRule(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias]),
-            QueryRule(ResolvedEnvironmentAlias, [ResolvedEnvironmentRequest]),
+            QueryRule(ChosenLocalEnvironmentName, []),
+            QueryRule(EnvironmentTarget, [EnvironmentName]),
+            QueryRule(EnvironmentName, [EnvironmentRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
     )
@@ -47,14 +47,14 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
                 """\
                 _local_environment(name='e1')
                 _local_environment(name='e2')
-                _local_environment(name='no-alias')
+                _local_environment(name='no-name')
                 _docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
     )
     rule_runner.set_options(
-        ["--environments-preview-aliases={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
+        ["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
     )
     result = rule_runner.request(AllEnvironmentTargets, [])
     assert result == AllEnvironmentTargets(
@@ -82,28 +82,28 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def get_env() -> ResolvedEnvironmentTarget:
-        alias = rule_runner.request(ChosenLocalEnvironmentAlias, [])
-        return rule_runner.request(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias(alias.val)])
+    def get_env() -> EnvironmentTarget:
+        name = rule_runner.request(ChosenLocalEnvironmentName, [])
+        return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
 
-    # If `--aliases` is not set, do not choose an environment.
+    # If `--names` is not set, do not choose an environment.
     assert get_env().val is None
 
-    rule_runner.set_options(["--environments-preview-aliases={'e': '//:e1'}"])
+    rule_runner.set_options(["--environments-preview-names={'e': '//:e1'}"])
     assert get_env().val == LocalEnvironmentTarget({}, Address("", target_name="e1"))
 
-    # Error if `--aliases` set, but no compatible platforms
-    rule_runner.set_options(["--environments-preview-aliases={'e': '//:not-compatible'}"])
+    # Error if `--names` set, but no compatible platforms
+    rule_runner.set_options(["--environments-preview-names={'e': '//:not-compatible'}"])
     with engine_error(NoCompatibleEnvironmentError):
         get_env()
 
     # Error if >1 compatible targets.
-    rule_runner.set_options(["--environments-preview-aliases={'e1': '//:e1', 'e2': '//:e2'}"])
+    rule_runner.set_options(["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2'}"])
     with engine_error(AmbiguousEnvironmentError):
         get_env()
 
 
-def test_resolve_environment_alias(rule_runner: RuleRunner) -> None:
+def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -117,41 +117,41 @@ def test_resolve_environment_alias(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def get_alias(v: str) -> ResolvedEnvironmentAlias:
+    def get_name(v: str) -> EnvironmentName:
         return rule_runner.request(
-            ResolvedEnvironmentAlias, [ResolvedEnvironmentRequest(v, description_of_origin="foo")]
+            EnvironmentName, [EnvironmentRequest(v, description_of_origin="foo")]
         )
 
-    # If `--aliases` is not set, and the local matcher is used, do not choose an environment.
-    assert get_alias(LOCAL_ENVIRONMENT_MATCHER).val is None
-    # Else, error for unrecognized aliases.
+    # If `--names` is not set, and the local matcher is used, do not choose an environment.
+    assert get_name(LOCAL_ENVIRONMENT_MATCHER).val is None
+    # Else, error for unrecognized names.
     with engine_error(UnrecognizedEnvironmentError):
-        get_alias("hardcoded")
+        get_name("hardcoded")
 
     rule_runner.set_options(
         [
-            "--environments-preview-aliases={'local': '//:local', 'hardcoded': '//:hardcoded', 'docker': '//:docker'}"
+            "--environments-preview-names={'local': '//:local', 'hardcoded': '//:hardcoded', 'docker': '//:docker'}"
         ]
     )
-    assert get_alias(LOCAL_ENVIRONMENT_MATCHER).val == "local"
-    assert get_alias("hardcoded").val == "hardcoded"
-    assert get_alias("docker").val == "docker"
+    assert get_name(LOCAL_ENVIRONMENT_MATCHER).val == "local"
+    assert get_name("hardcoded").val == "hardcoded"
+    assert get_name("docker").val == "docker"
     with engine_error(UnrecognizedEnvironmentError):
-        get_alias("fake")
+        get_name("fake")
 
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "_local_environment(name='env')"})
     rule_runner.set_options(
-        ["--environments-preview-aliases={'env': '//:env', 'bad-address': '//:fake'}"]
+        ["--environments-preview-names={'env': '//:env', 'bad-address': '//:fake'}"]
     )
 
-    def get_tgt(v: str | None) -> ResolvedEnvironmentTarget:
-        return rule_runner.request(ResolvedEnvironmentTarget, [ResolvedEnvironmentAlias(v)])
+    def get_tgt(v: str | None) -> EnvironmentTarget:
+        return rule_runner.request(EnvironmentTarget, [EnvironmentName(v)])
 
     assert get_tgt(None).val is None
 
-    # If the alias is not defined, error.
+    # If the name is not defined, error.
     with engine_error(AssertionError):
         get_tgt("bad")
 

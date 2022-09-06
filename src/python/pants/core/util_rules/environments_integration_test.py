@@ -19,7 +19,7 @@ def test_unrecognized_build_file_symbols_during_bootstrap() -> None:
         """
     )
     with setup_tmpdir({"BUILD": build_file}) as tmpdir:
-        args = [f"--environments-preview-aliases={{'env': '{tmpdir}:env'}}", "--plugins=ansicolors"]
+        args = [f"--environments-preview-names={{'env': '{tmpdir}:env'}}", "--plugins=ansicolors"]
         run_pants([*args, "--version"]).assert_success()
         # But then we should error after bootstrapping.
         run_pants([*args, "list", tmpdir]).assert_failure()
