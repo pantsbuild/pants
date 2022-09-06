@@ -44,7 +44,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -54,6 +54,7 @@ from pants.util.strutil import pluralize, shell_quote
 @dataclass(frozen=True)
 class MyPyPartition:
     field_sets: FrozenOrderedSet[MyPyFieldSet]
+    root_targets: CoarsenedTargets
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
@@ -135,9 +136,6 @@ async def mypy_typecheck_partition(
     cp: CpBinary,
     mv: MvBinary,
 ) -> CheckResult:
-    transitive_targets_get = Get(
-        TransitiveTargets, TransitiveTargetsRequest(fs.address for fs in partition.field_sets)
-    )
 
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
@@ -181,14 +179,7 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (
-        transitive_targets,
-        roots_sources,
-        mypy_pex,
-        extra_type_stubs_pex,
-        requirements_pex,
-    ) = await MultiGet(
-        transitive_targets_get,
+    (roots_sources, mypy_pex, extra_type_stubs_pex, requirements_pex,) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
         extra_type_stubs_pex_get,
@@ -219,7 +210,7 @@ async def mypy_typecheck_partition(
         ),
     )
     closure_sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure)
+        PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
     )
 
     closure_sources, requirements_venv_pex, file_list_digest = await MultiGet(
@@ -349,9 +340,18 @@ async def mypy_determine_partitions(
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+    coarsened_targets_by_address = coarsened_targets.by_address()
+
     return MyPyPartitions(
         MyPyPartition(
             FrozenOrderedSet(field_sets),
+            CoarsenedTargets(
+                coarsened_targets_by_address[field_set.address] for field_set in field_sets
+            ),
             resolve if len(python_setup.resolves) > 1 else None,
             interpreter_constraints or mypy.interpreter_constraints,
         )

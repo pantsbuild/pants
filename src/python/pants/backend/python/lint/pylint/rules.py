@@ -36,7 +36,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -46,6 +46,7 @@ from pants.util.strutil import pluralize
 @dataclass(frozen=True)
 class PylintPartition:
     field_sets: FrozenOrderedSet[PylintFieldSet]
+    root_targets: CoarsenedTargets
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
@@ -77,10 +78,6 @@ def generate_argv(source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
 async def pylint_lint_partition(
     partition: PylintPartition, pylint: Pylint, first_party_plugins: PylintFirstPartyPlugins
 ) -> LintResult:
-    transitive_targets_get = Get(
-        TransitiveTargets, TransitiveTargetsRequest(fs.address for fs in partition.field_sets)
-    )
-
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
@@ -102,19 +99,12 @@ async def pylint_lint_partition(
     )
 
     field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(fs.source for fs in partition.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in partition.field_sets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
 
-    (
-        transitive_targets,
-        pylint_pex,
-        requirements_pex,
-        field_set_sources,
-        report_directory,
-    ) = await MultiGet(
-        transitive_targets_get,
+    (pylint_pex, requirements_pex, field_set_sources, report_directory,) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
         field_set_sources_get,
@@ -122,7 +112,7 @@ async def pylint_lint_partition(
     )
 
     prepared_python_sources, pylint_runner_pex, config_files = await MultiGet(
-        Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure)),
+        Get(PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())),
         Get(
             VenvPex,
             VenvPexRequest(
@@ -185,23 +175,33 @@ async def pylint_lint_partition(
 async def pylint_determine_partitions(
     request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
 ) -> PylintPartitions:
-    resolve_and_interpreter_constraints_to_field_sets = (
-        _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
-    )
-
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
         first_party_plugins.interpreter_constraints_fields, python_setup
     )
 
+    resolve_and_interpreter_constraints_to_field_sets = (
+        _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    )
+
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+    coarsened_targets_by_address = coarsened_targets.by_address()
+
     return PylintPartitions(
         PylintPartition(
             FrozenOrderedSet(field_sets),
+            CoarsenedTargets(
+                coarsened_targets_by_address[field_set.address] for field_set in field_sets
+            ),
             resolve if len(python_setup.resolves) > 1 else None,
             InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
         )
-        for (resolve, interpreter_constraints), field_sets in sorted(
-            resolve_and_interpreter_constraints_to_field_sets.items()
-        )
+        for (
+            resolve,
+            interpreter_constraints,
+        ), field_sets, in resolve_and_interpreter_constraints_to_field_sets.items()
     )
 
 
