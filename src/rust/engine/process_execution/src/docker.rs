@@ -1,13 +1,18 @@
+use async_oncecell::OnceCell;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
-use bollard::Docker;
+use bollard::image::CreateImageOptions;
+use bollard::{errors::Error as DockerError, Docker};
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use nails::execution::ExitCode;
+use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, RunningWorkunit};
@@ -34,6 +39,76 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  image_pull_cache: Mutex<BTreeMap<String, Arc<OnceCell<()>>>>,
+  image_pull_policy: ImagePullPolicy,
+}
+
+#[allow(dead_code)] // TODO: temporary until next commit is written in PR
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ImagePullPolicy {
+  Always,
+  IfMissing,
+  Never,
+  OnlyIfLatestOrMissing,
+}
+
+async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Result<(), String> {
+  let has_latest_tag = {
+    if let Some((_, suffix)) = image.rsplit_once(':') {
+      suffix == "latest"
+    } else {
+      false
+    }
+  };
+
+  let image_exists = {
+    match docker.inspect_image(image).await {
+      Ok(_) => true,
+      Err(DockerError::DockerResponseServerError {
+        status_code: 404, ..
+      }) => false,
+      Err(err) => {
+        return Err(format!(
+          "Failed to inspect Docker image `{}`: {:?}",
+          image, err
+        ))
+      }
+    }
+  };
+
+  let do_pull = match (policy, image_exists) {
+    (ImagePullPolicy::Always, _) => true,
+    (ImagePullPolicy::IfMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => true,
+    (ImagePullPolicy::Never, false) => {
+      return Err(format!(
+        "Image `{}` was not found locally and Pants is configured to not attempt to pull",
+        image
+      ));
+    }
+    _ => false,
+  };
+
+  if do_pull {
+    let create_image_options = CreateImageOptions::<String> {
+      from_image: image.to_string(),
+      ..CreateImageOptions::default()
+    };
+
+    let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+    while let Some(msg) = result_stream.next().await {
+      log::trace!("pull {}: {:?}", image, msg);
+      if let Err(err) = msg {
+        return Err(format!(
+          "Failed to pull Docker image `{}`: {:?}",
+          image, err
+        ));
+      }
+    }
+  }
+
+  Ok(())
 }
 
 impl CommandRunner {
@@ -53,6 +128,8 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      image_pull_cache: Mutex::default(),
+      image_pull_policy: ImagePullPolicy::OnlyIfLatestOrMissing,
     })
   }
 
@@ -71,6 +148,21 @@ impl CommandRunner {
         Ok(docker)
       })
       .await
+  }
+
+  async fn pull_image(&self, image: &str) -> Result<(), String> {
+    let image_cell = {
+      let mut image_pull_cache = self.image_pull_cache.lock();
+      let cell = image_pull_cache
+        .entry(image.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()));
+      cell.clone()
+    };
+
+    image_cell
+      .get_or_try_init(pull_image(&self.docker, image, self.image_pull_policy))
+      .await?;
+    Ok(())
   }
 }
 
@@ -242,6 +334,9 @@ impl CapturedWorkdir for CommandRunner {
     let image = req
       .docker_image
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
+
+    // Attempt to pull the image (if so configured by the image pull policy).
+    self.pull_image(&image).await?;
 
     // DOCKER-TODO: Set creation options so we can set platform.
 
