@@ -38,7 +38,7 @@ class PipAuditFieldSet(FieldSet):
     )
 
     resolve: PythonRequirementResolveField
-    sources: PythonRequirementsField
+    requirements: PythonRequirementsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
