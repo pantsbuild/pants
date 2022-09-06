@@ -339,7 +339,7 @@ impl CapturedWorkdir for CommandRunner {
         .map_err(|err| {
           format!(
             "Failed to attach to Docker container `{}`: {:?}",
-            &container.id, err
+            &container_id, err
           )
         })?;
 
@@ -359,7 +359,7 @@ impl CapturedWorkdir for CommandRunner {
             }
             Ok(_) => (),
             Err(err) => {
-                println!("error during final output processing: {err}")
+                log::trace!("error while capturing output of container {}: {:?}", &container_id, err);
             }
         }
       }
