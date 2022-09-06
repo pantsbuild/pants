@@ -206,7 +206,7 @@ class LocalPantsRunner:
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
-        params = Params(self.union_membership, EnvironmentName())
+        params = Params(self.union_membership, EnvironmentName(None))
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
             WorkunitsCallbackFactories, [params]
         )

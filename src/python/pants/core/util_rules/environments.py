@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName as EnvironmentName
+from pants.engine.internals.graph import WrappedTargetForBootstrappingOnly
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -15,7 +17,6 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.option.option_types import DictOption
@@ -197,22 +198,6 @@ class ChosenLocalEnvironmentName:
 
 
 @dataclass(frozen=True)
-class EnvironmentName(EngineAwareParameter):
-    f"""The normalized name for an environment, from `[environments-preview].names`, after
-    applying things like {LOCAL_ENVIRONMENT_MATCHER}.
-
-    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient
-    rule graph. This node impacts the equality of many downstream nodes, so we want its identity
-    to only be a single string, rather than a Target instance.
-    """
-
-    val: str | None
-
-    def debug_hint(self) -> str:
-        return self.val or "<none>"
-
-
-@dataclass(frozen=True)
 class EnvironmentTarget:
     val: Target | None
 
@@ -340,10 +325,10 @@ async def get_target_for_environment_name(
         ),
     )
     wrapped_target = await Get(
-        WrappedTarget,
+        WrappedTargetForBootstrappingOnly,
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
-    tgt = wrapped_target.target
+    tgt = wrapped_target.val
     if not tgt.has_field(CompatiblePlatformsField) and not tgt.has_field(DockerImageField):
         raise ValueError(
             softwrap(
@@ -351,11 +336,11 @@ async def get_target_for_environment_name(
                 Expected to use the address to a `_local_environment` or `_docker_environment`
                 target in the option `[environments-preview].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
-                `{wrapped_target.target.alias}`.
+                `{tgt.alias}`.
                 """
             )
         )
-    return EnvironmentTarget(tgt)
+    return EnvironmentTarget(None)
 
 
 def rules():

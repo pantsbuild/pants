@@ -197,7 +197,7 @@ class RuleRunner:
         bootstrap_args: Iterable[str] = (),
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
-        singleton_environment: EnvironmentName | None = EnvironmentName(),
+        singleton_environment: EnvironmentName | None = EnvironmentName(None),
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]

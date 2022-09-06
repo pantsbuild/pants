@@ -1,11 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 import re
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
 
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -30,8 +32,19 @@ environment-variable matching APIs to remove ambiguity.
 
 
 @dataclass(frozen=True)
-class EnvironmentName:
-    """TODO: Replace with `pants.core.util_rules.environments.EnvironmentName`."""
+class EnvironmentName(EngineAwareParameter):
+    f"""The normalized name for an environment, from `[environments-preview].names`, after
+    applying things like the __local__ matcher.
+
+    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient
+    rule graph. This node impacts the equality of many downstream nodes, so we want its identity
+    to only be a single string, rather than a Target instance.
+    """
+
+    val: str | None
+
+    def debug_hint(self) -> str:
+        return self.val or "<none>"
 
 
 class CompleteEnvironment(FrozenDict):

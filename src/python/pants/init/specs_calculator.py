@@ -68,7 +68,7 @@ def calculate_specs(
 
     changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
-        ChangedAddresses, [Params(changed_request, options_bootstrapper, EnvironmentName())]
+        ChangedAddresses, [Params(changed_request, options_bootstrapper, EnvironmentName(None))]
     )
     logger.debug("changed addresses: %s", changed_addresses)
 

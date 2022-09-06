@@ -103,7 +103,7 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        params = Params(self._specs, self._options_bootstrapper, EnvironmentName())
+        params = Params(self._specs, self._options_bootstrapper, EnvironmentName(None))
         request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
         unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
