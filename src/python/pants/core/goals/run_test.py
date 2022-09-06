@@ -207,7 +207,7 @@ class SecondaryOwnerField(SecondaryOwnerMixin, Field):
         return Filespec(includes=[])
 
 
-def test_filters_secondary_owners(rule_runner: RuleRunner) -> None:
+def test_filters_secondary_owners_single_target(rule_runner: RuleRunner) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     target = TestBinaryTarget({}, Address("some/addr"))
     fs1 = TestRunFieldSet.create(target)
@@ -221,7 +221,22 @@ def test_filters_secondary_owners(rule_runner: RuleRunner) -> None:
     assert res.exit_code == 0
 
 
-def test_only_secondary_owner_ok(rule_runner: RuleRunner) -> None:
+def test_filters_secondary_owners_multi_target(rule_runner: RuleRunner) -> None:
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
+    t1 = TestBinaryTarget({}, Address("some/addr1"))
+    fs1 = TestRunFieldSet.create(t1)
+    t2 = TestBinaryTarget({}, Address("some/addr2"))
+    fs2 = TestRunSecondaryFieldSet.create(t2)
+    res = single_target_run(
+        rule_runner,
+        program_text=program_text,
+        targets_to_field_sets={t1: [fs1], t2: [fs2]},
+        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
+    )
+    assert res.exit_code == 0
+
+
+def test_only_secondary_owner_ok_single_target(rule_runner: RuleRunner) -> None:
     program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     target = TestBinaryTarget({}, Address("some/addr"))
     field_set = TestRunSecondaryFieldSet.create(target)
@@ -232,3 +247,18 @@ def test_only_secondary_owner_ok(rule_runner: RuleRunner) -> None:
         run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
     )
     assert res.exit_code == 0
+
+
+def test_only_secondary_owner_error_multi_target(rule_runner: RuleRunner) -> None:
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
+    t1 = TestBinaryTarget({}, Address("some/addr1"))
+    fs1 = TestRunSecondaryFieldSet.create(t1)
+    t2 = TestBinaryTarget({}, Address("some/addr2"))
+    fs2 = TestRunSecondaryFieldSet.create(t2)
+    with pytest.raises(TooManyTargetsException):
+        single_target_run(
+            rule_runner,
+            program_text=program_text,
+            targets_to_field_sets={t1: [fs1], t2: [fs2]},
+            run_field_set_types=[TestRunSecondaryFieldSet],
+        )

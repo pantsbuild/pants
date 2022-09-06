@@ -6,9 +6,10 @@ from __future__ import annotations
 import dataclasses
 import logging
 from abc import ABCMeta
+from collections import namedtuple
 from dataclasses import dataclass
 from itertools import filterfalse, tee
-from typing import Callable, Iterable, Mapping, Optional, Tuple, TypeVar
+from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -151,6 +152,10 @@ class Run(Goal):
 
 _T = TypeVar("_T")
 
+RankedFieldSets: NamedTuple["tuple[FieldSet, ...], tuple[FieldSet, ...]"] = namedtuple(
+    "RankedFieldSets", ("primary", "secondary")
+)
+
 
 def _partition(
     iterable: Iterable[_T], pred: Callable[[_T], bool]
@@ -172,31 +177,45 @@ async def _find_what_to_run(
         ),
     )
 
-    candidates = {}
+    primary_target: Target | None = None
+    target_ranked_field_sets: RankedFieldSets | None = None
+
     for target, field_sets in targets_to_valid_field_sets.mapping.items():
-        primary_field_sets, secondary_field_sets = _partition(
-            field_sets,
-            lambda field_set: not any(
-                isinstance(field, SecondaryOwnerMixin) for field in dataclasses.astuple(field_set)
-            ),
+        ranked_field_sets = RankedFieldSets(
+            *_partition(
+                field_sets,
+                lambda field_set: not any(
+                    isinstance(field, SecondaryOwnerMixin)
+                    for field in dataclasses.astuple(field_set)
+                ),
+            )
         )
-        # If there's both primary and secondary field sets, choose the primary ones.
-        # E.g. if we match both a `python_source` and a `pex_binary` choose the `python_source`.
-        if primary_field_sets and secondary_field_sets:
-            candidates[target] = primary_field_sets
-        else:
-            candidates[target] = primary_field_sets or secondary_field_sets
+        # In the case of multiple Targets/FieldSets, prefer the "primary" ones to the "secondary" ones.
+        if (
+            primary_target is None
+            or target_ranked_field_sets is None  # impossible, but satisfies mypy
+            or (ranked_field_sets.primary and not target_ranked_field_sets.primary)
+        ):
+            primary_target = target
+            target_ranked_field_sets = ranked_field_sets
+        elif (ranked_field_sets.primary and target_ranked_field_sets.primary) or (
+            ranked_field_sets.secondary and target_ranked_field_sets.secondary
+        ):
+            raise TooManyTargetsException(
+                targets_to_valid_field_sets.mapping, goal_description=goal_description
+            )
 
-    if len(candidates) > 1:
-        raise TooManyTargetsException(candidates, goal_description=goal_description)
-
-    target, field_sets = next(iter(candidates.items()))
+    assert primary_target is not None
+    assert target_ranked_field_sets is not None
+    field_sets = target_ranked_field_sets.primary or target_ranked_field_sets.secondary
     if len(field_sets) > 1:
         raise AmbiguousImplementationsException(
-            target, field_sets, goal_description=goal_description
+            primary_target,
+            target_ranked_field_sets.primary + target_ranked_field_sets.secondary,
+            goal_description=goal_description,
         )
 
-    return field_sets[0], target
+    return field_sets[0], primary_target
 
 
 @goal_rule
