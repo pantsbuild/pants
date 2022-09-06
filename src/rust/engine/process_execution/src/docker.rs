@@ -1,6 +1,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::Docker;
@@ -26,7 +27,7 @@ pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-in
 
 /// `CommandRunner` executes processes using a local Docker client.
 pub struct CommandRunner {
-  docker: Docker,
+  docker: OnceCell<Docker>,
   store: Store,
   executor: Executor,
   work_dir_base: PathBuf,
@@ -44,10 +45,8 @@ impl CommandRunner {
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let docker = Docker::connect_with_local_defaults()
-      .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
     Ok(CommandRunner {
-      docker,
+      docker: OnceCell::new(),
       store,
       executor,
       work_dir_base,
@@ -55,6 +54,23 @@ impl CommandRunner {
       immutable_inputs,
       keep_sandboxes,
     })
+  }
+
+  async fn docker(&self) -> Result<&Docker, String> {
+    self
+      .docker
+      .get_or_try_init(async move {
+        let docker = Docker::connect_with_local_defaults()
+          .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
+
+        docker
+          .ping()
+          .await
+          .map_err(|err| format!("Failed to receive response from local Docker: {err}"))?;
+
+        Ok(docker)
+      })
+      .await
   }
 }
 
@@ -171,6 +187,8 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+    let docker = self.docker().await?;
+
     let env = req
       .env
       .iter()
@@ -258,16 +276,14 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("creating container with config: {:?}", &config);
 
-    let container = self
-      .docker
+    let container = docker
       .create_container::<&str, String>(None, config)
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
 
     log::trace!("created container {}", &container.id);
 
-    self
-      .docker
+    docker
       .start_container::<String>(&container.id, None)
       .await
       .map_err(|err| {
@@ -287,8 +303,7 @@ impl CapturedWorkdir for CommandRunner {
       ..bollard::container::AttachContainerOptions::default()
     };
 
-    let attach_result = self
-      .docker
+    let attach_result = docker
       .attach_container(&container.id, Some(attach_options))
       .await
       .map_err(|err| {
@@ -305,14 +320,13 @@ impl CapturedWorkdir for CommandRunner {
     let wait_options = bollard::container::WaitContainerOptions {
       condition: "not-running",
     };
-    let mut wait_stream = self
-      .docker
+    let mut wait_stream = docker
       .wait_container(&container.id, Some(wait_options))
       .boxed();
 
     let container_id = container.id.to_owned();
     let keep_sandboxes = self.keep_sandboxes;
-    let docker = self.docker.clone();
+    let docker = docker.clone();
     let result_stream = async_stream::stream! {
       let was_success = loop {
         tokio::select! {
