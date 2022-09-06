@@ -43,15 +43,17 @@ pub struct CommandRunner {
   image_pull_policy: ImagePullPolicy,
 }
 
-#[allow(dead_code)] // TODO: temporary until next commit is written in PR
+#[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ImagePullPolicy {
+pub enum ImagePullPolicy {
   Always,
   IfMissing,
   Never,
   OnlyIfLatestOrMissing,
 }
 
+/// Pull an image given its name and the image pull policy. This method is debounced by
+/// the "image pull cache" in the `CommandRunner`.
 async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Result<(), String> {
   let has_latest_tag = {
     if let Some((_, suffix)) = image.rsplit_once(':') {
@@ -119,6 +121,7 @@ impl CommandRunner {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
     Ok(CommandRunner {
       docker: OnceCell::new(),
@@ -129,7 +132,7 @@ impl CommandRunner {
       immutable_inputs,
       keep_sandboxes,
       image_pull_cache: Mutex::default(),
-      image_pull_policy: ImagePullPolicy::OnlyIfLatestOrMissing,
+      image_pull_policy,
     })
   }
 
