@@ -180,9 +180,7 @@ class DockerEnvironmentTarget(Target):
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
     local_env = cast(
         ChosenLocalEnvironmentName,
-        session.product_request(
-            ChosenLocalEnvironmentName, [Params(Platform.create_for_localhost())]
-        )[0],
+        session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
     )
     return EnvironmentName(local_env.val)
 
@@ -236,8 +234,9 @@ async def determine_all_environments(
 
 @rule
 async def determine_local_environment(
-    platform: Platform, all_environment_targets: AllEnvironmentTargets
+    all_environment_targets: AllEnvironmentTargets,
 ) -> ChosenLocalEnvironmentName:
+    platform = Platform.create_for_localhost()
     if not all_environment_targets:
         return ChosenLocalEnvironmentName(None)
     compatible_name_and_targets = [
@@ -350,4 +349,4 @@ async def get_target_for_environment_name(
 
 
 def rules():
-    return (*collect_rules(), QueryRule(ChosenLocalEnvironmentName, [Platform]))
+    return (*collect_rules(), QueryRule(ChosenLocalEnvironmentName, []))
