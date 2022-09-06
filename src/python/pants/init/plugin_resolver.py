@@ -17,7 +17,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.core.util_rules.environments import EnvironmentRequest, LOCAL_ENVIRONMENT_MATCHER
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment, EnvironmentName
 from pants.engine.internals.selectors import Params
@@ -157,7 +157,7 @@ class PluginResolver:
                 }
             ),
         )
-        params = Params(request, EnvironmentName(None))
+        params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
             session.product_request(ResolvedPluginDistributions, [params])[0],

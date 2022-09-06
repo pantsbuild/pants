@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEnvironmentName
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.graph import WrappedTargetForBootstrappingOnly
+from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     StringField,
@@ -173,6 +177,16 @@ class DockerEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
+def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
+    local_env = cast(
+        ChosenLocalEnvironmentName,
+        session.product_request(
+            ChosenLocalEnvironmentName, [Params(Platform.create_for_localhost())]
+        )[0],
+    )
+    return EnvironmentName(local_env.val)
+
+
 class NoCompatibleEnvironmentError(Exception):
     pass
 
@@ -187,14 +201,6 @@ class UnrecognizedEnvironmentError(Exception):
 
 class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment names to their corresponding environment target."""
-
-
-@dataclass(frozen=True)
-class ChosenLocalEnvironmentName:
-    f"""Which environment name from `[environments-preview].names` that
-    {LOCAL_ENVIRONMENT_MATCHER} resolves to."""
-
-    val: str | None
 
 
 @dataclass(frozen=True)
@@ -340,8 +346,8 @@ async def get_target_for_environment_name(
                 """
             )
         )
-    return EnvironmentTarget(None)
+    return EnvironmentTarget(tgt)
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), QueryRule(ChosenLocalEnvironmentName, [Platform]))

@@ -11,7 +11,8 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
@@ -206,7 +207,10 @@ class LocalPantsRunner:
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
-        params = Params(self.union_membership, EnvironmentName(None))
+        params = Params(
+            self.union_membership,
+            determine_bootstrap_environment(self.graph_session.scheduler_session),
+        )
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
             WorkunitsCallbackFactories, [params]
         )

@@ -15,6 +15,7 @@ from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
@@ -124,6 +125,7 @@ class GraphSession:
         """
 
         workspace = Workspace(self.scheduler_session)
+        env_name = determine_bootstrap_environment(self.scheduler_session)
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -133,7 +135,7 @@ class GraphSession:
             if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, EnvironmentName(None))
+            params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(

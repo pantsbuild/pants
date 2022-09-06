@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
@@ -103,7 +104,11 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        params = Params(self._specs, self._options_bootstrapper, EnvironmentName(None))
+        params = Params(
+            self._specs,
+            self._options_bootstrapper,
+            determine_bootstrap_environment(self._scheduler),
+        )
         request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
         unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 

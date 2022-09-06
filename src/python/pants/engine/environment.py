@@ -30,21 +30,37 @@ If the second use case gains steam as #13682 proceeds, we should move and rename
 environment-variable matching APIs to remove ambiguity.
 """
 
+# ----------------------------------------------------------------------
+# Environments mechanism
+# ----------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class EnvironmentName(EngineAwareParameter):
-    f"""The normalized name for an environment, from `[environments-preview].names`, after
-    applying things like the __local__ matcher.
+    """The normalized name for an environment, from `[environments-preview].names`, after applying
+    things like the __local__ matcher.
 
-    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient
-    rule graph. This node impacts the equality of many downstream nodes, so we want its identity
-    to only be a single string, rather than a Target instance.
+    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient rule
+    graph. This node impacts the equality of many downstream nodes, so we want its identity to only
+    be a single string, rather than a Target instance.
     """
 
     val: str | None
 
     def debug_hint(self) -> str:
         return self.val or "<none>"
+
+
+@dataclass(frozen=True)
+class ChosenLocalEnvironmentName:
+    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
+
+    val: str | None
+
+
+# ----------------------------------------------------------------------
+# Environments variables
+# ----------------------------------------------------------------------
 
 
 class CompleteEnvironment(FrozenDict):
