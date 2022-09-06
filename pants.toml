@@ -96,7 +96,7 @@ root_patterns = [
   "/",
 ]
 
-[environments-preview.aliases]
+[environments-preview.names]
 default_env = "//:default_env"
 # TODO(#7735): Define `//:macos_local_env` after figuring out why our Build Wheels Mac job is
 #  failing when this is set:
