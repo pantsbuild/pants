@@ -32,11 +32,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
-            QueryRule(ChosenLocalEnvironmentName, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
+        singleton_environment=None,
     )
 
 
@@ -84,6 +84,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
 
     def get_env() -> EnvironmentTarget:
         name = rule_runner.request(ChosenLocalEnvironmentName, [])
+        print(name)
         return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
 
     # If `--names` is not set, do not choose an environment.
