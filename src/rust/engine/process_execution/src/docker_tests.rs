@@ -83,7 +83,7 @@ async fn runner_errors_if_docker_image_not_set() {
   if let ProcessError::Unclassified(msg) = err {
     assert!(msg.contains("Failed to pull Docker image"));
   } else {
-    panic!("expected value: {:?}", err)
+    panic!("unexpected value: {:?}", err)
   }
 
   // Otherwise, if docker_image is not set, use the local runner.
@@ -95,7 +95,7 @@ async fn runner_errors_if_docker_image_not_set() {
       msg.contains("docker_image not set on the Process, but the Docker CommandRunner was used")
     );
   } else {
-    panic!("expected value: {:?}", err)
+    panic!("unexpected value: {:?}", err)
   }
 }
 
