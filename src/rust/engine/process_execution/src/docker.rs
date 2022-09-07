@@ -1,13 +1,17 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
-use bollard::Docker;
+use bollard::image::CreateImageOptions;
+use bollard::{errors::Error as DockerError, Docker};
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use nails::execution::ExitCode;
+use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, RunningWorkunit};
@@ -34,6 +38,90 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  image_pull_cache: Mutex<ImageCache>,
+  image_pull_policy: ImagePullPolicy,
+}
+
+#[derive(Default)]
+struct ImageCache {
+  /// Maps an image name to a `OnceCell` used to debounce image pull attempts made during this
+  /// particular run.
+  cache: BTreeMap<String, Arc<OnceCell<()>>>,
+
+  /// Stores the current "build generation" during which this command runner will not attempt
+  /// to pull an image again. This is populated from `build_id` field on `Context`. `cache`
+  /// will be cleared when the generation changes.
+  generation: String,
+}
+
+#[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImagePullPolicy {
+  Always,
+  IfMissing,
+  Never,
+  OnlyIfLatestOrMissing,
+}
+
+/// Pull an image given its name and the image pull policy. This method is debounced by
+/// the "image pull cache" in the `CommandRunner`.
+async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Result<(), String> {
+  let has_latest_tag = {
+    if let Some((_, suffix)) = image.rsplit_once(':') {
+      suffix == "latest"
+    } else {
+      false
+    }
+  };
+
+  let image_exists = {
+    match docker.inspect_image(image).await {
+      Ok(_) => true,
+      Err(DockerError::DockerResponseServerError {
+        status_code: 404, ..
+      }) => false,
+      Err(err) => {
+        return Err(format!(
+          "Failed to inspect Docker image `{}`: {:?}",
+          image, err
+        ))
+      }
+    }
+  };
+
+  let do_pull = match (policy, image_exists) {
+    (ImagePullPolicy::Always, _) => true,
+    (ImagePullPolicy::IfMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => true,
+    (ImagePullPolicy::Never, false) => {
+      return Err(format!(
+        "Image `{}` was not found locally and Pants is configured to not attempt to pull",
+        image
+      ));
+    }
+    _ => false,
+  };
+
+  if do_pull {
+    let create_image_options = CreateImageOptions::<String> {
+      from_image: image.to_string(),
+      ..CreateImageOptions::default()
+    };
+
+    let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+    while let Some(msg) = result_stream.next().await {
+      log::trace!("pull {}: {:?}", image, msg);
+      if let Err(err) = msg {
+        return Err(format!(
+          "Failed to pull Docker image `{}`: {:?}",
+          image, err
+        ));
+      }
+    }
+  }
+
+  Ok(())
 }
 
 impl CommandRunner {
@@ -44,6 +132,7 @@ impl CommandRunner {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
     Ok(CommandRunner {
       docker: OnceCell::new(),
@@ -53,6 +142,8 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      image_pull_cache: Mutex::default(),
+      image_pull_policy,
     })
   }
 
@@ -71,6 +162,32 @@ impl CommandRunner {
         Ok(docker)
       })
       .await
+  }
+
+  async fn pull_image(&self, image: &str, build_generation: &str) -> Result<(), String> {
+    let image_cell = {
+      let mut image_pull_cache = self.image_pull_cache.lock();
+
+      if build_generation != image_pull_cache.generation {
+        image_pull_cache.cache.clear();
+        image_pull_cache.generation = build_generation.to_string();
+      }
+
+      let cell = image_pull_cache
+        .cache
+        .entry(image.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()));
+      cell.clone()
+    };
+
+    image_cell
+      .get_or_try_init(pull_image(
+        self.docker().await?,
+        image,
+        self.image_pull_policy,
+      ))
+      .await?;
+    Ok(())
   }
 }
 
@@ -180,13 +297,14 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (PathBuf, PathBuf);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    context: &'c Context,
+    workdir_path: &'w Path,
     (immutable_inputs_workdir, named_caches_workdir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let docker = self.docker().await?;
 
     let env = req
@@ -242,6 +360,11 @@ impl CapturedWorkdir for CommandRunner {
     let image = req
       .docker_image
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
+
+    // Attempt to pull the image (if so configured by the image pull policy). The `build_id` is
+    // used to determine when images should again be pulled (for example, when the "always"
+    // image pull policy is set).
+    self.pull_image(&image, &context.build_id).await?;
 
     // DOCKER-TODO: Set creation options so we can set platform.
 
