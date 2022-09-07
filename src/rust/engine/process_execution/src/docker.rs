@@ -31,19 +31,48 @@ pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-in
 
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner {
-  docker: OnceCell<Docker>,
+  docker: DockerOnceCell,
   store: Store,
   executor: Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  image_pull_cache: Mutex<ImageCache>,
-  image_pull_policy: ImagePullPolicy,
+  container_cache: ContainerCache,
+}
+
+#[derive(Clone)]
+struct DockerOnceCell {
+  cell: Arc<OnceCell<Docker>>,
+}
+
+impl DockerOnceCell {
+  pub fn new() -> Self {
+    Self {
+      cell: Arc::new(OnceCell::new()),
+    }
+  }
+
+  pub async fn get(&self) -> Result<&Docker, String> {
+    self
+      .cell
+      .get_or_try_init(async move {
+        let docker = Docker::connect_with_local_defaults()
+          .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
+
+        docker
+          .ping()
+          .await
+          .map_err(|err| format!("Failed to receive response from local Docker: {err}"))?;
+
+        Ok(docker)
+      })
+      .await
+  }
 }
 
 #[derive(Default)]
-struct ImageCache {
+struct ImagePullCacheInner {
   /// Maps an image name to a `OnceCell` used to debounce image pull attempts made during this
   /// particular run.
   cache: BTreeMap<String, Arc<OnceCell<()>>>,
@@ -52,6 +81,50 @@ struct ImageCache {
   /// to pull an image again. This is populated from `build_id` field on `Context`. `cache`
   /// will be cleared when the generation changes.
   generation: String,
+}
+
+struct ImagePullCache {
+  /// Image pull cache and current build generation ID.
+  inner: Mutex<ImagePullCacheInner>,
+
+  /// Policy to use when deciding whether to pull an image or not.
+  image_pull_policy: ImagePullPolicy,
+}
+
+impl ImagePullCache {
+  pub fn new(image_pull_policy: ImagePullPolicy) -> Self {
+    Self {
+      inner: Mutex::default(),
+      image_pull_policy,
+    }
+  }
+
+  async fn pull_image(
+    &self,
+    docker: &Docker,
+    image: &str,
+    build_generation: &str,
+  ) -> Result<(), String> {
+    let image_cell = {
+      let mut inner = self.inner.lock();
+
+      if build_generation != inner.generation {
+        inner.cache.clear();
+        inner.generation = build_generation.to_string();
+      }
+
+      let cell = inner
+        .cache
+        .entry(image.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()));
+      cell.clone()
+    };
+
+    image_cell
+      .get_or_try_init(pull_image(docker, image, self.image_pull_policy))
+      .await?;
+    Ok(())
+  }
 }
 
 #[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
@@ -134,60 +207,26 @@ impl CommandRunner {
     keep_sandboxes: KeepSandboxes,
     image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
+    let docker = DockerOnceCell::new();
+
+    let container_cache = ContainerCache::new(
+      docker.clone(),
+      &work_dir_base,
+      &named_caches,
+      &immutable_inputs,
+      image_pull_policy,
+    )?;
+
     Ok(CommandRunner {
-      docker: OnceCell::new(),
+      docker,
       store,
       executor,
       work_dir_base,
       named_caches,
       immutable_inputs,
       keep_sandboxes,
-      image_pull_cache: Mutex::default(),
-      image_pull_policy,
+      container_cache,
     })
-  }
-
-  async fn docker(&self) -> Result<&Docker, String> {
-    self
-      .docker
-      .get_or_try_init(async move {
-        let docker = Docker::connect_with_local_defaults()
-          .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
-
-        docker
-          .ping()
-          .await
-          .map_err(|err| format!("Failed to receive response from local Docker: {err}"))?;
-
-        Ok(docker)
-      })
-      .await
-  }
-
-  async fn pull_image(&self, image: &str, build_generation: &str) -> Result<(), String> {
-    let image_cell = {
-      let mut image_pull_cache = self.image_pull_cache.lock();
-
-      if build_generation != image_pull_cache.generation {
-        image_pull_cache.cache.clear();
-        image_pull_cache.generation = build_generation.to_string();
-      }
-
-      let cell = image_pull_cache
-        .cache
-        .entry(image.to_string())
-        .or_insert_with(|| Arc::new(OnceCell::new()));
-      cell.clone()
-    };
-
-    image_cell
-      .get_or_try_init(pull_image(
-        self.docker().await?,
-        image,
-        self.image_pull_policy,
-      ))
-      .await?;
-    Ok(())
   }
 }
 
@@ -305,7 +344,7 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
-    let docker = self.docker().await?;
+    let docker = self.docker.get().await?;
 
     let env = req
       .env
@@ -361,10 +400,11 @@ impl CapturedWorkdir for CommandRunner {
       .docker_image
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
 
-    // Attempt to pull the image (if so configured by the image pull policy). The `build_id` is
-    // used to determine when images should again be pulled (for example, when the "always"
-    // image pull policy is set).
-    self.pull_image(&image, &context.build_id).await?;
+    // Obtain ID of the base container in which to run the execution for this process.
+    let container_id = self
+      .container_cache
+      .container_id_for_image(&image, &context.build_id)
+      .await?;
 
     // DOCKER-TODO: Set creation options so we can set platform.
 
@@ -515,13 +555,14 @@ impl CapturedWorkdir for CommandRunner {
   }
 }
 
-/// Caches running containers so that build actions can be invoked by running executions
+/// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
 struct ContainerCache {
-  docker: Docker,
+  docker: DockerOnceCell,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
+  image_pull_cache: Arc<ImagePullCache>,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
@@ -530,10 +571,11 @@ struct ContainerCache {
 
 impl ContainerCache {
   pub fn new(
-    docker: Docker,
+    docker: DockerOnceCell,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
+    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
     let work_dir_base = work_dir_base
       .to_path_buf()
@@ -575,17 +617,25 @@ impl ContainerCache {
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
+      image_pull_cache: Arc::new(ImagePullCache::new(image_pull_policy)),
       containers: Mutex::default(),
     })
   }
 
   async fn make_container(
     docker: Docker,
+    image_pull_cache: Arc<ImagePullCache>,
     image: String,
+    build_generation: &str,
     work_dir_base: String,
     named_caches_base_dir: String,
     immutable_inputs_base_dir: String,
   ) -> Result<String, String> {
+    // Pull the image
+    image_pull_cache
+      .pull_image(&docker, &image, build_generation)
+      .await?;
+
     let config = bollard::container::Config {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
       host_config: Some(bollard_stubs::models::HostConfig {
@@ -649,7 +699,14 @@ impl ContainerCache {
 
   /// Return the container ID of a container running `image` for use as a place to invoke
   /// build actions as executions within the cached container.
-  pub async fn container_id_for_image(&self, image: &str) -> Result<&String, String> {
+  pub async fn container_id_for_image(
+    &self,
+    image: &str,
+    build_generation: &str,
+  ) -> Result<&String, String> {
+    let docker = self.docker.get().await?;
+    let docker = docker.clone();
+
     let container_id_cell = {
       let mut containers = self.containers.lock();
       let cell = containers
@@ -658,16 +715,18 @@ impl ContainerCache {
       cell.clone()
     };
 
-    let docker = self.docker.clone();
     let work_dir_base = self.work_dir_base.clone();
     let named_caches_base_dir = self.named_caches_base_dir.clone();
     let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
+    let image_pull_cache = Arc::clone(&self.image_pull_cache);
 
     container_id_cell
       .get_or_try_init(async move {
         Self::make_container(
           docker,
+          image_pull_cache,
           image.to_string(),
+          build_generation,
           work_dir_base,
           named_caches_base_dir,
           immutable_inputs_base_dir,
