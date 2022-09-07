@@ -258,9 +258,9 @@ impl Core {
         docker::ImagePullPolicy::OnlyIfLatestOrMissing,
       )?);
 
-      let runner =
-        SwitchedCommandRunner::new(docker_runner, runner, |req| req.docker_image.is_some());
-      let runner = Box::new(runner) as _;
+      let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
+        req.docker_image.is_some()
+      }));
 
       (runner, exec_strategy_opts.local_parallelism)
     };
