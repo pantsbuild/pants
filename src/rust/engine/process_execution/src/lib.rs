@@ -875,6 +875,18 @@ pub trait CommandRunner: Send + Sync + Debug {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
 }
 
+#[async_trait]
+impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    (**self).run(context, workunit, req).await
+  }
+}
+
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
 pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
   let (_, _, execute_request) =

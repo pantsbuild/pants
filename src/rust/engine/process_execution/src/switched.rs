@@ -9,28 +9,24 @@ use workunit_store::RunningWorkunit;
 
 use crate::{CommandRunner, Context, FallibleProcessResultWithPlatform, Process, ProcessError};
 
-pub struct SwitchedCommandRunner<F> {
-  true_runner: Box<dyn CommandRunner>,
-  false_runner: Box<dyn CommandRunner>,
-  predicate: F,
+pub struct SwitchedCommandRunner<T, F, P> {
+  true_runner: T,
+  false_runner: F,
+  predicate: P,
 }
 
-impl<F> fmt::Debug for SwitchedCommandRunner<F> {
+impl<T, F, P> fmt::Debug for SwitchedCommandRunner<T, F, P> {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     f.debug_struct("SwitchedCommandRunner")
       .finish_non_exhaustive()
   }
 }
 
-impl<F> SwitchedCommandRunner<F>
+impl<T, F, P> SwitchedCommandRunner<T, F, P>
 where
-  F: Fn(&Process) -> bool + Send + Sync,
+  P: Fn(&Process) -> bool + Send + Sync,
 {
-  pub fn new(
-    true_runner: Box<dyn CommandRunner>,
-    false_runner: Box<dyn CommandRunner>,
-    predicate: F,
-  ) -> Self {
+  pub fn new(true_runner: T, false_runner: F, predicate: P) -> Self {
     Self {
       true_runner,
       false_runner,
@@ -40,9 +36,11 @@ where
 }
 
 #[async_trait]
-impl<F> CommandRunner for SwitchedCommandRunner<F>
+impl<T, F, P> CommandRunner for SwitchedCommandRunner<T, F, P>
 where
-  F: Fn(&Process) -> bool + Send + Sync,
+  T: CommandRunner,
+  F: CommandRunner,
+  P: Fn(&Process) -> bool + Send + Sync,
 {
   async fn run(
     &self,
@@ -86,12 +84,8 @@ mod tests {
   async fn switched_command_runner() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-    let left = Box::new(MockCommandRunner(Err(ProcessError::Unclassified(
-      "left".to_string(),
-    ))));
-    let right = Box::new(MockCommandRunner(Err(ProcessError::Unclassified(
-      "right".to_string(),
-    ))));
+    let left = MockCommandRunner(Err(ProcessError::Unclassified("left".to_string())));
+    let right = MockCommandRunner(Err(ProcessError::Unclassified("right".to_string())));
 
     let runner = SwitchedCommandRunner::new(left, right, |req| req.argv.get(0).unwrap() == "left");
 
