@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -34,12 +35,13 @@ struct LocalTestResult {
   stderr_bytes: Vec<u8>,
 }
 
-macro_rules! setup_docker {
+/// Skips a test if Docker is not available in macOS CI.
+macro_rules! skip_if_no_docker_available_in_macos_ci {
   () => {{
     let docker = match Docker::connect_with_local_defaults() {
       Ok(docker) => docker,
       Err(err) => {
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && env::var_os("GITHUB_ACTIONS").is_some() {
           println!("Skipping test due to Docker not being available: {:?}", err);
           return;
         } else {
@@ -50,7 +52,7 @@ macro_rules! setup_docker {
 
     let ping_response = docker.ping().await;
     if ping_response.is_err() {
-      if cfg!(target_os = "macos") {
+      if cfg!(target_os = "macos") && env::var_os("GITHUB_ACTIONS").is_some() {
         println!(
           "Skipping test due to Docker not being available: {:?}",
           ping_response
@@ -69,7 +71,7 @@ macro_rules! setup_docker {
 #[tokio::test]
 #[cfg(unix)]
 async fn use_local_runner_if_docker_not_set() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   // Because `docker_image` is set but it does not exist, this process should fail.
   run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
@@ -90,7 +92,7 @@ async fn use_local_runner_if_docker_not_set() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
   )
@@ -106,7 +108,7 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&[
       SH_PATH,
@@ -127,7 +129,7 @@ async fn stdout_and_stderr_and_exit_code() {
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   // Launch a process that kills itself with a signal.
   let result = run_command_via_docker(
@@ -170,7 +172,7 @@ fn extract_env(
 #[tokio::test]
 #[cfg(unix)]
 async fn env() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
@@ -192,7 +194,7 @@ async fn env() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
@@ -214,7 +216,7 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   // Use `xyzzy` as a command that should not exist.
   let result = run_command_via_docker(
@@ -230,7 +232,7 @@ async fn binary_not_found() {
 
 #[tokio::test]
 async fn output_files_none() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker_image(IMAGE.to_owned()),
@@ -246,7 +248,7 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -272,7 +274,7 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -303,7 +305,7 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -333,7 +335,7 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -362,7 +364,7 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -392,7 +394,7 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -419,7 +421,7 @@ async fn output_overlapping_file_and_dir() {
 
 #[tokio::test]
 async fn append_only_cache_created() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let name = "geo";
   let dest_base = ".cache";
@@ -459,7 +461,7 @@ async fn test_apply_chroot() {
 
 #[tokio::test]
 async fn test_chroot_placeholder() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -491,7 +493,7 @@ async fn test_chroot_placeholder() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -524,7 +526,7 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -550,7 +552,7 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let argv = vec![
     SH_PATH.to_string(),
@@ -573,7 +575,7 @@ async fn timeout() {
 
 #[tokio::test]
 async fn working_directory() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -633,7 +635,7 @@ async fn working_directory() {
 
 #[tokio::test]
 async fn immutable_inputs() {
-  setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
