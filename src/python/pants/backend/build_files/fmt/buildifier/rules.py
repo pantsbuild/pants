@@ -19,9 +19,11 @@ class BuildifierRequest(_FmtBuildFilesRequest):
 
 
 @rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
-async def buildfier_fmt(request: BuildifierRequest, buildifier: Buildifier) -> FmtResult:
+async def buildfier_fmt(
+    request: BuildifierRequest, buildifier: Buildifier, platform: Platform
+) -> FmtResult:
     buildifier_tool = await Get(
-        DownloadedExternalTool, ExternalToolRequest, buildifier.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, buildifier.get_request(platform)
     )
     input_digest = await Get(
         Digest,

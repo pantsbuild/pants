@@ -244,6 +244,7 @@ async def invoke_coursier_wrapper(
 async def setup_coursier(
     coursier_subsystem: CoursierSubsystem,
     python: PythonBinary,
+    platform: Platform,
 ) -> Coursier:
     repos_args = (
         " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
@@ -260,7 +261,7 @@ async def setup_coursier(
     downloaded_coursier_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        coursier_subsystem.get_request(Platform.current),
+        coursier_subsystem.get_request(platform),
     )
     wrapper_scripts_digest_get = Get(
         Digest,

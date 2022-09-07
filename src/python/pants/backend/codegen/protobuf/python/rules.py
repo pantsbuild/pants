@@ -54,9 +54,10 @@ async def generate_python_from_protobuf(
     python_protobuf_subsystem: PythonProtobufSubsystem,
     python_protobuf_mypy_plugin: PythonProtobufMypyPlugin,
     pex_environment: PexEnvironment,
+    platform: Platform,
 ) -> GeneratedSources:
     download_protoc_request = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
     )
 
     output_dir = "_generated_files"
@@ -125,7 +126,7 @@ async def generate_python_from_protobuf(
         await Get(
             DownloadedExternalTool,
             ExternalToolRequest,
-            grpc_python_plugin.get_request(Platform.current),
+            grpc_python_plugin.get_request(platform),
         )
         if request.protocol_target.get(ProtobufGrpcToggleField).value
         else None

@@ -15,7 +15,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -477,7 +476,7 @@ class QueryRule(Rule):
     _output_type: Type
     input_types: Tuple[Type, ...]
 
-    def __init__(self, output_type: Type, input_types: Sequence[Type]) -> None:
+    def __init__(self, output_type: Type, input_types: Iterable[Type]) -> None:
         self._output_type = output_type
         self.input_types = tuple(input_types)
 

@@ -8,6 +8,7 @@ from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Spec
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
@@ -67,7 +68,7 @@ def calculate_specs(
 
     changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
-        ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+        ChangedAddresses, [Params(changed_request, options_bootstrapper, EnvironmentName())]
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
@@ -100,7 +101,7 @@ def calculate_specs(
 
 def rules():
     return [
-        QueryRule(ChangedAddresses, [ChangedRequest]),
+        QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
         QueryRule(GitBinary, [GitBinaryRequest]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary]),
     ]

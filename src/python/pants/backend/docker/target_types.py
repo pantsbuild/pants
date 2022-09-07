@@ -16,6 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -429,7 +430,7 @@ class DockerImageTarget(Target):
     )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class DockerImageTagsRequest:
     """A request to provide additional image tags."""

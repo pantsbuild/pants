@@ -63,6 +63,7 @@ async def count_loc(
     console: Console,
     succinct_code_counter: SuccinctCodeCounter,
     specs_paths: SpecsPaths,
+    platform: Platform,
 ) -> CountLinesOfCode:
     if not specs_paths.files:
         return CountLinesOfCode(exit_code=0)
@@ -72,7 +73,7 @@ async def count_loc(
         Get(
             DownloadedExternalTool,
             ExternalToolRequest,
-            succinct_code_counter.get_request(Platform.current),
+            succinct_code_counter.get_request(platform),
         ),
     )
     input_digest = await Get(Digest, MergeDigests((scc_program.digest, specs_digest)))

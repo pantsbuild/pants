@@ -42,6 +42,7 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
@@ -1081,7 +1082,7 @@ class TargetFilesGenerator(TargetGenerator):
             )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class TargetFilesGeneratorSettingsRequest:
     """An optional union to provide dynamic settings for a `TargetFilesGenerator`.
 
@@ -1107,7 +1108,7 @@ class TargetFilesGeneratorSettings:
 _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
     generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
@@ -2319,7 +2320,7 @@ class HydratedSources:
     sources_type: type[SourcesField] | None
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
@@ -2625,7 +2626,7 @@ class ExplicitlyProvidedDependencies:
 FS = TypeVar("FS", bound="FieldSet")
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
@@ -2680,7 +2681,7 @@ class InferredDependencies:
         self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.

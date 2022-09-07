@@ -9,6 +9,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -32,7 +33,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
 

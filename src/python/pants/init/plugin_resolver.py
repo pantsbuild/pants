@@ -18,7 +18,8 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
@@ -155,14 +156,15 @@ class PluginResolver:
                 }
             ),
         )
+        params = Params(request, EnvironmentName())
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [request])[0],
+            session.product_request(ResolvedPluginDistributions, [params])[0],
         )
 
 
 def rules():
     return [
-        QueryRule(ResolvedPluginDistributions, [PluginsRequest]),
+        QueryRule(ResolvedPluginDistributions, [PluginsRequest, EnvironmentName]),
         *collect_rules(),
     ]

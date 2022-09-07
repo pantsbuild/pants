@@ -37,12 +37,12 @@ class ShfmtRequest(FmtTargetsRequest):
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
+async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> FmtResult:
     if shfmt.skip:
         return FmtResult.skip(formatter_name=request.name)
 
     download_shfmt_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
     )
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, shfmt.config_request(request.snapshot.dirs)

@@ -218,13 +218,14 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (String, SocketAddr);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    _context: &'c Context,
+    workdir_path: &'w Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let client_workdir = if let Some(working_directory) = &req.working_directory {
       workdir_path.join(working_directory)
     } else {

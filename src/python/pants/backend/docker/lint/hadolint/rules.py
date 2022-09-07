@@ -49,12 +49,14 @@ def generate_argv(
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
-async def run_hadolint(request: HadolintRequest, hadolint: Hadolint) -> LintResults:
+async def run_hadolint(
+    request: HadolintRequest, hadolint: Hadolint, platform: Platform
+) -> LintResults:
     if hadolint.skip:
         return LintResults([], linter_name=request.name)
 
     downloaded_hadolint, config_files = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
     )
 

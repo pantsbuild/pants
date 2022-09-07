@@ -97,6 +97,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(task_side_effected, m)?)?;
 
+  m.add_function(wrap_pyfunction!(tasks_add_query_inputs_filter, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
@@ -1092,6 +1093,13 @@ fn execution_add_root_select(
       })
       .map_err(PyException::new_err)
   })
+}
+
+#[pyfunction]
+fn tasks_add_query_inputs_filter(py_tasks: &PyTasks, filtered_type: &PyType) {
+  let filtered_type = TypeId::new(filtered_type);
+  let mut tasks = py_tasks.0.borrow_mut();
+  tasks.add_query_inputs_filter(filtered_type);
 }
 
 #[pyfunction]

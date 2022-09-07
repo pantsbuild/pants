@@ -177,7 +177,7 @@ from pants.util.strutil import pluralize
 
 @rule
 async def run_shellcheck(
-    request: ShellcheckRequest, shellcheck: Shellcheck
+    request: ShellcheckRequest, shellcheck: Shellcheck, platform: Platform
 ) -> LintResults:
     if shellcheck.skip:
         return LintResults([], linter_name=request.name)
@@ -185,7 +185,7 @@ async def run_shellcheck(
     download_shellcheck_request = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        shellcheck.get_request(Platform.current),
+        shellcheck.get_request(platform),
     )
 
     sources_request = Get(

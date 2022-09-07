@@ -16,6 +16,7 @@ from pants.base.specs import AncestorGlobSpec, RawSpecs, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -53,7 +54,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
     dirs: tuple[str, ...]

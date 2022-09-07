@@ -151,11 +151,11 @@ impl TypeId {
   }
 
   pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::union_in_scope_types(py, self.as_py_type(py))
-      .unwrap()
-      .map(|types| types.into_iter().map(TypeId::new).collect())
+    Python::with_gil(|py| {
+      externs::union_in_scope_types(py, self.as_py_type(py))
+        .unwrap()
+        .map(|types| types.into_iter().map(TypeId::new).collect())
+    })
   }
 }
 

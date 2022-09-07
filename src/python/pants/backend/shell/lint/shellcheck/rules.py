@@ -38,7 +38,9 @@ class ShellcheckRequest(LintTargetsRequest):
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
-async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> LintResults:
+async def run_shellcheck(
+    request: ShellcheckRequest, shellcheck: Shellcheck, platform: Platform
+) -> LintResults:
     if shellcheck.skip:
         return LintResults([], linter_name=request.name)
 
@@ -66,7 +68,7 @@ async def run_shellcheck(request: ShellcheckRequest, shellcheck: Shellcheck) -> 
     )
 
     download_shellcheck_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, shellcheck.get_request(platform)
     )
 
     direct_sources, dependency_sources, downloaded_shellcheck = await MultiGet(

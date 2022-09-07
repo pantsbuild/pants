@@ -11,18 +11,9 @@ import pytest
 from pants.backend.python.target_types import PexExecutionMode, PexLayout
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
-use_deprecated_semantics_args = pytest.mark.parametrize(
-    "use_deprecated_semantics_args",
-    [
-        (),
-        ("--use-deprecated-pex-binary-run-semantics",),
-    ],
-)
-
 
 def run_generic_test(
     *,
-    use_deprecated_semantics_args: tuple[str, ...],
     entry_point: str = "app.py",
     execution_mode: Optional[PexExecutionMode] = None,
     include_tools: bool = False,
@@ -77,7 +68,6 @@ def run_generic_test(
             args = [
                 "--backend-packages=pants.backend.python",
                 "--backend-packages=pants.backend.codegen.protobuf.python",
-                *use_deprecated_semantics_args,
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
@@ -91,43 +81,32 @@ def run_generic_test(
 
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    if use_deprecated_semantics_args:
-        assert file.endswith("src_root2/utils/strutil.py")
+    assert "src_root2" not in file
+    assert file.endswith("utils/strutil.py")
+    if layout == PexLayout.LOOSE:
+        # Loose PEXs execute their own code directly
         assert "pants-sandbox-" in file
     else:
-        assert "src_root2" not in file
-        assert file.endswith("utils/strutil.py")
-        if layout == PexLayout.LOOSE:
-            # Loose PEXs execute their own code directly
-            assert "pants-sandbox-" in file
-        else:
-            assert "pants-sandbox-" not in file
+        assert "pants-sandbox-" not in file
     assert result.exit_code == 23
 
     return run
 
 
 @pytest.mark.parametrize("entry_point", ["app.py", "app.py:main"])
-@use_deprecated_semantics_args
 def test_entry_point(
     entry_point: str,
-    use_deprecated_semantics_args: tuple[str, ...],
 ):
-    run_generic_test(
-        use_deprecated_semantics_args=use_deprecated_semantics_args, entry_point=entry_point
-    )
+    run_generic_test(entry_point=entry_point)
 
 
 @pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
 @pytest.mark.parametrize("include_tools", [True, False])
-@use_deprecated_semantics_args
 def test_execution_mode_and_include_tools(
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    use_deprecated_semantics_args: tuple[str, ...],
 ):
     run = run_generic_test(
-        use_deprecated_semantics_args=use_deprecated_semantics_args,
         execution_mode=execution_mode,
         include_tools=include_tools,
     )
@@ -140,23 +119,17 @@ def test_execution_mode_and_include_tools(
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"
         ]
-        if use_deprecated_semantics_args:
-            assert not pex_info["strip_pex_env"]
-        else:
-            assert pex_info["strip_pex_env"]
+        assert pex_info["strip_pex_env"]
 
 
 @pytest.mark.parametrize("layout", PexLayout)
-@use_deprecated_semantics_args
 def test_layout(
     layout: Optional[PexLayout],
-    use_deprecated_semantics_args: tuple[str, ...],
 ):
-    run_generic_test(use_deprecated_semantics_args=use_deprecated_semantics_args, layout=layout)
+    run_generic_test(layout=layout)
 
 
-@use_deprecated_semantics_args
-def test_no_strip_pex_env_issues_12057(use_deprecated_semantics_args: tuple[str, ...]) -> None:
+def test_no_strip_pex_env_issues_12057() -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -185,7 +158,6 @@ def test_no_strip_pex_env_issues_12057(use_deprecated_semantics_args: tuple[str,
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *use_deprecated_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:binary",
@@ -194,8 +166,7 @@ def test_no_strip_pex_env_issues_12057(use_deprecated_semantics_args: tuple[str,
         assert result.exit_code == 42, result.stderr
 
 
-@use_deprecated_semantics_args
-def test_local_dist(use_deprecated_semantics_args: tuple[str, ...]) -> None:
+def test_local_dist() -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
@@ -232,7 +203,6 @@ def test_local_dist(use_deprecated_semantics_args: tuple[str, ...]) -> None:
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *use_deprecated_semantics_args,
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
             f"{tmpdir}/foo:bin",
@@ -241,8 +211,7 @@ def test_local_dist(use_deprecated_semantics_args: tuple[str, ...]) -> None:
         assert result.stdout == "LOCAL DIST\n"
 
 
-@use_deprecated_semantics_args
-def test_run_script_from_3rdparty_dist_issue_13747(use_deprecated_semantics_args) -> None:
+def test_run_script_from_3rdparty_dist_issue_13747() -> None:
     sources = {
         "src/BUILD": dedent(
             """\
@@ -255,7 +224,6 @@ def test_run_script_from_3rdparty_dist_issue_13747(use_deprecated_semantics_args
         SAY = "moooo"
         args = [
             "--backend-packages=pants.backend.python",
-            *use_deprecated_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:test",
@@ -265,37 +233,3 @@ def test_run_script_from_3rdparty_dist_issue_13747(use_deprecated_semantics_args
         result = run_pants(args)
         result.assert_success()
         assert SAY in result.stdout.strip()
-
-
-# NB: Can be removed in 2.15
-@use_deprecated_semantics_args
-def test_filename_spec_ambiutity(use_deprecated_semantics_args) -> None:
-    sources = {
-        "src/app.py": dedent(
-            """\
-            if __name__ == "__main__":
-                print(__file__)
-            """
-        ),
-        "src/BUILD": dedent(
-            """\
-            python_sources(name="lib")
-            pex_binary(
-                name="binary",
-                entry_point="app.py"
-            )
-            """
-        ),
-    }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            *use_deprecated_semantics_args,
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        file = result.stdout.strip()
-        assert file.endswith("src/app.py")
-        assert "pants-sandbox-" in file

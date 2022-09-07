@@ -254,6 +254,8 @@ impl Core {
         named_caches.clone(),
         immutable_inputs.clone(),
         exec_strategy_opts.local_keep_sandboxes,
+        // TODO(#16767): Allow users to specify this via an option.
+        docker::ImagePullPolicy::IfMissing,
       )?);
 
       (runner, exec_strategy_opts.local_parallelism)
@@ -539,7 +541,11 @@ impl Core {
     let http_client = http_client_builder
       .build()
       .map_err(|err| format!("Error building HTTP client: {}", err))?;
-    let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
+    let rule_graph = RuleGraph::with_query_inputs_filter(
+      tasks.rules().clone(),
+      tasks.queries().clone(),
+      tasks.query_inputs_filter().iter().cloned().collect(),
+    )?;
 
     let gitignore_file = if use_gitignore {
       let gitignore_path = build_root.join(".gitignore");

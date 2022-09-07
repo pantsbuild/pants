@@ -11,7 +11,7 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
@@ -28,7 +28,7 @@ class ExportError(Exception):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ExportRequest:
     """A union for exportable data provided by a backend.

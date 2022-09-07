@@ -9,7 +9,7 @@ from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironment, EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -22,7 +22,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ReplImplementation(ABC):
     """A REPL implementation for a specific language or runtime.
