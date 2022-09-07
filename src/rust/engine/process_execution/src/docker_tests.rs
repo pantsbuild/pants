@@ -154,7 +154,6 @@ fn extract_env(
 }
 
 #[tokio::test]
-#[ignore] // TODO(#16749): fix flaky test
 #[cfg(unix)]
 async fn env() {
   let docker = setup_docker!();
@@ -178,7 +177,6 @@ async fn env() {
 }
 
 #[tokio::test]
-#[ignore] // TODO(#16749): fix flaky test
 #[cfg(unix)]
 async fn env_is_deterministic() {
   let docker = setup_docker!();

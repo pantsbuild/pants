@@ -295,79 +295,81 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("started container {}", &container.id);
 
-    let attach_options = bollard::container::AttachContainerOptions::<String> {
-      stdout: Some(true),
-      stderr: Some(true),
-      logs: Some(true), // stream any output that was missed between the start_container call and now
-      stream: Some(true),
-      ..bollard::container::AttachContainerOptions::default()
-    };
-
-    let attach_result = docker
-      .attach_container(&container.id, Some(attach_options))
-      .await
-      .map_err(|err| {
-        format!(
-          "Failed to attach to Docker container `{}`: {:?}",
-          &container.id, err
-        )
-      })?;
-
-    log::trace!("attached to container {}", &container.id);
-
-    let mut output_stream = attach_result.output.boxed();
-
-    let wait_options = bollard::container::WaitContainerOptions {
-      condition: "not-running",
-    };
-    let mut wait_stream = docker
-      .wait_container(&container.id, Some(wait_options))
-      .boxed();
-
     let container_id = container.id.to_owned();
     let keep_sandboxes = self.keep_sandboxes;
     let docker = docker.clone();
-    let result_stream = async_stream::stream! {
-      let was_success = loop {
-        tokio::select! {
-          Some(output_msg) = output_stream.next() => {
-            match output_msg {
-              Ok(LogOutput::StdOut { message }) => {
-                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
-                yield Ok(ChildOutput::Stdout(message));
-              }
-              Ok(LogOutput::StdErr { message }) => {
-                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
-                yield Ok(ChildOutput::Stderr(message));
-              }
-              _ => (),
-            }
-          }
-          Some(wait_msg) = wait_stream.next() => {
-            log::trace!("wait_container stream ({}): {:?}", &container_id, wait_msg);
-            match wait_msg {
-              Ok(r) => {
-                // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
-                // `ChildResults` to better support exit code vs signal vs error message?
-                let status_code = r.status_code;
-                yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                break status_code == 0;
-              }
-              Err(err) => {
-                // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
-                log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
-                yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                break false;
-              }
-            }
-          }
-        }
+
+    let stream = async_stream::try_stream! {
+      // Wait for the container to exit.
+      let status_code = loop {
+        let wait_options = bollard::container::WaitContainerOptions {
+          condition: "not-running",
+        };
+        let mut wait_stream = docker
+          .wait_container(&container.id, Some(wait_options))
+          .boxed();
+
+        let wait_msg = match wait_stream.next().await {
+          Some(msg) => msg,
+          None => {
+            log::trace!("Docker wait_container monitoring stream closed early. Reconnecting ...");
+            continue
+          },
+        };
+
+        let status_code = wait_msg
+          .map_err(|err| format!("Docker wait_container failure for container {}: {:?}", &container_id, err))?
+          .status_code;
+
+        break status_code;
       };
+
+      log::trace!("container {} exited with status code {}", &container_id, status_code);
+
+      let attach_options = bollard::container::AttachContainerOptions::<String> {
+        stdout: Some(true),
+        stderr: Some(true),
+        logs: Some(true),
+        ..bollard::container::AttachContainerOptions::default()
+      };
+
+      let attach_result = docker
+        .attach_container(&container.id, Some(attach_options))
+        .await
+        .map_err(|err| {
+          format!(
+            "Failed to attach to Docker container `{}`: {:?}",
+            &container_id, err
+          )
+        })?;
+
+      log::trace!("attached to container {}", &container.id);
+
+      let mut output_stream = attach_result.output.boxed();
+
+      while let Some(output_msg) = output_stream.next().await {
+        match output_msg {
+            Ok(LogOutput::StdOut { message }) => {
+                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
+                yield ChildOutput::Stdout(message);
+            }
+            Ok(LogOutput::StdErr { message }) => {
+                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
+                yield ChildOutput::Stderr(message);
+            }
+            Ok(_) => (),
+            Err(err) => {
+                log::trace!("error while capturing output of container {}: {:?}", &container_id, err);
+            }
+        }
+      }
+
+      yield ChildOutput::Exit(ExitCode(status_code as i32));
 
       let do_remove_container = match keep_sandboxes {
         KeepSandboxes::Always => false,
         KeepSandboxes::Never => true,
-        KeepSandboxes::OnFailure => !was_success,
+        KeepSandboxes::OnFailure => status_code == 0,
       };
 
       if do_remove_container {
@@ -380,14 +382,12 @@ impl CapturedWorkdir for CommandRunner {
           .remove_container(&container_id, Some(remove_options))
           .await
           .map_err(|err| format!("Failed to remove container `{}`: {:?}", &container_id, err));
-
         if let Err(err) = remove_result {
           log::warn!("{}", err);
         }
       }
-    }
-    .boxed();
+    };
 
-    Ok(result_stream)
+    Ok(stream.boxed())
   }
 }
