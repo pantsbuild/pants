@@ -6,6 +6,7 @@ from typing import cast
 
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
@@ -68,7 +69,8 @@ def calculate_specs(
 
     changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
-        ChangedAddresses, [Params(changed_request, options_bootstrapper, EnvironmentName())]
+        ChangedAddresses,
+        [Params(changed_request, options_bootstrapper, determine_bootstrap_environment(session))],
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
