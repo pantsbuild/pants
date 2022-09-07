@@ -515,6 +515,9 @@ fn interactive_process(
         .unwrap();
       (py_interactive_process.extract().unwrap(), py_process, process_config)
     });
+    if let Some(docker_image) = process_config.docker_image {
+      panic!("InteractiveProcess should not run with a docker environment, but set to {docker_image}")
+    }
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config).await?.process;
     let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
       let py_interactive_process_obj = py_interactive_process.to_object(py);
