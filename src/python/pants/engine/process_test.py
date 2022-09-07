@@ -139,6 +139,7 @@ def test_cache_scope_always(rule_runner: RuleRunner) -> None:
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
     rule_runner.new_session("session two")
+    rule_runner.set_options([])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
 
@@ -151,7 +152,9 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
         description="success",
     )
     result_one = rule_runner.request(FallibleProcessResult, [process])
+
     rule_runner.new_session("session one")
+    rule_runner.set_options([])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
 
@@ -163,7 +166,9 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
     )
     result_three = rule_runner.request(FallibleProcessResult, [process])
     result_four = rule_runner.request(FallibleProcessResult, [process])
+
     rule_runner.new_session("session two")
+    rule_runner.set_options([])
     result_five = rule_runner.request(FallibleProcessResult, [process])
     assert result_three is result_four
     assert result_four != result_five
@@ -197,6 +202,7 @@ def test_cache_scope_per_restart() -> None:
     success_cache_failure_res1 = run1(success_cache_failure)
 
     runner_one.new_session("new session")
+    runner_one.set_options([])
     always_cache_success_res2 = run1(always_cache_success)
     always_cache_failure_res2 = run1(always_cache_failure)
     success_cache_success_res2 = run1(success_cache_success)
@@ -229,7 +235,9 @@ def test_cache_scope_per_session(rule_runner: RuleRunner) -> None:
     result_one = rule_runner.request(FallibleProcessResult, [process])
     result_two = rule_runner.request(FallibleProcessResult, [process])
     assert result_one is result_two
+
     rule_runner.new_session("next attempt")
+    rule_runner.set_options([])
     result_three = rule_runner.request(FallibleProcessResult, [process])
     # Should re-run in a new Session.
     assert result_one != result_three
