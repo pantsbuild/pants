@@ -39,7 +39,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -193,7 +193,9 @@ async def pylint_determine_partitions(
         PylintPartition(
             FrozenOrderedSet(field_sets),
             CoarsenedTargets(
-                coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                OrderedSet(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                )
             ),
             resolve if len(python_setup.resolves) > 1 else None,
             InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),

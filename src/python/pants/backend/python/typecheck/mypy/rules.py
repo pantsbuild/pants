@@ -350,7 +350,9 @@ async def mypy_determine_partitions(
         MyPyPartition(
             FrozenOrderedSet(field_sets),
             CoarsenedTargets(
-                coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                OrderedSet(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                )
             ),
             resolve if len(python_setup.resolves) > 1 else None,
             interpreter_constraints or mypy.interpreter_constraints,
