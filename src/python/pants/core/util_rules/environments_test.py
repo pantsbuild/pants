@@ -13,6 +13,7 @@ from pants.core.util_rules.environments import (
     LOCAL_ENVIRONMENT_MATCHER,
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
+    ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
     DockerImageField,
     EnvironmentName,
@@ -22,7 +23,6 @@ from pants.core.util_rules.environments import (
     NoCompatibleEnvironmentError,
     UnrecognizedEnvironmentError,
 )
-from pants.engine.environment import ChosenLocalEnvironmentName
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 

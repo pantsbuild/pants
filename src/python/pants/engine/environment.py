@@ -51,13 +51,6 @@ class EnvironmentName(EngineAwareParameter):
         return self.val or "<none>"
 
 
-@dataclass(frozen=True)
-class ChosenLocalEnvironmentName:
-    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
-
-    val: str | None
-
-
 # ----------------------------------------------------------------------
 # Environments variables
 # ----------------------------------------------------------------------
