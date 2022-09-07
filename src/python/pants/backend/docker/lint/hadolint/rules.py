@@ -8,7 +8,7 @@ from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -50,11 +50,11 @@ def generate_argv(
 @rule
 async def partition_hadolint(
     request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
-) -> TargetPartitions[None]:
+) -> Partitions[HadolintFieldSet, None]:
     if hadolint.skip:
-        return TargetPartitions()
+        return Partitions()
 
-    return TargetPartitions.from_field_set_partitions([request.field_sets])
+    return Partitions.from_partitions([request.field_sets])
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
@@ -68,7 +68,7 @@ async def run_hadolint(
 
     dockerfile_infos = await MultiGet(
         Get(DockerfileInfo, DockerfileInfoRequest(field_set.address))
-        for field_set in request.field_sets
+        for field_set in request.elements
     )
 
     input_digest = await Get(

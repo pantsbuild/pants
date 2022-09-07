@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -40,7 +40,7 @@ def rule_runner() -> RuleRunner:
             *subsystem.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(TargetPartitions, [PylintRequest.PartitionRequest]),
+            QueryRule(Partitions, [PylintRequest.PartitionRequest]),
             QueryRule(LintResult, [PylintRequest.Batch]),
         ],
         target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
@@ -71,7 +71,7 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[PylintFieldSet, PylintPartition],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
@@ -521,7 +521,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions: TargetPartitions[PylintPartition] = rule_runner.request(TargetPartitions, [request])
+    partitions = rule_runner.request(Partitions[PylintFieldSet, PylintPartition], [request])
     assert len(partitions) == 3
 
     def assert_partition(

@@ -8,7 +8,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
@@ -37,9 +37,9 @@ async def partition_bandit(
     request: BanditRequest.PartitionRequest[BanditFieldSet],
     bandit: Bandit,
     python_setup: PythonSetup,
-) -> TargetPartitions[InterpreterConstraints]:
+) -> Partitions[BanditFieldSet, InterpreterConstraints]:
     if bandit.skip:
-        return TargetPartitions()
+        return Partitions()
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
@@ -49,7 +49,7 @@ async def partition_bandit(
         request.field_sets, python_setup
     )
 
-    return TargetPartitions(
+    return Partitions(
         (
             field_sets,
             interpreter_constraints,
@@ -71,7 +71,7 @@ async def bandit_lint(
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -93,7 +93,7 @@ async def bandit_lint(
             bandit_pex,
             argv=generate_argv(source_files, bandit),
             input_digest=input_digest,
-            description=f"Run Bandit on {pluralize(len(request.field_sets), 'file')}.",
+            description=f"Run Bandit on {pluralize(len(request.elements), 'file')}.",
             output_directories=(REPORT_DIR,),
             level=LogLevel.DEBUG,
         ),

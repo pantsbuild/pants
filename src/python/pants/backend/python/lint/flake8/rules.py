@@ -16,7 +16,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, RemovePrefix
@@ -47,9 +47,9 @@ async def partition_flake8(
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> TargetPartitions[InterpreterConstraints]:
+) -> Partitions[Flake8FieldSet, InterpreterConstraints]:
     if flake8.skip:
-        return TargetPartitions()
+        return Partitions()
 
     results: dict[InterpreterConstraints, list[Flake8FieldSet]] = defaultdict(list)
     for fs in request.field_sets:
@@ -59,7 +59,7 @@ async def partition_flake8(
         )
         results[constraints].append(fs)
 
-    return TargetPartitions(
+    return Partitions(
         (tuple(partition), interpreter_constraints)
         for interpreter_constraints, partition in results.items()
     )
@@ -82,7 +82,7 @@ async def flake8_lint_partition(
     )
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.field_sets)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     extra_files_get = Get(
         Digest,
@@ -123,8 +123,8 @@ async def flake8_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": first_party_plugins.PREFIX},
-            concurrency_available=len(request.field_sets),
-            description=f"Run Flake8 on {pluralize(len(request.field_sets), 'file')}.",
+            concurrency_available=len(request.elements),
+            description=f"Run Flake8 on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

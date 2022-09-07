@@ -21,7 +21,7 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart, sources
 from pants.build_graph.address import Address
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.engine.target import Target
@@ -42,7 +42,7 @@ def rule_runner() -> RuleRunner:
             *sources.rules(),
             *target_types_rules(),
             SubsystemRule(HelmSubsystem),
-            QueryRule(TargetPartitions, [HelmLintRequest.PartitionRequest]),
+            QueryRule(Partitions, [HelmLintRequest.PartitionRequest]),
             QueryRule(LintResult, [HelmLintRequest.Batch]),
         ],
     )
@@ -57,7 +57,7 @@ def run_helm_lint(
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(extra_options)
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[HelmLintFieldSet, None],
         [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

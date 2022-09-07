@@ -29,15 +29,15 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, Target
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -73,9 +73,9 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> TargetPartitions[PylintPartition]:
+) -> Partitions[PylintFieldSet, PylintPartition]:
     if pylint.skip:
-        return TargetPartitions()
+        return Partitions()
 
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
         first_party_plugins.interpreter_constraints_fields, python_setup
@@ -91,15 +91,18 @@ async def partition_pylint(
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
-    return TargetPartitions(
-        PylintPartition(
-            CoarsenedTargets(
-                OrderedSet(
-                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
-                )
+    return Partitions(
+        (
+            tuple(field_sets),
+            PylintPartition(
+                CoarsenedTargets(
+                    OrderedSet(
+                        coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                    )
+                ),
+                resolve if len(python_setup.resolves) > 1 else None,
+                InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
             ),
-            resolve if len(python_setup.resolves) > 1 else None,
-            InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
         )
         for (
             resolve,
@@ -118,7 +121,7 @@ async def pylint_lint_partition(
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (fs.address for fs in request.field_sets),
+            (fs.address for fs in request.elements),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -136,7 +139,7 @@ async def pylint_lint_partition(
     )
 
     field_set_sources_get = Get(
-        SourceFiles, SourceFilesRequest(fs.source for fs in request.field_sets)
+        SourceFiles, SourceFilesRequest(fs.source for fs in request.elements)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -195,8 +198,8 @@ async def pylint_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            concurrency_available=len(request.field_sets),
-            description=f"Run Pylint on {pluralize(len(request.field_sets), 'file')}.",
+            concurrency_available=len(request.elements),
+            description=f"Run Pylint on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

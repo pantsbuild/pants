@@ -12,7 +12,7 @@ from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufL
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
-            QueryRule(TargetPartitions, [BufLintRequest.PartitionRequest]),
+            QueryRule(Partitions, [BufLintRequest.PartitionRequest]),
             QueryRule(LintResult, [BufLintRequest.Batch]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
@@ -55,7 +55,7 @@ def run_buf(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[BufFieldSet, None],
         [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

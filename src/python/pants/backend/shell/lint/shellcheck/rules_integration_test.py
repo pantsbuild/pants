@@ -11,7 +11,7 @@ from pants.backend.shell.lint.shellcheck.rules import ShellcheckFieldSet, Shellc
 from pants.backend.shell.lint.shellcheck.rules import rules as shellcheck_rules
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(TargetPartitions, [ShellcheckRequest.PartitionRequest]),
+            QueryRule(Partitions, [ShellcheckRequest.PartitionRequest]),
             QueryRule(LintResult, [ShellcheckRequest.Batch]),
         ],
         target_types=[ShellSourcesGeneratorTarget],
@@ -46,7 +46,7 @@ def run_shellcheck(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[ShellcheckFieldSet, None],
         [
             ShellcheckRequest.PartitionRequest(
                 tuple(ShellcheckFieldSet.create(tgt) for tgt in targets)

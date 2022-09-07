@@ -16,7 +16,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -46,22 +46,22 @@ class GoVetRequest(LintTargetsRequest):
 @rule
 async def partition_go_vet(
     request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
-) -> TargetPartitions[None]:
+) -> Partitions[GoVetFieldSet, None]:
     if go_vet_subsystem.skip:
-        return TargetPartitions()
+        return Partitions()
 
-    return TargetPartitions.from_field_set_partitions([request.field_sets])
+    return Partitions.from_partitions([request.field_sets])
 
 
 @rule(level=LogLevel.DEBUG)
 async def run_go_vet(request: GoVetRequest.Batch[GoVetFieldSet, None]) -> LintResult:
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request.field_sets),
+        SourceFilesRequest(field_set.sources for field_set in request.elements),
     )
 
     owning_go_mods = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.field_sets
+        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.elements
     )
 
     owning_go_mod_addresses = {x.address for x in owning_go_mods}

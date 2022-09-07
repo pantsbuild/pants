@@ -8,7 +8,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
 )
-from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -41,11 +41,11 @@ class BufLintRequest(LintTargetsRequest):
 @rule
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
-) -> TargetPartitions[None]:
+) -> Partitions[BufFieldSet, None]:
     if buf.lint_skip:
-        return TargetPartitions()
+        return Partitions()
 
-    return TargetPartitions.from_field_set_partitions([request.field_sets])
+    return Partitions.from_partitions([request.field_sets])
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
@@ -54,7 +54,7 @@ async def run_buf(
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest((field_set.address for field_set in request.field_sets)),
+        TransitiveTargetsRequest((field_set.address for field_set in request.elements)),
     )
 
     all_stripped_sources_request = Get(
@@ -68,7 +68,7 @@ async def run_buf(
     target_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (field_set.sources for field_set in request.field_sets),
+            (field_set.sources for field_set in request.elements),
             for_sources_types=(ProtobufSourceField,),
             enable_codegen=True,
         ),
@@ -102,7 +102,7 @@ async def run_buf(
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
-            description=f"Run buf lint on {pluralize(len(request.field_sets), 'file')}.",
+            description=f"Run buf lint on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

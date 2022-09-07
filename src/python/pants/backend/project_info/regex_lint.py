@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Iterable
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.core.goals.lint import FilePartitions, LintFilesRequest, LintResult
+from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import DictOption, EnumOption
@@ -260,10 +260,10 @@ class RegexLintRequest(LintFilesRequest):
 @rule
 async def partition_inputs(
     request: RegexLintRequest.PartitionRequest, regex_lint_subsystem: RegexLintSubsystem
-) -> FilePartitions:
+) -> Partitions[str, None]:
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     if multi_matcher is None:
-        return FilePartitions()
+        return Partitions()
 
     applicable_file_paths = []
     for fp in request.file_paths:
@@ -271,7 +271,7 @@ async def partition_inputs(
         if content_pattern_names and encoding:
             applicable_file_paths.append(fp)
 
-    return FilePartitions.from_file_partitions([applicable_file_paths])
+    return Partitions.from_partitions([applicable_file_paths])
 
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)
@@ -281,7 +281,7 @@ async def lint_with_regex_patterns(
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     assert multi_matcher is not None
     file_to_content_pattern_names_and_encoding = {}
-    for fp in request.file_paths:
+    for fp in request.elements:
         content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
         assert content_pattern_names and encoding
         file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)

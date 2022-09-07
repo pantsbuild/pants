@@ -15,7 +15,7 @@ from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(TargetPartitions, [BanditRequest.PartitionRequest]),
+            QueryRule(Partitions, [BanditRequest.PartitionRequest]),
             QueryRule(LintResult, [BanditRequest.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -59,7 +59,7 @@ def run_bandit(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[BanditFieldSet, None],
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

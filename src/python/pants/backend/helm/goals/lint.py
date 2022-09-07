@@ -15,7 +15,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.goals.lint import LintResult, LintTargetsRequest, TargetPartitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
@@ -37,18 +37,16 @@ class HelmLintRequest(LintTargetsRequest):
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-) -> TargetPartitions[None]:
-    return TargetPartitions.from_field_set_partitions(
-        [fs] for fs in request.field_sets if not fs.skip_lint.value
-    )
+) -> Partitions[HelmLintFieldSet, None]:
+    return Partitions.from_partitions([fs] for fs in request.field_sets if not fs.skip_lint.value)
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
     request: HelmLintRequest.Batch[HelmLintFieldSet, None], helm_subsystem: HelmSubsystem
 ) -> LintResult:
-    assert len(request.field_sets) == 1
-    field_set = request.field_sets[0]
+    assert len(request.elements) == 1
+    field_set = request.elements[0]
     chart = await Get(HelmChart, HelmChartRequest(field_set))
 
     argv = ["lint", chart.name]

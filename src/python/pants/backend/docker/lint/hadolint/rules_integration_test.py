@@ -12,7 +12,7 @@ from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.core.goals import package
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *hadolint_rules(),
             package.find_all_packageable_targets,
             *source_files.rules(),
-            QueryRule(TargetPartitions, [HadolintRequest.PartitionRequest]),
+            QueryRule(Partitions, [HadolintRequest.PartitionRequest]),
             QueryRule(LintResult, [HadolintRequest.Batch]),
         ],
         target_types=[DockerImageTarget],
@@ -48,7 +48,7 @@ def run_hadolint(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[HadolintFieldSet, None],
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

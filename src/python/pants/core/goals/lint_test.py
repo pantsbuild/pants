@@ -15,14 +15,13 @@ from pants.base.specs import Specs
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
-    FilePartitions,
     Lint,
     LintFilesRequest,
     LintRequest,
     LintResult,
     LintSubsystem,
     LintTargetsRequest,
-    TargetPartitions,
+    Partitions,
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -122,19 +121,21 @@ class InvalidRequest(MockLintRequest):
         return -1
 
 
-def mock_target_partitioner(request: MockLintRequest.PartitionRequest) -> TargetPartitions:
+def mock_target_partitioner(
+    request: MockLintRequest.PartitionRequest,
+) -> Partitions[MockLinterFieldSet, None]:
     if type(request) is SkippedRequest.PartitionRequest:
-        return TargetPartitions()
+        return Partitions()
 
-    return TargetPartitions.from_field_set_partitions([request.field_sets])
+    return Partitions.from_partitions([request.field_sets])
 
 
 class MockFilesRequest(LintFilesRequest):
     name = "FilesLinter"
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> FilePartitions:
-    return FilePartitions.from_file_partitions([request.file_paths])
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, None]:
+    return Partitions.from_partitions([request.file_paths])
 
 
 def mock_lint_partition(request: Any) -> LintResult:
@@ -203,7 +204,7 @@ def run_lint_rule(
             ),
             LintRequest.Batch: (
                 [rt.Batch for rt in lint_request_types]
-                + ([MockFilesRequest.Batch] if run_files_linter else [])  # type: ignore[list-item]
+                + ([MockFilesRequest.Batch] if run_files_linter else [])
             ),
             LintTargetsRequest.PartitionRequest: [rt.PartitionRequest for rt in lint_request_types],
             LintFilesRequest.PartitionRequest: (
@@ -238,12 +239,12 @@ def run_lint_rule(
                     mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
                 ),
                 MockGet(
-                    output_type=TargetPartitions,
+                    output_type=Partitions,
                     input_type=LintTargetsRequest.PartitionRequest,
                     mock=mock_target_partitioner,
                 ),
                 MockGet(
-                    output_type=FilePartitions,
+                    output_type=Partitions,
                     input_type=LintFilesRequest.PartitionRequest,
                     mock=mock_file_partitioner,
                 ),

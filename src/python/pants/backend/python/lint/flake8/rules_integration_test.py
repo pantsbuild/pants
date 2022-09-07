@@ -15,7 +15,8 @@ from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.lint import LintResult, TargetPartitions
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -36,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(TargetPartitions, [Flake8Request.PartitionRequest]),
+            QueryRule(Partitions, [Flake8Request.PartitionRequest]),
             QueryRule(LintResult, [Flake8Request.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -55,7 +56,7 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        TargetPartitions,
+        Partitions[Flake8FieldSet, InterpreterConstraints],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
