@@ -6,13 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.core.util_rules.system_binaries import OpenBinary
+from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
-from pants.engine.process import (
-    Process,
-    ProcessCacheScope,
-    ProcessConfigFromEnvironment,
-    ProcessResult,
-)
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -55,5 +51,5 @@ async def get_browser(request: BrowserRequest, open_binary: OpenBinary) -> Brows
 def rules():
     return (
         *collect_rules(),
-        QueryRule(ProcessResult, (Process, ProcessConfigFromEnvironment)),
+        QueryRule(ProcessResult, (Process, EnvironmentName)),
     )
