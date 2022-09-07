@@ -349,13 +349,14 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = ();
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    _context: &'c Context,
+    workdir_path: &'w Path,
     _workdir_token: (),
     req: Process,
     exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let cwd = if let Some(ref working_directory) = req.working_directory {
       workdir_path.join(working_directory)
     } else {
@@ -484,7 +485,13 @@ pub trait CapturedWorkdir {
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
-          .run_in_workdir(&workdir_path, workdir_token, req.clone(), exclusive_spawn)
+          .run_in_workdir(
+            &context,
+            &workdir_path,
+            workdir_token,
+            req.clone(),
+            exclusive_spawn,
+          )
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
@@ -589,13 +596,14 @@ pub trait CapturedWorkdir {
   ///  fork+execs in the scheduler. For now we rely on the fact that the process_execution::nailgun
   ///  module is dead code in practice.
   ///
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    context: &'c Context,
+    workdir_path: &'w Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
     exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
 }
 
 ///

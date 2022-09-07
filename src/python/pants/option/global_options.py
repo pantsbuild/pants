@@ -23,7 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -536,7 +536,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            cache_content_behavior=GlobalOptions.resolve_cache_content_behavior(bootstrap_options),
+            cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
@@ -1486,20 +1486,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_cache_eager_fetch = BoolOption(
-        advanced=True,
-        default=(DEFAULT_EXECUTION_OPTIONS.cache_content_behavior != CacheContentBehavior.defer),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use the `cache_content_behavior` option instead.",
-        help=softwrap(
-            """
-            Eagerly fetch relevant content from the remote store instead of lazily fetching.
-
-            This may result in worse performance, but reduce the frequency of errors
-            encountered by reducing the surface area of when remote caching is used.
-            """
-        ),
-    )
     remote_cache_rpc_concurrency = IntOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
@@ -1722,38 +1708,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    use_deprecated_pex_binary_run_semantics = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            If `true`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
-            a sandbox (while still using a PEX for thirdparty dependencies). Additionally, you can
-            refer to the `pex_binary` using the value of its `entry_point` field (if it is a filename).
-
-            If `false`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
-            This makes `run` equivalent to using `package` and running the artifact. Additionally,
-            the binary must be `run` using the `pex_binary`'s address, as passing a filename to `run`
-            will run the `python_source`.
-
-            Note that support has been added to Pants to allow you to `run` any `python_source`,
-            so setting this to `true` should be reserved for maintaining backwards-compatibility
-            with previous versions of Pants. Additionally, you can remove any `pex_binary` targets
-            that exist solely for running Python code (and aren't meant to be packaged).
-            """
-        ),
-        removal_version="2.15.0.dev1",
-        removal_hint=softwrap(
-            """
-            If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
-            simply delete the option from `pants.toml` because `false` is now the default.
-
-            If set to `true`, removing the option will cause `run` on a `pex_binary` to package and
-            run the built PEX file. Additionally, the `pex_binary` must be referred to by its address.
-            To keep the old `run` semantics, use `run` on the relevant `python_source` target.
-            """
-        ),
-    )
-
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
@@ -1789,41 +1743,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                     """
                 )
             )
-
-        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
-        # removed as well.
-        deprecated_conditional(
-            lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
-            removal_version="2.15.0.dev1",
-            entity="Setting `[GLOBAL].remote_execution` at the same time as `[GLOBAL].remote_cache_eager-fetch`.",
-            hint=softwrap(
-                """
-                Use of `[GLOBAL].remote_execution` currently implies use of
-                `[GLOBAL].remote_cache_eager-fetch=false`, but in future versions, use of eager fetch with
-                remote execution will be optional. To preserve the current behavior in future
-                versions, `[GLOBAL].remote_cache_eager-fetch` should be disabled.
-                """
-            ),
-        )
-
-        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
-        # removed as well.
-        deprecated_conditional(
-            lambda: (
-                opts.remote_execution
-                and (not opts.remote_cache_read or not opts.remote_cache_write)
-            ),
-            removal_version="2.15.0.dev1",
-            entity="Using `[GLOBAL].remote_execution` without setting `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write`.",
-            hint=softwrap(
-                """
-                Use of `[GLOBAL].remote_execution` currently implies use of a remote cache, but in future
-                versions, use of the remote cache with remote execution will be optional. To
-                preserve the current behavior in future versions, both `[GLOBAL].remote_cache_read` and
-                `[GLOBAL].remote_cache_write` should be enabled.
-                """
-            ),
-        )
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
@@ -1878,29 +1797,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         return PyExecutor(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
         )
-
-    @staticmethod
-    def resolve_cache_content_behavior(
-        bootstrap_options: OptionValueContainer,
-    ) -> CacheContentBehavior:
-        resolved_value = resolve_conflicting_options(
-            old_option="remote_cache_eager_fetch",
-            new_option="cache_content_behavior",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
-        )
-
-        if isinstance(resolved_value, bool):
-            # Is `remote_cache_eager_fetch`.
-            return CacheContentBehavior.fetch if resolved_value else CacheContentBehavior.defer
-        elif isinstance(resolved_value, CacheContentBehavior):
-            return resolved_value
-        else:
-            raise TypeError(
-                f"Unexpected option value for `cache_content_behavior`: {resolved_value}"
-            )
 
     @staticmethod
     def resolve_keep_sandboxes(
@@ -2033,13 +1929,3 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
-
-
-@dataclass(frozen=True)
-class UseDeprecatedPexBinaryRunSemanticsOption:
-    """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
-
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
-    """
-
-    val: bool

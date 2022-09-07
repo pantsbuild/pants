@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
-    Any,
     ClassVar,
     Iterable,
     Iterator,
@@ -28,7 +27,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -54,7 +52,6 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -293,8 +290,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -827,19 +823,9 @@ class PythonTestsTimeoutField(IntField):
         `TestTimeoutField` once the deprecated options in the `pytest` scope are removed.
         """
 
-        def resolve_opt(*, option: str) -> Any:
-            return resolve_conflicting_options(
-                old_option=option,
-                new_option=option,
-                old_scope="pytest",
-                new_scope="test",
-                old_container=pytest.options,
-                new_container=test.options,
-            )
-
-        enabled = resolve_opt(option="timeouts")
-        timeout_default = resolve_opt(option="timeout_default")
-        timeout_maximum = resolve_opt(option="timeout_maximum")
+        enabled = test.options.timeouts
+        timeout_default = test.options.timeout_default
+        timeout_maximum = test.options.timeout_maximum
 
         if not enabled:
             return None

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address, AddressInput
@@ -32,21 +33,21 @@ class EnvironmentsSubsystem(Subsystem):
         """
     )
 
-    aliases = DictOption[str](
+    names = DictOption[str](
         help=softwrap(
             """
             A mapping of logical names to addresses to environment targets. For example:
 
-                [environments-preview.aliases]
+                [environments-preview.names]
                 linux_local = "//:linux_env"
                 macos_local = "//:macos_env"
                 centos6 = "//:centos6_docker_env"
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
-            TODO(#7735): explain how aliases are used once they are consumed.
+            TODO(#7735): explain how names are used once they are consumed.
 
-            Pants will ignore any environment targets that are not given an alias via this option.
+            Pants will ignore any environment targets that are not given a name via this option.
             """
         )
     )
@@ -120,7 +121,7 @@ class CompatiblePlatformsField(StringSequenceField):
         """
         Which platforms this environment can be used with.
 
-        This is used for Pants to automatically determine which which environment target to use for
+        This is used for Pants to automatically determine which environment target to use for
         the user's machine. Currently, there must be exactly one environment target for the
         platform.
         """
@@ -184,23 +185,23 @@ class UnrecognizedEnvironmentError(Exception):
 
 
 class AllEnvironmentTargets(FrozenDict[str, Target]):
-    """A mapping of environment aliases to their corresponding environment target."""
+    """A mapping of environment names to their corresponding environment target."""
 
 
 @dataclass(frozen=True)
-class ChosenLocalEnvironmentAlias:
-    f"""Which environment alias from `[environments-preview].aliases` that
+class ChosenLocalEnvironmentName:
+    f"""Which environment name from `[environments-preview].names` that
     {LOCAL_ENVIRONMENT_MATCHER} resolves to."""
 
     val: str | None
 
 
 @dataclass(frozen=True)
-class ResolvedEnvironmentAlias(EngineAwareParameter):
-    f"""The normalized alias for an environment, from `[environments-preview].aliases`, after
+class EnvironmentName(EngineAwareParameter):
+    f"""The normalized name for an environment, from `[environments-preview].names`, after
     applying things like {LOCAL_ENVIRONMENT_MATCHER}.
 
-    Note that we have this type, rather than only `ResolvedEnvironmentTarget`, for a more efficient
+    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient
     rule graph. This node impacts the equality of many downstream nodes, so we want its identity
     to only be a single string, rather than a Target instance.
     """
@@ -212,17 +213,17 @@ class ResolvedEnvironmentAlias(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class ResolvedEnvironmentTarget:
+class EnvironmentTarget:
     val: Target | None
 
 
 @dataclass(frozen=True)
-class ResolvedEnvironmentRequest(EngineAwareParameter):
-    f"""Normalize the value into an alias from `[environments-preview].aliases`, such as by
+class EnvironmentRequest(EngineAwareParameter):
+    f"""Normalize the value into a name from `[environments-preview].names`, such as by
     applying {LOCAL_ENVIRONMENT_MATCHER}."""
 
     raw_value: str
-    description_of_origin: str
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
     def debug_hint(self) -> str:
         return self.raw_value
@@ -233,12 +234,11 @@ async def determine_all_environments(
     environments_subsystem: EnvironmentsSubsystem,
 ) -> AllEnvironmentTargets:
     resolved_tgts = await MultiGet(
-        Get(ResolvedEnvironmentTarget, ResolvedEnvironmentAlias(alias))
-        for alias in environments_subsystem.aliases
+        Get(EnvironmentTarget, EnvironmentName(name)) for name in environments_subsystem.names
     )
     return AllEnvironmentTargets(
-        (alias, resolved_tgt.val)
-        for alias, resolved_tgt in zip(environments_subsystem.aliases.keys(), resolved_tgts)
+        (name, resolved_tgt.val)
+        for name, resolved_tgt in zip(environments_subsystem.names.keys(), resolved_tgts)
         if resolved_tgt.val is not None
     )
 
@@ -246,97 +246,97 @@ async def determine_all_environments(
 @rule
 async def determine_local_environment(
     platform: Platform, all_environment_targets: AllEnvironmentTargets
-) -> ChosenLocalEnvironmentAlias:
+) -> ChosenLocalEnvironmentName:
     if not all_environment_targets:
-        return ChosenLocalEnvironmentAlias(None)
-    compatible_alias_and_targets = [
-        (alias, tgt)
-        for alias, tgt in all_environment_targets.items()
+        return ChosenLocalEnvironmentName(None)
+    compatible_name_and_targets = [
+        (name, tgt)
+        for name, tgt in all_environment_targets.items()
         if tgt.has_field(CompatiblePlatformsField)
         and platform.value in tgt[CompatiblePlatformsField].value
     ]
-    if not compatible_alias_and_targets:
+    if not compatible_name_and_targets:
         raise NoCompatibleEnvironmentError(
             softwrap(
                 f"""
-                No `_local_environment` targets from `[environments-preview].aliases` are
+                No `_local_environment` targets from `[environments-preview].names` are
                 compatible with the current platform: {platform.value}
 
                 To fix, either adjust the `{CompatiblePlatformsField.alias}` field from the targets
-                in `[environments-preview].aliases` to include `{platform.value}`, or define a new
+                in `[environments-preview].names` to include `{platform.value}`, or define a new
                 `_local_environment` target with `{platform.value}` included in the
                 `{CompatiblePlatformsField.alias}` field. (Current targets from
-                `[environments-preview].aliases`:
+                `[environments-preview].names`:
                 {sorted(tgt.address.spec for tgt in all_environment_targets.values())})
                 """
             )
         )
-    elif len(compatible_alias_and_targets) > 1:
+    elif len(compatible_name_and_targets) > 1:
         # TODO(#7735): Allow the user to disambiguate what __local__ means via an option.
         raise AmbiguousEnvironmentError(
             softwrap(
                 f"""
-                Multiple `_local_environment` targets from `[environments-preview].aliases`
+                Multiple `_local_environment` targets from `[environments-preview].names`
                 are compatible with the current platform `{platform.value}`, so it is ambiguous
                 which to use:
-                {sorted(tgt.address.spec for _alias, tgt in compatible_alias_and_targets)}
+                {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
 
                 To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
                 targets so that only one includes the value `{platform.value}`, or change
-                `[environments-preview].aliases` so that it does not define some of those targets.
+                `[environments-preview].names` so that it does not define some of those targets.
                 """
             )
         )
-    result_alias, _tgt = compatible_alias_and_targets[0]
-    return ChosenLocalEnvironmentAlias(result_alias)
+    result_name, _tgt = compatible_name_and_targets[0]
+    return ChosenLocalEnvironmentName(result_name)
 
 
 @rule
-async def resolve_environment_alias(
-    request: ResolvedEnvironmentRequest, environments_subsystem: EnvironmentsSubsystem
-) -> ResolvedEnvironmentAlias:
+async def resolve_environment_name(
+    request: EnvironmentRequest, environments_subsystem: EnvironmentsSubsystem
+) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
-        local_env_alias = await Get(ChosenLocalEnvironmentAlias, {})
-        return ResolvedEnvironmentAlias(local_env_alias.val)
-    if request.raw_value not in environments_subsystem.aliases:
+        local_env_name = await Get(ChosenLocalEnvironmentName, {})
+        return EnvironmentName(local_env_name.val)
+    if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
             softwrap(
                 f"""
-                Unrecognized environment alias `{request.raw_value}` from
+                Unrecognized environment name `{request.raw_value}` from
                 {request.description_of_origin}.
 
-                The value must either be `{LOCAL_ENVIRONMENT_MATCHER}` or an alias from the option
-                `[environments-preview].aliases`: {sorted(environments_subsystem.aliases.keys())}
+                The value must either be `{LOCAL_ENVIRONMENT_MATCHER}` or a name from the option
+                `[environments-preview].names`: {sorted(environments_subsystem.names.keys())}
                 """
             )
         )
-    return ResolvedEnvironmentAlias(request.raw_value)
+    return EnvironmentName(request.raw_value)
 
 
 @rule
-async def get_target_for_environment_alias(
-    alias: ResolvedEnvironmentAlias, environments_subsystem: EnvironmentsSubsystem
-) -> ResolvedEnvironmentTarget:
-    if alias.val is None:
-        return ResolvedEnvironmentTarget(None)
-    if alias.val not in environments_subsystem.aliases:
+async def get_target_for_environment_name(
+    env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
+) -> EnvironmentTarget:
+    if env_name.val is None:
+        return EnvironmentTarget(None)
+    if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
                 f"""
-                The alias `{alias.val}` is not defined. The alias should have been normalized and
-                validated in the rule `ResolvedEnvironmentRequest -> ResolvedEnvironmentAlias`
+                The name `{env_name.val}` is not defined. The name should have been normalized and
+                validated in the rule `EnvironmentRequest -> EnvironmentName`
                 already. If you directly wrote
-                `Get(ResolvedEnvironmentTarget, ResolvedEnvironmentAlias(my_alias))`, refactor to
-                `Get(ResolvedEnvironmentTarget, ResolvedEnvironmentRequest(my_alias, ...))`.
+                `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
+                `Get(EnvironmentTarget, EnvironmentRequest(my_name, ...))`.
                 """
             )
         )
-    _description_of_origin = "the option [environments-preview].aliases"
+    _description_of_origin = "the option [environments-preview].names"
     address = await Get(
         Address,
         AddressInput,
         AddressInput.parse(
-            environments_subsystem.aliases[alias.val], description_of_origin=_description_of_origin
+            environments_subsystem.names[env_name.val], description_of_origin=_description_of_origin
         ),
     )
     wrapped_target = await Get(
@@ -349,13 +349,13 @@ async def get_target_for_environment_alias(
             softwrap(
                 f"""
                 Expected to use the address to a `_local_environment` or `_docker_environment`
-                target in the option `[environments-preview].aliases`, but the alias
-                `{alias.val}` was set to the target {address.spec} with the target type
+                target in the option `[environments-preview].names`, but the name
+                `{env_name.val}` was set to the target {address.spec} with the target type
                 `{wrapped_target.target.alias}`.
                 """
             )
         )
-    return ResolvedEnvironmentTarget(tgt)
+    return EnvironmentTarget(tgt)
 
 
 def rules():

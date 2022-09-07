@@ -533,7 +533,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     ) -> None:
         root_addresses = {t.address for t in roots}
         assert {fs.address for fs in partition[0]} == root_addresses
-        assert {t.address for t in partition[1].closure} == {
+        assert {t.address for t in partition[1].root_targets.closure()} == {
             *root_addresses,
             *(t.address for t in deps),
         }

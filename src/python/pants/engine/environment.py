@@ -31,7 +31,7 @@ environment-variable matching APIs to remove ambiguity.
 
 @dataclass(frozen=True)
 class EnvironmentName:
-    """TODO: Replace with `pants.core.util_rules.environments.ResolvedEnvironmentAlias`."""
+    """TODO: Replace with `pants.core.util_rules.environments.EnvironmentName`."""
 
 
 class CompleteEnvironment(FrozenDict):

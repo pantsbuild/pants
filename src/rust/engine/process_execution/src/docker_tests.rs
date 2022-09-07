@@ -2,10 +2,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
-use futures::StreamExt;
 use maplit::hashset;
 use spectral::assert_that;
 use spectral::string::StrAssertions;
@@ -15,7 +13,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::SANDBOX_PATH_IN_CONTAINER;
+use super::docker::{ImagePullPolicy, SANDBOX_PATH_IN_CONTAINER};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -73,9 +71,8 @@ macro_rules! setup_docker {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
   )
   .await
@@ -90,9 +87,8 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&[
       SH_PATH,
       "-c",
@@ -112,11 +108,10 @@ async fn stdout_and_stderr_and_exit_code() {
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   // Launch a process that kills itself with a signal.
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker_image(IMAGE.to_owned()),
   )
   .await
@@ -154,17 +149,15 @@ fn extract_env(
 }
 
 #[tokio::test]
-#[ignore] // TODO(#16749): fix flaky test
 #[cfg(unix)]
 async fn env() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
   env.insert("BAR".to_string(), "not foo".to_string());
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&["/bin/env"]))
       .env(env.clone())
       .docker_image(IMAGE.to_owned()),
@@ -178,10 +171,9 @@ async fn env() {
 }
 
 #[tokio::test]
-#[ignore] // TODO(#16749): fix flaky test
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
@@ -192,12 +184,8 @@ async fn env_is_deterministic() {
       .docker_image(IMAGE.to_owned())
   }
 
-  let result1 = run_command_via_docker(&docker, make_request())
-    .await
-    .unwrap();
-  let result2 = run_command_via_docker(&docker, make_request())
-    .await
-    .unwrap();
+  let result1 = run_command_via_docker(make_request()).await.unwrap();
+  let result2 = run_command_via_docker(make_request()).await.unwrap();
 
   let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
   let env1 = extract_env(result1.stdout_bytes, exclude_keys).unwrap();
@@ -207,11 +195,10 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   // Use `xyzzy` as a command that should not exist.
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker_image(IMAGE.to_owned()),
   )
   .await
@@ -224,10 +211,9 @@ async fn binary_not_found() {
 
 #[tokio::test]
 async fn output_files_none() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker_image(IMAGE.to_owned()),
   )
   .await
@@ -241,10 +227,9 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -268,10 +253,9 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -300,10 +284,9 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -331,10 +314,9 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -361,10 +343,9 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -392,10 +373,9 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -420,14 +400,13 @@ async fn output_overlapping_file_and_dir() {
 
 #[tokio::test]
 async fn append_only_cache_created() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
   let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
   let result = run_command_via_docker(
-    &docker,
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
       .docker_image(IMAGE.to_owned()),
@@ -461,7 +440,7 @@ async fn test_apply_chroot() {
 
 #[tokio::test]
 async fn test_chroot_placeholder() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -471,7 +450,6 @@ async fn test_chroot_placeholder() {
   let work_root = work_tmpdir.path().to_owned();
 
   let result = run_command_via_docker_in_dir(
-    &docker,
     Process::new(vec!["/bin/env".to_owned()])
       .env(env.clone())
       .docker_image(IMAGE.to_owned()),
@@ -494,10 +472,9 @@ async fn test_chroot_placeholder() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -528,10 +505,9 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let result = run_command_via_docker(
-    &docker,
     Process::new(vec![
       SH_PATH.to_string(),
       "-c".to_owned(),
@@ -555,7 +531,7 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
 
   let argv = vec![
     SH_PATH.to_string(),
@@ -568,7 +544,7 @@ async fn timeout() {
   process.description = "sleepy-cat".to_string();
   process.docker_image = Some(IMAGE.to_owned());
 
-  let result = run_command_via_docker(&docker, process).await.unwrap();
+  let result = run_command_via_docker(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
@@ -578,7 +554,7 @@ async fn timeout() {
 
 #[tokio::test]
 async fn working_directory() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -616,7 +592,6 @@ async fn working_directory() {
   process.docker_image = Some(IMAGE.to_owned());
 
   let result = run_command_via_docker_in_dir(
-    &docker,
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
@@ -639,7 +614,7 @@ async fn working_directory() {
 
 #[tokio::test]
 async fn immutable_inputs() {
-  let docker = setup_docker!();
+  let _docker = setup_docker!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -686,7 +661,6 @@ async fn immutable_inputs() {
   process.docker_image = Some(IMAGE.to_string());
 
   let result = run_command_via_docker_in_dir(
-    &docker,
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
@@ -706,22 +680,7 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
-// DOCKER-TODO: We should debounce calls to this method from multiple tests in the same process.
-async fn pull_image(docker: &Docker, image: &str) {
-  let create_image_options = CreateImageOptions::<String> {
-    from_image: image.to_string(),
-    ..CreateImageOptions::default()
-  };
-  let mut result_stream = docker.create_image(Some(create_image_options), None, None);
-  while let Some(msg) = result_stream.next().await {
-    if msg.is_err() {
-      panic!("Unable to pull image `{}` for test: {:?}", image, msg);
-    }
-  }
-}
-
 async fn run_command_via_docker_in_dir(
-  docker: &Docker,
   req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
@@ -735,7 +694,6 @@ async fn run_command_via_docker_in_dir(
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
-  pull_image(docker, IMAGE).await;
   let runner = crate::docker::CommandRunner::new(
     store.clone(),
     executor.clone(),
@@ -743,6 +701,7 @@ async fn run_command_via_docker_in_dir(
     named_caches,
     immutable_inputs,
     cleanup,
+    ImagePullPolicy::IfMissing,
   )?;
   let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes = store
@@ -758,15 +717,11 @@ async fn run_command_via_docker_in_dir(
   })
 }
 
-async fn run_command_via_docker(
-  docker: &Docker,
-  req: Process,
-) -> Result<LocalTestResult, ProcessError> {
+async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
   run_command_via_docker_in_dir(
-    docker,
     req,
     work_dir_path,
     KeepSandboxes::Never,

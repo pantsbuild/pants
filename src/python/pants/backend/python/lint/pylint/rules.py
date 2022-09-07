@@ -12,8 +12,11 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules import partition, pex_from_targets
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import (
+    _partition_by_interpreter_constraints_and_resolve,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexRequest,
@@ -32,15 +35,15 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, Target
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, Target
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
 class PylintPartition:
-    closure: FrozenOrderedSet[Target]
+    root_targets: CoarsenedTargets
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
@@ -74,26 +77,34 @@ async def partition_pylint(
     if pylint.skip:
         return TargetPartitions()
 
-    resolve_and_interpreter_constraints_to_coarsened_targets = (
-        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
-    )
-
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
         first_party_plugins.interpreter_constraints_fields, python_setup
     )
 
+    resolve_and_interpreter_constraints_to_field_sets = (
+        _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    )
+
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+    coarsened_targets_by_address = coarsened_targets.by_address()
+
     return TargetPartitions(
-        (
-            tuple(fs for fs in roots),
-            PylintPartition(
-                FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
-                resolve if len(python_setup.resolves) > 1 else None,
-                InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
+        PylintPartition(
+            CoarsenedTargets(
+                OrderedSet(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                )
             ),
+            resolve if len(python_setup.resolves) > 1 else None,
+            InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
         )
-        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
-            resolve_and_interpreter_constraints_to_coarsened_targets.items()
-        )
+        for (
+            resolve,
+            interpreter_constraints,
+        ), field_sets, in resolve_and_interpreter_constraints_to_field_sets.items()
     )
 
 
@@ -124,28 +135,21 @@ async def pylint_lint_partition(
         ),
     )
 
-    prepare_python_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     field_set_sources_get = Get(
         SourceFiles, SourceFilesRequest(fs.source for fs in request.field_sets)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
 
-    (
-        pylint_pex,
-        requirements_pex,
-        prepared_python_sources,
-        field_set_sources,
-        report_directory,
-    ) = await MultiGet(
+    (pylint_pex, requirements_pex, field_set_sources, report_directory,) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
-        prepare_python_sources_get,
         field_set_sources_get,
         report_directory_digest_get,
     )
 
-    pylint_runner_pex, config_files = await MultiGet(
+    prepared_python_sources, pylint_runner_pex, config_files = await MultiGet(
+        Get(PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())),
         Get(
             VenvPex,
             VenvPexRequest(

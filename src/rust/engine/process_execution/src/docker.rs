@@ -1,12 +1,17 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
-use bollard::Docker;
+use bollard::image::CreateImageOptions;
+use bollard::{errors::Error as DockerError, Docker};
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use nails::execution::ExitCode;
+use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, RunningWorkunit};
@@ -26,13 +31,97 @@ pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-in
 
 /// `CommandRunner` executes processes using a local Docker client.
 pub struct CommandRunner {
-  docker: Docker,
+  docker: OnceCell<Docker>,
   store: Store,
   executor: Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  image_pull_cache: Mutex<ImageCache>,
+  image_pull_policy: ImagePullPolicy,
+}
+
+#[derive(Default)]
+struct ImageCache {
+  /// Maps an image name to a `OnceCell` used to debounce image pull attempts made during this
+  /// particular run.
+  cache: BTreeMap<String, Arc<OnceCell<()>>>,
+
+  /// Stores the current "build generation" during which this command runner will not attempt
+  /// to pull an image again. This is populated from `build_id` field on `Context`. `cache`
+  /// will be cleared when the generation changes.
+  generation: String,
+}
+
+#[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImagePullPolicy {
+  Always,
+  IfMissing,
+  Never,
+  OnlyIfLatestOrMissing,
+}
+
+/// Pull an image given its name and the image pull policy. This method is debounced by
+/// the "image pull cache" in the `CommandRunner`.
+async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Result<(), String> {
+  let has_latest_tag = {
+    if let Some((_, suffix)) = image.rsplit_once(':') {
+      suffix == "latest"
+    } else {
+      false
+    }
+  };
+
+  let image_exists = {
+    match docker.inspect_image(image).await {
+      Ok(_) => true,
+      Err(DockerError::DockerResponseServerError {
+        status_code: 404, ..
+      }) => false,
+      Err(err) => {
+        return Err(format!(
+          "Failed to inspect Docker image `{}`: {:?}",
+          image, err
+        ))
+      }
+    }
+  };
+
+  let do_pull = match (policy, image_exists) {
+    (ImagePullPolicy::Always, _) => true,
+    (ImagePullPolicy::IfMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => true,
+    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => true,
+    (ImagePullPolicy::Never, false) => {
+      return Err(format!(
+        "Image `{}` was not found locally and Pants is configured to not attempt to pull",
+        image
+      ));
+    }
+    _ => false,
+  };
+
+  if do_pull {
+    let create_image_options = CreateImageOptions::<String> {
+      from_image: image.to_string(),
+      ..CreateImageOptions::default()
+    };
+
+    let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+    while let Some(msg) = result_stream.next().await {
+      log::trace!("pull {}: {:?}", image, msg);
+      if let Err(err) = msg {
+        return Err(format!(
+          "Failed to pull Docker image `{}`: {:?}",
+          image, err
+        ));
+      }
+    }
+  }
+
+  Ok(())
 }
 
 impl CommandRunner {
@@ -43,18 +132,62 @@ impl CommandRunner {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
-    let docker = Docker::connect_with_local_defaults()
-      .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
     Ok(CommandRunner {
-      docker,
+      docker: OnceCell::new(),
       store,
       executor,
       work_dir_base,
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      image_pull_cache: Mutex::default(),
+      image_pull_policy,
     })
+  }
+
+  async fn docker(&self) -> Result<&Docker, String> {
+    self
+      .docker
+      .get_or_try_init(async move {
+        let docker = Docker::connect_with_local_defaults()
+          .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
+
+        docker
+          .ping()
+          .await
+          .map_err(|err| format!("Failed to receive response from local Docker: {err}"))?;
+
+        Ok(docker)
+      })
+      .await
+  }
+
+  async fn pull_image(&self, image: &str, build_generation: &str) -> Result<(), String> {
+    let image_cell = {
+      let mut image_pull_cache = self.image_pull_cache.lock();
+
+      if build_generation != image_pull_cache.generation {
+        image_pull_cache.cache.clear();
+        image_pull_cache.generation = build_generation.to_string();
+      }
+
+      let cell = image_pull_cache
+        .cache
+        .entry(image.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()));
+      cell.clone()
+    };
+
+    image_cell
+      .get_or_try_init(pull_image(
+        self.docker().await?,
+        image,
+        self.image_pull_policy,
+      ))
+      .await?;
+    Ok(())
   }
 }
 
@@ -164,13 +297,16 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (PathBuf, PathBuf);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    context: &'c Context,
+    workdir_path: &'w Path,
     (immutable_inputs_workdir, named_caches_workdir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
+    let docker = self.docker().await?;
+
     let env = req
       .env
       .iter()
@@ -225,6 +361,11 @@ impl CapturedWorkdir for CommandRunner {
       .docker_image
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
 
+    // Attempt to pull the image (if so configured by the image pull policy). The `build_id` is
+    // used to determine when images should again be pulled (for example, when the "always"
+    // image pull policy is set).
+    self.pull_image(&image, &context.build_id).await?;
+
     // DOCKER-TODO: Set creation options so we can set platform.
 
     let config = bollard::container::Config {
@@ -258,16 +399,14 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("creating container with config: {:?}", &config);
 
-    let container = self
-      .docker
+    let container = docker
       .create_container::<&str, String>(None, config)
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
 
     log::trace!("created container {}", &container.id);
 
-    self
-      .docker
+    docker
       .start_container::<String>(&container.id, None)
       .await
       .map_err(|err| {
@@ -279,81 +418,81 @@ impl CapturedWorkdir for CommandRunner {
 
     log::trace!("started container {}", &container.id);
 
-    let attach_options = bollard::container::AttachContainerOptions::<String> {
-      stdout: Some(true),
-      stderr: Some(true),
-      logs: Some(true), // stream any output that was missed between the start_container call and now
-      stream: Some(true),
-      ..bollard::container::AttachContainerOptions::default()
-    };
-
-    let attach_result = self
-      .docker
-      .attach_container(&container.id, Some(attach_options))
-      .await
-      .map_err(|err| {
-        format!(
-          "Failed to attach to Docker container `{}`: {:?}",
-          &container.id, err
-        )
-      })?;
-
-    log::trace!("attached to container {}", &container.id);
-
-    let mut output_stream = attach_result.output.boxed();
-
-    let wait_options = bollard::container::WaitContainerOptions {
-      condition: "not-running",
-    };
-    let mut wait_stream = self
-      .docker
-      .wait_container(&container.id, Some(wait_options))
-      .boxed();
-
     let container_id = container.id.to_owned();
     let keep_sandboxes = self.keep_sandboxes;
-    let docker = self.docker.clone();
-    let result_stream = async_stream::stream! {
-      let was_success = loop {
-        tokio::select! {
-          Some(output_msg) = output_stream.next() => {
-            match output_msg {
-              Ok(LogOutput::StdOut { message }) => {
-                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
-                yield Ok(ChildOutput::Stdout(message));
-              }
-              Ok(LogOutput::StdErr { message }) => {
-                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
-                yield Ok(ChildOutput::Stderr(message));
-              }
-              _ => (),
-            }
-          }
-          Some(wait_msg) = wait_stream.next() => {
-            log::trace!("wait_container stream ({}): {:?}", &container_id, wait_msg);
-            match wait_msg {
-              Ok(r) => {
-                // DOCKER-TODO: How does Docker distinguish signal versus exit code? Improve
-                // `ChildResults` to better support exit code vs signal vs error message?
-                let status_code = r.status_code;
-                yield Ok(ChildOutput::Exit(ExitCode(status_code as i32)));
-                break status_code == 0;
-              }
-              Err(err) => {
-                // DOCKER-TODO: Consider a way to pass error messages back to child status collector.
-                log::error!("Docker wait failure for container {}: {:?}", &container_id, err);
-                yield Err(format!("Docker wait_container failure for container {}: {:?}", &container_id, err));
-                break false;
-              }
-            }
-          }
-        }
+    let docker = docker.clone();
+
+    let stream = async_stream::try_stream! {
+      // Wait for the container to exit.
+      let status_code = loop {
+        let wait_options = bollard::container::WaitContainerOptions {
+          condition: "not-running",
+        };
+        let mut wait_stream = docker
+          .wait_container(&container.id, Some(wait_options))
+          .boxed();
+
+        let wait_msg = match wait_stream.next().await {
+          Some(msg) => msg,
+          None => {
+            log::trace!("Docker wait_container monitoring stream closed early. Reconnecting ...");
+            continue
+          },
+        };
+
+        let status_code = wait_msg
+          .map_err(|err| format!("Docker wait_container failure for container {}: {:?}", &container_id, err))?
+          .status_code;
+
+        break status_code;
       };
+
+      log::trace!("container {} exited with status code {}", &container_id, status_code);
+
+      let attach_options = bollard::container::AttachContainerOptions::<String> {
+        stdout: Some(true),
+        stderr: Some(true),
+        logs: Some(true),
+        ..bollard::container::AttachContainerOptions::default()
+      };
+
+      let attach_result = docker
+        .attach_container(&container.id, Some(attach_options))
+        .await
+        .map_err(|err| {
+          format!(
+            "Failed to attach to Docker container `{}`: {:?}",
+            &container_id, err
+          )
+        })?;
+
+      log::trace!("attached to container {}", &container.id);
+
+      let mut output_stream = attach_result.output.boxed();
+
+      while let Some(output_msg) = output_stream.next().await {
+        match output_msg {
+            Ok(LogOutput::StdOut { message }) => {
+                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
+                yield ChildOutput::Stdout(message);
+            }
+            Ok(LogOutput::StdErr { message }) => {
+                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
+                yield ChildOutput::Stderr(message);
+            }
+            Ok(_) => (),
+            Err(err) => {
+                log::trace!("error while capturing output of container {}: {:?}", &container_id, err);
+            }
+        }
+      }
+
+      yield ChildOutput::Exit(ExitCode(status_code as i32));
 
       let do_remove_container = match keep_sandboxes {
         KeepSandboxes::Always => false,
         KeepSandboxes::Never => true,
-        KeepSandboxes::OnFailure => !was_success,
+        KeepSandboxes::OnFailure => status_code == 0,
       };
 
       if do_remove_container {
@@ -366,14 +505,12 @@ impl CapturedWorkdir for CommandRunner {
           .remove_container(&container_id, Some(remove_options))
           .await
           .map_err(|err| format!("Failed to remove container `{}`: {:?}", &container_id, err));
-
         if let Err(err) = remove_result {
           log::warn!("{}", err);
         }
       }
-    }
-    .boxed();
+    };
 
-    Ok(result_stream)
+    Ok(stream.boxed())
   }
 }
