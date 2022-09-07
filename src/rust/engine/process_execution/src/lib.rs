@@ -54,6 +54,8 @@ pub mod cache;
 #[cfg(test)]
 mod cache_tests;
 
+pub mod switched;
+
 pub mod children;
 
 pub mod docker;

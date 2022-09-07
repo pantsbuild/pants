@@ -70,23 +70,33 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
 
 #[tokio::test]
 #[cfg(unix)]
-async fn use_local_runner_if_docker_not_set() {
+async fn runner_errors_if_docker_image_not_set() {
   skip_if_no_docker_available_in_macos_ci!();
+
   // Because `docker_image` is set but it does not exist, this process should fail.
-  run_command_via_docker(
+  let err = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
       .docker_image("does-not-exist:latest".to_owned()),
   )
   .await
   .unwrap_err();
+  if let ProcessError::Unclassified(msg) = err {
+    assert!(msg.contains("Failed to pull Docker image"));
+  } else {
+    panic!("expected value: {:?}", err)
+  }
 
   // Otherwise, if docker_image is not set, use the local runner.
-  let result = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
+  let err = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
     .await
-    .unwrap();
-  assert_eq!(result.stdout_bytes, "foo".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
+    .unwrap_err();
+  if let ProcessError::Unclassified(msg) = &err {
+    assert!(
+      msg.contains("docker_image not set on the Process, but the Docker CommandRunner was used")
+    );
+  } else {
+    panic!("expected value: {:?}", err)
+  }
 }
 
 #[tokio::test]
@@ -715,16 +725,7 @@ async fn run_command_via_docker_in_dir(
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
-  let local_runner = local::CommandRunner::new(
-    store.clone(),
-    executor.clone(),
-    dir.clone(),
-    named_caches.clone(),
-    immutable_inputs.clone(),
-    cleanup,
-  );
   let runner = crate::docker::CommandRunner::new(
-    Box::new(local_runner),
     store.clone(),
     executor.clone(),
     dir.clone(),
