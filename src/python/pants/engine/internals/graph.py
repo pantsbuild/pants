@@ -362,7 +362,7 @@ async def resolve_target(
 
 
 @dataclass(frozen=True)
-class WrappedTargetForBootstrappingOnly:
+class WrappedTargetForBootstrap:
     """Used to avoid a rule graph cycle when evaluating bootstrap targets.
 
     This does not work with target generation and parametrization. It also ignores any unrecognized
@@ -380,7 +380,7 @@ async def resolve_target_for_bootstrapping(
     request: WrappedTargetRequest,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-) -> WrappedTargetForBootstrappingOnly:
+) -> WrappedTargetForBootstrap:
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
         request.address,
         registered_target_types,
@@ -393,7 +393,7 @@ async def resolve_target_for_bootstrapping(
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
     )
-    return WrappedTargetForBootstrappingOnly(target)
+    return WrappedTargetForBootstrap(target)
 
 
 @rule

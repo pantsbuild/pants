@@ -10,7 +10,7 @@ from typing import cast
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName as EnvironmentName
-from pants.engine.internals.graph import WrappedTargetForBootstrappingOnly
+from pants.engine.internals.graph import WrappedTargetForBootstrap
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
@@ -336,7 +336,7 @@ async def get_target_for_environment_name(
         ),
     )
     wrapped_target = await Get(
-        WrappedTargetForBootstrappingOnly,
+        WrappedTargetForBootstrap,
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
     tgt = wrapped_target.val
