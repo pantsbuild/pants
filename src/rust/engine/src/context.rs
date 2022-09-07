@@ -255,7 +255,7 @@ impl Core {
         immutable_inputs.clone(),
         exec_strategy_opts.local_keep_sandboxes,
         // TODO(#16767): Allow users to specify this via an option.
-        docker::ImagePullPolicy::IfMissing,
+        docker::ImagePullPolicy::OnlyIfLatestOrMissing,
       )?);
 
       (runner, exec_strategy_opts.local_parallelism)
