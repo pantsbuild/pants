@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveProcessResult
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -326,7 +326,7 @@ def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
 def session_run_interactive_process(
-    session: PySession, InteractiveProcess
+    session: PySession, process: InteractiveProcess, process_config: ProcessConfigFromEnvironment
 ) -> InteractiveProcessResult: ...
 def session_get_metrics(session: PySession) -> dict[str, int]: ...
 def session_get_observation_histograms(
