@@ -84,7 +84,6 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
 
     def get_env() -> EnvironmentTarget:
         name = rule_runner.request(ChosenLocalEnvironmentName, [])
-        print(name)
         return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
 
     # If `--names` is not set, do not choose an environment.
