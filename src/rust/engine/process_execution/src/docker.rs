@@ -1,4 +1,3 @@
-use async_oncecell::OnceCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -39,8 +38,20 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  image_pull_cache: Mutex<BTreeMap<String, Arc<OnceCell<()>>>>,
+  image_pull_cache: Mutex<ImageCache>,
   image_pull_policy: ImagePullPolicy,
+}
+
+#[derive(Default)]
+struct ImageCache {
+  /// Maps an image name to a `OnceCell` used to debounce image pull attempts made during this
+  /// particular run.
+  cache: BTreeMap<String, Arc<OnceCell<()>>>,
+
+  /// Stores the current "build generation" during which this command runner will not attempt
+  /// to pull an image again. This is populated from `build_id` field on `Context`. `cache`
+  /// will be cleared when the generation changes.
+  generation: String,
 }
 
 #[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
@@ -153,17 +164,28 @@ impl CommandRunner {
       .await
   }
 
-  async fn pull_image(&self, image: &str) -> Result<(), String> {
+  async fn pull_image(&self, image: &str, build_generation: &str) -> Result<(), String> {
     let image_cell = {
       let mut image_pull_cache = self.image_pull_cache.lock();
+
+      if build_generation != image_pull_cache.generation {
+        image_pull_cache.cache.clear();
+        image_pull_cache.generation = build_generation.to_string();
+      }
+
       let cell = image_pull_cache
+        .cache
         .entry(image.to_string())
         .or_insert_with(|| Arc::new(OnceCell::new()));
       cell.clone()
     };
 
     image_cell
-      .get_or_try_init(pull_image(&self.docker, image, self.image_pull_policy))
+      .get_or_try_init(pull_image(
+        self.docker().await?,
+        image,
+        self.image_pull_policy,
+      ))
       .await?;
     Ok(())
   }
@@ -275,13 +297,14 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (PathBuf, PathBuf);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    context: &'c Context,
+    workdir_path: &'w Path,
     (immutable_inputs_workdir, named_caches_workdir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let docker = self.docker().await?;
 
     let env = req
@@ -338,8 +361,10 @@ impl CapturedWorkdir for CommandRunner {
       .docker_image
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
 
-    // Attempt to pull the image (if so configured by the image pull policy).
-    self.pull_image(&image).await?;
+    // Attempt to pull the image (if so configured by the image pull policy). The `build_id` is
+    // used to determine when images should again be pulled (for example, when the "always"
+    // image pull policy is set).
+    self.pull_image(&image, &context.build_id).await?;
 
     // DOCKER-TODO: Set creation options so we can set platform.
 
