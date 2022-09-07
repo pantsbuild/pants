@@ -54,6 +54,8 @@ pub mod cache;
 #[cfg(test)]
 mod cache_tests;
 
+pub mod switched;
+
 pub mod children;
 
 pub mod docker;
@@ -871,6 +873,18 @@ pub trait CommandRunner: Send + Sync + Debug {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
+}
+
+#[async_trait]
+impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    (**self).run(context, workunit, req).await
+  }
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?

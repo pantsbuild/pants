@@ -31,7 +31,6 @@ pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-in
 
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner {
-  inner: Box<dyn crate::CommandRunner>,
   docker: OnceCell<Docker>,
   store: Store,
   executor: Executor,
@@ -127,7 +126,6 @@ async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Re
 
 impl CommandRunner {
   pub fn new(
-    inner: Box<dyn crate::CommandRunner>,
     store: Store,
     executor: Executor,
     work_dir_base: PathBuf,
@@ -137,7 +135,6 @@ impl CommandRunner {
     image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
     Ok(CommandRunner {
-      inner,
       docker: OnceCell::new(),
       store,
       executor,
@@ -197,7 +194,6 @@ impl CommandRunner {
 impl fmt::Debug for CommandRunner {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("docker::CommandRunner")
-      .field("inner", &self.inner)
       .finish_non_exhaustive()
   }
 }
@@ -207,13 +203,9 @@ impl super::CommandRunner for CommandRunner {
   async fn run(
     &self,
     context: Context,
-    workunit: &mut RunningWorkunit,
+    _workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    if req.docker_image.is_none() {
-      return self.inner.run(context, workunit, req).await;
-    }
-
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
       "run_local_process_via_docker",

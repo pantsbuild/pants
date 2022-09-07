@@ -25,6 +25,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
   ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
@@ -246,8 +247,7 @@ impl Core {
 
       // Note that the Docker command runner is only used if the Process sets docker_image. So,
       // it's safe to always create this command runner.
-      let runner = Box::new(docker::CommandRunner::new(
-        runner,
+      let docker_runner = Box::new(docker::CommandRunner::new(
         local_runner_store.clone(),
         executor.clone(),
         local_execution_root_dir.to_path_buf(),
@@ -257,6 +257,10 @@ impl Core {
         // TODO(#16767): Allow users to specify this via an option.
         docker::ImagePullPolicy::OnlyIfLatestOrMissing,
       )?);
+
+      let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
+        req.docker_image.is_some()
+      }));
 
       (runner, exec_strategy_opts.local_parallelism)
     };
