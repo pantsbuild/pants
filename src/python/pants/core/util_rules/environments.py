@@ -214,7 +214,7 @@ class EnvironmentTarget:
 
 
 @dataclass(frozen=True)
-class EnvironmentRequest(EngineAwareParameter):
+class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
     applying {LOCAL_ENVIRONMENT_MATCHER}."""
 
@@ -290,7 +290,7 @@ async def determine_local_environment(
 
 @rule
 async def resolve_environment_name(
-    request: EnvironmentRequest, environments_subsystem: EnvironmentsSubsystem
+    request: EnvironmentNameRequest, environments_subsystem: EnvironmentsSubsystem
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
@@ -321,10 +321,10 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentRequest -> EnvironmentName`
+                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
                 already. If you directly wrote
                 `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentRequest(my_name, ...))`.
+                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
                 """
             )
         )

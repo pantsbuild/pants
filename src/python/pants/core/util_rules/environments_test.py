@@ -17,7 +17,7 @@ from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     DockerImageField,
     EnvironmentName,
-    EnvironmentRequest,
+    EnvironmentNameRequest,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
-            QueryRule(EnvironmentName, [EnvironmentRequest]),
+            QueryRule(EnvironmentName, [EnvironmentNameRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
         singleton_environment=None,
@@ -119,7 +119,7 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
 
     def get_name(v: str) -> EnvironmentName:
         return rule_runner.request(
-            EnvironmentName, [EnvironmentRequest(v, description_of_origin="foo")]
+            EnvironmentName, [EnvironmentNameRequest(v, description_of_origin="foo")]
         )
 
     # If `--names` is not set, and the local matcher is used, do not choose an environment.
