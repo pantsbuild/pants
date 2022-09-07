@@ -30,6 +30,7 @@ use fs::{DigestTrie, DirectoryDigest, PathStat, RelativePath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
 use process_execution::ManagedChild;
+use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 
@@ -84,7 +85,13 @@ impl Intrinsics {
       Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.process_result, types.process),
+      Intrinsic {
+        product: types.process_result,
+        inputs: vec![
+          DependencyKey::new(types.process),
+          DependencyKey::new(types.process_config_from_environment),
+        ],
+      },
       Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
@@ -106,7 +113,13 @@ impl Intrinsics {
       Box::new(run_id),
     );
     intrinsics.insert(
-      Intrinsic::new(types.interactive_process_result, types.interactive_process),
+      Intrinsic {
+        product: types.interactive_process_result,
+        inputs: vec![
+          DependencyKey::new(types.interactive_process),
+          DependencyKey::new(types.process_config_from_environment),
+        ],
+      },
       Box::new(interactive_process),
     );
     Intrinsics { intrinsics }
@@ -135,9 +148,19 @@ fn process_request_to_process_result(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
-      .map_err(|e| e.enrich("Error lifting Process"))
-      .await?;
+    let process_config: externs::process::PyProcessConfigFromEnvironment =
+      Python::with_gil(|py| {
+        args
+          .pop()
+          .unwrap()
+          .as_ref()
+          .extract(py)
+          .map_err(|e| format!("{}", e))
+      })?;
+    let process_request =
+      ExecuteProcess::lift(&context.core.store(), args.pop().unwrap(), process_config)
+        .map_err(|e| e.enrich("Error lifting Process"))
+        .await?;
 
     let result = context.get(process_request).await?.result;
 
@@ -483,12 +506,16 @@ fn interactive_process(
     let types = &context.core.types;
     let interactive_process_result = types.interactive_process_result;
 
-    let (py_interactive_process, py_process): (Value, Value) = Python::with_gil(|py| {
+    let (py_interactive_process, py_process, process_config): (Value, Value, externs::process::PyProcessConfigFromEnvironment) = Python::with_gil(|py| {
       let py_interactive_process = (*args[0]).as_ref(py);
       let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
-      (py_interactive_process.extract().unwrap(), py_process)
+      let process_config = (*args[1])
+        .as_ref(py)
+        .extract()
+        .unwrap();
+      (py_interactive_process.extract().unwrap(), py_process, process_config)
     });
-    let mut process = ExecuteProcess::lift_process(&context.core.store(), py_process).await?;
+    let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config).await?.process;
     let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
       let py_interactive_process_obj = py_interactive_process.to_object(py);
       let py_interactive_process = py_interactive_process_obj.as_ref(py);

@@ -11,6 +11,9 @@ from typing import Iterable, Mapping
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
+from pants.engine.internals.native_engine import (  # noqa: F401
+    ProcessConfigFromEnvironment as ProcessConfigFromEnvironment,
+)
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -131,8 +134,6 @@ class Process:
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.platform = platform.value if platform is not None else None
-        # TODO(#7735): Figure out how this should be set by callers, e.g. automatically.
-        self.docker_image = None
 
 
 @dataclass(frozen=True)

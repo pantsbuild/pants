@@ -162,6 +162,24 @@ EMPTY_SNAPSHOT: Snapshot
 def default_cache_path() -> str: ...
 
 # ------------------------------------------------------------------------------
+# Process
+# ------------------------------------------------------------------------------
+
+class ProcessConfigFromEnvironment:
+    """Settings from the current Environment for how a `Process` should be run.
+
+    Note that most values from the Environment are instead set via changing the arguments `argv` and
+    `env` in the `Process` constructor.
+    """
+
+    def __init__(self, *, docker_image: str | None) -> None: ...
+    def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    @property
+    def docker_image(self) -> str | None: ...
+
+# ------------------------------------------------------------------------------
 # Workunits
 # ------------------------------------------------------------------------------
 

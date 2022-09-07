@@ -55,9 +55,13 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    (git_binary,) = session.product_request(GitBinary, [Params(GitBinaryRequest())])
+    bootstrap_environment = determine_bootstrap_environment(session)
+
+    (git_binary,) = session.product_request(
+        GitBinary, [Params(GitBinaryRequest(), bootstrap_environment)]
+    )
     (maybe_git_worktree,) = session.product_request(
-        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
+        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
     )
     if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
@@ -70,7 +74,7 @@ def calculate_specs(
     changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
-        [Params(changed_request, options_bootstrapper, determine_bootstrap_environment(session))],
+        [Params(changed_request, options_bootstrapper, bootstrap_environment)],
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
@@ -104,6 +108,6 @@ def calculate_specs(
 def rules():
     return [
         QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
-        QueryRule(GitBinary, [GitBinaryRequest]),
-        QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary]),
+        QueryRule(GitBinary, [GitBinaryRequest, EnvironmentName]),
+        QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
     ]

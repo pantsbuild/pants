@@ -58,6 +58,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
+  externs::process::register(m)?;
   externs::scheduler::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
@@ -214,6 +215,9 @@ impl PyTypes {
       platform: TypeId::new(platform),
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
+      process_config_from_environment: TypeId::new(
+        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+      ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
       session_values: TypeId::new(session_values),
