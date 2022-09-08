@@ -250,6 +250,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.java.lint.google_java_format",
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
+        "pants.backend.experimental.openapi",
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
