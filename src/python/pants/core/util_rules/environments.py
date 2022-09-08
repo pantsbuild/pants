@@ -11,6 +11,7 @@ from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.graph import WrappedTargetForBootstrap
+from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
@@ -352,6 +353,14 @@ async def get_target_for_environment_name(
             )
         )
     return EnvironmentTarget(tgt)
+
+
+@rule
+def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessConfigFromEnvironment:
+    docker_image = (
+        tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
+    )
+    return ProcessConfigFromEnvironment(docker_image=docker_image)
 
 
 def rules():
