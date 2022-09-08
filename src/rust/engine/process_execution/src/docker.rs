@@ -470,7 +470,6 @@ impl CapturedWorkdir for CommandRunner {
     log::trace!("started execution {}", &exec.id);
 
     let exec_id = exec.id.to_owned();
-    let keep_sandboxes = self.keep_sandboxes;
     let docker = docker.clone();
 
     let stream = async_stream::try_stream! {
@@ -504,27 +503,6 @@ impl CapturedWorkdir for CommandRunner {
       log::trace!("execution {} exited with status code {}", &exec_id, status_code);
 
       yield ChildOutput::Exit(ExitCode(status_code as i32));
-
-      let do_remove_execution = match keep_sandboxes {
-        KeepSandboxes::Always => false,
-        KeepSandboxes::Never => true,
-        KeepSandboxes::OnFailure => status_code == 0,
-      };
-
-      if do_remove_execution {
-        let remove_options = bollard::container::RemoveContainerOptions {
-          force: true,
-          ..bollard::container::RemoveContainerOptions::default()
-        };
-
-        let remove_result = docker
-          .remove_container(&exec_id, Some(remove_options))
-          .await
-          .map_err(|err| format!("Failed to remove execution `{}`: {:?}", &exec_id, err));
-        if let Err(err) = remove_result {
-          log::warn!("{}", err);
-        }
-      }
     };
 
     Ok(stream.boxed())
