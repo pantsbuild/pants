@@ -10,6 +10,8 @@ use bytes::{BufMut, Bytes};
 use futures::stream::StreamExt;
 use humansize::{file_size_opts, FileSize};
 use reqwest::Error;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::RetryIf;
 use url::Url;
 
 use crate::context::Core;
@@ -26,30 +28,40 @@ struct NetDownload {
 
 impl NetDownload {
   async fn start(core: &Arc<Core>, url: Url, file_name: String) -> Result<NetDownload, String> {
-    // TODO: Retry failures
-    let response = core
+    let try_download = || async {
+      core
       .http_client
       .get(url.clone())
       .send()
       .await
-      .map_err(|err| format!("Error downloading file: {}", err))?;
+      .map_err(|err| (format!("Error downloading file: {}", err), true))
+      .and_then(|res|
+        // Handle common HTTP errors.
+        if res.status().is_server_error() {
+          Err((format!(
+            "Server error ({}) downloading file {} from {}",
+            res.status().as_str(),
+            file_name,
+            url,
+          ), true))
+        } else if res.status().is_client_error() {
+          Err((format!(
+            "Client error ({}) downloading file {} from {}",
+            res.status().as_str(),
+            file_name,
+            url,
+          ), false))
+        } else {
+          Ok(res)
+        })
+    };
 
-    // Handle common HTTP errors.
-    if response.status().is_server_error() {
-      return Err(format!(
-        "Server error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    } else if response.status().is_client_error() {
-      return Err(format!(
-        "Client error ({}) downloading file {} from {}",
-        response.status().as_str(),
-        file_name,
-        url,
-      ));
-    }
+    // TODO: Allow the retry strategy to be configurable?
+    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(3);
+    let response = RetryIf::spawn(retry_strategy, try_download, |err: &(String, bool)| err.1)
+      .await
+      .map_err(|(err, _)| err)?;
+
     let byte_stream = Pin::new(Box::new(response.bytes_stream()));
     Ok(NetDownload {
       stream: byte_stream,
