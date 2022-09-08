@@ -82,7 +82,7 @@ def _docs_only_cond(docs_only: bool) -> str:
 def is_docs_only() -> Jobs:
     """Check if this change only involves docs."""
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
-    docs_files = ["docs/**"]
+    docs_files = ["docs/**", "build-support/bin/generate_user_list.py"]
     return {
         "docs_only_check": {
             "name": "Check for docs-only change",

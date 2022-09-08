@@ -755,7 +755,7 @@ jobs:
       name: Get changed files
       uses: tj-actions/changed-files@v23.1
       with:
-        files_ignore: docs/**
+        files_ignore: docs/**|build-support/bin/generate_user_list.py
         files_ignore_separator: '|'
     - id: docs_only_check
       if: steps.files.outputs.any_changed != 'true'
