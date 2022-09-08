@@ -234,12 +234,19 @@ impl Core {
           exec_strategy_opts.local_parallelism * 2
         };
 
-        Box::new(nailgun::CommandRunner::new(
-          local_command_runner,
+        let nailgun_runner = nailgun::CommandRunner::new(
           local_execution_root_dir.to_path_buf(),
           local_runner_store.clone(),
           executor.clone(),
+          named_caches.clone(),
+          immutable_inputs.clone(),
           pool_size,
+        );
+
+        Box::new(SwitchedCommandRunner::new(
+          nailgun_runner,
+          local_command_runner,
+          |req| !req.input_digests.use_nailgun.is_empty(),
         ))
       } else {
         Box::new(local_command_runner)
