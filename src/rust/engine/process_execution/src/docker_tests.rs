@@ -234,10 +234,8 @@ async fn binary_not_found() {
   )
   .await
   .unwrap();
-  let stderr = String::from_utf8(result.stderr_bytes).unwrap();
-  // Note: The error message is dependent on the fact that `tini` is used as the init process
-  // in the container for the execution.
-  assert_eq!(stderr, "");
+  let stdout = String::from_utf8(result.stdout_bytes).unwrap();
+  assert!(stdout.contains("exec failed: unable to start container process: exec: \"xyzzy\":"));
 }
 
 #[tokio::test]
