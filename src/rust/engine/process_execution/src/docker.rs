@@ -316,11 +316,7 @@ impl super::CommandRunner for CommandRunner {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            ExecutionContext {
-              sandbox_path_in_container,
-              _immutable_inputs_workdir: self.immutable_inputs.workdir().to_path_buf(),
-              _named_caches_workdir: self.named_caches.base_dir().to_path_buf(),
-            },
+            sandbox_path_in_container,
             exclusive_spawn,
             req
               .platform_constraint
@@ -354,21 +350,15 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
-pub struct ExecutionContext {
-  pub sandbox_path_in_container: String,
-  pub _immutable_inputs_workdir: PathBuf,
-  pub _named_caches_workdir: PathBuf,
-}
-
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  type WorkdirToken = ExecutionContext;
+  type WorkdirToken = String;
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
     &'s self,
     context: &'c Context,
     _workdir_path: &'w Path,
-    exec_context: Self::WorkdirToken,
+    sandbox_path_in_container: Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
@@ -382,8 +372,8 @@ impl CapturedWorkdir for CommandRunner {
 
     let working_dir = req
       .working_directory
-      .map(|relpath| Path::new(&exec_context.sandbox_path_in_container).join(&relpath))
-      .unwrap_or_else(|| Path::new(&exec_context.sandbox_path_in_container).to_path_buf())
+      .map(|relpath| Path::new(&sandbox_path_in_container).join(&relpath))
+      .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
       .into_os_string()
       .into_string()
       .map_err(|s| {
