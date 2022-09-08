@@ -4,11 +4,8 @@
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.target_types import (
-    GoBinaryMainPackage,
-    GoBinaryMainPackageField,
-    GoBinaryMainPackageRequest,
-)
+from pants.backend.go.target_types import GoBinaryMainPackageField, GoBinaryTarget, GoPackageTarget
+from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
