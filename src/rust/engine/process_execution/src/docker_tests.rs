@@ -102,7 +102,6 @@ async fn runner_errors_if_docker_image_not_set() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  env_logger::try_init().unwrap();
   skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
