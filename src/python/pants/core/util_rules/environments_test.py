@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
@@ -16,6 +17,7 @@ from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
     DockerImageField,
+    EnvironmentField,
     EnvironmentName,
     EnvironmentNameRequest,
     EnvironmentTarget,
@@ -23,6 +25,7 @@ from pants.core.util_rules.environments import (
     NoCompatibleEnvironmentError,
     UnrecognizedEnvironmentError,
 )
+from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
@@ -158,3 +161,35 @@ def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     assert get_tgt("env").val == LocalEnvironmentTarget({}, Address("", target_name="env"))
     with engine_error(ResolveError):
         get_tgt("bad-address")
+
+
+def test_environment_name_request_from_field_set() -> None:
+    class EnvFieldSubclass(EnvironmentField):
+        alias = "the_env_field"  # This intentionally uses a custom alias.
+
+    class Tgt(Target):
+        alias = "tgt"
+        help = "foo"
+        core_fields = (OptionalSingleSourceField, EnvFieldSubclass)
+
+    @dataclass(frozen=True)
+    class NoEnvFS(FieldSet):
+        required_fields = (OptionalSingleSourceField,)
+
+        source: OptionalSingleSourceField
+
+    @dataclass(frozen=True)
+    class EnvFS(FieldSet):
+        required_fields = (OptionalSingleSourceField,)
+
+        source: OptionalSingleSourceField
+        the_env_field: EnvironmentField  # This intentionally uses an unusual attribute name.
+
+    tgt = Tgt({EnvFieldSubclass.alias: "my_env"}, Address("dir"))
+    assert EnvironmentNameRequest.from_field_set(NoEnvFS.create(tgt)) == EnvironmentNameRequest(
+        LOCAL_ENVIRONMENT_MATCHER,
+        description_of_origin="the `environment` field from the target dir:dir",
+    )
+    assert EnvironmentNameRequest.from_field_set(EnvFS.create(tgt)) == EnvironmentNameRequest(
+        "my_env", description_of_origin="the `the_env_field` field from the target dir:dir"
+    )

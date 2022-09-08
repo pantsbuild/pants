@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.partition import _find_all_unique_interpret
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -51,6 +52,7 @@ class PythonTestFieldSet(TestFieldSet):
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
     xdist_concurrency: PythonTestsXdistConcurrencyField
+    environment: EnvironmentField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
