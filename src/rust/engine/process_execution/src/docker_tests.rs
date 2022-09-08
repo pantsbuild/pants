@@ -14,7 +14,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::{ImagePullPolicy, SANDBOX_PATH_IN_CONTAINER};
+use super::docker::{ImagePullPolicy, SANDBOX_BASE_PATH_IN_CONTAINER};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -102,6 +102,7 @@ async fn runner_errors_if_docker_image_not_set() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
+  env_logger::try_init().unwrap();
   skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
@@ -497,7 +498,7 @@ async fn test_chroot_placeholder() {
   let actual_path = got_env.get("PATH").unwrap();
   assert_eq!(
     *actual_path,
-    format!("/usr/bin:{}/bin", SANDBOX_PATH_IN_CONTAINER)
+    format!("/usr/bin:{}/bin", SANDBOX_BASE_PATH_IN_CONTAINER)
   );
 }
 

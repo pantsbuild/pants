@@ -2286,6 +2286,7 @@ dependencies = [
  "concrete_time",
  "deepsize",
  "derivative",
+ "env_logger",
  "fs",
  "futures",
  "grpc_util",

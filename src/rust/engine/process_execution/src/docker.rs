@@ -6,6 +6,7 @@ use std::sync::Arc;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
+use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::{errors::Error as DockerError, Docker};
 use futures::stream::BoxStream;
@@ -25,9 +26,9 @@ use crate::{
   ProcessError,
 };
 
-pub(crate) const SANDBOX_PATH_IN_CONTAINER: &str = "/pants-sandbox";
-pub(crate) const NAMED_CACHES_PATH_IN_CONTAINER: &str = "/pants-named-caches";
-pub(crate) const IMMUTABLE_INPUTS_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
+pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
+pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
+pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
 
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner {
@@ -268,7 +269,27 @@ impl super::CommandRunner for CommandRunner {
         //
         // DOCKER-TODO: With cached containers, the destination in the container
         // will need to be unique within that container to avoid conflicts.
-        apply_chroot(SANDBOX_PATH_IN_CONTAINER, &mut req);
+        let sandbox_relpath = workdir
+          .path()
+          .strip_prefix(&self.work_dir_base)
+          .map_err(|err| {
+            format!("Internal error - base directory was not prefix of sandbox directory: {err}")
+          })?;
+        let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
+          .join(sandbox_relpath)
+          .into_os_string()
+          .into_string()
+          .map_err(|s| {
+            format!(
+              "Unable to convert sandbox path to string due to non UTF-8 characters: {:?}",
+              s
+            )
+          })?;
+        apply_chroot(&sandbox_path_in_container, &mut req);
+        log::trace!(
+          "sandbox_path_in_container = {:?}",
+          &sandbox_path_in_container
+        );
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -280,8 +301,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           &self.named_caches,
           &self.immutable_inputs,
-          Some(Path::new(NAMED_CACHES_PATH_IN_CONTAINER)),
-          Some(Path::new(IMMUTABLE_INPUTS_PATH_IN_CONTAINER)),
+          Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
+          Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
         )
         .await?;
 
@@ -295,10 +316,11 @@ impl super::CommandRunner for CommandRunner {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            (
-              self.immutable_inputs.workdir().to_path_buf(),
-              self.named_caches.base_dir().to_path_buf(),
-            ),
+            ExecutionContext {
+              sandbox_path_in_container,
+              _immutable_inputs_workdir: self.immutable_inputs.workdir().to_path_buf(),
+              _named_caches_workdir: self.named_caches.base_dir().to_path_buf(),
+            },
             exclusive_spawn,
             req
               .platform_constraint
@@ -332,15 +354,21 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+pub struct ExecutionContext {
+  pub sandbox_path_in_container: String,
+  pub _immutable_inputs_workdir: PathBuf,
+  pub _named_caches_workdir: PathBuf,
+}
+
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  type WorkdirToken = (PathBuf, PathBuf);
+  type WorkdirToken = ExecutionContext;
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
     &'s self,
     context: &'c Context,
-    workdir_path: &'w Path,
-    (immutable_inputs_workdir, named_caches_workdir): Self::WorkdirToken,
+    _workdir_path: &'w Path,
+    exec_context: Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
@@ -352,41 +380,41 @@ impl CapturedWorkdir for CommandRunner {
       .map(|(key, value)| format!("{}={}", key, value))
       .collect::<Vec<_>>();
 
-    let workdir_path_as_string = workdir_path
-      .to_path_buf()
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
+    // let workdir_path_as_string = workdir_path
+    //   .to_path_buf()
+    //   .into_os_string()
+    //   .into_string()
+    //   .map_err(|s| {
+    //     format!(
+    //       "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
+    //       s
+    //     )
+    //   })?;
 
-    let immutable_inputs_workdir_as_string = immutable_inputs_workdir
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert immutable_inputs_workdir due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
-
-    let named_caches_workdir_as_string = named_caches_workdir
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert named_caches_workdir due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
+    // let immutable_inputs_workdir_as_string = immutable_inputs_workdir
+    //   .into_os_string()
+    //   .into_string()
+    //   .map_err(|s| {
+    //     format!(
+    //       "Unable to convert immutable_inputs_workdir due to non UTF-8 characters: {:?}",
+    //       s
+    //     )
+    //   })?;
+    //
+    // let named_caches_workdir_as_string = named_caches_workdir
+    //   .into_os_string()
+    //   .into_string()
+    //   .map_err(|s| {
+    //     format!(
+    //       "Unable to convert named_caches_workdir due to non UTF-8 characters: {:?}",
+    //       s
+    //     )
+    //   })?;
 
     let working_dir = req
       .working_directory
-      .map(|relpath| Path::new(SANDBOX_PATH_IN_CONTAINER).join(&relpath))
-      .unwrap_or_else(|| Path::new(SANDBOX_PATH_IN_CONTAINER).to_path_buf())
+      .map(|relpath| Path::new(&exec_context.sandbox_path_in_container).join(&relpath))
+      .unwrap_or_else(|| Path::new(&exec_context.sandbox_path_in_container).to_path_buf())
       .into_os_string()
       .into_string()
       .map_err(|s| {
@@ -408,143 +436,91 @@ impl CapturedWorkdir for CommandRunner {
 
     // DOCKER-TODO: Set creation options so we can set platform.
 
-    let config = bollard::container::Config {
+    let config = bollard::exec::CreateExecOptions {
       env: Some(env),
-      entrypoint: Some(req.argv),
+      cmd: Some(req.argv),
       working_dir: Some(working_dir),
-      // DOCKER-TODO: Is this necessary on linux hosts for allowing bind mount?
-      // user: Some(format!("{}", unsafe { libc::geteuid() })),
-      // user: Some("0".to_string()),
-      host_config: Some(bollard_stubs::models::HostConfig {
-        binds: Some(vec![
-          format!("{}:{}", workdir_path_as_string, SANDBOX_PATH_IN_CONTAINER),
-          // DOCKER-TODO: Consider making this bind mount read-only.
-          format!(
-            "{}:{}",
-            immutable_inputs_workdir_as_string, IMMUTABLE_INPUTS_PATH_IN_CONTAINER
-          ),
-          format!(
-            "{}:{}",
-            named_caches_workdir_as_string, NAMED_CACHES_PATH_IN_CONTAINER
-          ),
-        ]),
-        init: Some(true),
-        ..bollard_stubs::models::HostConfig::default()
-      }),
-      image: Some(image),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
-      ..bollard::container::Config::default()
+      ..bollard::exec::CreateExecOptions::default()
     };
 
-    log::trace!("creating container with config: {:?}", &config);
+    log::trace!("creating execution with config: {:?}", &config);
 
-    let container = docker
-      .create_container::<&str, String>(None, config)
+    let exec = docker
+      .create_exec::<String>(&container_id, config)
       .await
-      .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
+      .map_err(|err| format!("Failed to create Docker execution in container: {:?}", err))?;
 
-    log::trace!("created container {}", &container.id);
+    log::trace!("created execution {}", &exec.id);
 
-    docker
-      .start_container::<String>(&container.id, None)
+    let exec_result = docker
+      .start_exec(&exec.id, None)
       .await
-      .map_err(|err| {
-        format!(
-          "Failed to start Docker container `{}`: {:?}",
-          &container.id, err
-        )
-      })?;
+      .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
+    let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
+      output.boxed()
+    } else {
+      panic!(
+        "Unexpected value returned from start_exec: {:?}",
+        exec_result
+      );
+    };
 
-    log::trace!("started container {}", &container.id);
+    log::trace!("started execution {}", &exec.id);
 
-    let container_id = container.id.to_owned();
+    let exec_id = exec.id.to_owned();
     let keep_sandboxes = self.keep_sandboxes;
     let docker = docker.clone();
 
     let stream = async_stream::try_stream! {
-      // Wait for the container to exit.
-      let status_code = loop {
-        let wait_options = bollard::container::WaitContainerOptions {
-          condition: "not-running",
-        };
-        let mut wait_stream = docker
-          .wait_container(&container.id, Some(wait_options))
-          .boxed();
-
-        let wait_msg = match wait_stream.next().await {
-          Some(msg) => msg,
-          None => {
-            log::trace!("Docker wait_container monitoring stream closed early. Reconnecting ...");
-            continue
-          },
-        };
-
-        let status_code = wait_msg
-          .map_err(|err| format!("Docker wait_container failure for container {}: {:?}", &container_id, err))?
-          .status_code;
-
-        break status_code;
-      };
-
-      log::trace!("container {} exited with status code {}", &container_id, status_code);
-
-      let attach_options = bollard::container::AttachContainerOptions::<String> {
-        stdout: Some(true),
-        stderr: Some(true),
-        logs: Some(true),
-        ..bollard::container::AttachContainerOptions::default()
-      };
-
-      let attach_result = docker
-        .attach_container(&container.id, Some(attach_options))
-        .await
-        .map_err(|err| {
-          format!(
-            "Failed to attach to Docker container `{}`: {:?}",
-            &container_id, err
-          )
-        })?;
-
-      log::trace!("attached to container {}", &container.id);
-
-      let mut output_stream = attach_result.output.boxed();
-
+      // Read output from the execution.
       while let Some(output_msg) = output_stream.next().await {
         match output_msg {
             Ok(LogOutput::StdOut { message }) => {
-                log::trace!("container {} wrote {} bytes to stdout", &container_id, message.len());
+                log::trace!("execution {} wrote {} bytes to stdout", &exec_id, message.len());
                 yield ChildOutput::Stdout(message);
             }
             Ok(LogOutput::StdErr { message }) => {
-                log::trace!("container {} wrote {} bytes to stderr", &container_id, message.len());
+                log::trace!("execution {} wrote {} bytes to stderr", &exec_id, message.len());
                 yield ChildOutput::Stderr(message);
             }
             Ok(_) => (),
             Err(err) => {
-                log::trace!("error while capturing output of container {}: {:?}", &container_id, err);
+                log::trace!("error while capturing output of execution {}: {:?}", &exec_id, err);
             }
         }
       }
 
+      let exec_metadata = docker
+        .inspect_exec(&exec_id)
+        .await
+        .map_err(|err| format!("Failed to inspect Docker execution `{}`: {:?}", &exec_id, err))?;
+
+      let status_code = exec_metadata
+        .exit_code
+        .ok_or_else(|| format!("Inspected execution `{}` for exit status but was missing.", &exec_id))?;
+
+      log::trace!("execution {} exited with status code {}", &exec_id, status_code);
+
       yield ChildOutput::Exit(ExitCode(status_code as i32));
 
-      let do_remove_container = match keep_sandboxes {
+      let do_remove_execution = match keep_sandboxes {
         KeepSandboxes::Always => false,
         KeepSandboxes::Never => true,
         KeepSandboxes::OnFailure => status_code == 0,
       };
 
-      if do_remove_container {
+      if do_remove_execution {
         let remove_options = bollard::container::RemoveContainerOptions {
           force: true,
           ..bollard::container::RemoveContainerOptions::default()
         };
 
         let remove_result = docker
-          .remove_container(&container_id, Some(remove_options))
+          .remove_container(&exec_id, Some(remove_options))
           .await
-          .map_err(|err| format!("Failed to remove container `{}`: {:?}", &container_id, err));
+          .map_err(|err| format!("Failed to remove execution `{}`: {:?}", &exec_id, err));
         if let Err(err) = remove_result {
           log::warn!("{}", err);
         }
@@ -640,15 +616,15 @@ impl ContainerCache {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
       host_config: Some(bollard_stubs::models::HostConfig {
         binds: Some(vec![
-          format!("{}:{}", work_dir_base, SANDBOX_PATH_IN_CONTAINER),
+          format!("{}:{}", work_dir_base, SANDBOX_BASE_PATH_IN_CONTAINER),
           // DOCKER-TODO: Consider making this bind mount read-only.
           format!(
             "{}:{}",
-            named_caches_base_dir, IMMUTABLE_INPUTS_PATH_IN_CONTAINER
+            named_caches_base_dir, IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER
           ),
           format!(
             "{}:{}",
-            immutable_inputs_base_dir, NAMED_CACHES_PATH_IN_CONTAINER
+            immutable_inputs_base_dir, NAMED_CACHES_BASE_PATH_IN_CONTAINER
           ),
         ]),
         // The init process ensures that child processes are properly reaped.
@@ -703,7 +679,7 @@ impl ContainerCache {
     &self,
     image: &str,
     build_generation: &str,
-  ) -> Result<&String, String> {
+  ) -> Result<String, String> {
     let docker = self.docker.get().await?;
     let docker = docker.clone();
 
@@ -720,7 +696,7 @@ impl ContainerCache {
     let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
     let image_pull_cache = Arc::clone(&self.image_pull_cache);
 
-    container_id_cell
+    let container_id = container_id_cell
       .get_or_try_init(async move {
         Self::make_container(
           docker,
@@ -733,6 +709,8 @@ impl ContainerCache {
         )
         .await
       })
-      .await
+      .await?;
+
+    Ok(container_id.to_owned())
   }
 }
