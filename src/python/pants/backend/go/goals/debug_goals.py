@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
     GoImportPathField,
+    GoModTarget,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
@@ -22,7 +25,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import Targets, UnexpandedTargets
 
 
 class ShowGoPackageAnalysisSubsystem(GoalSubsystem):
@@ -77,6 +80,38 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
             console.write_stdout(str(third_party_analysis) + "\n")
 
     return ShowGoPackageAnalysis(exit_code=0)
+
+
+class DumpGoImportPathsForModuleSubsystem(GoalSubsystem):
+    name = "go-dump-import-path-mapping"
+    help = "Dump import paths mapped to package addresses."
+
+
+class DumpGoImportPathsForModule(Goal):
+    subsystem_cls = DumpGoImportPathsForModuleSubsystem
+
+
+@goal_rule
+async def dump_go_import_paths_for_module(
+    targets: UnexpandedTargets, console: Console
+) -> DumpGoImportPathsForModule:
+    for tgt in targets:
+        console.write_stdout(
+            f"Target: {tgt.address} ({tgt.__class__} ({isinstance(tgt, GoModTarget)})\n"
+        )
+        if not isinstance(tgt, GoModTarget):
+            continue
+
+        package_mapping = await Get(
+            GoModuleImportPathsMapping, GoImportPathMappingRequest(tgt.address)
+        )
+        for import_path, address_set in package_mapping.mapping.items():
+            maybe_infer_all = " (infer all)" if address_set.infer_all else ""
+            console.write_stdout(
+                f"  {import_path}: {', '.join(sorted([str(addr) for addr in address_set.addresses]))}{maybe_infer_all}\n"
+            )
+
+    return DumpGoImportPathsForModule(exit_code=0)
 
 
 def rules():
