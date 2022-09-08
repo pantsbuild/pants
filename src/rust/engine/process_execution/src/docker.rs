@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
-use bollard::container::LogOutput;
+use bollard::container::{LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::{errors::Error as DockerError, Docker};
@@ -659,5 +659,34 @@ impl ContainerCache {
       .await?;
 
     Ok(container_id.to_owned())
+  }
+}
+
+impl Drop for ContainerCache {
+  fn drop(&mut self) {
+    let docker = self.docker.clone();
+    let container_ids = self.containers.lock().keys().cloned().collect::<Vec<_>>();
+    tokio::spawn(async move {
+      let docker = match docker.get().await {
+        Ok(d) => d,
+        Err(err) => {
+          log::warn!("Failed to get Docker connection during container removal: {err}");
+          return;
+        }
+      };
+
+      let removal_futures = container_ids.into_iter().map(|id| async move {
+        let remove_options = RemoveContainerOptions {
+          force: true,
+          ..RemoveContainerOptions::default()
+        };
+        let remove_result = docker.remove_container(&id, Some(remove_options)).await;
+        if let Err(err) = remove_result {
+          log::warn!("Failed to remove Docker container `{}`: {:?}", &id, err);
+        }
+      });
+
+      let _ = futures::future::join_all(removal_futures).await;
+    });
   }
 }
