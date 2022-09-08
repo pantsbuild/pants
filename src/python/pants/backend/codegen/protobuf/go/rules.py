@@ -146,7 +146,6 @@ async def map_import_paths_of_all_go_protobuf_targets(
         Get(DigestContents, Digest, source.snapshot.digest) for source in sources
     )
 
-    # go_protobuf_targets: dict[str, set[Address]] = defaultdict(set)
     go_protobuf_mapping_metadata = []
     owning_go_mod_gets = []
     for tgt, contents in zip(all_protobuf_targets, all_contents):
