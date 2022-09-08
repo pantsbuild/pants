@@ -498,7 +498,7 @@ impl CapturedWorkdir for CommandRunner {
 
       let status_code = exec_metadata
         .exit_code
-        .ok_or_else(|| format!("Inspected execution `{}` for exit status but was missing.", &exec_id))?;
+        .ok_or_else(|| format!("Inspected execution `{}` for exit status but status was missing.", &exec_id))?;
 
       log::trace!("execution {} exited with status code {}", &exec_id, status_code);
 
