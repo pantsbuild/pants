@@ -146,28 +146,48 @@ class GolangSubsystem(Subsystem):
         help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
     )
 
-    cgo_default_cflags = StrListOption(
+    cgo_c_flags = StrListOption(
         default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
         advanced=True,
-        help="Default options used for CFLAGS when compiling cgo code. Equivalent to CGO_CFLAGS passed to `go`.",
+        help=softwrap(
+            """
+            Compiler options used when compiling C code when Cgo is enabled. Equivalent to setting the
+            CGO_CFLAGS environment variable when invoking `go`.
+            """
+        ),
     )
 
-    cgo_default_cxxflags = StrListOption(
+    cgo_cxx_flags = StrListOption(
         default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
         advanced=True,
-        help="Default options used for CXXFLAGS when compiling cgo code. Equivalent to CGO_CXXFLAGS passed to `go`.",
+        help=softwrap(
+            """
+            Compiler options used when compiling C++ code when Cgo is enabled. Equivalent to setting the
+            CGO_CXXFLAGS environment variable when invoking `go`.
+            """
+        ),
     )
 
-    cgo_default_fflags = StrListOption(
+    cgo_fortran_flags = StrListOption(
         default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
         advanced=True,
-        help="Default options used for FFLAGS when compiling cgo code. Equivalent to CGO_FFLAGS passed to `go`.",
+        help=softwrap(
+            """
+            Compiler options used when compiling Fortran code when Cgo is enabled. Equivalent to setting the
+            CGO_FFLAGS environment variable when invoking `go`.
+            """
+        ),
     )
 
-    cgo_default_ldflags = StrListOption(
+    cgo_linker_flags = StrListOption(
         default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
         advanced=True,
-        help="Default options used for LDFLAGS when compiling cgo code. Equivalent to CGO_LDFLAGS passed to `go`.",
+        help=softwrap(
+            """
+            Compiler options used when linking native code when Cgo is enabled. Equivalent to setting the
+            CGO_LDFLAGS environment variable when invoking `go`.
+            """
+        ),
     )
 
     asdf_tool_name = StrOption(

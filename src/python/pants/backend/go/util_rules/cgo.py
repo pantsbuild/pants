@@ -607,10 +607,10 @@ async def cgo_compile_request(
     # directives.
     flags = dataclasses.replace(
         flags,
-        cflags=golang_subsystem.cgo_default_cflags + flags.cflags,
-        cxxflags=golang_subsystem.cgo_default_cxxflags + flags.cxxflags,
-        fflags=golang_subsystem.cgo_default_fflags + flags.fflags,
-        ldflags=golang_subsystem.cgo_default_ldflags + flags.ldflags,
+        cflags=golang_subsystem.cgo_c_flags + flags.cflags,
+        cxxflags=golang_subsystem.cgo_cxx_flags + flags.cxxflags,
+        fflags=golang_subsystem.cgo_fortran_flags + flags.fflags,
+        ldflags=golang_subsystem.cgo_linker_flags + flags.ldflags,
     )
 
     # Resolve pkg-config flags into compiler and linker flags.
