@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.unions import union
 from pants.util.frozendict import FrozenDict
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GoModuleImportPathsMappingsHook:
     """An entry point for a specific implementation of mapping Go import paths to owning targets.
