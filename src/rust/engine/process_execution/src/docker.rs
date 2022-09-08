@@ -380,37 +380,6 @@ impl CapturedWorkdir for CommandRunner {
       .map(|(key, value)| format!("{}={}", key, value))
       .collect::<Vec<_>>();
 
-    // let workdir_path_as_string = workdir_path
-    //   .to_path_buf()
-    //   .into_os_string()
-    //   .into_string()
-    //   .map_err(|s| {
-    //     format!(
-    //       "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
-    //       s
-    //     )
-    //   })?;
-
-    // let immutable_inputs_workdir_as_string = immutable_inputs_workdir
-    //   .into_os_string()
-    //   .into_string()
-    //   .map_err(|s| {
-    //     format!(
-    //       "Unable to convert immutable_inputs_workdir due to non UTF-8 characters: {:?}",
-    //       s
-    //     )
-    //   })?;
-    //
-    // let named_caches_workdir_as_string = named_caches_workdir
-    //   .into_os_string()
-    //   .into_string()
-    //   .map_err(|s| {
-    //     format!(
-    //       "Unable to convert named_caches_workdir due to non UTF-8 characters: {:?}",
-    //       s
-    //     )
-    //   })?;
-
     let working_dir = req
       .working_directory
       .map(|relpath| Path::new(&exec_context.sandbox_path_in_container).join(&relpath))
