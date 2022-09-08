@@ -1058,8 +1058,11 @@ class TargetGenerator(Target):
             )
 
     @classmethod
-    def register_plugin_field(cls, field: Type[Field]) -> UnionRule:
-        cls.moved_fields = cls.moved_fields + (field,)
+    def register_plugin_field(cls, field: Type[Field], *, copy_field: bool = False) -> UnionRule:
+        if copy_field:
+            cls.copied_fields = cls.copied_fields + (field,)
+        else:
+            cls.moved_fields = cls.moved_fields + (field,)
         return super().register_plugin_field(field)
 
 
