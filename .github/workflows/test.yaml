@@ -15,7 +15,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -161,7 +160,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Bootstrap Pants, test Rust (macOS11-x86_64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - macos-11
@@ -298,7 +296,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Build wheels and fs_util (Linux-x86_64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -384,7 +381,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS10-15-x86_64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - macOS-10.15-X64
@@ -487,7 +483,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Bootstrap Pants, build wheels and fs_util (macOS11-ARM64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - macOS-11-ARM64
@@ -627,7 +622,6 @@ jobs:
       != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS11-x86_64)
     needs:
-    - check_labels
     - docs_only_check
     runs-on:
     - macos-11
@@ -767,7 +761,6 @@ jobs:
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -849,6 +842,7 @@ jobs:
     name: Set Merge OK
     needs:
     - docs_only_check
+    - check_labels
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -861,6 +855,7 @@ jobs:
     name: Set Merge OK
     needs:
     - docs_only_check
+    - check_labels
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos11_x86_64
     - build_wheels_linux_x86_64
@@ -887,7 +882,6 @@ jobs:
     name: Test Python (Linux-x86_64) Shard 0/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -979,7 +973,6 @@ jobs:
     name: Test Python (Linux-x86_64) Shard 1/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -1071,7 +1064,6 @@ jobs:
     name: Test Python (Linux-x86_64) Shard 2/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
     - docs_only_check
     runs-on:
     - ubuntu-20.04
@@ -1165,7 +1157,6 @@ jobs:
     name: Test Python (macOS11-x86_64)
     needs:
     - bootstrap_pants_macos11_x86_64
-    - check_labels
     - docs_only_check
     runs-on:
     - macos-11
