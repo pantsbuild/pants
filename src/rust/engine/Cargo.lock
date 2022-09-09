@@ -218,7 +218,7 @@ name = "brfs"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap 3.2.15",
+ "clap 3.2.20",
  "dirs-next",
  "env_logger",
  "errno",
@@ -378,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.15"
+version = "3.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44bbe24bbd31a185bc2c4f7c2abe80bea13a20d57ee4e55be70ac512bdc76417"
+checksum = "23b71c3ce99b7611011217b366d923f1d0a7e07a92bb2dbf1e84508c673ca3bd"
 dependencies = [
  "atty",
  "bitflags",
@@ -959,7 +959,7 @@ name = "fs_util"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap 3.2.15",
+ "clap 3.2.20",
  "env_logger",
  "fs",
  "futures",
@@ -1603,7 +1603,7 @@ dependencies = [
 name = "local_cas"
 version = "0.0.1"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.20",
  "env_logger",
  "mock",
 ]
@@ -1612,7 +1612,7 @@ dependencies = [
 name = "local_execution_server"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.20",
  "mock",
  "protos",
  "structopt",
@@ -2330,7 +2330,7 @@ dependencies = [
 name = "process_executor"
 version = "0.0.1"
 dependencies = [
- "clap 3.2.15",
+ "clap 3.2.20",
  "dirs-next",
  "env_logger",
  "fs",
@@ -2972,9 +2972,9 @@ dependencies = [
 
 [[package]]
 name = "serde_test"
-version = "1.0.143"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4b5b007c1bccdc70f8d8b5804da305a64d4279f990f1ae9e3b06eaae46f42e0"
+checksum = "6c7f3621491f256177206a7c2152c17f322c0d0b30af05359088172437d29e25"
 dependencies = [
  "serde",
 ]
