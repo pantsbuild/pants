@@ -18,7 +18,6 @@ hashing = { path = "../../hashing" }
 libc = "0.2.126"
 log = "0.4.17"
 parking_lot = "0.12"
-protobuf = { version = "2.27.1", features = ["with-bytes"] }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.3"
