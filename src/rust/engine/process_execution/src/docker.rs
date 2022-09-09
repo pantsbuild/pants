@@ -216,6 +216,7 @@ impl CommandRunner {
       &named_caches,
       &immutable_inputs,
       image_pull_policy,
+      executor.clone(),
     )?;
 
     Ok(CommandRunner {
@@ -476,6 +477,7 @@ struct ContainerCache {
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
   image_pull_cache: Arc<ImagePullCache>,
+  executor: Executor,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
@@ -489,6 +491,7 @@ impl ContainerCache {
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     image_pull_policy: ImagePullPolicy,
+    executor: Executor,
   ) -> Result<Self, String> {
     let work_dir_base = work_dir_base
       .to_path_buf()
@@ -532,6 +535,7 @@ impl ContainerCache {
       immutable_inputs_base_dir,
       image_pull_cache: Arc::new(ImagePullCache::new(image_pull_policy)),
       containers: Mutex::default(),
+      executor,
     })
   }
 
@@ -654,29 +658,33 @@ impl ContainerCache {
 
 impl Drop for ContainerCache {
   fn drop(&mut self) {
-    let docker = self.docker.clone();
+    let executor = self.executor.clone();
     let container_ids = self.containers.lock().keys().cloned().collect::<Vec<_>>();
-    tokio::spawn(async move {
-      let docker = match docker.get().await {
-        Ok(d) => d,
-        Err(err) => {
-          log::warn!("Failed to get Docker connection during container removal: {err}");
-          return;
-        }
-      };
-
-      let removal_futures = container_ids.into_iter().map(|id| async move {
-        let remove_options = RemoveContainerOptions {
-          force: true,
-          ..RemoveContainerOptions::default()
+    let docker = self.docker.clone();
+    executor.enter(move || {
+      let join_fut = tokio::spawn(async move {
+        let docker = match docker.get().await {
+          Ok(d) => d,
+          Err(err) => {
+            log::warn!("Failed to get Docker connection during container removal: {err}");
+            return;
+          }
         };
-        let remove_result = docker.remove_container(&id, Some(remove_options)).await;
-        if let Err(err) = remove_result {
-          log::warn!("Failed to remove Docker container `{}`: {:?}", &id, err);
-        }
-      });
 
-      let _ = futures::future::join_all(removal_futures).await;
+        let removal_futures = container_ids.into_iter().map(|id| async move {
+          let remove_options = RemoveContainerOptions {
+            force: true,
+            ..RemoveContainerOptions::default()
+          };
+          let remove_result = docker.remove_container(&id, Some(remove_options)).await;
+          if let Err(err) = remove_result {
+            log::warn!("Failed to remove Docker container `{}`: {:?}", &id, err);
+          }
+        });
+
+        let _ = futures::future::join_all(removal_futures).await;
+      });
+      let _ = tokio::task::block_in_place(|| futures::executor::block_on(join_fut));
     });
   }
 }

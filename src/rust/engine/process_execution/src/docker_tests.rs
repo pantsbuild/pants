@@ -68,7 +68,7 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
   }};
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn runner_errors_if_docker_image_not_set() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -99,7 +99,7 @@ async fn runner_errors_if_docker_image_not_set() {
   }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn stdout() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -115,7 +115,7 @@ async fn stdout() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -136,7 +136,7 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -179,7 +179,7 @@ fn extract_env(
   Ok(result)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn env() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -201,7 +201,7 @@ async fn env() {
   assert_eq!(env, got_env);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn env_is_deterministic() {
   skip_if_no_docker_available_in_macos_ci!();
@@ -224,7 +224,7 @@ async fn env_is_deterministic() {
   assert_eq!(env1, env2);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn binary_not_found() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -238,7 +238,7 @@ async fn binary_not_found() {
   assert!(stdout.contains("exec failed: unable to start container process: exec: \"xyzzy\":"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_none() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -254,7 +254,7 @@ async fn output_files_none() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_one() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -280,7 +280,7 @@ async fn output_files_one() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_dirs() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -311,7 +311,7 @@ async fn output_dirs() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_many() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -341,7 +341,7 @@ async fn output_files_many() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_execution_failure() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -370,7 +370,7 @@ async fn output_files_execution_failure() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_partial_output() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -400,7 +400,7 @@ async fn output_files_partial_output() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_overlapping_file_and_dir() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -427,7 +427,7 @@ async fn output_overlapping_file_and_dir() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn append_only_cache_created() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -450,7 +450,7 @@ async fn append_only_cache_created() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn test_apply_chroot() {
   let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -467,7 +467,7 @@ async fn test_apply_chroot() {
   assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_chroot_placeholder() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -497,7 +497,7 @@ async fn test_chroot_placeholder() {
   assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn all_containing_directories_for_outputs_are_created() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -530,7 +530,7 @@ async fn all_containing_directories_for_outputs_are_created() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_empty_dir() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -556,7 +556,7 @@ async fn output_empty_dir() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn timeout() {
   skip_if_no_docker_available_in_macos_ci!();
 
@@ -579,7 +579,7 @@ async fn timeout() {
   assert_that(&error_msg).contains("sleepy-cat");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn working_directory() {
   skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
@@ -639,7 +639,7 @@ async fn working_directory() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn immutable_inputs() {
   skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
