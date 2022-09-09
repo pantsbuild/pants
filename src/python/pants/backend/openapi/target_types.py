@@ -10,6 +10,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 
 OPENAPI_FILE_EXTENSIONS = (".json", ".yaml", ".yml")
@@ -48,6 +49,7 @@ class OpenApiDocumentTarget(Target):
 
 class OpenApiDocumentGeneratorField(OpenApiGeneratorField):
     default = tuple(f"openapi{ext}" for ext in OPENAPI_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message("Example: `sources=['openapi.json']`")
 
 
 class OpenApiDocumentGeneratorTarget(TargetFilesGenerator):
@@ -87,6 +89,7 @@ class OpenApiSourceTarget(Target):
 
 class OpenApiSourceGeneratorField(OpenApiGeneratorField):
     default = tuple(f"*{ext}" for ext in OPENAPI_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message("Example: `sources=['*.json']`")
 
 
 class OpenApiSourceGeneratorTarget(TargetFilesGenerator):
