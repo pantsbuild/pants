@@ -235,7 +235,7 @@ async fn binary_not_found() {
   .await
   .unwrap();
   let stdout = String::from_utf8(result.stdout_bytes).unwrap();
-  assert!(stdout.contains("exec failed: unable to start container process: exec: \"xyzzy\":"));
+  assert!(stdout.contains("exec failed"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
