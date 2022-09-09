@@ -38,13 +38,13 @@ The process will run in a temporary directory and is hermetic, meaning that it c
 
 > 📘 Debugging a `Process`
 > 
-> Setting the [`--no-process-cleanup`](docs:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
+> Setting the [`--no-process-cleanup`](doc:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
 > 
 > It can be very helpful while editing `Process` definitions!
 
 ### Input Files
 
-To populate the temporary directory with files, use the parameter `input_digest: Digest`. It's common to use [`MergeDigests`](docs:rules-api-file-system) to combine multiple `Digest`s into one single `input_digest`.
+To populate the temporary directory with files, use the parameter `input_digest: Digest`. It's common to use [`MergeDigests`](doc:rules-api-file-system) to combine multiple `Digest`s into one single `input_digest`.
 
 ### Environment Variables
 
@@ -64,7 +64,7 @@ async def partial_env(...) -> Foo:
 
 ### Output Files
 
-To capture output files from the process, set `output_files: Iterable[str]` and/or `output_directories: Iterable[str]`. Then, you can use the `ProcessResult.output_digest` field to get a [`Digest`](docs:rules-api-file-system) of the result.
+To capture output files from the process, set `output_files: Iterable[str]` and/or `output_directories: Iterable[str]`. Then, you can use the `ProcessResult.output_digest` field to get a [`Digest`](doc:rules-api-file-system) of the result.
 
 `output_directores` captures that directory and everything below it.
 
