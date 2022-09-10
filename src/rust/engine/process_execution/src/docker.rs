@@ -128,7 +128,6 @@ impl ImagePullCache {
   }
 }
 
-#[allow(dead_code)] // TODO: temporary until docker command runner is hooked up
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagePullPolicy {
   Always,
@@ -265,11 +264,8 @@ impl super::CommandRunner for CommandRunner {
         // Start working on a mutable version of the process.
         let mut req = req;
 
-        // Update env, replacing `{chroot}` placeholders with `/pants-sandbox`. This is the mount point
-        // for the sandbox directory within the Docker container.
-        //
-        // DOCKER-TODO: With cached containers, the destination in the container
-        // will need to be unique within that container to avoid conflicts.
+        // Update env, replacing `{chroot}` placeholders with the path to the sandbox
+        // within the Docker container.
         let sandbox_relpath = workdir
           .path()
           .strip_prefix(&self.work_dir_base)
@@ -430,7 +426,7 @@ impl CapturedWorkdir for CommandRunner {
     log::trace!("started execution {}", &exec.id);
 
     let exec_id = exec.id.to_owned();
-    let docker = docker.clone();
+    let docker = docker.to_owned();
 
     let stream = async_stream::try_stream! {
       // Read output from the execution.
