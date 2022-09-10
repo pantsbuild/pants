@@ -229,7 +229,6 @@ dependencies = [
  "libc",
  "log",
  "parking_lot 0.12.1",
- "protobuf",
  "protos",
  "store",
  "task_executor",
@@ -2415,15 +2414,6 @@ checksum = "534b7a0e836e3c482d2693070f982e39e7611da9695d4d1f5a4b186b51faef0a"
 dependencies = [
  "bytes",
  "prost",
-]
-
-[[package]]
-name = "protobuf"
-version = "2.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf7e6d18738ecd0902d30d1ad232c9125985a3422929b16c65517b38adc14f96"
-dependencies = [
- "bytes",
 ]
 
 [[package]]
