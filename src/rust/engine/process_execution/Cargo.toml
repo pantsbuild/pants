@@ -25,7 +25,7 @@ hashing = { path = "../hashing" }
 libc = "0.2.126"
 log = "0.4"
 nails = "0.13"
-nix = "0.24"
+nix = "0.25"
 sha2 = "0.10"
 shell-quote = "0.3.0"
 store = { path = "../fs/store" }
