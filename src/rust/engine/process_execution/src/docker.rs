@@ -472,7 +472,7 @@ struct ContainerCache {
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
-  image_pull_cache: Arc<ImagePullCache>,
+  image_pull_cache: ImagePullCache,
   executor: Executor,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
@@ -529,7 +529,7 @@ impl ContainerCache {
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
-      image_pull_cache: Arc::new(ImagePullCache::new(image_pull_policy)),
+      image_pull_cache: ImagePullCache::new(image_pull_policy),
       containers: Mutex::default(),
       executor,
     })
@@ -537,7 +537,7 @@ impl ContainerCache {
 
   async fn make_container(
     docker: Docker,
-    image_pull_cache: Arc<ImagePullCache>,
+    image_pull_cache: &ImagePullCache,
     image: String,
     build_generation: &str,
     work_dir_base: String,
@@ -631,13 +631,12 @@ impl ContainerCache {
     let work_dir_base = self.work_dir_base.clone();
     let named_caches_base_dir = self.named_caches_base_dir.clone();
     let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
-    let image_pull_cache = Arc::clone(&self.image_pull_cache);
 
     let container_id = container_id_cell
       .get_or_try_init(async move {
         Self::make_container(
           docker,
-          image_pull_cache,
+          &self.image_pull_cache,
           image.to_string(),
           build_generation,
           work_dir_base,
