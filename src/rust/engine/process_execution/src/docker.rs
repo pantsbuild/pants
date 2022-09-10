@@ -673,7 +673,7 @@ impl Drop for ContainerCache {
           };
           let remove_result = docker.remove_container(&id, Some(remove_options)).await;
           if let Err(err) = remove_result {
-            log::warn!("Failed to remove Docker container `{}`: {:?}", &id, err);
+            log::warn!("Failed to remove Docker container `{id}`: {err:?}");
           }
         });
 
