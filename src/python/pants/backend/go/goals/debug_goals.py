@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
-from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoModTarget,
@@ -119,6 +119,7 @@ async def dump_go_import_paths_for_module(
             )
 
     return DumpGoImportPathsForModule(exit_code=0)
+
 
 class GoExportCgoCodegenSubsystem(GoalSubsystem):
     name = "go-export-cgo-codegen"
