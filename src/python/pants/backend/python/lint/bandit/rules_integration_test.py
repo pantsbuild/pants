@@ -9,7 +9,7 @@ from typing import Sequence
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.bandit.rules import BanditRequest
+from pants.backend.python.lint.bandit.rules import BanditRequest, PartitionElement
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [BanditRequest.PartitionRequest]),
-            QueryRule(LintResult, [BanditRequest.Batch]),
+            QueryRule(LintResult, [BanditRequest.SubPartition]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -59,14 +59,14 @@ def run_bandit(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[BanditFieldSet, None],
+        Partitions[PartitionElement],
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for field_sets, metadata in partition:
+    for subpartition in partition:
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.Batch(field_sets, metadata)],
+            [BanditRequest.SubPartition(subpartition)],
         )
         results.append(result)
     return tuple(results)

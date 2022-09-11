@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import PylintPartition, PylintRequest
+from pants.backend.python.lint.pylint.rules import PartitionElement, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -24,7 +24,7 @@ from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.target import FieldSet, Target
+from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [PylintRequest.PartitionRequest]),
-            QueryRule(LintResult, [PylintRequest.Batch]),
+            QueryRule(LintResult, [PylintRequest.SubPartition]),
         ],
         target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
@@ -71,14 +71,14 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[PylintFieldSet, PylintPartition],
+        Partitions[PartitionElement],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for field_sets, metadata in partition:
+    for subpartition in partition:
         result = rule_runner.request(
             LintResult,
-            [PylintRequest.Batch(field_sets, metadata)],
+            [PylintRequest.SubPartition(subpartition)],
         )
         results.append(result)
     return tuple(results)
@@ -459,6 +459,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
         Address("pants-plugins/plugins", relative_file_path="print_plugin.py")
     )
     result = run_pylint_with_plugin(plugin_tgt)
+    print(result.stdout)
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout
     assert result.report == EMPTY_DIGEST
@@ -521,25 +522,24 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = rule_runner.request(Partitions[PylintFieldSet, PylintPartition], [request])
+    partitions = rule_runner.request(Partitions[PartitionElement], [request])
     assert len(partitions) == 3
 
     def assert_partition(
-        partition: tuple[tuple[FieldSet, ...], PylintPartition],
+        elements: tuple[PartitionElement, ...],
         roots: list[Target],
         deps: list[Target],
         interpreter: str,
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {fs.address for fs in partition[0]} == root_addresses
-        assert {t.address for t in partition[1].root_targets.closure()} == {
+        assert {t.address for element in elements for t in element.coarsened_target.closure()} == {
             *root_addresses,
             *(t.address for t in deps),
         }
         ics = [f"CPython=={interpreter}.*"]
-        assert partition[1].interpreter_constraints == InterpreterConstraints(ics)
-        assert partition[1].description() == f"{resolve}, {ics}"
+        assert elements[0].interpreter_constraints == InterpreterConstraints(ics)
+        assert elements[0].description() == f"{resolve}, {ics}"
 
     assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
     assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")

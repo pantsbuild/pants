@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Tuple
+from typing import NamedTuple, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -31,6 +31,12 @@ class Flake8Request(LintTargetsRequest):
     name = Flake8.options_scope
 
 
+class PartitionElement(NamedTuple):
+    field_set: Flake8FieldSet
+    # NB: The interpreter_constraints are the same for every element in a partition
+    interpreter_constraints: InterpreterConstraints
+
+
 def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
     args = []
     if flake8.config:
@@ -47,7 +53,7 @@ async def partition_flake8(
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> Partitions[Flake8FieldSet, InterpreterConstraints]:
+) -> Partitions[PartitionElement]:
     if flake8.skip:
         return Partitions()
 
@@ -60,18 +66,18 @@ async def partition_flake8(
         results[constraints].append(fs)
 
     return Partitions(
-        (tuple(partition), interpreter_constraints)
+        tuple(PartitionElement(field_set, interpreter_constraints) for field_set in partition)
         for interpreter_constraints, partition in results.items()
     )
 
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def flake8_lint_partition(
-    request: Flake8Request.Batch[Flake8FieldSet, InterpreterConstraints],
+    request: Flake8Request.SubPartition[PartitionElement],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = request.metadata
+    interpreter_constraints = request[0].interpreter_constraints
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,
@@ -82,7 +88,7 @@ async def flake8_lint_partition(
     )
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, flake8.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
+        SourceFiles, SourceFilesRequest(element.field_set.source for element in request)
     )
     extra_files_get = Get(
         Digest,
@@ -123,8 +129,8 @@ async def flake8_lint_partition(
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": first_party_plugins.PREFIX},
-            concurrency_available=len(request.elements),
-            description=f"Run Flake8 on {pluralize(len(request.elements), 'file')}.",
+            concurrency_available=len(request),
+            description=f"Run Flake8 on {pluralize(len(request), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

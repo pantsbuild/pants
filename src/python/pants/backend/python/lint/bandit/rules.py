@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
+from __future__ import annotations
+
+from typing import NamedTuple, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -23,6 +25,12 @@ class BanditRequest(LintTargetsRequest):
     name = Bandit.options_scope
 
 
+class PartitionElement(NamedTuple):
+    field_set: BanditFieldSet
+    # NB: The interpreter_constraints are the same for every element in a partition
+    interpreter_constraints: InterpreterConstraints
+
+
 def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
@@ -37,7 +45,7 @@ async def partition_bandit(
     request: BanditRequest.PartitionRequest[BanditFieldSet],
     bandit: Bandit,
     python_setup: PythonSetup,
-) -> Partitions[BanditFieldSet, InterpreterConstraints]:
+) -> Partitions[PartitionElement]:
     if bandit.skip:
         return Partitions()
 
@@ -50,9 +58,12 @@ async def partition_bandit(
     )
 
     return Partitions(
-        (
-            field_sets,
-            interpreter_constraints,
+        tuple(
+            PartitionElement(
+                field_set,
+                interpreter_constraints,
+            )
+            for field_set in field_sets
         )
         for interpreter_constraints, field_sets in constraints_to_field_sets.items()
     )
@@ -60,9 +71,9 @@ async def partition_bandit(
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
-    request: BanditRequest.Batch[BanditFieldSet, InterpreterConstraints], bandit: Bandit
+    request: BanditRequest.SubPartition[PartitionElement], bandit: Bandit
 ) -> LintResult:
-    interpreter_constraints = request.metadata
+    interpreter_constraints = request[0].interpreter_constraints
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,
@@ -71,7 +82,7 @@ async def bandit_lint(
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
+        SourceFiles, SourceFilesRequest(element.field_set.source for element in request)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -93,7 +104,7 @@ async def bandit_lint(
             bandit_pex,
             argv=generate_argv(source_files, bandit),
             input_digest=input_digest,
-            description=f"Run Bandit on {pluralize(len(request.elements), 'file')}.",
+            description=f"Run Bandit on {pluralize(len(request), 'file')}.",
             output_directories=(REPORT_DIR,),
             level=LogLevel.DEBUG,
         ),

@@ -37,16 +37,16 @@ class HelmLintRequest(LintTargetsRequest):
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-) -> Partitions[HelmLintFieldSet, None]:
-    return Partitions.from_partitions([fs] for fs in request.field_sets if not fs.skip_lint.value)
+) -> Partitions[HelmLintFieldSet]:
+    return Partitions((fs,) for fs in request.field_sets if not fs.skip_lint.value)
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
-    request: HelmLintRequest.Batch[HelmLintFieldSet, None], helm_subsystem: HelmSubsystem
+    request: HelmLintRequest.SubPartition[HelmLintFieldSet], helm_subsystem: HelmSubsystem
 ) -> LintResult:
-    assert len(request.elements) == 1
-    field_set = request.elements[0]
+    assert len(request) == 1
+    field_set = request[0]
     chart = await Get(HelmChart, HelmChartRequest(field_set))
 
     argv = ["lint", chart.name]

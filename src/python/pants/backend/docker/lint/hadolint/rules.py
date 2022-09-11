@@ -50,16 +50,16 @@ def generate_argv(
 @rule
 async def partition_hadolint(
     request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
-) -> Partitions[HadolintFieldSet, None]:
+) -> Partitions[HadolintFieldSet]:
     if hadolint.skip:
         return Partitions()
 
-    return Partitions.from_partitions([request.field_sets])
+    return Partitions([request.field_sets])
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(
-    request: HadolintRequest.Batch[HadolintFieldSet, None], hadolint: Hadolint, platform: Platform
+    request: HadolintRequest.SubPartition[HadolintFieldSet], hadolint: Hadolint, platform: Platform
 ) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
@@ -67,8 +67,7 @@ async def run_hadolint(
     )
 
     dockerfile_infos = await MultiGet(
-        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address))
-        for field_set in request.elements
+        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address)) for field_set in request
     )
 
     input_digest = await Get(

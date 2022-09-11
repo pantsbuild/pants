@@ -41,20 +41,20 @@ class BufLintRequest(LintTargetsRequest):
 @rule
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
-) -> Partitions[BufFieldSet, None]:
+) -> Partitions[BufFieldSet]:
     if buf.lint_skip:
         return Partitions()
 
-    return Partitions.from_partitions([request.field_sets])
+    return Partitions([request.field_sets])
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(
-    request: BufLintRequest.Batch[BufFieldSet, None], buf: BufSubsystem, platform: Platform
+    request: BufLintRequest.SubPartition[BufFieldSet], buf: BufSubsystem, platform: Platform
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest((field_set.address for field_set in request.elements)),
+        TransitiveTargetsRequest((field_set.address for field_set in request)),
     )
 
     all_stripped_sources_request = Get(
@@ -68,7 +68,7 @@ async def run_buf(
     target_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (field_set.sources for field_set in request.elements),
+            (field_set.sources for field_set in request),
             for_sources_types=(ProtobufSourceField,),
             enable_codegen=True,
         ),
@@ -102,7 +102,7 @@ async def run_buf(
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
-            description=f"Run buf lint on {pluralize(len(request.elements), 'file')}.",
+            description=f"Run buf lint on {pluralize(len(request), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

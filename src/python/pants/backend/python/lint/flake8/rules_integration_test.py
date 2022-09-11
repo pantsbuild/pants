@@ -8,14 +8,13 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.flake8.rules import Flake8Request
+from pants.backend.python.lint.flake8.rules import Flake8Request, PartitionElement
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
@@ -38,7 +37,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [Flake8Request.PartitionRequest]),
-            QueryRule(LintResult, [Flake8Request.Batch]),
+            QueryRule(LintResult, [Flake8Request.SubPartition]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -56,14 +55,14 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[Flake8FieldSet, InterpreterConstraints],
+        Partitions[PartitionElement],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for field_sets, metadata in partition:
+    for subpartition in partition:
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.Batch(field_sets, metadata)],
+            [Flake8Request.SubPartition(subpartition)],
         )
         results.append(result)
     return tuple(results)

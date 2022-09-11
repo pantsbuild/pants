@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *target_types_rules(),
             QueryRule(Partitions, [ShellcheckRequest.PartitionRequest]),
-            QueryRule(LintResult, [ShellcheckRequest.Batch]),
+            QueryRule(LintResult, [ShellcheckRequest.SubPartition]),
         ],
         target_types=[ShellSourcesGeneratorTarget],
     )
@@ -46,7 +46,7 @@ def run_shellcheck(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        Partitions[ShellcheckFieldSet, None],
+        Partitions[ShellcheckFieldSet],
         [
             ShellcheckRequest.PartitionRequest(
                 tuple(ShellcheckFieldSet.create(tgt) for tgt in targets)
@@ -54,10 +54,10 @@ def run_shellcheck(
         ],
     )
     results = []
-    for field_sets, metadata in partition:
+    for subpartition in partition:
         result = rule_runner.request(
             LintResult,
-            [ShellcheckRequest.Batch(field_sets, metadata)],
+            [ShellcheckRequest.SubPartition(subpartition)],
         )
         results.append(result)
     return tuple(results)

@@ -123,27 +123,29 @@ class InvalidRequest(MockLintRequest):
 
 def mock_target_partitioner(
     request: MockLintRequest.PartitionRequest,
-) -> Partitions[MockLinterFieldSet, None]:
+) -> Partitions[MockLinterFieldSet]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
-    return Partitions.from_partitions([request.field_sets])
+    return Partitions([request.field_sets])
 
 
 class MockFilesRequest(LintFilesRequest):
     name = "FilesLinter"
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, None]:
-    return Partitions.from_partitions([request.file_paths])
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
+    return Partitions([request.file_paths])
 
 
 def mock_lint_partition(request: Any) -> LintResult:
-    if type(request) is MockFilesRequest.Batch:
+    if type(request) is MockFilesRequest.SubPartition:
         return LintResult(0, "", "", MockFilesRequest.name)
 
-    request_type = {cls.Batch: cls for cls in MockLintRequest.__subclasses__()}[type(request)]
-    return request_type(request.field_sets).lint_result  # type: ignore[abstract]
+    request_type = {cls.SubPartition: cls for cls in MockLintRequest.__subclasses__()}[
+        type(request)
+    ]
+    return request_type(request).lint_result  # type: ignore[abstract]
 
 
 class MockFmtRequest(FmtTargetsRequest):
@@ -202,9 +204,9 @@ def run_lint_rule(
             LintRequest: (
                 list(lint_request_types) + ([MockFilesRequest] if run_files_linter else [])  # type: ignore[list-item]
             ),
-            LintRequest.Batch: (
-                [rt.Batch for rt in lint_request_types]
-                + ([MockFilesRequest.Batch] if run_files_linter else [])
+            LintRequest.SubPartition: (
+                [rt.SubPartition for rt in lint_request_types]
+                + ([MockFilesRequest.SubPartition] if run_files_linter else [])
             ),
             LintTargetsRequest.PartitionRequest: [rt.PartitionRequest for rt in lint_request_types],
             LintFilesRequest.PartitionRequest: (
@@ -250,7 +252,7 @@ def run_lint_rule(
                 ),
                 MockGet(
                     output_type=LintResult,
-                    input_type=LintRequest.Batch,
+                    input_type=LintRequest.SubPartition,
                     mock=mock_lint_partition,
                 ),
                 MockGet(
