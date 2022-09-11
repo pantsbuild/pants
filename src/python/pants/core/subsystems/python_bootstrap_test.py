@@ -113,11 +113,13 @@ def test_expand_interpreter_search_paths() -> None:
     rule_runner.write_files(
         {
             ".python-version": f"{local_pyenv_version}\n",
-            ".tool-versions": (
-                "nodejs 16.0.1\n"
-                "java current\n"
-                f"python {asdf_local_versions_str}\n"
-                "rust 1.52.0\n"
+            ".tool-versions": "\n".join(
+                [
+                    "nodejs 16.0.1",
+                    "java current",
+                    f"python {asdf_local_versions_str}",
+                    "rust 1.52.0",
+                ]
             ),
         }
     )

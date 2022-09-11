@@ -120,11 +120,13 @@ def test_get_asdf_paths() -> None:
     )
     rule_runner.write_files(
         {
-            ".tool-versions": (
-                "nodejs 16.0.1\n"
-                "java current\n"
-                f"python {asdf_local_versions_str}\n"
-                "rust 1.52.0\n"
+            ".tool-versions": "\n".join(
+                [
+                    "nodejs 16.0.1",
+                    "java current",
+                    f"python {asdf_local_versions_str}",
+                    "rust 1.52.0",
+                ]
             )
         }
     )

@@ -13,6 +13,7 @@ from pants.base.build_root import BuildRoot
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,12 @@ async def _resolve_asdf_tool_paths(
         tool_versions_file = Path(get_buildroot(), ".tool-versions")
         if not tool_versions_file.exists():
             logger.warning(
-                "No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in"
-                f" `{paths_option_name}`."
+                softwrap(
+                    f"""
+                    No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in
+                    `{paths_option_name}`.
+                    """
+                )
             )
             tool_versions_file = None
     # Target the home directory tool-versions file.
@@ -128,17 +133,25 @@ async def _resolve_asdf_tool_paths(
                         asdf_versions[value] = str(tool_versions_file)
                     else:
                         logger.warning(
-                            f"Unknown version format `{v}` from ASDF configured by "
-                            f"`{paths_option_name}`, ignoring. This "
-                            f"version will not be considered when determining which {tool_description} "
-                            f"to use. Please check that `{tool_versions_file}` "
-                            "is accurate."
+                            softwrap(
+                                f"""
+                                Unknown version format `{v}` from ASDF configured by
+                                `{paths_option_name}`, ignoring. This
+                                version will not be considered when determining which {tool_description}
+                                to use. Please check that `{tool_versions_file}`
+                                is accurate.
+                            """
+                            )
                         )
                 elif v == "system":
                     logger.warning(
-                        f"System path set by ASDF configured by `{paths_option_name}` is unsupported, ignoring. "
-                        f"This version will not be considered when determining which {tool_description} to use. "
-                        f"Please remove 'system' from `{tool_versions_file}` to disable this warning."
+                        softwrap(
+                            f"""
+                            System path set by ASDF configured by `{paths_option_name}` is unsupported, ignoring.
+                            This version will not be considered when determining which {tool_description} to use.
+                            Please remove 'system' from `{tool_versions_file}` to disable this warning.
+                            """
+                        )
                     )
                 else:
                     asdf_versions[v] = str(tool_versions_file)
@@ -149,10 +162,14 @@ async def _resolve_asdf_tool_paths(
             asdf_paths.append(str(install_dir))
         else:
             logger.warning(
-                f"Trying to use ASDF version `{version}` configured by "
-                f"`{paths_option_name}` but `{install_dir}` does not "
-                f"exist. This version will not be considered when determining which {tool_description} "
-                f"to use. Please check that `{source}` is accurate."
+                softwrap(
+                    f"""
+                    Trying to use ASDF version `{version}` configured by
+                    `{paths_option_name}` but `{install_dir}` does not
+                    exist. This version will not be considered when determining which {tool_description}
+                    to use. Please check that `{source}` is accurate.
+                    """
+                )
             )
 
     # For non-local, if no paths have been defined, fallback to every version installed
