@@ -563,7 +563,7 @@ async fn timeout() {
   let argv = vec![
     SH_PATH.to_string(),
     "-c".to_owned(),
-    "/bin/echo -n 'Calculating...'; /bin/sleep 0.5; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 2; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
