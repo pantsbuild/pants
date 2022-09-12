@@ -57,7 +57,8 @@ impl NetDownload {
     };
 
     // TODO: Allow the retry strategy to be configurable?
-    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(3);
+    // For now we retry after 10ms, 100ms, 1s, and 10s.
+    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(4);
     let response = RetryIf::spawn(retry_strategy, try_download, |err: &(String, bool)| err.1)
       .await
       .map_err(|(err, _)| err)?;
