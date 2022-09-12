@@ -322,7 +322,7 @@ async def setup_full_package_build_request(
             input_digest=input_digest,
             description=f"Determine metadata for generated Go package for {request.import_path}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "0"},  # protobuf files should not have cgo!
         ),
     )
 
