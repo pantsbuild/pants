@@ -19,6 +19,7 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     PythonBootstrapBinaryNamesField,
     PythonInterpreterSearchPathsField,
+    add_option_fields_for,
 )
 from pants.engine.environment import Environment
 from pants.engine.rules import Get, collect_rules, rule
@@ -83,6 +84,7 @@ class PythonBootstrapSubsystem(Subsystem):
         ),
         advanced=True,
         metavar="<python-binary-names>",
+        environment_sensitive=True,
     )
 
     # TODO(#7735): Move to `Subsystem`?
@@ -288,4 +290,5 @@ def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
+        *add_option_fields_for(PythonBootstrapSubsystem),
     )

@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
+from abc import ABC
 from dataclasses import dataclass
-from typing import cast
+from typing import Iterable, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -23,7 +25,8 @@ from pants.engine.target import (
     Target,
     WrappedTargetRequest,
 )
-from pants.option.option_types import DictOption
+from pants.engine.unions import UnionRule
+from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -361,6 +364,64 @@ def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessCo
         tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
     )
     return ProcessConfigFromEnvironment(docker_image=docker_image)
+
+
+logger = logging.getLogger(__name__)
+
+
+class MagicalEnvironmentThingy(Target):
+    alias = "environment_thingy"
+    core_fields = COMMON_TARGET_FIELDS
+    help = softwrap(
+        """
+        Magical. Just ignore this for the moment.
+        """
+    )
+
+
+class EnvironmentSensitiveOptionFieldMixin(ABC):
+    subsystem: type[Subsystem]
+    option_name: str
+
+
+_rules_for_subsystems: dict[type[Subsystem], set[UnionRule]] = {}
+
+
+def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
+    if subsystem in _rules_for_subsystems:
+        return _rules_for_subsystems[subsystem]
+
+    field_rules = set()
+
+    for option in collect_options_info(subsystem):
+        if option.flag_options["environment_sensitive"]:
+            field_rules.add(add_option_field_for(subsystem, option))
+
+    _rules_for_subsystems[subsystem] = field_rules
+    return field_rules
+
+
+def add_option_field_for(subsystem_t: type[Subsystem], option: OptionsInfo) -> UnionRule:
+    logger.warning(f"OPTION: {option}")
+    option_type: type = option.flag_options["type"]
+
+    if option_type == list:
+        member_type = option.flag_options["member_type"]
+        if member_type == str:
+
+            class ItsAField(StringSequenceField, EnvironmentSensitiveOptionFieldMixin):
+                alias = "a" + option.flag_names[0].replace("-", "_")
+                required = False
+                value: tuple[str, ...]
+                help = option.flag_options["help"] or ""
+                subsystem = subsystem_t
+                option_name = option.flag_names[0]
+
+            return MagicalEnvironmentThingy.register_plugin_field(ItsAField)
+        else:
+            raise Exception("Unsupported list member type")
+    else:
+        raise Exception("Unsupported option type")
 
 
 def rules():
