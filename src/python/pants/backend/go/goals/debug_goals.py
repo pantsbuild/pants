@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
+
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
@@ -25,14 +28,17 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
+from pants.build_graph.address import Address
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import Digest, RemovePrefix
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, RemovePrefix
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets, UnexpandedTargets
+
+logger = logging.getLogger(__name__)
 
 
 class ShowGoPackageAnalysisSubsystem(GoalSubsystem):
@@ -130,61 +136,84 @@ class GoExportCgoCodegen(Goal):
     subsystem_cls = GoExportCgoCodegenSubsystem
 
 
+@dataclass(frozen=True)
+class ExportCgoPackageRequest:
+    address: Address
+
+
+@dataclass(frozen=True)
+class ExportCgoPackageResult:
+    digest: Digest = EMPTY_DIGEST
+    error: str | None = None
+    skip: bool = False
+
+
+@rule
+async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPackageResult:
+    # Analyze the package and ensure it is actually contains cgo code.
+    analysis_wrapper = await Get(
+        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)
+    )
+    if not analysis_wrapper.analysis:
+        return ExportCgoPackageResult(error=f"Failed to analyze target: {analysis_wrapper.stderr}")
+
+    analysis = analysis_wrapper.analysis
+    if not analysis.cgo_files:
+        return ExportCgoPackageResult(skip=True)
+
+    fallible_digest_info = await Get(
+        FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(request.address)
+    )
+    if not fallible_digest_info.pkg_digest:
+        return ExportCgoPackageResult(
+            error=f"Failed to export due to failure to obtain package digest: {fallible_digest_info.stderr}"
+        )
+
+    # Perform CGo compilation.
+    result = await Get(
+        CGoCompileResult,
+        CGoCompileRequest(
+            import_path=analysis.import_path,
+            pkg_name=analysis.name,
+            digest=fallible_digest_info.pkg_digest.digest,
+            dir_path=analysis.dir_path,
+            cgo_files=analysis.cgo_files,
+            cgo_flags=analysis.cgo_flags,
+        ),
+    )
+
+    output_digest = await Get(Digest, RemovePrefix(result.digest, analysis.dir_path))
+    return ExportCgoPackageResult(digest=output_digest)
+
+
 @goal_rule
 async def go_export_cgo_codegen(
     targets: Targets,
-    console: Console,
     distdir_path: DistDir,
     workspace: Workspace,
     golang_subsystem: GolangSubsystem,
 ) -> GoExportCgoCodegen:
     if not golang_subsystem.cgo_enabled:
-        raise ValueError("Nothing to export since cgo is disabled.")
+        raise ValueError(
+            "Nothing to export since cgo is disabled, which is set by the option [golang].cgo_enabled"
+        )
 
     go_package_targets = [tgt for tgt in targets if tgt.has_field(GoPackageSourcesField)]
-    for tgt in go_package_targets:
-        # Analyze the package and ensure it is actually contains cgo code.
-        analysis_wrapper = await Get(
-            FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(tgt.address)
-        )
-        if not analysis_wrapper.analysis:
-            console.write_stdout(
-                f"{tgt.address}: Failed to analyze target: {analysis_wrapper.stderr}\n"
-            )
+    cgo_results = await MultiGet(
+        Get(ExportCgoPackageResult, ExportCgoPackageRequest(tgt.address))
+        for tgt in go_package_targets
+    )
+
+    for tgt, cgo_result in zip(go_package_targets, cgo_results):
+        if cgo_result.skip:
             continue
-        analysis = analysis_wrapper.analysis
-        if not analysis.cgo_files:
-            console.write_stdout(
-                f"{tgt.address}: Nothing to export because package does not contain Cgo files.\n"
-            )
-            continue
-        fallible_digest_info = await Get(
-            FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(tgt.address)
-        )
-        if not fallible_digest_info.pkg_digest:
-            console.write_stdout(
-                f"{tgt.address}: Failed to export due to failure to obtain package digest: {fallible_digest_info.stderr}\n"
-            )
+        if cgo_result.error:
+            logger.error(f"{tgt.address}: {cgo_result.error}")
             continue
 
-        # Perform CGo compilation.
-        result = await Get(
-            CGoCompileResult,
-            CGoCompileRequest(
-                import_path=analysis.import_path,
-                pkg_name=analysis.name,
-                digest=fallible_digest_info.pkg_digest.digest,
-                dir_path=analysis.dir_path,
-                cgo_files=analysis.cgo_files,
-                cgo_flags=analysis.cgo_flags,
-            ),
-        )
-
-        output_digest = await Get(Digest, RemovePrefix(result.digest, analysis.dir_path))
-
-        export_dir = distdir_path.relpath / "__cgo__" / tgt.address.path_safe_spec
-        workspace.write_digest(output_digest, path_prefix=str(export_dir))
-        console.write_stdout(f"{tgt.address}: Exported to `{export_dir}`\n")
+        export_dir = distdir_path.relpath / "cgo" / tgt.address.path_safe_spec
+        workspace.write_digest(cgo_result.digest, path_prefix=str(export_dir))
+        logger.info(f"{tgt.address}: Exported cgo files to `{export_dir}`\n")
 
     return GoExportCgoCodegen(exit_code=0)
 
