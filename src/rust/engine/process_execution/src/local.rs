@@ -461,11 +461,9 @@ pub trait CapturedWorkdir {
     let mut stderr = BytesMut::with_capacity(8192);
 
     // Spawn the process.
-    // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
-    // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
-    // code. The idea going forward though is we eventually want to pass incremental results on
-    // down the line for streaming process results to console logs, etc. as tracked by:
-    //   https://github.com/pantsbuild/pants/issues/6089
+    // NB: We fully buffer the `Stream` into the stdout/stderr buffers, but the idea going forward
+    // is that we eventually want to pass incremental results on down the line for streaming
+    // process results to console logs, etc.
     let exit_code_result = {
       let exit_code_future = collect_child_outputs(
         &mut stdout,
