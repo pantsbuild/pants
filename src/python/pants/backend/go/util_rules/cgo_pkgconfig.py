@@ -16,6 +16,13 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 
+# Adapted from the Go toolchain
+#
+# Original copyright:
+#   // Copyright 2011 The Go Authors. All rights reserved.
+#   // Use of this source code is governed by a BSD-style
+#   // license that can be found in the LICENSE file.
+
 
 @dataclass(frozen=True)
 class CGoPkgConfigFlagsRequest:
@@ -30,8 +37,9 @@ class CGoPkgConfigFlagsResult:
     ldflags: tuple[str, ...]
 
 
-# splitPkgConfigOutput parses the pkg-config output into a slice of
-# flags. This implements the algorithm from pkgconf/libpkgconf/argvsplit.c.
+# _split_pkg_config_output parses the pkg-config output into a tuple of flags. This implements the algorithm from
+# https://github.com/pkgconf/pkgconf/blob/master/libpkgconf/argvsplit.c
+# See https://github.com/golang/go/blob/54182ff54a687272dd7632c3a963e036ce03cb7c/src/cmd/go/internal/work/exec.go#L1414-L1473
 def _split_pkg_config_output(content: bytes) -> tuple[str, ...]:
     if not content:
         return ()
@@ -57,7 +65,7 @@ def _split_pkg_config_output(content: bytes) -> tuple[str, ...]:
                     escaped = True
                 else:
                     flag.append(c)
-        elif c in b" \t\n\v\f\r":
+        elif c not in b" \t\n\v\f\r":
             if c == ord(b"\\"):
                 escaped = True
             elif c in b"'\"":
