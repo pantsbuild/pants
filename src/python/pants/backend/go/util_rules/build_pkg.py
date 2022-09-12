@@ -238,7 +238,7 @@ class GoCompileActionIdResult:
     action_id: str
 
 
-# TODO: Merge this rule helper and the AssemblyPostCompilationRequest.
+# TODO(#16831): Merge this rule helper and the AssemblyPostCompilationRequest.
 @rule_helper
 async def _add_objects_to_archive(
     input_digest: Digest,

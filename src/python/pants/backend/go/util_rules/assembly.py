@@ -153,6 +153,7 @@ async def setup_assembly_pre_compilation(
     )
 
 
+# TODO(#16831): Refactor this to share logic with similar cgo logic.
 @rule
 async def link_assembly_post_compilation(
     request: AssemblyPostCompilationRequest,

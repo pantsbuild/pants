@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules.system_binaries import (
-    BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
@@ -38,11 +37,9 @@ async def find_cgo_binary_path(
         test=request.binary_path_test,
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(
-            path_request, rationale=f"find the `{request.binary_name}` tool required by CGo"
-        )
+    first_path = paths.first_path_or_raise(
+        path_request, rationale=f"find the `{request.binary_name}` tool required by CGo"
+    )
     return first_path
 
 

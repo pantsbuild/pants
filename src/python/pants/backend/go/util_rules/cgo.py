@@ -353,7 +353,7 @@ async def _gccld(
         ),
     )
 
-    # TODO: Select CXX if any C++ code is present.
+    # TODO(#16830): Select CXX if any C++ code is present.
     compiler_args_result, env = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), obj_dir_path)),
         Get(Environment, EnvironmentRequest(["PATH"])),
@@ -371,7 +371,7 @@ async def _gccld(
         ),
     )
 
-    # TODO: Filter out output with irrelevant warnings just like `go` tool does.
+    # TODO(#16828): Filter out output with irrelevant warnings just like `go` tool does.
 
     return result
 
@@ -417,7 +417,8 @@ async def _dynimport(
         Digest, MergeDigests([input_digest, cgo_main_compile_result.output_digest])
     )
 
-    # TODO: Gather .syso files from this package and all (transitive) dependencies.
+    # TODO(#16827): Gather .syso files from this package and all (transitive) dependencies. Cgo support requires
+    # linking all object files with `.syso` extension into the package archive.
 
     dynobj = os.path.join(obj_dir_path, "_cgo_.o")
     ldflags = list(ldflags)

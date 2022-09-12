@@ -170,5 +170,4 @@ def test_cgo_compile(rule_runner: RuleRunner) -> None:
             )
         ],
     )
-    print(f"stdout:\n{result.stdout.decode()}\nstderr:\n{result.stderr.decode()}\n")
     assert result.stdout.decode() == "Hello World!\n"
