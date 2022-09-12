@@ -70,56 +70,7 @@ class EnvironmentsSubsystem(Subsystem):
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
-class PythonInterpreterSearchPathsField(StringSequenceField):
-    alias = "python_interpreter_search_paths"
-    default = ("<PYENV>", "<PATH>")
-    value: tuple[str, ...]
-    help = softwrap(
-        """
-        A list of paths to search for Python interpreters.
-
-        Which interpreters are actually used from these paths is context-specific:
-        the Python backend selects interpreters using options on the `python` subsystem,
-        in particular, the `[python].interpreter_constraints` option.
-
-        You can specify absolute paths to interpreter binaries
-        and/or to directories containing interpreter binaries. The order of entries does
-        not matter.
-
-        The following special strings are supported:
-
-          * `<PATH>`, the contents of the PATH env var
-          * `<ASDF>`, all Python versions currently configured by ASDF \
-              `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-          * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
-          * `<PYENV>`, all Python versions under $(pyenv root)/versions
-          * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
-          * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
-        """
-    )
-
-
-class PythonBootstrapBinaryNamesField(StringSequenceField):
-    alias = "python_bootstrap_binary_names"
-    default = ("python", "python3")
-    value: tuple[str, ...]
-    help = softwrap(
-        f"""
-        The names of Python binaries to search for. See the
-        `{PythonInterpreterSearchPathsField.alias}` field to influence where interpreters are
-        searched for.
-
-        This does not impact which Python interpreter is used to run your code, only what
-        is used to run internal tools.
-        """
-    )
-
-
-_COMMON_ENV_FIELDS = (
-    *COMMON_TARGET_FIELDS,
-    PythonInterpreterSearchPathsField,
-    PythonBootstrapBinaryNamesField,
-)
+_COMMON_ENV_FIELDS = (*COMMON_TARGET_FIELDS,)
 
 
 class CompatiblePlatformsField(StringSequenceField):
