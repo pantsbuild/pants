@@ -137,7 +137,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         :param deprecation_start_version: If the option is deprecated, sets the version at which the
             deprecation will begin. Must be less than the `removal_version`.
         :param environment_sensitive: If the option is environment-sensitive, it may be overridden
-            in a runtime enviornment, and a correspon
+            in a runtime enviornment definition.
         """
         self = super().__new__(cls)
         self._flag_names = (flag_name,) if flag_name else None
