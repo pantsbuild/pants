@@ -155,6 +155,8 @@ class SetupCompilerCmdResult:
     args: tuple[str, ...]
 
 
+# Logic and comments in this rule come from `go` toolchain.
+# Note: Commented-out Go code remains in this function because it was not clear yet how to adapt that code.
 def _gcc_arch_args(goroot: GoRoot) -> list[str]:
     goarch = goroot.goarch
     if goarch == "386":
@@ -192,6 +194,8 @@ def _gcc_arch_args(goroot: GoRoot) -> list[str]:
     return []
 
 
+# Note: This function is adapted mostly from the Go toolchain. Comments are generally from the adapted
+# function. Portions that did not make sense to adapt yet have been commented out.
 @rule
 async def setup_compiler_cmd(
     request: SetupCompilerCmdRequest, goroot: GoRoot
@@ -393,12 +397,15 @@ class _DynImportResult:
     use_external_link: bool
 
 
-# dynimport creates a Go source file named importGo containing
-# //go:cgo_import_dynamic directives for each symbol or library
-# dynamically imported by the object files outObj.
-# dynOutObj, if not empty, is a new file to add to the generated archive.'
+# From Go comments:
+#   dynimport creates a Go source file named importGo containing
+#   //go:cgo_import_dynamic directives for each symbol or library
+#   dynamically imported by the object files outObj.
+#   dynOutObj, if not empty, is a new file to add to the generated archive.'
 #
 # see https://github.com/golang/go/blob/f28fa952b5f81a63afd96c9c58dceb99cc7d1dbf/src/cmd/go/internal/work/exec.go#L3020
+#
+# Note: Commented-out Go code remains in this function because it was not clear yet how to adapt that code.
 @rule_helper
 async def _dynimport(
     input_digest: Digest,
@@ -528,6 +535,7 @@ async def _dynimport(
     )
 
 
+# Note: Comments are mostly from the original function in Go toolchain sources.
 def _check_link_args_in_content(src: bytes):
     cgo_ldflag_directive = b"//go:cgo_ldflag"
     idx = src.find(cgo_ldflag_directive)
@@ -647,8 +655,8 @@ async def cgo_compile_request(
     if request.f_files and "gfortran" in golang_subsystem.cgo_fortran_binary_name:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lgfortran",))
 
-    # TODO: Add MSan (memory sanitizer) option.
-    # TODO: Add ASan (address sanitizer) option.
+    # TODO(#16838): Add MSan (memory sanitizer) option.
+    # TODO(#16837): Add ASan (address sanitizer) option.
 
     # Allows including _cgo_export.h, as well as the user's .h files,
     # from .[ch] files in the package.
@@ -707,8 +715,8 @@ async def cgo_compile_request(
                 obj_dir_path,
                 "-importpath",
                 request.import_path,
-                # TODO: Add -trimpath option to remove sandbox paths from source paths embedded in files.
-                # This means knowing the sandbox path, see SRCDIR note above.
+                # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
+                # This means using `__PANTS_SANDBOX_ROOT__` support of `GoSdkProcess`.
                 "--",
                 *flags.cppflags,
                 *flags.cflags,
@@ -745,7 +753,7 @@ async def cgo_compile_request(
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
-    # TODO: Compile "gccfiles"
+    # TODO(#16836): Compile "gccfiles"
 
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
