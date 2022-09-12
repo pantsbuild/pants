@@ -162,22 +162,22 @@ def assert_build(
         mock_gets=[
             MockGet(
                 output_type=DockerBuildContext,
-                input_type=DockerBuildContextRequest,
+                input_types=(DockerBuildContextRequest,),
                 mock=build_context_mock,
             ),
             MockGet(
                 output_type=WrappedTarget,
-                input_type=WrappedTargetRequest,
+                input_types=(WrappedTargetRequest,),
                 mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
                 output_type=DockerImageTags,
-                input_type=DockerImageTagsRequestPlugin,
+                input_types=(DockerImageTagsRequestPlugin,),
                 mock=lambda _: DockerImageTags(plugin_tags),
             ),
             MockGet(
                 output_type=FallibleProcessResult,
-                input_type=Process,
+                input_types=(Process,),
                 mock=run_process_mock,
             ),
         ],

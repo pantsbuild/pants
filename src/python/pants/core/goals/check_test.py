@@ -144,7 +144,7 @@ def run_typecheck_rule(
             mock_gets=[
                 MockGet(
                     output_type=CheckResults,
-                    input_type=CheckRequest,
+                    input_types=(CheckRequest,),
                     mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
             ],

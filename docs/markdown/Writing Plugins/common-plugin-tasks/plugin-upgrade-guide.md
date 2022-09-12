@@ -9,6 +9,30 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `MockGet` expects `input_types` kwarg, not `input_type`
+
+It's now possible in Pants 2.15 to use zero arguments or multiple arguments in a `Get`. To support this change, `MockGet` from `run_run_with_mocks()` now expects the kwarg `input_types: tuple[type, ...]` rather than `input_type: type`.
+
+Before:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_type=LintTargetsRequest,
+    mock=lambda _: LintResult(...),
+)
+```
+
+After:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_types=(LintTargetsRequest,),
+    mock=lambda _: LintResult(...),
+)
+```
+
 ### Deprecated `Platform.current`
 
 The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To
