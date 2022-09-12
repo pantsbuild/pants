@@ -46,7 +46,6 @@ from pants.core.util_rules import (
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     LocalEnvironmentTarget,
-    MagicalEnvironmentThingy,
 )
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
@@ -99,7 +98,6 @@ def target_types():
         RelocatedFiles,
         LocalEnvironmentTarget,
         DockerEnvironmentTarget,
-        MagicalEnvironmentThingy,  # TODO: delete when appropriate
     ]
 
 
