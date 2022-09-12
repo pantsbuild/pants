@@ -14,7 +14,18 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Generic,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    TypeVar,
+    cast,
+)
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -520,24 +531,25 @@ class MockEffect(Generic[_O, _I]):
     input_type: type[_I]
     mock: Callable[[_I], _O]
 
+    @property
+    def input_types(self) -> tuple[type, ...]:
+        return (self.input_type,)
 
-# TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
-#  `Callable[[InputType], OutputType]`.
+
 @dataclass(frozen=True)
-class MockGet:
-    output_type: type
-    input_type: type
-    mock: Callable[[Any], Any]
+class MockGet(Generic[_O]):
+    output_type: type[_O]
+    input_types: tuple[type, ...]
+    mock: Callable[..., _O]
 
 
-# TODO: Improve the type hints so that the return type can be inferred.
 def run_rule_with_mocks(
-    rule: Callable,
+    rule: Callable[..., Coroutine[Any, Any, _O]],
     *,
     rule_args: Sequence[Any] = (),
     mock_gets: Sequence[MockGet | MockEffect] = (),
     union_membership: UnionMembership | None = None,
-):
+) -> _O:
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
     An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
@@ -599,33 +611,32 @@ def run_rule_with_mocks(
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res
+        return res  # type: ignore[return-value]
 
     def get(res: Get | Effect):
-        if len(res.inputs) != 1:
-            raise AssertionError(
-                f"TODO: `run_rule_with_mocks` does not yet support multiple parameter `Get`s: {res}"
-            )
-        val = res.inputs[0]
         provider = next(
             (
                 mock_get.mock
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
-                and (
-                    mock_get.input_type == type(val)  # noqa: E721
+                and all(
+                    type(val) in mock_get.input_types
                     or (
                         union_membership
-                        and mock_get.input_type in union_membership
-                        and union_membership.is_member(mock_get.input_type, val)
+                        and any(
+                            input_type in union_membership
+                            and union_membership.is_member(input_type, val)
+                            for input_type in mock_get.input_types
+                        )
                     )
+                    for val in res.inputs
                 )
             ),
             None,
         )
         if provider is None:
             raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
-        return provider(val)
+        return provider(*res.inputs)
 
     rule_coroutine = res
     rule_input = None
@@ -635,12 +646,12 @@ def run_rule_with_mocks(
             if isinstance(res, (Get, Effect)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]
+                rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
             else:
-                return res
+                return res  # type: ignore[return-value]
         except StopIteration as e:
             if e.args:
-                return e.value
+                return e.value  # type: ignore[no-any-return]
 
 
 @contextmanager

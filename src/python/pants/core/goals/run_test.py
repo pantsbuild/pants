@@ -97,22 +97,22 @@ def single_target_run(
             mock_gets=[
                 MockGet(
                     output_type=TargetRootsToFieldSets,
-                    input_type=TargetRootsToFieldSetsRequest,
+                    input_types=(TargetRootsToFieldSetsRequest,),
                     mock=lambda _: TargetRootsToFieldSets({target: [field_set]}),
                 ),
                 MockGet(
                     output_type=WrappedTarget,
-                    input_type=WrappedTargetRequest,
+                    input_types=(WrappedTargetRequest,),
                     mock=lambda _: WrappedTarget(target),
                 ),
                 MockGet(
                     output_type=RunRequest,
-                    input_type=TestRunFieldSet,
+                    input_types=(TestRunFieldSet,),
                     mock=lambda _: create_mock_run_request(rule_runner, program_text),
                 ),
                 MockGet(
                     output_type=RunDebugAdapterRequest,
-                    input_type=TestRunFieldSet,
+                    input_types=(TestRunFieldSet,),
                     mock=lambda _: create_mock_run_debug_adapter_request(rule_runner, program_text),
                 ),
                 MockEffect(

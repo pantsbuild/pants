@@ -83,7 +83,7 @@ Approach 2: `run_rule_with_mocks()` (unit tests for rules)
 
 To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`. 
 
-If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: Type`, `input_type: Type`, and `mock: Callable[[OutputType], InputType]`, which is a function that takes an instance of the `input_type` and returns an instance of the `output_type`.
+If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`. 
 
 For example, given this contrived rule to find all targets with `sources` with a certain filename included (find a "needle in the haystack"):
 
@@ -159,7 +159,7 @@ def test_find_needle_in_haystack() -> None:
         mock_gets=[
             MockGet(
                 output_type=HydratedSources,
-                input_type=HydrateSourcesRequest,
+                input_types=(HydrateSourcesRequest,),
                 mock=mock_hydrate_sources,
             )
         ],
