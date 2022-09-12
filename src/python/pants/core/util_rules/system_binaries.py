@@ -431,7 +431,7 @@ async def create_binary_shims(
                 " && ".join(
                     [
                         # The `printf` cmd is a bash builtin, so always available.
-                        f"printf '{_create_shim(bash.path, binary_path)} > '{bin_relpath}/{os.path.basename(binary_path)}'"
+                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
                         f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
                     ]
                 )
