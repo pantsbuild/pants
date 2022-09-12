@@ -7,7 +7,6 @@ import dataclasses
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from optparse import Option
 from typing import ClassVar, Iterable, cast
 
 from pants.build_graph.address import Address, AddressInput
@@ -380,11 +379,10 @@ _rules_for_subsystems: dict[type[Subsystem], set[UnionRule]] = {}
 
 
 def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
-    """ Register environment fields for the `environment_sensitive` options of `subsystem` 
-    
-    This should be called in the `rules()` method in the file where `subsystem` is defined. It 
-    will register the relevant fields under the `local_environment` and `docker_environment`
-    targets.    
+    """Register environment fields for the `environment_sensitive` options of `subsystem`
+
+    This should be called in the `rules()` method in the file where `subsystem` is defined. It will
+    register the relevant fields under the `local_environment` and `docker_environment` targets.
     """
     if subsystem in _rules_for_subsystems:
         return _rules_for_subsystems[subsystem]
@@ -428,7 +426,7 @@ def _add_option_field_for(subsystem_t: type[Subsystem], option: OptionsInfo) -> 
 
     # If we ever add a third environment type, this would be a good thing to genericise.
     return [
-        LocalEnvironmentTarget.register_plugin_field(OptionField), 
+        LocalEnvironmentTarget.register_plugin_field(OptionField),
         DockerEnvironmentTarget.register_plugin_field(OptionField),
     ]
 
