@@ -387,7 +387,7 @@ def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
     if subsystem in _rules_for_subsystems:
         return _rules_for_subsystems[subsystem]
 
-    field_rules = set()
+    field_rules: set[UnionRule] = set()
 
     for option in collect_options_info(subsystem):
         if option.flag_options["environment_sensitive"]:
