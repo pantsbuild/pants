@@ -12,6 +12,10 @@ from pants.util.memo import memoized
 # Check compiler and linker arguments in CGo use cases against explicit allow lists.
 # Adapted from https://github.com/golang/go/blob/master/src/cmd/go/internal/work/security.go.
 #
+# Original copyright:
+#   // Copyright 2018 The Go Authors. All rights reserved.
+#   // Use of this source code is governed by a BSD-style
+#   // license that can be found in the LICENSE file.
 
 
 class CGoFlagSecurityError(ValueError):

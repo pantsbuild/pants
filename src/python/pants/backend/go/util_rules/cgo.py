@@ -46,6 +46,15 @@ from pants.engine.rules import collect_rules, rule, rule_helper
 _logger = logging.getLogger(__name__)
 
 
+# Adapted from the Go toolchain.
+# See generally https://github.com/golang/go/blob/master/src/cmd/go/internal/work/exec.go.
+#
+# Original copyright:
+#   // Copyright 2011 The Go Authors. All rights reserved.
+#   // Use of this source code is governed by a BSD-style
+#   // license that can be found in the LICENSE file.
+
+
 @dataclass(frozen=True)
 class CGoCompileRequest(EngineAwareParameter):
     import_path: str
