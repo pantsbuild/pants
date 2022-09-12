@@ -21,6 +21,10 @@ class OptionsInfo:
 
 def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
     """Yields the ordered options info from the MRO of the provided class."""
+    yield from (info[1] for info in _collect_options_info_extended(cls))
+
+
+def _collect_options_info_extended(cls: type) -> Iterator[tuple[str, OptionsInfo]]:
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
     # class attribute order, starting from the base class down.
     for class_ in reversed(inspect.getmro(cls)):
@@ -28,7 +32,7 @@ def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
             # NB: We use attrname and getattr to trigger descriptors
             attr = getattr(cls, attrname)
             if isinstance(attr, OptionsInfo):
-                yield attr
+                yield (attrname, attr)
 
 
 # The type of the option.

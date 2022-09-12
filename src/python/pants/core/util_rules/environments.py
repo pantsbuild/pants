@@ -6,8 +6,9 @@ from __future__ import annotations
 import dataclasses
 import logging
 from abc import ABC
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, cast
+from typing import ClassVar, Iterable, Optional, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -27,7 +28,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
+from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -389,15 +390,17 @@ def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
 
     field_rules: set[UnionRule] = set()
 
-    for option in collect_options_info(subsystem):
+    for option_attrname, option in _collect_options_info_extended(subsystem):
         if option.flag_options["environment_sensitive"]:
-            field_rules.update(_add_option_field_for(subsystem, option))
+            field_rules.update(_add_option_field_for(subsystem, option, option_attrname))
 
     _rules_for_subsystems[subsystem] = field_rules
     return field_rules
 
 
-def _add_option_field_for(subsystem_t: type[Subsystem], option: OptionsInfo) -> Iterable[UnionRule]:
+def _add_option_field_for(
+    subsystem_t: type[Subsystem], option: OptionsInfo, attrname: str
+) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
     scope = getattr(subsystem_t, "options_scope")
 
@@ -422,7 +425,7 @@ def _add_option_field_for(subsystem_t: type[Subsystem], option: OptionsInfo) -> 
         value: ofm.field_value_type  # type: ignore[name-defined]
         help = option.flag_options["help"] or ""
         subsystem = subsystem_t
-        option_name = option.flag_names[0]
+        option_name = attrname
 
     # If we ever add a third environment type, this would be a good thing to genericise.
     return [
@@ -454,6 +457,40 @@ class _OptionFieldMap:
 
 _OptionFieldMap.list(str, StringSequenceField, tuple[str, ...])
 _OptionFieldMap.simple(str, StringField)
+
+
+def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
+    """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
+
+    This is slated for quick deprecation once we can construct `Subsystems` per environment.
+    """
+
+    if env_tgt.val is None:
+        return getattr(subsystem, name)
+
+    if env_tgt not in _options:
+        _fill_options(env_tgt)
+
+    maybe = _options[env_tgt].get((type(subsystem), name))
+    if maybe is None or maybe.value is None:
+        return getattr(subsystem, name)
+    else:
+        return maybe.value
+
+
+def _fill_options(env_tgt: EnvironmentTarget) -> None:
+    if env_tgt.val is None:
+        _options[env_tgt] = {}
+        return
+
+    for _, field in env_tgt.val.field_values.items():
+        if isinstance(field, EnvironmentSensitiveOptionFieldMixin):
+            _options[env_tgt][(field.subsystem, field.option_name)] = field
+
+
+_options: dict[EnvironmentTarget, dict[tuple[type[Subsystem], str], Optional[Field]]] = defaultdict(
+    dict
+)
 
 
 def rules():
