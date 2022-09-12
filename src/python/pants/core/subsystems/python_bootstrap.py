@@ -148,9 +148,14 @@ class PythonBootstrap:
         # Some special-case logging to avoid misunderstandings.
         if from_pexrc and len(expanded) > len(from_pexrc):
             logger.info(
-                "pexrc interpreters requested and found, but other paths were also specified, "
-                "so interpreters may not be restricted to the pexrc ones. Full search path is: "
-                "{}".format(":".join(expanded))
+                softwrap(
+                    f"""
+                    pexrc interpreters requested and found, but other paths were also specified,
+                    so interpreters may not be restricted to the pexrc ones. Full search path is:
+
+                    {":".join(expanded)}
+                    """
+                )
             )
         return expanded
 
@@ -208,8 +213,12 @@ class PythonBootstrap:
             local_version_file = Path(get_buildroot(), ".python-version")
             if not local_version_file.exists():
                 logger.warning(
-                    "No `.python-version` file found in the build root, "
-                    "but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`."
+                    softwrap(
+                        """
+                        No `.python-version` file found in the build root,
+                        but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`.
+                        """
+                    )
                 )
                 return []
 

@@ -136,8 +136,12 @@ class UnrecognizedResolveNamesError(Exception):
             unrecognized_str = str(sorted(unrecognized_resolve_names))
             name_description = "names"
         super().__init__(
-            f"Unrecognized resolve {name_description} from {description_of_origin}: "
-            f"{unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}"
+            softwrap(
+                f"""
+            Unrecognized resolve {name_description} from {description_of_origin}:
+            {unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}
+            """
+            )
         )
 
 
@@ -165,31 +169,44 @@ class AmbiguousResolveNamesError(Exception):
         if tool_providers:
             if not user_providers:
                 raise AssertionError(
-                    f"{len(tool_providers)} tools have the same options_scope: {ambiguous_name}. "
-                    "If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so "
-                    "that there is no ambiguity. Otherwise, please open a bug at "
-                    "https://github.com/pantsbuild/pants/issues/new."
+                    softwrap(
+                        f"""
+                        {len(tool_providers)} tools have the same options_scope: {ambiguous_name}.
+                        If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so
+                        that there is no ambiguity. Otherwise, please open a bug at
+                        https://github.com/pantsbuild/pants/issues/new.
+                        """
+                    )
                 )
             if len(user_providers) == 1:
-                msg = (
-                    f"A resolve name from the option `{user_providers[0]}` collides with the "
-                    f"name of a tool resolve: {ambiguous_name}\n\n"
-                    f"To fix, please update `{user_providers[0]}` to use a different resolve name."
+                msg = softwrap(
+                    f"""
+                    A resolve name from the option `{user_providers[0]}` collides with the
+                    name of a tool resolve: {ambiguous_name}
+
+                    To fix, please update `{user_providers[0]}` to use a different resolve name.
+                    """
                 )
             else:
-                msg = (
-                    f"Multiple options define the resolve name `{ambiguous_name}`, but it is "
-                    f"already claimed by a tool: {user_providers}\n\n"
-                    f"To fix, please update these options so that none of them use "
-                    f"`{ambiguous_name}`."
+                msg = softwrap(
+                    f"""
+                    Multiple options define the resolve name `{ambiguous_name}`, but it is
+                    already claimed by a tool: {user_providers}
+
+                    To fix, please update these options so that none of them use
+                    `{ambiguous_name}`.
+                    """
                 )
         else:
             assert len(user_providers) > 1
-            msg = (
-                f"The same resolve name `{ambiguous_name}` is used by multiple options, which "
-                f"causes ambiguity: {user_providers}\n\n"
-                f"To fix, please update these options so that `{ambiguous_name}` is not used more "
-                f"than once."
+            msg = softwrap(
+                f"""
+                The same resolve name `{ambiguous_name}` is used by multiple options, which
+                causes ambiguity: {user_providers}
+
+                To fix, please update these options so that `{ambiguous_name}` is not used more
+                than once.
+                """
             )
         super().__init__(msg)
 
@@ -278,13 +295,17 @@ def filter_tool_lockfile_requests(
         if resolve_specified:
             resolve = req.resolve_name
             raise ValueError(
-                f"You requested to generate a lockfile for {resolve} because "
-                "you included it in `--generate-lockfiles-resolve`, but "
-                f"`[{resolve}].lockfile` is set to `{req.lockfile_dest}` "
-                "so a lockfile will not be generated.\n\n"
-                f"If you would like to generate a lockfile for {resolve}, please "
-                f"set `[{resolve}].lockfile` to the path where it should be "
-                "generated and run again."
+                softwrap(
+                    f"""
+                You requested to generate a lockfile for {resolve} because
+                you included it in `--generate-lockfiles-resolve`, but
+                `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
+                so a lockfile will not be generated.\n\n
+                If you would like to generate a lockfile for {resolve}, please
+                set `[{resolve}].lockfile` to the path where it should be
+                generated and run again.
+                """
+                )
             )
 
     return result
@@ -413,10 +434,14 @@ class NoCompatibleResolveException(Exception):
             for resolve, addresses in sorted(resolves_to_addresses.items())
         )
         return NoCompatibleResolveException(
-            f"The input targets did not have a resolve in common.\n\n"
-            f"{formatted_resolve_lists}\n\n"
-            "Targets used together must use the same resolve, set by the `resolve` field. For more "
-            f"information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}."
+            softwrap(
+                f"""
+            The input targets did not have a resolve in common.\n\n
+            {formatted_resolve_lists}\n\n
+            Targets used together must use the same resolve, set by the `resolve` field. For more
+            information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}.
+            """
+            )
             + (f"\n\n{workaround}" if workaround else "")
         )
 

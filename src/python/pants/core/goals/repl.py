@@ -20,6 +20,7 @@ from pants.option.option_types import BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -108,8 +109,12 @@ async def run_repl(
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
-            f"{repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may "
-            f"be specified through the option `--repl-shell`): {available}"
+            softwrap(
+                f"""
+                {repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may
+                be specified through the option `--repl-shell`): {available}
+                """
+            )
         )
         return Repl(-1)
 
