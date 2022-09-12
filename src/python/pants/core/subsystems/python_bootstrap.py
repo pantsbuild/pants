@@ -258,8 +258,6 @@ async def python_bootstrap(
     interpreter_search_paths = get_option("search_path", python_bootstrap_subsystem, env_tgt)
     interpreter_names = get_option("names", python_bootstrap_subsystem, env_tgt)
 
-    logger.warning(f"{interpreter_search_paths=}, {interpreter_names=}")
-
     has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
         interpreter_search_paths
     )
