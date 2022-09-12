@@ -918,7 +918,7 @@ def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
             # If in the future we have any docs-related checks, we can make both "Set Merge OK"
             # jobs depend on them here (it has to be both since some changes may modify docs
             # as well as code, and so are not "docs only").
-            "needs": ["docs_only_check"] + sorted(needs),
+            "needs": ["docs_only_check", "check_labels"] + sorted(needs),
             "outputs": {"merge_ok": "${{ steps.set_merge_ok.outputs.merge_ok }}"},
             "steps": [
                 {
@@ -978,7 +978,7 @@ def generate() -> dict[Path, str]:
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.extend(["check_labels", "docs_only_check"])
+        needs.extend(["docs_only_check"])
         val["needs"] = needs
         if_cond = val.get("if")
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
