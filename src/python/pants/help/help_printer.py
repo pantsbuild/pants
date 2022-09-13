@@ -269,6 +269,8 @@ class HelpPrinter(MaybeColor):
         for alias, target_type_info in sorted(
             self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
         ):
+            if alias.startswith("_"):
+                continue
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             summary = self._format_summary_description(
                 target_type_info.summary, chars_before_description
