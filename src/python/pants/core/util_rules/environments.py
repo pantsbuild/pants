@@ -365,7 +365,7 @@ def _add_option_field_for(
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
-    # if `_OptionFieldMap` is ever modified.
+    # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
     class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
         # TODO: use envvar-like normalization logic here
         alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
