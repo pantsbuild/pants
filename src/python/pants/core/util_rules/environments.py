@@ -371,7 +371,10 @@ def _add_option_field_for(
         alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
         required = False
         value: Any
-        help = option.flag_options["help"] or ""
+        help = (
+            f"Overrides the default value from the option `[{scope}].{attrname}` when this "
+            "environment target is active."
+        )
         subsystem = subsystem_t
         option_name = attrname
 
