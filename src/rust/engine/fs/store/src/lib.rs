@@ -39,7 +39,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Error, Read, Write};
+use std::io::{self, Read, Write};
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -136,8 +136,8 @@ impl From<String> for StoreError {
   }
 }
 
-impl From<Error> for StoreError {
-  fn from(err: Error) -> Self {
+impl From<io::Error> for StoreError {
+  fn from(err: io::Error) -> Self {
     Self::Unclassified(err.to_string())
   }
 }
@@ -907,8 +907,7 @@ impl Store {
         directory::Entry::File(f) => {
           file_digests.insert(f.digest());
         }
-        directory::Entry::Directory(_) => (),
-        directory::Entry::Symlink(_) => (),
+        directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
       });
     }
 
@@ -949,8 +948,7 @@ impl Store {
       .await?
       .walk(&mut |_, entry| match entry {
         directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Symlink(_) => (),
-        directory::Entry::Directory(_) => (),
+        directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
       });
 
     let _ = future::try_join_all(
@@ -1255,7 +1253,11 @@ impl Store {
                 };
                 store.materialize_file(path, f.digest(), mode).await
               }
-              directory::Entry::Symlink(s) => store.materialize_symlink(path, s.target()).await,
+              directory::Entry::Symlink(s) => {
+                store
+                  .materialize_symlink(path, s.target().to_str().unwrap().to_string())
+                  .await
+              }
               directory::Entry::Directory(_) => {
                 store
                   .materialize_directory_helper(path, false, parent_to_child, perms)
@@ -1380,7 +1382,7 @@ impl Store {
         directory::Entry::Symlink(s) => {
           entries.push(DigestEntry::Symlink(LinkEntry {
             path: path.to_owned(),
-            target: s.target(),
+            target: s.target().to_str().unwrap().to_string(),
           }));
         }
         directory::Entry::Directory(d) => {

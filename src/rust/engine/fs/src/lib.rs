@@ -655,7 +655,7 @@ impl Vfs<String> for DigestTrie {
         ))
       }
     };
-    Ok(target.into())
+    Ok(target.to_path_buf())
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {

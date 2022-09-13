@@ -317,7 +317,7 @@ impl From<&File> for remexec::FileNode {
 #[derive(Clone, Debug, DeepSizeOf)]
 pub struct Symlink {
   name: Name,
-  target: String,
+  target: RelativePath,
 }
 
 impl Symlink {
@@ -325,8 +325,8 @@ impl Symlink {
     self.name
   }
 
-  pub fn target(&self) -> String {
-    self.target.to_owned()
+  pub fn target(&self) -> &RelativePath {
+    &self.target
   }
 }
 
@@ -336,7 +336,7 @@ impl TryFrom<&remexec::SymlinkNode> for Symlink {
   fn try_from(symlink_node: &remexec::SymlinkNode) -> Result<Self, Self::Error> {
     Ok(Self {
       name: Name(Intern::from(&symlink_node.name)),
-      target: symlink_node.target.clone(),
+      target: RelativePath::new(&symlink_node.target)?,
     })
   }
 }
@@ -345,7 +345,7 @@ impl From<&Symlink> for remexec::SymlinkNode {
   fn from(symlink: &Symlink) -> Self {
     remexec::SymlinkNode {
       name: symlink.name.as_ref().to_owned(),
-      target: symlink.target.clone(),
+      target: symlink.target.to_str().unwrap().to_string(),
       ..remexec::SymlinkNode::default()
     }
   }

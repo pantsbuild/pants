@@ -110,7 +110,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
     .iter()
     .map(|symlink| async move {
       let target = symlink.target();
-      let detail = format!("symlink target={}:\n\n", target);
+      let detail = format!("symlink target={}:\n\n", target.to_str().unwrap());
       let res: Result<_, String> = Ok((symlink.name(), detail));
       res
     })
