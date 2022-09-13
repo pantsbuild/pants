@@ -110,14 +110,14 @@ def test_output_digest(rule_runner: RuleRunner, working_directory) -> None:
 
 def test_timeout(rule_runner: RuleRunner) -> None:
     process = Process(
-        argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
+        argv=("/bin/bash", "-c", "/bin/sleep 0.5; /bin/echo -n 'European Burmese'"),
         timeout_seconds=0.1,
         description="sleepy-cat",
     )
     result = rule_runner.request(FallibleProcessResult, [process])
     assert result.exit_code != 0
-    assert b"Exceeded timeout" in result.stdout
-    assert b"sleepy-cat" in result.stdout
+    assert b"Exceeded timeout" in result.stderr
+    assert b"sleepy-cat" in result.stderr
 
 
 def test_failing_process(rule_runner: RuleRunner) -> None:
