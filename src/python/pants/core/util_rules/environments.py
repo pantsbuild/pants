@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -330,8 +330,8 @@ _SIMPLE_OPTIONS: dict[type, type[Field]] = {
 
 # Maps between the member types for list options. Each element is the
 # field type, and the `value` type for the field.
-_LIST_OPTIONS: dict[type, tuple[type[Field], type]] = {
-    str: (StringSequenceField, tuple[str, ...]),
+_LIST_OPTIONS: dict[type, type[Field]] = {
+    str: StringSequenceField,
 }
 
 
@@ -363,10 +363,9 @@ def _add_option_field_for(
 
     if option_type != list:
         field_type = _SIMPLE_OPTIONS[option_type]
-        field_value_type = option_type
     else:
         member_type = option.flag_options["member_type"]
-        field_type, field_value_type = _LIST_OPTIONS[member_type]
+        field_type = _LIST_OPTIONS[member_type]
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
@@ -375,7 +374,7 @@ def _add_option_field_for(
         # TODO: use envvar-like normalization logic here
         alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
         required = False
-        value: field_value_type  # type: ignore[valid-type]
+        value: Any
         help = option.flag_options["help"] or ""
         subsystem = subsystem_t
         option_name = attrname
