@@ -177,17 +177,26 @@ impl PySnapshot {
       "Snapshot(digest=({}, {}), dirs=({}), files=({}), symlinks=({}))",
       self.0.digest.hash.to_hex(),
       self.0.digest.size_bytes,
-      self.0.tree.directories
+      self
+        .0
+        .tree
+        .directories()
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
         .join(","),
-      self.0.tree.files
+      self
+        .0
+        .tree
+        .files()
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
         .join(","),
-      self.0.tree.symlinks
+      self
+        .0
+        .tree
+        .symlinks()
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()

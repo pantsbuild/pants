@@ -74,6 +74,14 @@ class FileEntry:
 
 
 @dataclass(frozen=True)
+class LinkEntry:
+    """A symlink pointing to a target in the same digest."""
+
+    path: str
+    target: str
+
+
+@dataclass(frozen=True)
 class Directory:
     """The path to a directory.
 

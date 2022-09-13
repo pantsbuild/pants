@@ -39,8 +39,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Read, Write, Error};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};
+use std::io::{self, Error, Read, Write};
+use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -50,7 +50,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST, LinkEntry
+  FileEntry, LinkEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -141,8 +141,6 @@ impl From<Error> for StoreError {
     Self::Unclassified(err.to_string())
   }
 }
-
-
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -910,6 +908,7 @@ impl Store {
           file_digests.insert(f.digest());
         }
         directory::Entry::Directory(_) => (),
+        directory::Entry::Symlink(_) => (),
       });
     }
 
@@ -1256,7 +1255,7 @@ impl Store {
                 };
                 store.materialize_file(path, f.digest(), mode).await
               }
-              directory::Entry::Symlink(s) => {store.materialize_link(path, s.target()).await}
+              directory::Entry::Symlink(s) => store.materialize_link(path, s.target()).await,
               directory::Entry::Directory(_) => {
                 store
                   .materialize_directory_helper(path, false, parent_to_child, perms)
@@ -1312,11 +1311,7 @@ impl Store {
       .await?
   }
 
-  async fn materialize_link(
-    &self,
-    destination: PathBuf,
-    target: String
-  ) -> Result<(), StoreError> {
+  async fn materialize_link(&self, destination: PathBuf, target: String) -> Result<(), StoreError> {
     symlink(target, destination)?;
     Ok(())
   }
@@ -1334,6 +1329,7 @@ impl Store {
       .await?
       .walk(&mut |path, entry| match entry {
         directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
+        directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
       });
 

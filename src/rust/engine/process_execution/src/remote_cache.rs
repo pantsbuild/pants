@@ -129,8 +129,9 @@ impl CommandRunner {
     directory_path: RelativePath,
   ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
     let sub_trie = match root_trie.entry(&directory_path)? {
-      Some(directory::Entry::Directory(d)) => d.tree(),
       None => return Ok(None),
+      Some(directory::Entry::Directory(d)) => d.tree(),
+      Some(directory::Entry::Symlink(_)) => todo!(),
       Some(directory::Entry::File(_)) => {
         return Err(format!(
           "Declared output directory path {directory_path:?} in output \
@@ -144,6 +145,7 @@ impl CommandRunner {
     let mut file_digests = Vec::new();
     sub_trie.walk(&mut |_, entry| match entry {
       directory::Entry::File(f) => file_digests.push(f.digest()),
+      directory::Entry::Symlink(_) => todo!(),
       directory::Entry::Directory(_) => {}
     });
 
@@ -155,6 +157,7 @@ impl CommandRunner {
     file_path: &str,
   ) -> Result<Option<remexec::OutputFile>, String> {
     match root_trie.entry(&RelativePath::new(file_path)?)? {
+      None => Ok(None),
       Some(directory::Entry::File(f)) => {
         let output_file = remexec::OutputFile {
           digest: Some(f.digest().into()),
@@ -164,7 +167,7 @@ impl CommandRunner {
         };
         Ok(Some(output_file))
       }
-      None => Ok(None),
+      Some(directory::Entry::Symlink(_)) => todo!(),
       Some(directory::Entry::Directory(_)) => Err(format!(
         "Declared output file path {file_path:?} in output \
            digest {trie_digest:?} contained a directory instead.",

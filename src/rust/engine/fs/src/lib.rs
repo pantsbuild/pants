@@ -637,7 +637,25 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 #[async_trait]
 impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
-    let entry = self.entry(link).ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?
+    let entry = self
+      .entry(&link.0)?
+      .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?;
+    let target = match entry {
+      directory::Entry::File(_) => {
+        return Err(format!(
+          "Path `{}` was a file rather than a symlink.",
+          link.0.display()
+        ))
+      }
+      directory::Entry::Symlink(s) => s.target(),
+      directory::Entry::Directory(_) => {
+        return Err(format!(
+          "Path `{}` was a directory rather than a symlink.",
+          link.0.display()
+        ))
+      }
+    };
+    Ok(target.into())
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {

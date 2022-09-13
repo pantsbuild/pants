@@ -351,7 +351,6 @@ impl From<&Symlink> for remexec::SymlinkNode {
   }
 }
 
-
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
 // whether these types can be merged.
 enum TypedPath<'a> {
@@ -488,7 +487,12 @@ impl DigestTrie {
       .files
       .iter()
       .map(|f| File::try_from(f).map(Entry::File))
-      .chain(root.symlinks.iter().map(|s| Symlink::try_from(s).map(Entry::Symlink)))
+      .chain(
+        root
+          .symlinks
+          .iter()
+          .map(|s| Symlink::try_from(s).map(Entry::Symlink)),
+      )
       .chain(root.directories.iter().map(|d| {
         Directory::from_remexec_directory_node(d, children_by_digest).map(Entry::Directory)
       }))
@@ -553,11 +557,9 @@ impl DigestTrie {
 
   pub fn files(&self) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    self.walk(&mut |path, entry| {
-      match entry {
-        Entry::File(_) => files.push(path.to_owned()),
-        _ => (),
-      }
+    self.walk(&mut |path, entry| match entry {
+      Entry::File(_) => files.push(path.to_owned()),
+      _ => (),
     });
     files
   }
@@ -578,11 +580,9 @@ impl DigestTrie {
 
   pub fn symlinks(&self) -> Vec<PathBuf> {
     let mut symlinks = Vec::new();
-    self.walk(&mut |path, entry| {
-      match entry {
-        Entry::Symlink(_) => symlinks.push(path.to_owned()),
-        _ => (),
-      }
+    self.walk(&mut |path, entry| match entry {
+      Entry::Symlink(_) => symlinks.push(path.to_owned()),
+      _ => (),
     });
     symlinks
   }
@@ -626,18 +626,25 @@ impl DigestTrie {
     let mut ours = our_iter.next();
     let mut theirs = their_iter.next();
 
-    let add_unique =
-      |entry: &Entry, unique_files: &mut Vec<PathBuf>, unique_dirs: &mut Vec<PathBuf>, unique_symlinks: &mut Vec<PathBuf>| {
-        let path = path_so_far.join(entry.name().as_ref());
-        match entry {
-          Entry::File(_) => unique_files.push(path),
-          Entry::Symlink(_) => unique_symlinks.push(path),
-          Entry::Directory(_) => unique_dirs.push(path),
-        }
-      };
+    let add_unique = |entry: &Entry,
+                      unique_files: &mut Vec<PathBuf>,
+                      unique_dirs: &mut Vec<PathBuf>,
+                      unique_symlinks: &mut Vec<PathBuf>| {
+      let path = path_so_far.join(entry.name().as_ref());
+      match entry {
+        Entry::File(_) => unique_files.push(path),
+        Entry::Symlink(_) => unique_symlinks.push(path),
+        Entry::Directory(_) => unique_dirs.push(path),
+      }
+    };
 
     let add_ours = |entry: &Entry, diff: &mut DigestTrieDiff| {
-      add_unique(entry, &mut diff.our_unique_files, &mut diff.our_unique_dirs, &mut diff.our_unique_symlinks);
+      add_unique(
+        entry,
+        &mut diff.our_unique_files,
+        &mut diff.our_unique_dirs,
+        &mut diff.our_unique_symlinks,
+      );
     };
     let add_theirs = |entry: &Entry, diff: &mut DigestTrieDiff| {
       add_unique(
@@ -899,8 +906,12 @@ impl DigestTrie {
       match first {
         Entry::File(f) => {
           // If any Entry is a File, then they must all be identical.
-          let (mut mismatched_files, mismatched_dirs, mismatched_symlinks) = collisions(f.digest, group);
-          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() || !mismatched_symlinks.is_empty() {
+          let (mut mismatched_files, mismatched_dirs, mismatched_symlinks) =
+            collisions(f.digest, group);
+          if !mismatched_files.is_empty()
+            || !mismatched_dirs.is_empty()
+            || !mismatched_symlinks.is_empty()
+          {
             mismatched_files.push(f);
             return Err(MergeError::duplicates(
               parent_path,
@@ -919,14 +930,17 @@ impl DigestTrie {
           let mut mismatched_symlinks = Vec::new();
           for entry in group {
             match entry {
-              Entry::File(other)  => mismatched_files.push(other),
+              Entry::File(other) => mismatched_files.push(other),
               Entry::Symlink(other) if other.target != s.target => mismatched_symlinks.push(other),
               Entry::Directory(other) => mismatched_dirs.push(other),
               _ => (),
             }
           }
 
-          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() || !mismatched_symlinks.is_empty() {
+          if !mismatched_files.is_empty()
+            || !mismatched_dirs.is_empty()
+            || !mismatched_symlinks.is_empty()
+          {
             mismatched_symlinks.push(s);
             return Err(MergeError::duplicates(
               parent_path,
@@ -941,7 +955,8 @@ impl DigestTrie {
         }
         Entry::Directory(d) => {
           // If any Entry is a Directory, then they must all be Directories which will be merged.
-          let (mismatched_files, mut mismatched_dirs, mismatched_symlinks) = collisions(d.digest, group);
+          let (mismatched_files, mut mismatched_dirs, mismatched_symlinks) =
+            collisions(d.digest, group);
 
           // If there were any Files, error.
           if !mismatched_files.is_empty() || !mismatched_symlinks.is_empty() {
@@ -1041,7 +1056,12 @@ pub enum MergeError {
 }
 
 impl MergeError {
-  fn duplicates(parent_path: PathBuf, files: Vec<&File>, directories: Vec<&Directory>, symlinks: Vec<&Symlink>) -> Self {
+  fn duplicates(
+    parent_path: PathBuf,
+    files: Vec<&File>,
+    directories: Vec<&Directory>,
+    symlinks: Vec<&Symlink>,
+  ) -> Self {
     MergeError::Duplicates {
       parent_path,
       files: files.into_iter().cloned().collect(),
