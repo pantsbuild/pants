@@ -178,11 +178,10 @@ dependencies = [
 [[package]]
 name = "bollard"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d82e7850583ead5f8bbef247e2a3c37a19bd576e8420cd262a6711921827e1e5"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
 dependencies = [
  "base64",
- "bollard-stubs",
+ "bollard-stubs 1.42.0-rc.4",
  "bytes",
  "futures-core",
  "futures-util",
@@ -208,6 +207,15 @@ name = "bollard-stubs"
 version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
+dependencies = [
+ "serde",
+ "serde_with",
+]
+
+[[package]]
+name = "bollard-stubs"
+version = "1.42.0-rc.4"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
 dependencies = [
  "serde",
  "serde_with",
@@ -2282,7 +2290,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bollard",
- "bollard-stubs",
+ "bollard-stubs 1.42.0-rc.3",
  "bytes",
  "cache",
  "concrete_time",
