@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 
@@ -24,6 +25,28 @@ class EnvironmentName(EngineAwareParameter):
         return self.val or "<none>"
 
 
-CompleteEnvironment = CompleteEnvironmentVars
-EnvironmentRequest = EnvironmentVarsRequest
-Environment = EnvironmentVars
+def __getattr__(name):
+    if name == "EnvironmentName":
+        return EnvironmentName
+    if name == "CompleteEnvironment":
+        warn_or_error(
+            "2.16.0.dev0",
+            "`pants.engine.environment.CompleteEnvironment`",
+            "Use `pants.engine.env_vars.CompleteEnvironmentVars",
+        )
+        return CompleteEnvironmentVars
+    if name == "EnvironmentRequest":
+        warn_or_error(
+            "2.16.0.dev0",
+            "`pants.engine.environment.EnvironmentRequest`",
+            "Use `pants.engine.env_vars.EnvironmentVarsRequest",
+        )
+        return EnvironmentVarsRequest
+    if name == "Environment":
+        warn_or_error(
+            "2.16.0.dev0",
+            "`pants.engine.environment.Environment`",
+            "Use `pants.engine.env_vars.EnvironmentVars",
+        )
+        return EnvironmentVars
+    raise AttributeError(name)
