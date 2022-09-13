@@ -31,6 +31,14 @@ lazy_static! {
   };
 }
 
+#[derive(Clone)]
+pub enum SymlinkBehavior {
+  /// Treat symlinks as a distinctive element.
+  Aware,
+  /// Follow symlinks to their target.
+  Oblivious,
+}
+
 /// A Digest for a directory, optionally with its content stored as a DigestTrie.
 ///
 /// If a DirectoryDigest has a DigestTrie reference, then its Digest _might not_ be persisted to
@@ -555,18 +563,20 @@ impl DigestTrie {
     digests
   }
 
+  /// Returns the files in the trie, not including symlinks pointing to files.
   pub fn files(&self) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    self.walk(&mut |path, entry| match entry {
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
       Entry::File(_) => files.push(path.to_owned()),
       _ => (),
     });
     files
   }
 
+  /// Returns the files in the trie, not including directories pointing to files.
   pub fn directories(&self) -> Vec<PathBuf> {
     let mut directories = Vec::new();
-    self.walk(&mut |path, entry| {
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
       match entry {
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory, which is not emitted here.
@@ -580,7 +590,7 @@ impl DigestTrie {
 
   pub fn symlinks(&self) -> Vec<PathBuf> {
     let mut symlinks = Vec::new();
-    self.walk(&mut |path, entry| match entry {
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
       Entry::Symlink(_) => symlinks.push(path.to_owned()),
       _ => (),
     });
@@ -589,7 +599,8 @@ impl DigestTrie {
 
   /// Visit every node in the tree, calling the given function with the path to the Node, and its
   /// entries.
-  pub fn walk(&self, f: &mut impl FnMut(&Path, &Entry)) {
+  /// NOTE: if SymlinkBehavior::Oblivious, `f` will never be called with a `SymlinkEntry`.
+  pub fn walk(&self, symlink_behavior: SymlinkBehavior, f: &mut impl FnMut(&Path, &Entry)) {
     {
       // TODO: It's likely that a DigestTrie should hold its own Digest, to avoid re-computing it
       // here.
@@ -599,15 +610,20 @@ impl DigestTrie {
       ));
       f(&PathBuf::new(), &root);
     }
-    self.walk_helper(PathBuf::new(), f)
+    self.walk_helper(PathBuf::new(), symlink_behavior, f)
   }
 
-  fn walk_helper(&self, path_so_far: PathBuf, f: &mut impl FnMut(&Path, &Entry)) {
+  fn walk_helper(
+    &self,
+    path_so_far: PathBuf,
+    symlink_behavior: SymlinkBehavior,
+    f: &mut impl FnMut(&Path, &Entry),
+  ) {
     for entry in &*self.0 {
       let path = path_so_far.join(entry.name().as_ref());
       f(&path, entry);
       if let Entry::Directory(d) = entry {
-        d.tree.walk_helper(path, f);
+        d.tree.walk_helper(path, symlink_behavior.clone(), f);
       }
     }
   }
@@ -1016,7 +1032,7 @@ impl TryFrom<remexec::Tree> for DigestTrie {
 impl From<&DigestTrie> for remexec::Tree {
   fn from(trie: &DigestTrie) -> Self {
     let mut tree = remexec::Tree::default();
-    trie.walk(&mut |_, entry| {
+    trie.walk(SymlinkBehavior::Aware, &mut |_, entry| {
       match entry {
         Entry::File(_) => (),
         Entry::Symlink(_) => (),

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use fs::{directory, DigestTrie, RelativePath};
+use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -149,7 +149,7 @@ impl CommandRunner {
 
     let tree = sub_trie.into();
     let mut file_digests = Vec::new();
-    sub_trie.walk(&mut |_, entry| match entry {
+    sub_trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
       directory::Entry::File(f) => file_digests.push(f.digest()),
       directory::Entry::Symlink(_) => (),
       directory::Entry::Directory(_) => {}

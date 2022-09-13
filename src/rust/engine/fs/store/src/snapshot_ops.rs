@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
   directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
-  EMPTY_DIRECTORY_DIGEST,
+  SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, FutureExt};
 use hashing::Digest;
@@ -234,7 +234,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
     let mut files = HashMap::new();
-    input_tree.walk(&mut |path, entry| match entry {
+    input_tree.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }

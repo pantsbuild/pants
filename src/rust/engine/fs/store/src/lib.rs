@@ -50,7 +50,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, LinkEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
+  FileEntry, LinkEntry, PathStat, Permissions, RelativePath, SymlinkBehavior,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -480,7 +481,7 @@ impl Store {
   ) -> Result<DirectoryDigest, String> {
     // Collect all Directory structs in the trie.
     let mut directories = Vec::new();
-    tree.walk(&mut |_, entry| match entry {
+    tree.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
       directory::Entry::Directory(d) => {
         let directory = d.as_remexec_directory();
         if cfg!(debug_assertions) {
@@ -903,7 +904,7 @@ impl Store {
     // Collect all file digests.
     let mut file_digests = file_digests.into_iter().collect::<HashSet<_>>();
     for digest_trie in digest_tries {
-      digest_trie.walk(&mut |_, entry| match entry {
+      digest_trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
         directory::Entry::File(f) => {
           file_digests.insert(f.digest());
         }
@@ -946,7 +947,7 @@ impl Store {
     self
       .load_digest_trie(dir_digest)
       .await?
-      .walk(&mut |_, entry| match entry {
+      .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
         directory::Entry::File(f) => file_digests.push(f.digest()),
         directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
       });
@@ -1194,7 +1195,7 @@ impl Store {
     self
       .load_digest_trie(digest)
       .await?
-      .walk(&mut |path, entry| {
+      .walk(SymlinkBehavior::Aware, &mut |path, entry| {
         if let Some(parent) = path.parent() {
           parent_to_child
             .entry(destination.join(parent))
@@ -1330,14 +1331,14 @@ impl Store {
     digest: DirectoryDigest,
   ) -> Result<Vec<FileContent>, StoreError> {
     let mut files = Vec::new();
-    self
-      .load_digest_trie(digest)
-      .await?
-      .walk(&mut |path, entry| match entry {
+    self.load_digest_trie(digest).await?.walk(
+      SymlinkBehavior::Aware,
+      &mut |path, entry| match entry {
         directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
         directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
-      });
+      },
+    );
 
     future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
       let store = self.clone();
@@ -1368,10 +1369,9 @@ impl Store {
     }
 
     let mut entries = Vec::new();
-    self
-      .load_digest_trie(digest)
-      .await?
-      .walk(&mut |path, entry| match entry {
+    self.load_digest_trie(digest).await?.walk(
+      SymlinkBehavior::Aware,
+      &mut |path, entry| match entry {
         directory::Entry::File(f) => {
           entries.push(DigestEntry::File(FileEntry {
             path: path.to_owned(),
@@ -1392,7 +1392,8 @@ impl Store {
             entries.push(DigestEntry::EmptyDirectory(path.to_owned()));
           }
         }
-      });
+      },
+    );
 
     Ok(entries)
   }
