@@ -35,6 +35,7 @@ from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestSubsystem,
 )
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -879,6 +880,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,
     SkipPythonTestsField,
+    EnvironmentField,
 )
 
 

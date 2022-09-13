@@ -32,7 +32,6 @@ from pants.core.goals.test import (
     TestResult,
     get_filtered_environment,
 )
-from pants.core.goals.test import rules as core_test_rules
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents
@@ -60,7 +59,6 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
-            *core_test_rules(),
             QueryRule(TestResult, (GoTestFieldSet,)),
             QueryRule(CoverageReports, (GoCoverageDataCollection,)),
             QueryRule(DigestContents, (Digest,)),

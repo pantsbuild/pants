@@ -18,6 +18,7 @@ from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    FieldSet,
     StringField,
     StringSequenceField,
     Target,
@@ -63,6 +64,17 @@ class EnvironmentsSubsystem(Subsystem):
 # -------------------------------------------------------------------------------------------
 
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
+
+
+class EnvironmentField(StringField):
+    alias = "_environment"
+    default = LOCAL_ENVIRONMENT_MATCHER
+    value: str
+    help = softwrap(
+        """
+        TODO(#7735): fill this in.
+        """
+    )
 
 
 class PythonInterpreterSearchPathsField(StringSequenceField):
@@ -214,12 +226,47 @@ class EnvironmentTarget:
 
 
 @dataclass(frozen=True)
-class EnvironmentRequest(EngineAwareParameter):
+class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
     applying {LOCAL_ENVIRONMENT_MATCHER}."""
 
     raw_value: str
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_field_set(cls, field_set: FieldSet) -> EnvironmentNameRequest:
+        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+
+        If the FieldSet includes `EnvironmentField` in its class definition, then this method will
+        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+
+        Rules can then use `Get(EnvironmentName, EnvironmentNameRequest,
+        field_set.environment_name_request())` to normalize the environment value, and
+        then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
+        environment is used for the subgraph.
+        """
+        for attr in dir(field_set):
+            # Skip what look like dunder methods, which are unlikely to be an
+            # EnvironmentField value on FieldSet class declarations.
+            if attr.startswith("__"):
+                continue
+            val = getattr(field_set, attr)
+            if isinstance(val, EnvironmentField):
+                env_field = val
+                break
+        else:
+            env_field = EnvironmentField(None, address=field_set.address)
+
+        return EnvironmentNameRequest(
+            env_field.value,
+            # Note that if the field was not registered, we will have fallen back to the default
+            # LOCAL_ENVIRONMENT_MATCHER, which we expect to be infallible when normalized. That
+            # implies that the error message using description_of_origin should not trigger, so
+            # it's okay that the field is not actually registered on the target.
+            description_of_origin=(
+                f"the `{env_field.alias}` field from the target {field_set.address}"
+            ),
+        )
 
     def debug_hint(self) -> str:
         return self.raw_value
@@ -269,6 +316,8 @@ async def determine_local_environment(
             )
         )
     elif len(compatible_name_and_targets) > 1:
+        # TODO(#7735): Consider if we still want to error when no target is found, given that we
+        #  are now falling back to subsystem values.
         # TODO(#7735): Allow the user to disambiguate what __local__ means via an option.
         raise AmbiguousEnvironmentError(
             softwrap(
@@ -290,7 +339,7 @@ async def determine_local_environment(
 
 @rule
 async def resolve_environment_name(
-    request: EnvironmentRequest, environments_subsystem: EnvironmentsSubsystem
+    request: EnvironmentNameRequest, environments_subsystem: EnvironmentsSubsystem
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
@@ -321,10 +370,10 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 The name `{env_name.val}` is not defined. The name should have been normalized and
-                validated in the rule `EnvironmentRequest -> EnvironmentName`
+                validated in the rule `EnvironmentNameRequest -> EnvironmentName`
                 already. If you directly wrote
                 `Get(EnvironmentTarget, EnvironmentName(my_name))`, refactor to
-                `Get(EnvironmentTarget, EnvironmentRequest(my_name, ...))`.
+                `Get(EnvironmentTarget, EnvironmentNameRequest(my_name, ...))`.
                 """
             )
         )
