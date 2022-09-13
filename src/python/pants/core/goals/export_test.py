@@ -92,7 +92,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
             mock_gets=[
                 MockGet(
                     output_type=ExportResults,
-                    input_type=ExportRequest,
+                    input_types=(ExportRequest,),
                     mock=lambda req: ExportResults(
                         (
                             mock_export(
@@ -112,17 +112,17 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 ),
                 MockGet(
                     output_type=Digest,
-                    input_type=MergeDigests,
+                    input_types=(MergeDigests,),
                     mock=lambda md: rule_runner.request(Digest, [md]),
                 ),
                 MockGet(
                     output_type=Digest,
-                    input_type=AddPrefix,
+                    input_types=(AddPrefix,),
                     mock=lambda ap: rule_runner.request(Digest, [ap]),
                 ),
                 MockGet(
                     output_type=Environment,
-                    input_type=EnvironmentRequest,
+                    input_types=(EnvironmentRequest,),
                     mock=lambda env: rule_runner.request(Environment, [env]),
                 ),
                 MockEffect(

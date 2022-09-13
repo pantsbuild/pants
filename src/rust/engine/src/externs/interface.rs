@@ -38,7 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
-use rule_graph::{self, RuleGraph};
+use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -46,6 +46,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
+use crate::externs::process::PyProcessConfigFromEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -58,6 +59,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
+  externs::process::register(m)?;
   externs::scheduler::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
@@ -214,6 +216,9 @@ impl PyTypes {
       platform: TypeId::new(platform),
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
+      process_config_from_environment: TypeId::new(
+        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+      ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
       session_values: TypeId::new(session_values),
@@ -979,21 +984,26 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
+  process_config_from_environment: PyProcessConfigFromEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
   let interactive_process: Value = interactive_process.into();
+  let process_config = Value::new(process_config_from_environment.into_py(py));
   py.allow_threads(|| {
     core.executor.clone().block_on(nodes::maybe_side_effecting(
       true,
       &Arc::new(std::sync::atomic::AtomicBool::new(true)),
       core.intrinsics.run(
-        &Intrinsic::new(
-          core.types.interactive_process_result,
-          core.types.interactive_process,
-        ),
+        &Intrinsic {
+          product: core.types.interactive_process_result,
+          inputs: vec![
+            DependencyKey::new(core.types.interactive_process),
+            DependencyKey::new(core.types.process_config_from_environment),
+          ],
+        },
         context,
-        vec![interactive_process],
+        vec![interactive_process, process_config],
       ),
     ))
   })

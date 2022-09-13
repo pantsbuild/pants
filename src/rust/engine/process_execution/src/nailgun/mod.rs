@@ -15,7 +15,8 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform,
+  Process, ProcessError,
 };
 
 #[cfg(test)]
@@ -85,23 +86,33 @@ fn construct_nailgun_client_request(
 /// Otherwise, it will just delegate to the regular local runner.
 ///
 pub struct CommandRunner {
-  inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
+  store: Store,
   executor: Executor,
+  named_caches: NamedCaches,
+  immutable_inputs: ImmutableInputs,
 }
 
 impl CommandRunner {
   pub fn new(
-    runner: crate::local::CommandRunner,
     workdir_base: PathBuf,
     store: Store,
     executor: Executor,
+    named_caches: NamedCaches,
+    immutable_inputs: ImmutableInputs,
     nailgun_pool_size: usize,
   ) -> Self {
     CommandRunner {
-      inner: runner,
-      nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, store, executor.clone()),
+      nailgun_pool: NailgunPool::new(
+        workdir_base,
+        nailgun_pool_size,
+        store.clone(),
+        executor.clone(),
+      ),
+      store,
       executor,
+      named_caches,
+      immutable_inputs,
     }
   }
 
@@ -113,7 +124,6 @@ impl CommandRunner {
 impl Debug for CommandRunner {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("nailgun::CommandRunner")
-      .field("inner", &self.inner)
       .finish_non_exhaustive()
   }
 }
@@ -123,13 +133,9 @@ impl super::CommandRunner for CommandRunner {
   async fn run(
     &self,
     context: Context,
-    workunit: &mut RunningWorkunit,
+    _workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    if req.input_digests.use_nailgun.is_empty() {
-      trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-      return self.inner.run(context, workunit, req).await;
-    }
     debug!("Running request under nailgun:\n {:?}", req);
 
     in_workunit!(
@@ -168,11 +174,7 @@ impl super::CommandRunner for CommandRunner {
         // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
         let mut nailgun_process = self
           .nailgun_pool
-          .acquire(
-            server_req,
-            self.inner.named_caches(),
-            self.inner.immutable_inputs(),
-          )
+          .acquire(server_req, &self.named_caches, &self.immutable_inputs)
           .await
           .map_err(|e| e.enrich("Failed to connect to nailgun"))?;
 
@@ -181,10 +183,10 @@ impl super::CommandRunner for CommandRunner {
           nailgun_process.workdir_path().to_owned(),
           &client_req,
           client_req.input_digests.input_files.clone(),
-          self.inner.store.clone(),
+          self.store.clone(),
           self.executor.clone(),
-          self.inner.named_caches(),
-          self.inner.immutable_inputs(),
+          &self.named_caches,
+          &self.immutable_inputs,
           None,
           None,
         )
@@ -194,7 +196,7 @@ impl super::CommandRunner for CommandRunner {
           .run_and_capture_workdir(
             client_req,
             context,
-            self.inner.store.clone(),
+            self.store.clone(),
             self.executor.clone(),
             nailgun_process.workdir_path().to_owned(),
             (nailgun_process.name().to_owned(), nailgun_process.address()),
@@ -218,13 +220,14 @@ impl super::CommandRunner for CommandRunner {
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = (String, SocketAddr);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    _context: &'c Context,
+    workdir_path: &'w Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let client_workdir = if let Some(working_directory) = &req.working_directory {
       workdir_path.join(working_directory)
     } else {

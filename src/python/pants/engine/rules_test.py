@@ -278,7 +278,7 @@ class TestRule:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(output_type=A, input_type=str, mock=lambda _: A())],
+            mock_gets=[MockGet(output_type=A, input_types=(str,), mock=lambda _: A())],
         )
         assert res == Example(0)
 

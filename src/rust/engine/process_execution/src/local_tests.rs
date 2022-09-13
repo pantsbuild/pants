@@ -565,7 +565,7 @@ async fn timeout() {
   let argv = vec![
     find_bash(),
     "-c".to_owned(),
-    "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 0.5; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
@@ -575,9 +575,11 @@ async fn timeout() {
   let result = run_command_locally(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
-  assert_that(&error_msg).contains("sleepy-cat");
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
+  assert_that(&stdout).contains("Calculating...");
+  assert_that(&stderr).contains("Exceeded timeout");
+  assert_that(&stderr).contains("sleepy-cat");
 }
 
 #[tokio::test]

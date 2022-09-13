@@ -181,7 +181,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             mock_gets=[
                 MockGet(
                     output_type=LoadedLockfile,
-                    input_type=LoadedLockfileRequest,
+                    input_types=(LoadedLockfileRequest,),
                     mock=lambda _: loaded_lock,
                 )
             ],

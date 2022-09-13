@@ -43,6 +43,7 @@ class ApplyCodeCoverageRequest:
     digest: Digest
     dir_path: str
     go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
     cover_mode: GoCoverMode
     import_path: str
 
@@ -67,6 +68,8 @@ class BuiltGoPackageCodeCoverageMetadata:
 class ApplyCodeCoverageResult:
     digest: Digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...]
+    go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -122,10 +125,40 @@ def _hash_string(s: str) -> str:
     return h.hexdigest()[:12]
 
 
+def _is_test_file(s: str) -> bool:
+    return s.endswith("_test.go")
+
+
 @rule
 async def go_apply_code_coverage(request: ApplyCodeCoverageRequest) -> ApplyCodeCoverageResult:
-    # Code coverage is never applied to test files.
-    go_files = [go_file for go_file in request.go_files if not go_file.endswith("_test.go")]
+    # Setup metadata for each file to which code coverage will be applied by assigning the name of the exported
+    # variable which holds coverage counters for each file.
+    file_metadatas: list[FileCodeCoverageMetadata] = []
+    output_go_files = []
+    output_cgo_files = []
+    import_path_hash = _hash_string(request.import_path)
+    for i, go_file in enumerate(request.go_files + request.cgo_files):
+        if _is_test_file(go_file):
+            if i < len(request.go_files):
+                output_go_files.append(go_file)
+            else:
+                output_cgo_files.append(go_file)
+            continue
+
+        p = PurePath(go_file)
+        cover_go_file = str(p.with_name(f"{p.stem}.cover.go"))
+        file_metadatas.append(
+            FileCodeCoverageMetadata(
+                file_id=f"{request.import_path}/{go_file}",
+                go_file=go_file,
+                cover_go_file=cover_go_file,
+                cover_var=f"GoCover_{import_path_hash}_{i}",
+            )
+        )
+        if i < len(request.go_files):
+            output_go_files.append(cover_go_file)
+        else:
+            output_cgo_files.append(cover_go_file)
 
     subsetted_digests = await MultiGet(
         Get(
@@ -133,48 +166,39 @@ async def go_apply_code_coverage(request: ApplyCodeCoverageRequest) -> ApplyCode
             DigestSubset(
                 request.digest,
                 PathGlobs(
-                    [os.path.join(request.dir_path, go_file)],
+                    [os.path.join(request.dir_path, file_metadata.go_file)],
                     glob_match_error_behavior=GlobMatchErrorBehavior.error,
                     description_of_origin="coverage",
                 ),
             ),
         )
-        for go_file in go_files
+        for file_metadata in file_metadatas
     )
 
-    # Setup metadata for each file to which code coverage will be applied by assigning the name of the exported
-    # variable which holds coverage counters for each file.
-    import_path_hash = _hash_string(request.import_path)
-    file_metadatas = []
-    for i, go_file in enumerate(go_files):
-        p = PurePath(go_file)
-        file_metadatas.append(
-            FileCodeCoverageMetadata(
-                file_id=f"{request.import_path}/{go_file}",
-                go_file=go_file,
-                cover_go_file=str(p.with_name(f"{p.stem}.cover-{i}.go")),
-                cover_var=f"GoCover_{import_path_hash}_{i}",
-            )
-        )
-
+    # Apply code coverage codegen to each file that will be analyzed.
     cover_results = await MultiGet(
         Get(
             ApplyCodeCoverageToFileResult,
             ApplyCodeCoverageToFileRequest(
                 digest=go_file_digest,
-                go_file=os.path.join(request.dir_path, m.go_file),
-                cover_go_file=os.path.join(request.dir_path, m.cover_go_file),
+                go_file=os.path.join(request.dir_path, file_metadata.go_file),
+                cover_go_file=os.path.join(request.dir_path, file_metadata.cover_go_file),
                 mode=request.cover_mode,
-                cover_var=m.cover_var,
+                cover_var=file_metadata.cover_var,
             ),
         )
-        for m, go_file_digest in zip(file_metadatas, subsetted_digests)
+        for file_metadata, go_file_digest in zip(file_metadatas, subsetted_digests)
     )
 
-    digest = await Get(Digest, MergeDigests([r.digest for r in cover_results]))
+    # Merge the coverage codegen back into the original digest so that non-covered and covered sources are in
+    # the same digest.
+    digest = await Get(Digest, MergeDigests([request.digest, *(r.digest for r in cover_results)]))
+
     return ApplyCodeCoverageResult(
         digest=digest,
         cover_file_metadatas=tuple(file_metadatas),
+        go_files=tuple(output_go_files),
+        cgo_files=tuple(output_cgo_files),
     )
 
 

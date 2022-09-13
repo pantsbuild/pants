@@ -10,7 +10,7 @@ from typing_extensions import Protocol
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveProcessResult
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -162,6 +162,24 @@ EMPTY_SNAPSHOT: Snapshot
 def default_cache_path() -> str: ...
 
 # ------------------------------------------------------------------------------
+# Process
+# ------------------------------------------------------------------------------
+
+class ProcessConfigFromEnvironment:
+    """Settings from the current Environment for how a `Process` should be run.
+
+    Note that most values from the Environment are instead set via changing the arguments `argv` and
+    `env` in the `Process` constructor.
+    """
+
+    def __init__(self, *, docker_image: str | None) -> None: ...
+    def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    @property
+    def docker_image(self) -> str | None: ...
+
+# ------------------------------------------------------------------------------
 # Workunits
 # ------------------------------------------------------------------------------
 
@@ -308,7 +326,7 @@ def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
 def session_run_interactive_process(
-    session: PySession, InteractiveProcess
+    session: PySession, process: InteractiveProcess, process_config: ProcessConfigFromEnvironment
 ) -> InteractiveProcessResult: ...
 def session_get_metrics(session: PySession) -> dict[str, int]: ...
 def session_get_observation_histograms(

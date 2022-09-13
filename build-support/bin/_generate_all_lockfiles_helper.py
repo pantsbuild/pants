@@ -21,6 +21,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
+from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
@@ -98,6 +99,9 @@ class DefaultTool:
 
 AllTools = (
     # Python
+    DefaultTool.python(
+        AddTrailingComma, backend="pants.backend.experimental.python.lint.add_trailing_comma"
+    ),
     DefaultTool.python(Autoflake),
     DefaultTool.python(Bandit, backend="pants.backend.python.lint.bandit"),
     DefaultTool.python(Black),

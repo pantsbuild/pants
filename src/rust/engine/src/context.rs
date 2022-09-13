@@ -25,8 +25,9 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
+  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
   ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
@@ -233,16 +234,40 @@ impl Core {
           exec_strategy_opts.local_parallelism * 2
         };
 
-        Box::new(nailgun::CommandRunner::new(
-          local_command_runner,
+        let nailgun_runner = nailgun::CommandRunner::new(
           local_execution_root_dir.to_path_buf(),
           local_runner_store.clone(),
           executor.clone(),
+          named_caches.clone(),
+          immutable_inputs.clone(),
           pool_size,
+        );
+
+        Box::new(SwitchedCommandRunner::new(
+          nailgun_runner,
+          local_command_runner,
+          |req| !req.input_digests.use_nailgun.is_empty(),
         ))
       } else {
         Box::new(local_command_runner)
       };
+
+      // Note that the Docker command runner is only used if the Process sets docker_image. So,
+      // it's safe to always create this command runner.
+      let docker_runner = Box::new(docker::CommandRunner::new(
+        local_runner_store.clone(),
+        executor.clone(),
+        local_execution_root_dir.to_path_buf(),
+        named_caches.clone(),
+        immutable_inputs.clone(),
+        exec_strategy_opts.local_keep_sandboxes,
+        // TODO(#16767): Allow users to specify this via an option.
+        docker::ImagePullPolicy::OnlyIfLatestOrMissing,
+      )?);
+
+      let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
+        req.docker_image.is_some()
+      }));
 
       (runner, exec_strategy_opts.local_parallelism)
     };

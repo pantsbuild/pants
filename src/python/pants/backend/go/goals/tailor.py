@@ -10,13 +10,12 @@ from pathlib import PurePath
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import (
-    GoBinaryMainPackage,
     GoBinaryMainPackageField,
-    GoBinaryMainPackageRequest,
     GoBinaryTarget,
     GoModTarget,
     GoPackageTarget,
 )
+from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,

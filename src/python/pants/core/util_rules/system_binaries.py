@@ -25,7 +25,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, pluralize
+from pants.util.strutil import create_path_env_var, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -158,9 +158,11 @@ class BinaryNotFoundError(EnvironmentError):
             beyond installing the program. For example, "Alternatively, you can set the option
             `--python-bootstrap-search-path` to change the paths searched."
         """
-        msg = (
-            f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "
-            "ensure that it is installed"
+        msg = softwrap(
+            f"""
+            Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`.
+            Please ensure that it is installed
+            """
         )
         msg += f" so that Pants can {rationale}." if rationale else "."
         if alternative_solution:
@@ -428,11 +430,8 @@ async def create_binary_shims(
             *(
                 " && ".join(
                     [
-                        (
-                            # The `printf` cmd is a bash builtin, so always available.
-                            f"printf '{_create_shim(bash.path, binary_path)}'"
-                            f" > '{bin_relpath}/{os.path.basename(binary_path)}'"
-                        ),
+                        # The `printf` cmd is a bash builtin, so always available.
+                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
                         f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
                     ]
                 )
@@ -646,10 +645,16 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
 
     raise BinaryNotFoundError(
         # TODO(#7735): Update error message to mention local_environment.
-        "Was not able to locate a Python interpreter to execute rule code.\n\n"
-        "Please ensure that Python is available in one of the locations identified by "
-        "`[python-bootstrap].search_path`, which currently expands to:\n"
-        f"  {interpreter_search_paths}"
+        softwrap(
+            f"""
+            Was not able to locate a Python interpreter to execute rule code.
+
+            Please ensure that Python is available in one of the locations identified by
+            `[python-bootstrap].search_path`, which currently expands to:
+
+            {interpreter_search_paths}
+        """
+        )
     )
 
 

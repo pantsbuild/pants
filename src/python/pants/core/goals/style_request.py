@@ -17,7 +17,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.target import FieldSet
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import path_safe
+from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,17 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 
 def only_option_help(goal_name: str, tool_description: str, example1: str, example2: str) -> str:
-    return (
-        f"Only run these {tool_description}s and skip all others.\n\n"
-        f"The {tool_description} names are outputted at the final summary of running this goal, "
-        f"e.g. `{example1}` and `{example2}`. You can also run `{goal_name} --only=fake` to "
-        f"get a list of all activated {tool_description}s.\n\n"
-        f"You can repeat this option, e.g. `{goal_name} --only={example1} --only={example2}` or "
-        f"`{goal_name} --only=['{example1}', '{example2}']`."
+    return softwrap(
+        f"""
+        Only run these {tool_description}s and skip all others.
+
+        The {tool_description} names are outputted at the final summary of running this goal,
+        e.g. `{example1}` and `{example2}`. You can also run `{goal_name} --only=fake` to
+        get a list of all activated {tool_description}s.
+
+        You can repeat this option, e.g. `{goal_name} --only={example1} --only={example2}` or
+        `{goal_name} --only=['{example1}', '{example2}']`.
+        """
     )
 
 
@@ -56,29 +60,35 @@ def determine_specified_tool_names(
             else ("", repr(next(iter(unrecognized_names))))
         )
         raise ValueError(
-            f"Unrecognized name{plural[0]} with the option `--{goal_name}-only`: {plural[1]}\n\n"
-            f"All valid names: {sorted(all_valid_names)}"
+            softwrap(
+                f"""
+                Unrecognized name{plural[0]} with the option `--{goal_name}-only`: {plural[1]}
+
+                All valid names: {sorted(all_valid_names)}
+                """
+            )
         )
     return specified
 
 
 def style_batch_size_help(uppercase: str, lowercase: str) -> str:
-    return (
-        f"The target number of files to be included in each {lowercase} batch.\n"
-        "\n"
-        f"{uppercase} processes are batched for a few reasons:\n"
-        "\n"
-        "1. to avoid OS argument length limits (in processes which don't support argument "
-        "files)\n"
-        "2. to support more stable cache keys than would be possible if all files were "
-        "operated on in a single batch.\n"
-        f"3. to allow for parallelism in {lowercase} processes which don't have internal "
-        "parallelism, or -- if they do support internal parallelism -- to improve scheduling "
-        "behavior when multiple processes are competing for cores and so internal "
-        "parallelism cannot be used perfectly.\n"
-        "\n"
-        "In order to improve cache hit rates (see 2.), batches are created at stable boundaries, "
-        'and so this value is only a "target" batch size (rather than an exact value).'
+    return softwrap(
+        f"""
+        The target number of files to be included in each {lowercase} batch.
+
+        {uppercase} processes are batched for a few reasons:
+
+            1. to avoid OS argument length limits (in processes which don't support argument files)
+            2. to support more stable cache keys than would be possible if all files were operated \
+                on in a single batch.
+            3. to allow for parallelism in {lowercase} processes which don't have internal \
+            parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+            behavior when multiple processes are competing for cores and so internal \
+            parallelism cannot be used perfectly.
+
+        In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
+        and so this value is only a "target" batch size (rather than an exact value).
+        """
     )
 
 

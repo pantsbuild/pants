@@ -208,42 +208,42 @@ def run_lint_rule(
             mock_gets=[
                 MockGet(
                     output_type=SourceFiles,
-                    input_type=SourceFilesRequest,
+                    input_types=(SourceFilesRequest,),
                     mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
                 ),
                 MockGet(
                     output_type=LintResults,
-                    input_type=LintTargetsRequest,
+                    input_types=(LintTargetsRequest,),
                     mock=lambda mock_request: mock_request.lint_results,
                 ),
                 MockGet(
                     output_type=LintResults,
-                    input_type=LintFilesRequest,
+                    input_types=(LintFilesRequest,),
                     mock=lambda mock_request: mock_request.lint_results,
                 ),
                 MockGet(
                     output_type=FmtResult,
-                    input_type=FmtTargetsRequest,
+                    input_types=(FmtTargetsRequest,),
                     mock=lambda mock_request: mock_request.fmt_result,
                 ),
                 MockGet(
                     output_type=FmtResult,
-                    input_type=_FmtBuildFilesRequest,
+                    input_types=(_FmtBuildFilesRequest,),
                     mock=lambda mock_request: mock_request.fmt_result,
                 ),
                 MockGet(
                     output_type=FilteredTargets,
-                    input_type=Specs,
+                    input_types=(Specs,),
                     mock=lambda _: FilteredTargets(targets),
                 ),
                 MockGet(
                     output_type=SpecsPaths,
-                    input_type=Specs,
+                    input_types=(Specs,),
                     mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
                 ),
                 MockGet(
                     output_type=Snapshot,
-                    input_type=PathGlobs,
+                    input_types=(PathGlobs,),
                     mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],

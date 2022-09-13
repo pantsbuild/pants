@@ -15,13 +15,13 @@ from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, specs_rules
-from pants.engine.internals.build_files import IgnoreUnrecognizedBuildFileSymbols
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -125,6 +125,7 @@ class GraphSession:
         """
 
         workspace = Workspace(self.scheduler_session)
+        env_name = determine_bootstrap_environment(self.scheduler_session)
 
         for goal in goals:
             goal_product = self.goal_map[goal]
@@ -134,7 +135,7 @@ class GraphSession:
             if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, EnvironmentName())
+            params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -238,10 +239,6 @@ class EngineInitializer:
                 object_aliases=build_configuration.registered_aliases,
                 ignore_unrecognized_symbols=ignore_unrecognized_build_file_symbols,
             )
-
-        @rule
-        def ignore_unrecognized_build_file_symbols_singleton() -> IgnoreUnrecognizedBuildFileSymbols:
-            return IgnoreUnrecognizedBuildFileSymbols(ignore_unrecognized_build_file_symbols)
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:

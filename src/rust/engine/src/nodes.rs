@@ -334,6 +334,7 @@ impl ExecuteProcess {
   fn lift_process_fields(
     value: &PyAny,
     input_digests: InputDigests,
+    process_config: externs::process::PyProcessConfigFromEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
@@ -392,8 +393,6 @@ impl ExecuteProcess {
         None
       };
 
-    let docker_image = externs::getattr_as_optional_string(value, "docker_image");
-
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -410,19 +409,20 @@ impl ExecuteProcess {
       execution_slot_variable,
       concurrency_available,
       cache_scope,
-      docker_image,
+      docker_image: process_config.docker_image,
     })
   }
 
-  pub async fn lift_process(store: &Store, value: Value) -> Result<Process, StoreError> {
+  pub async fn lift(
+    store: &Store,
+    value: Value,
+    process_config: externs::process::PyProcessConfigFromEnvironment,
+  ) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
-    Python::with_gil(|py| Self::lift_process_fields((*value).as_ref(py), input_digests))
-  }
-
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
-    Ok(Self {
-      process: Self::lift_process(store, value).await?,
-    })
+    let process = Python::with_gil(|py| {
+      Self::lift_process_fields((*value).as_ref(py), input_digests, process_config)
+    })?;
+    Ok(Self { process })
   }
 
   async fn run_node(
