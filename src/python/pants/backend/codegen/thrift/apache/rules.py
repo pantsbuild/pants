@@ -14,7 +14,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult

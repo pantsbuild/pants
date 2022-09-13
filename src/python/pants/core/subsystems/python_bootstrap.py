@@ -20,7 +20,7 @@ from pants.core.util_rules.environments import (
     PythonBootstrapBinaryNamesField,
     PythonInterpreterSearchPathsField,
 )
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem

@@ -17,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule

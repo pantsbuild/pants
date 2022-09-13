@@ -19,7 +19,8 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult

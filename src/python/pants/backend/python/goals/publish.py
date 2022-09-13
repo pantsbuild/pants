@@ -17,7 +17,7 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule

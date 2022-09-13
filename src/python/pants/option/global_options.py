@@ -25,7 +25,7 @@ from pants.base.build_environment import (
 )
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError

@@ -32,7 +32,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
 )
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,

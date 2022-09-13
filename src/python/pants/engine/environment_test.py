@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import pytest
 
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 
 
 @pytest.mark.parametrize(

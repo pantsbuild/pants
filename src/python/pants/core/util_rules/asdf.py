@@ -10,7 +10,7 @@ from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
 from pants.util.strutil import softwrap

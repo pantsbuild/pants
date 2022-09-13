@@ -11,7 +11,8 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.environment import EnvironmentName, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet

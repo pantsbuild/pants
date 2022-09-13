@@ -33,7 +33,8 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine

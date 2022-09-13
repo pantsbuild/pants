@@ -10,7 +10,7 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 

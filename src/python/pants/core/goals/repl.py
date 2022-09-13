@@ -9,7 +9,8 @@ from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult

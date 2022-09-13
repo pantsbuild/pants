@@ -19,7 +19,7 @@ from pants.core.goals.export import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule

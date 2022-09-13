@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method

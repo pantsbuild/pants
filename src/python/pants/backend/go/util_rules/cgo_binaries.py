@@ -12,7 +12,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 

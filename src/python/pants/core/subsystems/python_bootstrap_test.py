@@ -10,7 +10,7 @@ from pants.core.subsystems.python_bootstrap import PythonBootstrap, get_pyenv_ro
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 

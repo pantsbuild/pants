@@ -10,7 +10,7 @@ from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer

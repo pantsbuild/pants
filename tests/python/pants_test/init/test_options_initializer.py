@@ -3,7 +3,7 @@
 
 import unittest
 
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper

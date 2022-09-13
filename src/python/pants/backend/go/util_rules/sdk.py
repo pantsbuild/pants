@@ -11,7 +11,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform

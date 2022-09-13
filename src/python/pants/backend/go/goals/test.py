@@ -46,7 +46,7 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope

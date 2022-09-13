@@ -10,7 +10,8 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult

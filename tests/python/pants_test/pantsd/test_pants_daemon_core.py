@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.service.pants_service import PantsServices

@@ -41,7 +41,8 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.environment import EnvironmentName, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,

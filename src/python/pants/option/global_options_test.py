@@ -10,7 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DynamicRemoteOptions, GlobalOptions

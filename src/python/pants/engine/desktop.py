@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Iterable, Tuple
 
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule

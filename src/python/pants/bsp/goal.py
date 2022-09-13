@@ -17,7 +17,7 @@ from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal

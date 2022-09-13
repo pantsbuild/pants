@@ -25,7 +25,8 @@ from pants.core.util_rules.external_tool import (
 from pants.engine import process
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.environment import EnvironmentName, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,

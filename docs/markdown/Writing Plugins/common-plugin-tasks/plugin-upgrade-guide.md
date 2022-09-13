@@ -9,12 +9,15 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
-### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` now include `Vars` in the name
+### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` renamed and moved
 
-Before: `Environment`, `EnvironmentRequest`, and `CompleteEnvironment`
-After: `EnvironmentVars`, `EnvironmentVarsRequest`, and `CompleteEnvironmentVars`
+The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have
+`Vars` in their names:
 
-The old names still exist as aliases, but we recommend changing to the new values for clarity.
+Before: `pants.engine.environment.{Environment,EnvironmentRequest,CompleteEnvironment}`
+After: `pants.engine.env_vars.{EnvironmentVars,EnvironmentVarsRequest,CompleteEnvironmentVars}`
+
+The old names still exist until Pants 2.16 as deprecated aliases.
 
 This rename was to avoid ambiguity with the new "environments" mechanism, which lets users specify different options for environments like Linux vs. macOS and running in Docker images.
 

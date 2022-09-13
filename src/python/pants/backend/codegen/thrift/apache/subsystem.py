@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet

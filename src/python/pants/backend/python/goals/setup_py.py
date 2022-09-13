@@ -57,7 +57,8 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.environment import EnvironmentName, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,

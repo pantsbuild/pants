@@ -20,7 +20,7 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
 

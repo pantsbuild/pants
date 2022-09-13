@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.environment import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import (
     BoolOption,
     DictOption,

@@ -12,7 +12,7 @@ from typing import Iterator
 import pkg_resources
 
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
 from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.init.bootstrap_scheduler import BootstrapScheduler

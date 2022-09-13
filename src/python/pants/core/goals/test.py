@@ -20,7 +20,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId

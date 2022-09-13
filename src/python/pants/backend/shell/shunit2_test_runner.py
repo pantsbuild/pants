@@ -34,7 +34,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.addresses import Address
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
     Digest,

@@ -8,7 +8,7 @@ from typing import Iterable, Mapping, Sequence, TypeVar
 
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult, get_asdf_data_dir
-from pants.engine.environment import CompleteEnvironmentVars, EnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir

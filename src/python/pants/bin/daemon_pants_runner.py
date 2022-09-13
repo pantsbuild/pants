@@ -11,7 +11,7 @@ from typing import Dict, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.init.logging import stdio_destination
 from pants.option.options_bootstrapper import OptionsBootstrapper

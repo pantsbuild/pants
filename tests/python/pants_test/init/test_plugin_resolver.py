@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules import external_tool
-from pants.engine.environment import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult

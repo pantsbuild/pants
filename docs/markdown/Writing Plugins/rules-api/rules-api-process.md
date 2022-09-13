@@ -53,7 +53,8 @@ To set environment variables, use the parameter `env: Mapping[str, str]`. `@rule
 The `EnvironmentVars` type contains a subset of the environment that Pants was run in, and is requested via a `EnvironmentVarsRequest` that lists the variables to consume.
 
 ```python
-from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
+
+from pants.engine.env_vars import EnvironmentVarsRequest, EnvironmentVars
 from pants.engine.rules import Get, rule
 
 
