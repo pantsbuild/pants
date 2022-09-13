@@ -402,15 +402,29 @@ def _add_option_field_for(
     option_type: type = option.flag_options["type"]
     scope = subsystem_t.options_scope
 
-    # If you get a `KeyError` due to a missing value in `map` or `list_map`, it means there
-    # isn't a mapping for a given option type added in the dicts defined earlier in this file.
-    # Add it there (note that currently it's not immediately clear how to support `Enum` options)
+    # Note that there is not presently good support for enum options. `str`-backed enums should
+    # be easy enough to add though...
 
     if option_type != list:
-        field_type = _SIMPLE_OPTIONS[option_type]
+        try:
+            field_type = _SIMPLE_OPTIONS[option_type]
+        except KeyError:
+            raise AssertionError(
+                f"The option `{subsystem_t.__name__}.{attrname}` has a value type that does "
+                "not yet have a mapping in `environments.py`. To fix, map the value type in "
+                "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
+            )
     else:
         member_type = option.flag_options["member_type"]
-        field_type = _LIST_OPTIONS[member_type]
+        try:
+            field_type = _LIST_OPTIONS[member_type]
+        except KeyError:
+            raise AssertionError(
+                f"The option `{subsystem_t.__name__}.{attrname}` has a member value type that "
+                "does yet have a mapping in `environments.py`. To fix, map the member value type "
+                "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
+                "member value type."
+            )
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
