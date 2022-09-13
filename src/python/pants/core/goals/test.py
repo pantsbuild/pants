@@ -14,12 +14,13 @@ from typing import Any, ClassVar, Optional, TypeVar, cast
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentName, EnvironmentNameRequest
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
@@ -545,9 +546,19 @@ async def run_tests(
             num_shards=num_shards,
         ),
     )
-    results = await MultiGet(
-        Get(TestResult, TestFieldSet, field_set)
+    environment_names_per_field_set = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
         for field_set in targets_to_valid_field_sets.field_sets
+    )
+    results = await MultiGet(
+        Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
+        for field_set, environment_name in zip(
+            targets_to_valid_field_sets.field_sets, environment_names_per_field_set
+        )
     )
 
     # Print summary.

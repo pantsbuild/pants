@@ -37,9 +37,11 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
@@ -235,9 +237,14 @@ def run_test_rule(
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda _: EnvironmentName(None),
+                ),
+                MockGet(
                     output_type=TestResult,
-                    input_types=(TestFieldSet,),
-                    mock=lambda fs: fs.test_result,
+                    input_types=(TestFieldSet, EnvironmentName),
+                    mock=lambda fs, _env: fs.test_result,
                 ),
                 MockGet(
                     output_type=TestDebugRequest,

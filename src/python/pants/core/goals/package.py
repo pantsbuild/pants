@@ -8,6 +8,7 @@ import os
 from abc import ABCMeta
 from dataclasses import dataclass
 
+from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
@@ -149,4 +150,4 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *distdir.rules())

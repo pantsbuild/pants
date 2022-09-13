@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
@@ -16,13 +17,15 @@ from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
     DockerImageField,
+    EnvironmentField,
     EnvironmentName,
-    EnvironmentRequest,
+    EnvironmentNameRequest,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
     UnrecognizedEnvironmentError,
 )
+from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
@@ -33,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
-            QueryRule(EnvironmentName, [EnvironmentRequest]),
+            QueryRule(EnvironmentName, [EnvironmentNameRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
         singleton_environment=None,
@@ -119,7 +122,7 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
 
     def get_name(v: str) -> EnvironmentName:
         return rule_runner.request(
-            EnvironmentName, [EnvironmentRequest(v, description_of_origin="foo")]
+            EnvironmentName, [EnvironmentNameRequest(v, description_of_origin="foo")]
         )
 
     # If `--names` is not set, and the local matcher is used, do not choose an environment.
@@ -158,3 +161,35 @@ def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     assert get_tgt("env").val == LocalEnvironmentTarget({}, Address("", target_name="env"))
     with engine_error(ResolveError):
         get_tgt("bad-address")
+
+
+def test_environment_name_request_from_field_set() -> None:
+    class EnvFieldSubclass(EnvironmentField):
+        alias = "the_env_field"  # This intentionally uses a custom alias.
+
+    class Tgt(Target):
+        alias = "tgt"
+        help = "foo"
+        core_fields = (OptionalSingleSourceField, EnvFieldSubclass)
+
+    @dataclass(frozen=True)
+    class NoEnvFS(FieldSet):
+        required_fields = (OptionalSingleSourceField,)
+
+        source: OptionalSingleSourceField
+
+    @dataclass(frozen=True)
+    class EnvFS(FieldSet):
+        required_fields = (OptionalSingleSourceField,)
+
+        source: OptionalSingleSourceField
+        the_env_field: EnvironmentField  # This intentionally uses an unusual attribute name.
+
+    tgt = Tgt({EnvFieldSubclass.alias: "my_env"}, Address("dir"))
+    assert EnvironmentNameRequest.from_field_set(NoEnvFS.create(tgt)) == EnvironmentNameRequest(
+        LOCAL_ENVIRONMENT_MATCHER,
+        description_of_origin="the `environment` field from the target dir:dir",
+    )
+    assert EnvironmentNameRequest.from_field_set(EnvFS.create(tgt)) == EnvironmentNameRequest(
+        "my_env", description_of_origin="the `the_env_field` field from the target dir:dir"
+    )
