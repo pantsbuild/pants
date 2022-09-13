@@ -17,7 +17,7 @@ from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironmentVars
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
@@ -116,7 +116,7 @@ class BSPGoal(BuiltinGoal):
                 union_membership=union_membership,
             )
         current_session_values = graph_session.scheduler_session.py_session.session_values
-        env = current_session_values[CompleteEnvironment]
+        env = current_session_values[CompleteEnvironmentVars]
         return self._setup_bsp_connection(
             union_membership=union_membership, env=env, options=goal_options
         )
@@ -149,7 +149,7 @@ class BSPGoal(BuiltinGoal):
 
         # Determine which environment variables to set in the BSP runner script.
         # TODO: Consider whether some of this logic could be shared with
-        #  `pants.engine.environment.CompleteEnvironment.get_subset`.
+        #  `pants.engine.environment.CompleteEnvironmentVars.get_subset`.
         run_script_env_lines: list[str] = []
         for env_var in options.runner_env_vars:
             if "=" in env_var:

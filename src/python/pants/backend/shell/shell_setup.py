@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 
-from pants.engine.environment import Environment
+from pants.engine.environment import EnvironmentVars
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -46,7 +46,7 @@ class ShellSetup(Subsystem):
     )
 
     @memoized_method
-    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
+    def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self._executable_search_path:
                 if entry == "<PATH>":

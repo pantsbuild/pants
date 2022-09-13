@@ -3,7 +3,7 @@
 
 import unittest
 
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -17,7 +17,7 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
 
-        env = CompleteEnvironment({})
+        env = CompleteEnvironmentVars({})
         with self.assertRaises(ExecutionError):
             OptionsInitializer(options_bootstrapper).build_config_and_options(
                 options_bootstrapper, env, raise_=True
@@ -30,7 +30,7 @@ class OptionsInitializerTest(unittest.TestCase):
             args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
             allow_pantsrc=False,
         )
-        env = CompleteEnvironment({})
+        env = CompleteEnvironmentVars({})
         with self.assertRaises(ExecutionError) as exc:
             OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
         self.assertIn(

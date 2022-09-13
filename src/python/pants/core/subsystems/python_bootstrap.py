@@ -20,7 +20,7 @@ from pants.core.util_rules.environments import (
     PythonBootstrapBinaryNamesField,
     PythonInterpreterSearchPathsField,
 )
-from pants.engine.environment import Environment
+from pants.engine.environment import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -106,7 +106,7 @@ class PythonBootstrap:
 
     interpreter_names: tuple[str, ...]
     raw_interpreter_search_paths: tuple[str, ...]
-    environment: Environment
+    environment: EnvironmentVars
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
 
@@ -123,7 +123,7 @@ class PythonBootstrap:
     def _expand_interpreter_search_paths(
         cls,
         interpreter_search_paths: Sequence[str],
-        env: Environment,
+        env: EnvironmentVars,
         asdf_standard_tool_paths: tuple[str, ...],
         asdf_local_tool_paths: tuple[str, ...],
     ):
@@ -160,7 +160,7 @@ class PythonBootstrap:
         return expanded
 
     @staticmethod
-    def get_environment_paths(env: Environment):
+    def get_environment_paths(env: EnvironmentVars):
         """Returns a list of paths specified by the PATH env var."""
         pathstr = env.get("PATH")
         if pathstr:
@@ -194,7 +194,7 @@ class PythonBootstrap:
         return standard_path_token, local_path_token
 
     @staticmethod
-    def get_pyenv_paths(env: Environment, *, pyenv_local: bool = False) -> list[str]:
+    def get_pyenv_paths(env: EnvironmentVars, *, pyenv_local: bool = False) -> list[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
         :param env: The environment to use to look up pyenv.
@@ -236,7 +236,7 @@ class PythonBootstrap:
         return paths
 
 
-def get_pyenv_root(env: Environment) -> str | None:
+def get_pyenv_root(env: EnvironmentVars) -> str | None:
     """See https://github.com/pyenv/pyenv#environment-variables."""
     from_env = env.get("PYENV_ROOT")
     if from_env:

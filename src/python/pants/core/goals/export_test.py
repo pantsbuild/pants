@@ -19,7 +19,7 @@ from pants.core.goals.export import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
@@ -121,9 +121,9 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                     mock=lambda ap: rule_runner.request(Digest, [ap]),
                 ),
                 MockGet(
-                    output_type=Environment,
-                    input_types=(EnvironmentRequest,),
-                    mock=lambda env: rule_runner.request(Environment, [env]),
+                    output_type=EnvironmentVars,
+                    input_types=(EnvironmentVarsRequest,),
+                    mock=lambda env: rule_runner.request(EnvironmentVars, [env]),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
@@ -141,7 +141,7 @@ def test_run_export_rule() -> None:
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
             QueryRule(Digest, [CreateDigest]),
-            QueryRule(Environment, [EnvironmentRequest]),
+            QueryRule(EnvironmentVars, [EnvironmentVarsRequest]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
         ],
         target_types=[MockTarget],

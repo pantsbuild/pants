@@ -25,7 +25,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine import process
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
+from pants.engine.environment import EnvironmentName, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -427,7 +427,7 @@ async def setup_helm(
         _HELM_DATA_DIR: data_subset_digest,
     }
 
-    local_env = await Get(Environment, EnvironmentRequest(["HOME", "PATH"]))
+    local_env = await Get(EnvironmentVars, EnvironmentVarsRequest(["HOME", "PATH"]))
     return HelmBinary(
         path=helm_path,
         helm_env=helm_env,
@@ -440,7 +440,9 @@ async def setup_helm(
 async def helm_process(
     request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
 ) -> Process:
-    global_extra_env = await Get(Environment, EnvironmentRequest(helm_subsytem.extra_env_vars))
+    global_extra_env = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(helm_subsytem.extra_env_vars)
+    )
 
     # Helm binary's setup parameters go last to prevent end users overriding any of its values.
 

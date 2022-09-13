@@ -25,7 +25,7 @@ from pants.base.build_environment import (
 )
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
@@ -306,7 +306,7 @@ class DynamicRemoteOptions:
     def from_options(
         cls,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
@@ -370,7 +370,7 @@ class DynamicRemoteOptions:
         cls,
         bootstrap_options: OptionValueContainer,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None,
         remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:

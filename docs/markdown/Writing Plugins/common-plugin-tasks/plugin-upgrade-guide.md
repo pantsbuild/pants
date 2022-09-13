@@ -9,6 +9,15 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` now include `Vars` in the name
+
+Before: `Environment`, `EnvironmentRequest`, and `CompleteEnvironment`
+After: `EnvironmentVars`, `EnvironmentVarsRequest`, and `CompleteEnvironmentVars`
+
+The old names still exist as aliases, but we recommend changing to the new values for clarity.
+
+This rename was to avoid ambiguity with the new "environments" mechanism, which lets users specify different options for environments like Linux vs. macOS and running in Docker images.
+
 ### `MockGet` expects `input_types` kwarg, not `input_type`
 
 It's now possible in Pants 2.15 to use zero arguments or multiple arguments in a `Get`. To support this change, `MockGet` from `run_run_with_mocks()` now expects the kwarg `input_types: tuple[type, ...]` rather than `input_type: type`.

@@ -13,7 +13,7 @@ from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment
+from pants.engine.environment import EnvironmentVars
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -65,7 +65,7 @@ class PexSubsystem(Subsystem):
     )
 
     @memoized_method
-    def path(self, env: Environment) -> tuple[str, ...]:
+    def path(self, env: EnvironmentVars) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self._executable_search_paths:
                 if entry == "<PATH>":

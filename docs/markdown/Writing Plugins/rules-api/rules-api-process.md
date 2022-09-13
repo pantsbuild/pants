@@ -50,15 +50,16 @@ To populate the temporary directory with files, use the parameter `input_digest:
 
 To set environment variables, use the parameter `env: Mapping[str, str]`. `@rules` are prevented from accessing `os.environ` (it will always be empty) because this reduces reproducibility and breaks caching. Instead, either hardcode the value or add a [`Subsystem` option](doc:rules-api-subsystems) for the environment variable in question, or request the `Environment` type in your `@rule`.
 
-The `Environment` type contains a subset of the environment that Pants was run in, and is requested via a `EnvironmentRequest` that lists the variables to consume.
+The `EnvironmentVars` type contains a subset of the environment that Pants was run in, and is requested via a `EnvironmentVarsRequest` that lists the variables to consume.
 
 ```python
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, rule
+
 
 @rule
 async def partial_env(...) -> Foo:
-    relevant_env = await Get(Environment, EnvironmentRequest(["RELEVANT_VAR", "PATH"]))
+    relevant_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["RELEVANT_VAR", "PATH"]))
     ..
 ```
 

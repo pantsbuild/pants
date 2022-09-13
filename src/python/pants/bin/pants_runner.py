@@ -10,7 +10,7 @@ from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironmentVars
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
@@ -97,6 +97,6 @@ class PantsRunner:
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
             )
             runner = LocalPantsRunner.create(
-                env=CompleteEnvironment(self.env), options_bootstrapper=options_bootstrapper
+                env=CompleteEnvironmentVars(self.env), options_bootstrapper=options_bootstrapper
             )
             return runner.run(start_time)

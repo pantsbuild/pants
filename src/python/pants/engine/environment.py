@@ -23,7 +23,7 @@ shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 """
 TODO: This module currently contains two concepts:
 
-1. environment variable matching (CompleteEnvironment, Environment, EnvironmentRequest)
+1. environment variable matching (CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest)
 2. the new "environment" concept from #13682.
 
 If the second use case gains steam as #13682 proceeds, we should move and rename the
@@ -52,14 +52,14 @@ class EnvironmentName(EngineAwareParameter):
 
 
 # ----------------------------------------------------------------------
-# Environments variables
+# Environment variables
 # ----------------------------------------------------------------------
 
 
-class CompleteEnvironment(FrozenDict):
-    """CompleteEnvironment contains all environment variables from the current Pants process.
+class CompleteEnvironmentVars(FrozenDict):
+    """CompleteEnvironmentVars contains all environment variables from the current Pants process.
 
-    NB: Consumers should almost always prefer to consume the `Environment` type, which is
+    NB: Consumers should almost always prefer to consume the `EnvironmentVars` type, which is
     filtered to a relevant subset of the environment.
     """
 
@@ -69,7 +69,7 @@ class CompleteEnvironment(FrozenDict):
         """Extract a subset of named env vars.
 
         Given a list of extra environment variable specifiers as strings, filter the contents of
-        the pants environment to only those variables.
+        the Pants environment to only those variables.
 
         Each variable can be specified either as a name or as a name=value pair.
         In the former case, the value for that name is taken from this env. In the latter
@@ -105,9 +105,12 @@ class CompleteEnvironment(FrozenDict):
         return FrozenDict(env_var_subset)
 
 
+CompleteEnvironment = CompleteEnvironmentVars
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class EnvironmentRequest:
+class EnvironmentVarsRequest:
     """Requests a subset of the variables set in the environment.
 
     Requesting only the relevant subset of the environment reduces invalidation caused by unrelated
@@ -122,30 +125,35 @@ class EnvironmentRequest:
         self.allowed = None if allowed is None else FrozenOrderedSet(allowed)
 
 
-class Environment(FrozenDict[str, str]):
-    """A subset of the variables set in the environment.
+EnvironmentRequest = EnvironmentVarsRequest
 
-    TODO: Rename to include "variables" in the name to avoid ambiguity with the new `Environment`
-    concept from #13682.
+
+class EnvironmentVars(FrozenDict[str, str]):
+    """A subset of the variables set in the environment.
 
     Accesses to `os.environ` cannot be accurately tracked, so @rules that need access to the
     environment should use APIs from this module instead.
 
-    Wherever possible, the `Environment` type should be consumed rather than the
-    `CompleteEnvironment`, as it represents a filtered/relevant subset of the environment, rather
+    Wherever possible, the `EnvironmentVars` type should be consumed rather than the
+    `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment, rather
     than the entire unfiltered environment.
     """
 
 
-@rule
-def complete_environment(session_values: SessionValues) -> CompleteEnvironment:
-    return session_values[CompleteEnvironment]
+Environment = EnvironmentVars
 
 
 @rule
-def environment_subset(session_values: SessionValues, request: EnvironmentRequest) -> Environment:
-    return Environment(
-        session_values[CompleteEnvironment]
+def complete_environment_vars(session_values: SessionValues) -> CompleteEnvironmentVars:
+    return session_values[CompleteEnvironmentVars]
+
+
+@rule
+def environment_vars_subset(
+    session_values: SessionValues, request: EnvironmentVarsRequest
+) -> EnvironmentVars:
+    return EnvironmentVars(
+        session_values[CompleteEnvironmentVars]
         .get_subset(
             requested=tuple(request.requested),
             allowed=(None if request.allowed is None else tuple(request.allowed)),

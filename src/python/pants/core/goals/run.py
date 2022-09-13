@@ -10,7 +10,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -150,7 +150,7 @@ async def run(
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
-    complete_env: CompleteEnvironment,
+    complete_env: CompleteEnvironmentVars,
 ) -> Run:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,

@@ -11,7 +11,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.environment import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
@@ -113,7 +113,10 @@ async def setup_go_sdk_process(
 ) -> Process:
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
-        Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
+        Get(
+            EnvironmentVars,
+            EnvironmentVarsRequest(golang_subsystem.env_vars_to_pass_to_subprocesses),
+        ),
     )
     maybe_replace_sandbox_root_env = (
         {GoSdkRunSetup.SANDBOX_ROOT_ENV: "1"} if request.replace_sandbox_root_in_args else {}

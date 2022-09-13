@@ -33,7 +33,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.environment import CompleteEnvironmentVars, EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
@@ -255,7 +255,7 @@ class RuleRunner:
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
-        self.environment = CompleteEnvironment({})
+        self.environment = CompleteEnvironmentVars({})
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         self.extra_session_values = extra_session_values or {}
         self.max_workunit_verbosity = max_workunit_verbosity
@@ -311,7 +311,7 @@ class RuleRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    CompleteEnvironment: self.environment,
+                    CompleteEnvironmentVars: self.environment,
                     **self.extra_session_values,
                 }
             ),
@@ -384,7 +384,7 @@ class RuleRunner:
     ) -> None:
         """Update the engine session with new options and/or environment variables.
 
-        The environment variables will be used to set the `CompleteEnvironment`, which is the
+        The environment variables will be used to set the `CompleteEnvironmentVars`, which is the
         environment variables captured by the parent Pants process. Some rules use this to be able
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
@@ -399,7 +399,7 @@ class RuleRunner:
             **(env or {}),
         }
         self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
-        self.environment = CompleteEnvironment(env)
+        self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 
     def set_session_values(

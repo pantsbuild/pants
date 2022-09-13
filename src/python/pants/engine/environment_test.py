@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import pytest
 
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import CompleteEnvironmentVars
 
 
 @pytest.mark.parametrize(
@@ -22,14 +22,14 @@ from pants.engine.environment import CompleteEnvironment
     ],
 )
 def test_complete_environment(input_strs: List[str], expected: Dict[str, str]) -> None:
-    pants_env = CompleteEnvironment({"A": "a", "B": "b", "C": "c"})
+    pants_env = CompleteEnvironmentVars({"A": "a", "B": "b", "C": "c"})
 
     subset = pants_env.get_subset(input_strs)
     assert dict(subset) == expected
 
 
 def test_invalid_variable() -> None:
-    pants_env = CompleteEnvironment()
+    pants_env = CompleteEnvironmentVars()
 
     with pytest.raises(ValueError) as exc:
         pants_env.get_subset(["3INVALID=doesn't matter"])

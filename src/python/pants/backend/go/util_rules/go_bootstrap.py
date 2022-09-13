@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.engine.environment import Environment
+from pants.engine.environment import EnvironmentVars
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
@@ -21,7 +21,7 @@ class GoBootstrap:
     EXTRA_ENV_VAR_NAMES = ("PATH",)
 
     raw_go_search_paths: tuple[str, ...]
-    environment: Environment
+    environment: EnvironmentVars
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
 
@@ -42,7 +42,7 @@ class GoBootstrap:
         return tuple(expanded)
 
     @staticmethod
-    def get_environment_paths(env: Environment) -> list[str]:
+    def get_environment_paths(env: EnvironmentVars) -> list[str]:
         """Returns a list of paths specified by the PATH env var."""
         pathstr = env.get("PATH")
         if pathstr:
