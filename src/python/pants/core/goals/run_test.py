@@ -262,3 +262,14 @@ def test_only_secondary_owner_error_multi_target(rule_runner: RuleRunner) -> Non
             targets_to_field_sets={t1: [fs1], t2: [fs2]},
             run_field_set_types=[TestRunSecondaryFieldSet],
         )
+
+
+def test_only_secondary_multi_field_set_error(rule_runner: RuleRunner) -> None:
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
+    target = TestBinaryTarget({}, Address("some/addr"))
+    fs1 = TestRunSecondaryFieldSet.create(target)
+    fs2 = TestRunSecondaryFieldSet.create(target)
+    with pytest.raises(AmbiguousImplementationsException):
+        single_target_run(
+            rule_runner, program_text=program_text, targets_to_field_sets={target: [fs1, fs2]}
+        )

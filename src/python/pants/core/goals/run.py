@@ -40,6 +40,8 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
 
 @union(in_scope_types=[EnvironmentName])
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
@@ -150,11 +152,9 @@ class Run(Goal):
     subsystem_cls = RunSubsystem
 
 
-_T = TypeVar("_T")
-
-RankedFieldSets: NamedTuple["tuple[FieldSet, ...], tuple[FieldSet, ...]"] = namedtuple(
-    "RankedFieldSets", ("primary", "secondary")
-)
+class RankedFieldSets(NamedTuple):
+    primary: tuple[FieldSet, ...]
+    secondary: tuple[FieldSet, ...]
 
 
 def _partition(
@@ -178,10 +178,10 @@ async def _find_what_to_run(
     )
 
     primary_target: Target | None = None
-    target_ranked_field_sets: RankedFieldSets | None = None
+    primary_target_rfs: RankedFieldSets | None = None
 
     for target, field_sets in targets_to_valid_field_sets.mapping.items():
-        ranked_field_sets = RankedFieldSets(
+        rfs = RankedFieldSets(
             *_partition(
                 field_sets,
                 lambda field_set: not any(
@@ -193,25 +193,25 @@ async def _find_what_to_run(
         # In the case of multiple Targets/FieldSets, prefer the "primary" ones to the "secondary" ones.
         if (
             primary_target is None
-            or target_ranked_field_sets is None  # impossible, but satisfies mypy
-            or (ranked_field_sets.primary and not target_ranked_field_sets.primary)
+            or primary_target_rfs is None  # impossible, but satisfies mypy
+            or (rfs.primary and not primary_target_rfs.primary)
         ):
             primary_target = target
-            target_ranked_field_sets = ranked_field_sets
-        elif (ranked_field_sets.primary and target_ranked_field_sets.primary) or (
-            ranked_field_sets.secondary and target_ranked_field_sets.secondary
+            primary_target_rfs = rfs
+        elif (rfs.primary and primary_target_rfs.primary) or (
+            rfs.secondary and primary_target_rfs.secondary
         ):
             raise TooManyTargetsException(
                 targets_to_valid_field_sets.mapping, goal_description=goal_description
             )
 
     assert primary_target is not None
-    assert target_ranked_field_sets is not None
-    field_sets = target_ranked_field_sets.primary or target_ranked_field_sets.secondary
+    assert primary_target_rfs is not None
+    field_sets = primary_target_rfs.primary or primary_target_rfs.secondary
     if len(field_sets) > 1:
         raise AmbiguousImplementationsException(
             primary_target,
-            target_ranked_field_sets.primary + target_ranked_field_sets.secondary,
+            primary_target_rfs.primary + primary_target_rfs.secondary,
             goal_description=goal_description,
         )
 
