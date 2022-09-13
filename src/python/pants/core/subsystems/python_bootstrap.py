@@ -254,7 +254,7 @@ async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget
 ) -> PythonBootstrap:
 
-    # TODO: use subsystems directly again once do overrides at subsystem contruct time.
+    # TODO: use subsystems directly again once we do overrides at subsystem contruct time.
     interpreter_search_paths = get_option("search_path", python_bootstrap_subsystem, env_tgt)
     interpreter_names = get_option("names", python_bootstrap_subsystem, env_tgt)
 

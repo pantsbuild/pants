@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from abc import ABC
 from dataclasses import dataclass
-from typing import Iterable, cast
+from typing import ClassVar, Iterable, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -70,9 +69,6 @@ class EnvironmentsSubsystem(Subsystem):
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
-_COMMON_ENV_FIELDS = (*COMMON_TARGET_FIELDS,)
-
-
 class CompatiblePlatformsField(StringSequenceField):
     alias = "compatible_platforms"
     default = tuple(plat.value for plat in Platform)
@@ -91,7 +87,7 @@ class CompatiblePlatformsField(StringSequenceField):
 
 class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
-    core_fields = (*_COMMON_ENV_FIELDS, CompatiblePlatformsField)
+    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
@@ -117,7 +113,7 @@ class DockerImageField(StringField):
 
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*_COMMON_ENV_FIELDS, DockerImageField)
+    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField)
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment
@@ -322,9 +318,9 @@ def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessCo
 logger = logging.getLogger(__name__)
 
 
-class EnvironmentSensitiveOptionFieldMixin(ABC):
-    subsystem: type[Subsystem]
-    option_name: str
+class EnvironmentSensitiveOptionFieldMixin:
+    subsystem: ClassVar[type[Subsystem]]
+    option_name: ClassVar[str]
 
 
 # Maps between non-list option value types and corresponding fields
