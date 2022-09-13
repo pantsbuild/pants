@@ -74,7 +74,7 @@ class FileEntry:
 
 
 @dataclass(frozen=True)
-class LinkEntry:
+class SymlinkEntry:
     """A symlink pointing to a target path."""
 
     path: str
@@ -104,7 +104,7 @@ class DigestContents(Collection[FileContent]):
     """
 
 
-class DigestEntries(Collection[Union[FileEntry, LinkEntry, Directory]]):
+class DigestEntries(Collection[Union[FileEntry, SymlinkEntry, Directory]]):
     """The indirect file contents of a Digest.
 
     DigestEntries is a collection of FileContent and Directory instances representing, respecively,
@@ -112,7 +112,7 @@ class DigestEntries(Collection[Union[FileEntry, LinkEntry, Directory]]):
     """
 
 
-class CreateDigest(Collection[Union[FileContent, FileEntry, LinkEntry, Directory]]):
+class CreateDigest(Collection[Union[FileContent, FileEntry, SymlinkEntry, Directory]]):
     """A request to create a Digest with the input FileContent and/or Directory values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will

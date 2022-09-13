@@ -1019,7 +1019,7 @@ impl From<&DigestTrie> for remexec::Tree {
     trie.walk(&mut |_, entry| {
       match entry {
         Entry::File(_) => (),
-        Entry::Symlink(_) => todo!(),
+        Entry::Symlink(_) => (),
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory.
           tree.root = Some(d.tree.as_remexec_directory());

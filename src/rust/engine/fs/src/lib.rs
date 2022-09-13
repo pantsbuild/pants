@@ -807,7 +807,7 @@ impl DigestEntry {
   pub fn path(&self) -> &Path {
     match self {
       DigestEntry::File(file_entry) => &file_entry.path,
-      DigestEntry::Symlink(link_entry) => &link_entry.path,
+      DigestEntry::Symlink(symlink_entry) => &symlink_entry.path,
       DigestEntry::EmptyDirectory(path) => path,
     }
   }

@@ -131,7 +131,13 @@ impl CommandRunner {
     let sub_trie = match root_trie.entry(&directory_path)? {
       None => return Ok(None),
       Some(directory::Entry::Directory(d)) => d.tree(),
-      Some(directory::Entry::Symlink(_)) => todo!(),
+      Some(directory::Entry::Symlink(_)) => {
+        return Err(format!(
+          "Declared output directory path {directory_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+          trie_digest = root_trie.compute_root_digest(),
+        ))
+      }
       Some(directory::Entry::File(_)) => {
         return Err(format!(
           "Declared output directory path {directory_path:?} in output \
@@ -145,7 +151,7 @@ impl CommandRunner {
     let mut file_digests = Vec::new();
     sub_trie.walk(&mut |_, entry| match entry {
       directory::Entry::File(f) => file_digests.push(f.digest()),
-      directory::Entry::Symlink(_) => todo!(),
+      directory::Entry::Symlink(_) => (),
       directory::Entry::Directory(_) => {}
     });
 
@@ -167,7 +173,11 @@ impl CommandRunner {
         };
         Ok(Some(output_file))
       }
-      Some(directory::Entry::Symlink(_)) => todo!(),
+      Some(directory::Entry::Symlink(_)) => Err(format!(
+        "Declared output file path {file_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+        trie_digest = root_trie.compute_root_digest(),
+      )),
       Some(directory::Entry::Directory(_)) => Err(format!(
         "Declared output file path {file_path:?} in output \
            digest {trie_digest:?} contained a directory instead.",

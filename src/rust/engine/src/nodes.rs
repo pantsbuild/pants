@@ -845,14 +845,14 @@ impl Snapshot {
     ))
   }
 
-  fn store_link_entry(
+  fn store_symlink_entry(
     py: Python,
     types: &crate::types::Types,
     item: &LinkEntry,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       py,
-      types.link_entry,
+      types.symlink_entry,
       &[
         Self::store_path(py, &item.path)?,
         externs::store_utf8(py, &item.target),
@@ -899,8 +899,8 @@ impl Snapshot {
         DigestEntry::File(file_entry) => {
           Self::store_file_entry(py, &context.core.types, file_entry)
         }
-        DigestEntry::Symlink(link_entry) => {
-          Self::store_link_entry(py, &context.core.types, link_entry)
+        DigestEntry::Symlink(symlink_entry) => {
+          Self::store_symlink_entry(py, &context.core.types, symlink_entry)
         }
         DigestEntry::EmptyDirectory(path) => {
           Self::store_empty_directory(py, &context.core.types, path)

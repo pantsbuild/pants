@@ -908,7 +908,7 @@ impl Store {
           file_digests.insert(f.digest());
         }
         directory::Entry::Directory(_) => (),
-        directory::Entry::Symlink(_) => todo!(),
+        directory::Entry::Symlink(_) => (),
       });
     }
 
@@ -949,7 +949,7 @@ impl Store {
       .await?
       .walk(&mut |_, entry| match entry {
         directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Symlink(_) => todo!(),
+        directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
       });
 
@@ -1255,7 +1255,7 @@ impl Store {
                 };
                 store.materialize_file(path, f.digest(), mode).await
               }
-              directory::Entry::Symlink(s) => store.materialize_link(path, s.target()).await,
+              directory::Entry::Symlink(s) => store.materialize_symlink(path, s.target()).await,
               directory::Entry::Directory(_) => {
                 store
                   .materialize_directory_helper(path, false, parent_to_child, perms)
@@ -1311,7 +1311,11 @@ impl Store {
       .await?
   }
 
-  async fn materialize_link(&self, destination: PathBuf, target: String) -> Result<(), StoreError> {
+  async fn materialize_symlink(
+    &self,
+    destination: PathBuf,
+    target: String,
+  ) -> Result<(), StoreError> {
     symlink(target, destination)?;
     Ok(())
   }
