@@ -9,6 +9,7 @@ use bollard::container::{LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::{errors::Error as DockerError, Docker};
+use bollard_stubs::models::CreateImageInfo;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use nails::execution::ExitCode;
@@ -162,21 +163,31 @@ async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Re
     }
   };
 
-  let do_pull = match (policy, image_exists) {
-    (ImagePullPolicy::Always, _) => true,
-    (ImagePullPolicy::IfMissing, false) => true,
-    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => true,
-    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => true,
+  let (do_pull, pull_reason) = match (policy, image_exists) {
+    (ImagePullPolicy::Always, _) => {
+      (true, "the image pull policy is set to \"always\"")
+    },
+    (ImagePullPolicy::IfMissing, false) => {
+      (true, "the image is missing locally")
+    },
+    (ImagePullPolicy::OnlyIfLatestOrMissing, false) => {
+      (true, "the image is missing locally")
+    },
+    (ImagePullPolicy::OnlyIfLatestOrMissing, true) if has_latest_tag => {
+      (true, "the image is present but the image tag is 'latest' and the image pull policy is set to pull images in this case")
+    },
     (ImagePullPolicy::Never, false) => {
       return Err(format!(
         "Image `{}` was not found locally and Pants is configured to not attempt to pull",
         image
       ));
     }
-    _ => false,
+    _ => (false, "")
   };
 
   if do_pull {
+    log::info!("Pulling Docker image `{image}` because {pull_reason}.");
+
     let create_image_options = CreateImageOptions::<String> {
       from_image: image.to_string(),
       ..CreateImageOptions::default()
@@ -185,13 +196,34 @@ async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Re
     let mut result_stream = docker.create_image(Some(create_image_options), None, None);
     while let Some(msg) = result_stream.next().await {
       log::trace!("pull {}: {:?}", image, msg);
-      if let Err(err) = msg {
-        return Err(format!(
-          "Failed to pull Docker image `{}`: {:?}",
-          image, err
-        ));
-      }
+      match msg {
+        Ok(msg) => match msg {
+          CreateImageInfo {
+            error: Some(error), ..
+          } => {
+            let error_msg = format!("Failed to pull Docker image `{image}`: {error}");
+            log::error!("{error_msg}");
+            return Err(error_msg);
+          }
+          CreateImageInfo {
+            status: Some(status),
+            ..
+          } => {
+            log::info!("Docker pull status: {status}");
+          }
+          // Ignore content in other event fields, namely `id`, `progress`, and `progress_detail`.
+          _ => (),
+        },
+        Err(err) => {
+          return Err(format!(
+            "Failed to pull Docker image `{}`: {:?}",
+            image, err
+          ))
+        }
+      };
     }
+
+    log::info!("Finished pull of Docker image `{image}`.");
   }
 
   Ok(())
