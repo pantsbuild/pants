@@ -1019,7 +1019,7 @@ impl From<&DigestTrie> for remexec::Tree {
     trie.walk(&mut |_, entry| {
       match entry {
         Entry::File(_) => (),
-        Entry::Symlink(_) => (),
+        Entry::Symlink(_) => todo!(),
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory.
           tree.root = Some(d.tree.as_remexec_directory());
@@ -1115,7 +1115,7 @@ fn collisions<'a>(
   for entry in entries {
     match entry {
       Entry::File(other) if other.digest != digest => mismatched_files.push(other),
-      // Symlinks can't have the same digest as files/directories
+      // Symlinks can't have the same digest as files/directories, as they have no digest
       Entry::Symlink(other) => mismatched_symlinks.push(other),
       Entry::Directory(other) if other.digest != digest => mismatched_dirs.push(other),
       _ => (),

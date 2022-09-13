@@ -238,7 +238,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
-      directory::Entry::Symlink(_) => (),
+      directory::Entry::Symlink(_) => todo!(),
       directory::Entry::Directory(_) => (),
     });
 

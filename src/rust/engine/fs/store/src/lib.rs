@@ -908,7 +908,7 @@ impl Store {
           file_digests.insert(f.digest());
         }
         directory::Entry::Directory(_) => (),
-        directory::Entry::Symlink(_) => (),
+        directory::Entry::Symlink(_) => todo!(),
       });
     }
 
@@ -949,7 +949,7 @@ impl Store {
       .await?
       .walk(&mut |_, entry| match entry {
         directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Symlink(_) => (),
+        directory::Entry::Symlink(_) => todo!(),
         directory::Entry::Directory(_) => (),
       });
 
