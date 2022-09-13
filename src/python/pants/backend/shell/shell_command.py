@@ -231,6 +231,7 @@ async def prepare_shell_command_process(
         output_files=output_files,
         timeout_seconds=timeout,
         working_directory=working_directory,
+        level=LogLevel.DEBUG,
     )
 
 
