@@ -505,19 +505,8 @@ async def find_valid_field_sets_for_target_roots(
             for tgt, value in targets_to_applicable_field_sets.items()
             if request.is_in_shard(tgt.address.spec)
         }
-        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
-    else:
-        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
-
-    if not request.expect_single_field_set:
-        return result
-    if len(result.targets) > 1:
-        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-    if len(result.field_sets) > 1:
-        raise AmbiguousImplementationsException(
-            result.targets[0], result.field_sets, goal_description=request.goal_description
-        )
-    return result
+        return TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
+    return TargetRootsToFieldSets(targets_to_applicable_field_sets)
 
 
 def rules():
