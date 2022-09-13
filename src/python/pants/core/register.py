@@ -36,7 +36,6 @@ from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
     archive,
     config_files,
-    distdir,
     external_tool,
     source_files,
     stripped_source_files,
@@ -71,7 +70,6 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *distdir.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),
