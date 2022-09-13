@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, cast
 
@@ -313,9 +312,6 @@ def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessCo
         tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
     )
     return ProcessConfigFromEnvironment(docker_image=docker_image)
-
-
-logger = logging.getLogger(__name__)
 
 
 class EnvironmentSensitiveOptionFieldMixin:
