@@ -12,6 +12,7 @@ from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.subsystems import pytest
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -475,6 +476,7 @@ async def setup_runtime_packages(request: RuntimePackagesPluginRequest) -> Pytes
 def rules():
     return [
         *collect_rules(),
+        *pytest.rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
     ]

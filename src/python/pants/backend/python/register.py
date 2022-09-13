@@ -29,7 +29,7 @@ from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTa
 from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
-from pants.backend.python.subsystems import debugpy, ipython, pytest, python_native_code, setuptools
+from pants.backend.python.subsystems import debugpy
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,
@@ -45,8 +45,6 @@ from pants.backend.python.util_rules import (
     ancestor_files,
     local_dists,
     pex,
-    pex_cli,
-    pex_environment,
     pex_from_targets,
     python_sources,
 )
@@ -60,30 +58,27 @@ def build_file_aliases():
 
 def rules():
     return (
-        *ancestor_files.rules(),
+        *target_types_rules.rules(),
+        # Subsystems
         *coverage_py.rules(),
         *debugpy.rules(),
+        # Util rules
+        *ancestor_files.rules(),
         *dependency_inference_rules.rules(),
-        *export.rules(),
-        *ipython.rules(),
-        *local_dists.rules(),
-        *lockfile.rules(),
-        *package_pex_binary.rules(),
         *pex.rules(),
-        *pex_cli.rules(),
-        *pex_environment.rules(),
         *pex_from_targets.rules(),
-        *pytest.rules(),
-        *pytest_runner.rules(),
-        *python_native_code.rules(),
         *python_sources.rules(),
+        # Goals
+        *package_pex_binary.rules(),
+        *pytest_runner.rules(),
         *repl.rules(),
         *run_pex_binary.rules(),
         *run_python_source.rules(),
         *setup_py.rules(),
-        *setuptools.rules(),
         *tailor.rules(),
-        *target_types_rules.rules(),
+        *local_dists.rules(),
+        *export.rules(),
+        *lockfile.rules(),
         # Macros.
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),

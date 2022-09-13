@@ -4,7 +4,6 @@
 import os
 from typing import Dict
 
-from pants.engine.rules import collect_rules
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
@@ -32,7 +31,3 @@ class PythonNativeCodeSubsystem(Subsystem):
             "CPPFLAGS": safe_shlex_join(self.cpp_flags),
             "LDFLAGS": safe_shlex_join(self.ld_flags),
         }
-
-
-def rules():
-    return collect_rules()

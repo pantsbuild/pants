@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
+from pants.backend.python.subsystems import ipython
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
@@ -197,6 +198,7 @@ async def create_ipython_repl_request(
 def rules():
     return [
         *collect_rules(),
+        *ipython.rules(),
         UnionRule(ReplImplementation, PythonRepl),
         UnionRule(ReplImplementation, IPythonRepl),
     ]
