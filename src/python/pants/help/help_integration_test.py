@@ -34,7 +34,7 @@ def test_help_targets() -> None:
     pants_run = run_pants(["help", "targets"])
     pants_run.assert_success()
     lines = [" ".join(line.split()) for line in pants_run.stdout.splitlines()]
-    assert "archive A ZIP or TAR file containing loose files" in lines
+    assert "archive A ZIP or TAR file containing loose files and code packages." in lines
     assert "to get help for a specific target" in pants_run.stdout
 
 
