@@ -173,18 +173,21 @@ impl PySnapshot {
   }
 
   fn __repr__(&self) -> PyResult<String> {
-    let (files, dirs): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
-
     Ok(format!(
-      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
+      "Snapshot(digest=({}, {}), dirs=({}), files=({}), symlinks=({}))",
       self.0.digest.hash.to_hex(),
       self.0.digest.size_bytes,
-      dirs
+      self.0.tree.directories
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
         .join(","),
-      files
+      self.0.tree.files
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(","),
+      self.0.tree.symlinks
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
@@ -207,7 +210,7 @@ impl PySnapshot {
 
   #[getter]
   fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let (files, _) = self.0.tree.files_and_directories();
+    let files = self.0.tree.files();
     PyTuple::new(
       py,
       files
@@ -219,7 +222,7 @@ impl PySnapshot {
 
   #[getter]
   fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let (_, dirs) = self.0.tree.files_and_directories();
+    let dirs = self.0.tree.directories();
     PyTuple::new(
       py,
       dirs

@@ -62,8 +62,12 @@ async fn snapshot_one_file() {
     )
   );
   assert_eq!(
-    snapshot.tree.files_and_directories(),
-    (vec![PathBuf::from("roland")], vec![])
+    snapshot.tree.files(),
+    vec![PathBuf::from("roland")],
+  );
+  assert_eq!(
+    snapshot.tree.directories(),
+    vec![],
   );
 }
 
@@ -91,11 +95,12 @@ async fn snapshot_recursive_directories() {
     )
   );
   assert_eq!(
-    snapshot.tree.files_and_directories(),
-    (
-      vec![PathBuf::from("cats/roland")],
-      vec![PathBuf::from("cats")]
-    )
+    snapshot.tree.files(),
+    vec![PathBuf::from("cats/roland")],
+  );
+  assert_eq!(
+    snapshot.tree.directories(),
+    vec![PathBuf::from("cats")],
   );
 }
 
@@ -170,15 +175,16 @@ async fn snapshot_recursive_directories_including_empty() {
     ),
   );
   assert_eq!(
-    snapshot.tree.files_and_directories(),
-    (
-      vec![PathBuf::from("cats/roland")],
-      vec![
-        PathBuf::from("cats"),
-        PathBuf::from("dogs"),
-        PathBuf::from("llamas")
-      ]
-    )
+    snapshot.tree.files(),
+    vec![PathBuf::from("cats/roland")],
+  );
+  assert_eq!(
+    snapshot.tree.directories(),
+    vec![
+      PathBuf::from("cats"),
+      PathBuf::from("dogs"),
+      PathBuf::from("llamas")
+    ],
   );
 }
 

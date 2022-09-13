@@ -39,8 +39,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::io::{self, Read, Write, Error};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -50,7 +50,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
+  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST, LinkEntry
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
@@ -135,6 +135,14 @@ impl From<String> for StoreError {
     Self::Unclassified(err)
   }
 }
+
+impl From<Error> for StoreError {
+  fn from(err: Error) -> Self {
+    Self::Unclassified(err.to_string())
+  }
+}
+
+
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -483,6 +491,7 @@ impl Store {
         directories.push((Some(d.digest()), directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
+      directory::Entry::Symlink(_) => (),
     });
 
     // Then store them as a batch.
@@ -941,6 +950,7 @@ impl Store {
       .await?
       .walk(&mut |_, entry| match entry {
         directory::Entry::File(f) => file_digests.push(f.digest()),
+        directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
       });
 
@@ -1246,6 +1256,7 @@ impl Store {
                 };
                 store.materialize_file(path, f.digest(), mode).await
               }
+              directory::Entry::Symlink(s) => {store.materialize_link(path, s.target()).await}
               directory::Entry::Directory(_) => {
                 store
                   .materialize_directory_helper(path, false, parent_to_child, perms)
@@ -1299,6 +1310,15 @@ impl Store {
         Ok(())
       })
       .await?
+  }
+
+  async fn materialize_link(
+    &self,
+    destination: PathBuf,
+    target: String
+  ) -> Result<(), StoreError> {
+    symlink(target, destination)?;
+    Ok(())
   }
 
   ///
@@ -1355,6 +1375,12 @@ impl Store {
             path: path.to_owned(),
             digest: f.digest(),
             is_executable: f.is_executable(),
+          }));
+        }
+        directory::Entry::Symlink(s) => {
+          entries.push(DigestEntry::Symlink(LinkEntry {
+            path: path.to_owned(),
+            target: s.target(),
           }));
         }
         directory::Entry::Directory(d) => {

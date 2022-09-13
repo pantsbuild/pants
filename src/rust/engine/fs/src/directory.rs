@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
@@ -314,10 +314,20 @@ impl From<&File> for remexec::FileNode {
   }
 }
 
-#[derive(Clone, DeepSizeOf)]
+#[derive(Clone, Debug, DeepSizeOf)]
 pub struct Symlink {
   name: Name,
   target: String,
+}
+
+impl Symlink {
+  pub fn name(&self) -> Name {
+    self.name
+  }
+
+  pub fn target(&self) -> String {
+    self.target.to_owned()
+  }
 }
 
 impl TryFrom<&remexec::SymlinkNode> for Symlink {
@@ -336,7 +346,7 @@ impl From<&Symlink> for remexec::SymlinkNode {
     remexec::SymlinkNode {
       name: symlink.name.as_ref().to_owned(),
       target: symlink.target.clone(),
-      ..remexec::SymlinkNode::default(),
+      ..remexec::SymlinkNode::default()
     }
   }
 }
@@ -495,8 +505,8 @@ impl DigestTrie {
     for entry in &*self.0 {
       match entry {
         Entry::File(f) => files.push(f.into()),
-        Entry::Directory(d) => directories.push(d.into()),
         Entry::Symlink(s) => symlinks.push(s.into()),
+        Entry::Directory(d) => directories.push(d.into()),
       }
     }
 
@@ -534,31 +544,47 @@ impl DigestTrie {
         Entry::File(f) => {
           digests.push(f.digest);
         }
+        // There is no digest for a symlink
         Entry::Symlink(_) => (),
       }
     }
     digests
   }
 
-  /// Return a pair of Vecs of the file paths and directory paths in this DigestTrie, each in
-  /// sorted order.
-  ///
-  /// TODO: This should probably be implemented directly by consumers via `walk`, since they
-  /// can directly allocate the collections that they need.
-  pub fn files_and_directories(&self) -> (Vec<PathBuf>, Vec<PathBuf>) {
+  pub fn files(&self) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    let mut directories = Vec::new();
     self.walk(&mut |path, entry| {
       match entry {
         Entry::File(_) => files.push(path.to_owned()),
+        _ => (),
+      }
+    });
+    files
+  }
+
+  pub fn directories(&self) -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    self.walk(&mut |path, entry| {
+      match entry {
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory, which is not emitted here.
         }
         Entry::Directory(_) => directories.push(path.to_owned()),
-        Entry::Symlink(_) => (),
+        _ => (),
       }
     });
-    (files, directories)
+    directories
+  }
+
+  pub fn symlinks(&self) -> Vec<PathBuf> {
+    let mut symlinks = Vec::new();
+    self.walk(&mut |path, entry| {
+      match entry {
+        Entry::Symlink(_) => symlinks.push(path.to_owned()),
+        _ => (),
+      }
+    });
+    symlinks
   }
 
   /// Visit every node in the tree, calling the given function with the path to the Node, and its
@@ -601,23 +627,24 @@ impl DigestTrie {
     let mut theirs = their_iter.next();
 
     let add_unique =
-      |entry: &Entry, unique_files: &mut Vec<PathBuf>, unique_dirs: &mut Vec<PathBuf>| {
+      |entry: &Entry, unique_files: &mut Vec<PathBuf>, unique_dirs: &mut Vec<PathBuf>, unique_symlinks: &mut Vec<PathBuf>| {
         let path = path_so_far.join(entry.name().as_ref());
         match entry {
           Entry::File(_) => unique_files.push(path),
+          Entry::Symlink(_) => unique_symlinks.push(path),
           Entry::Directory(_) => unique_dirs.push(path),
-          Entry::Symlink(_) => (), // TODO: Handle symlinks.
         }
       };
 
     let add_ours = |entry: &Entry, diff: &mut DigestTrieDiff| {
-      add_unique(entry, &mut diff.our_unique_files, &mut diff.our_unique_dirs);
+      add_unique(entry, &mut diff.our_unique_files, &mut diff.our_unique_dirs, &mut diff.our_unique_symlinks);
     };
     let add_theirs = |entry: &Entry, diff: &mut DigestTrieDiff| {
       add_unique(
         entry,
         &mut diff.their_unique_files,
         &mut diff.their_unique_dirs,
+        &mut diff.their_unique_symlinks,
       );
     };
 
@@ -640,6 +667,15 @@ impl DigestTrie {
                 result
                   .changed_files
                   .push(path_so_far.join(our_file.name().as_ref()));
+              }
+              ours = our_iter.next();
+              theirs = their_iter.next();
+            }
+            (Entry::Symlink(our_symlink), Entry::Symlink(their_symlink)) => {
+              if our_symlink.target != their_symlink.target {
+                result
+                  .changed_symlinks
+                  .push(path_so_far.join(our_symlink.name.as_ref()));
               }
               ours = our_iter.next();
               theirs = their_iter.next();
@@ -703,6 +739,7 @@ impl DigestTrie {
       let mut matching_dir = None;
       let mut extra_directories = Vec::new();
       let mut files = Vec::new();
+      let mut symlinks = Vec::new();
       for entry in tree.entries() {
         match entry {
           Entry::Directory(d) if Path::new(d.name.as_ref()).as_os_str() == component_to_strip => {
@@ -710,14 +747,14 @@ impl DigestTrie {
           }
           Entry::Directory(d) => extra_directories.push(d.name.as_ref().to_owned()),
           Entry::File(f) => files.push(f.name.as_ref().to_owned()),
-          Entry::Symlink(s) => (), // TODO: Handle stripping symlink targets?
+          Entry::Symlink(s) => symlinks.push(s.name.as_ref().to_owned()),
         }
       }
 
       let has_already_stripped_any = already_stripped.components().next().is_some();
       match (
         matching_dir,
-        extra_directories.is_empty() && files.is_empty(),
+        extra_directories.is_empty() && files.is_empty() && symlinks.is_empty(),
       ) {
         (None, true) => {
           tree = EMPTY_DIGEST_TREE.clone();
@@ -741,10 +778,10 @@ impl DigestTrie {
               String::new()
             },
             Path::new(component_to_strip).display(),
-            if !extra_directories.is_empty() || !files.is_empty() {
+            if !extra_directories.is_empty() || !files.is_empty() || !symlinks.is_empty() {
               format!(
                 " but did contain {}",
-                format_directories_and_files(&extra_directories, &files)
+                format_entries(&extra_directories, &files, &symlinks)
               )
             } else {
               String::new()
@@ -767,7 +804,7 @@ impl DigestTrie {
             } else {
               String::new()
             },
-            format_directories_and_files(&extra_directories, &files),
+            format_entries(&extra_directories, &files, &symlinks),
           ))
         }
         (Some(d), true) => {
@@ -862,14 +899,14 @@ impl DigestTrie {
       match first {
         Entry::File(f) => {
           // If any Entry is a File, then they must all be identical.
-          let (mut mismatched_files, mismatched_dirs) = collisions(f.digest, group);
-          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() {
+          let (mut mismatched_files, mismatched_dirs, mismatched_symlinks) = collisions(f.digest, group);
+          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() || !mismatched_symlinks.is_empty() {
             mismatched_files.push(f);
             return Err(MergeError::duplicates(
               parent_path,
               mismatched_files,
               mismatched_dirs,
-              vec![],
+              mismatched_symlinks,
             ));
           }
 
@@ -877,14 +914,25 @@ impl DigestTrie {
           entries.push(first.clone());
         }
         Entry::Symlink(s) => {
-          // If any Entry is a Symlink, then the targets must all be identical.
-          let targets_set: BTreeSet<String> = group.iter().map(|s| s.name().to_owned()).collect();
-          if targets_set.len() > 1 {
+          let mut mismatched_files = Vec::new();
+          let mut mismatched_dirs = Vec::new();
+          let mut mismatched_symlinks = Vec::new();
+          for entry in group {
+            match entry {
+              Entry::File(other)  => mismatched_files.push(other),
+              Entry::Symlink(other) if other.target != s.target => mismatched_symlinks.push(other),
+              Entry::Directory(other) => mismatched_dirs.push(other),
+              _ => (),
+            }
+          }
+
+          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() || !mismatched_symlinks.is_empty() {
+            mismatched_symlinks.push(s);
             return Err(MergeError::duplicates(
               parent_path,
-              vec![],
-              vec![],
-              group,
+              mismatched_files,
+              mismatched_dirs,
+              mismatched_symlinks,
             ));
           }
 
@@ -893,16 +941,16 @@ impl DigestTrie {
         }
         Entry::Directory(d) => {
           // If any Entry is a Directory, then they must all be Directories which will be merged.
-          let (mismatched_files, mut mismatched_dirs) = collisions(d.digest, group);
+          let (mismatched_files, mut mismatched_dirs, mismatched_symlinks) = collisions(d.digest, group);
 
           // If there were any Files, error.
-          if !mismatched_files.is_empty() {
+          if !mismatched_files.is_empty() || !mismatched_symlinks.is_empty() {
             mismatched_dirs.push(d);
             return Err(MergeError::duplicates(
               parent_path,
               mismatched_files,
               mismatched_dirs,
-              vec![],
+              mismatched_symlinks,
             ));
           }
 
@@ -956,6 +1004,7 @@ impl From<&DigestTrie> for remexec::Tree {
     trie.walk(&mut |_, entry| {
       match entry {
         Entry::File(_) => (),
+        Entry::Symlink(_) => (),
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory.
           tree.root = Some(d.tree.as_remexec_directory());
@@ -973,10 +1022,13 @@ impl From<&DigestTrie> for remexec::Tree {
 #[derive(Default)]
 pub struct DigestTrieDiff {
   pub our_unique_files: Vec<PathBuf>,
+  pub our_unique_symlinks: Vec<PathBuf>,
   pub our_unique_dirs: Vec<PathBuf>,
   pub their_unique_files: Vec<PathBuf>,
+  pub their_unique_symlinks: Vec<PathBuf>,
   pub their_unique_dirs: Vec<PathBuf>,
   pub changed_files: Vec<PathBuf>,
+  pub changed_symlinks: Vec<PathBuf>,
 }
 
 pub enum MergeError {
@@ -1036,23 +1088,26 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
 fn collisions<'a>(
   digest: Digest,
   entries: impl Iterator<Item = &'a Entry>,
-) -> (Vec<&'a File>, Vec<&'a Directory>) {
+) -> (Vec<&'a File>, Vec<&'a Directory>, Vec<&'a Symlink>) {
   let mut mismatched_files = Vec::new();
   let mut mismatched_dirs = Vec::new();
+  let mut mismatched_symlinks = Vec::new();
   for entry in entries {
     match entry {
       Entry::File(other) if other.digest != digest => mismatched_files.push(other),
+      // Symlinks can't have the same digest as files/directories
+      Entry::Symlink(other) => mismatched_symlinks.push(other),
       Entry::Directory(other) if other.digest != digest => mismatched_dirs.push(other),
       _ => (),
     }
   }
-  (mismatched_files, mismatched_dirs)
+  (mismatched_files, mismatched_dirs, mismatched_symlinks)
 }
 
-/// Format directories and files as a human readable string.
-fn format_directories_and_files(directories: &[String], files: &[String]) -> String {
+/// Format entries as a human readable string.
+fn format_entries(directories: &[String], files: &[String], symlinks: &[String]) -> String {
   format!(
-    "{}{}{}",
+    "{}{}{}{}{}",
     if directories.is_empty() {
       String::new()
     } else {
@@ -1062,7 +1117,7 @@ fn format_directories_and_files(directories: &[String], files: &[String]) -> Str
         directories.join(", ")
       )
     },
-    if !directories.is_empty() && !files.is_empty() {
+    if !directories.is_empty() && (!files.is_empty() || !symlinks.is_empty()) {
       " and "
     } else {
       ""
@@ -1074,6 +1129,20 @@ fn format_directories_and_files(directories: &[String], files: &[String]) -> Str
         "file{} named: {}",
         if files.len() == 1 { "" } else { "s" },
         files.join(", ")
+      )
+    },
+    if (!directories.is_empty() || !files.is_empty()) && !symlinks.is_empty() {
+      " and "
+    } else {
+      ""
+    },
+    if symlinks.is_empty() {
+      String::new()
+    } else {
+      format!(
+        "symlink{} named: {}",
+        if symlinks.len() == 1 { "" } else { "s" },
+        symlinks.join(", ")
       )
     },
   )

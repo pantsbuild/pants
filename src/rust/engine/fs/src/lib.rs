@@ -637,8 +637,7 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 #[async_trait]
 impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
-    // DigestTrie does not currently support Links.
-    Err(format!("{:?} does not exist within this Snapshot.", link))
+    let entry = self.entry(link).ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
@@ -658,6 +657,12 @@ impl Vfs<String> for DigestTrie {
             dir.0.display()
           ))
         }
+        directory::Entry::Symlink(_) => {
+          return Err(format!(
+            "Path `{}` was a symlink rather than a directory.",
+            dir.0.display()
+          ))
+        }
         directory::Entry::Directory(d) => d.clone(),
       }
     };
@@ -672,6 +677,7 @@ impl Vfs<String> for DigestTrie {
             path: dir.0.join(f.name().as_ref()),
             is_executable: f.is_executable(),
           }),
+          directory::Entry::Symlink(s) => Stat::Link(Link(dir.0.join(s.name().as_ref()))),
           directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
         })
         .collect(),
@@ -767,8 +773,15 @@ pub struct FileEntry {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub struct LinkEntry {
+  pub path: PathBuf,
+  pub target: String,
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum DigestEntry {
   File(FileEntry),
+  Symlink(LinkEntry),
   EmptyDirectory(PathBuf),
 }
 
@@ -776,6 +789,7 @@ impl DigestEntry {
   pub fn path(&self) -> &Path {
     match self {
       DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::Symlink(link_entry) => &link_entry.path,
       DigestEntry::EmptyDirectory(path) => path,
     }
   }
