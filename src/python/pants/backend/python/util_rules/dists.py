@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 import toml
 
+from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -325,4 +326,4 @@ def distutils_repr(obj) -> str:
 
 
 def rules():
-    return (*collect_rules(), *pex_rules())
+    return (*collect_rules(), *setuptools.rules(), *pex_rules())
