@@ -6,14 +6,16 @@ import dataclasses
 import hashlib
 import os.path
 from dataclasses import dataclass
+from typing import Iterable
 
-from pants.backend.go.util_rules import coverage
+from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
     AssemblyPostCompilation,
     AssemblyPostCompilationRequest,
     AssemblyPreCompilationRequest,
     FallibleAssemblyPreCompilation,
 )
+from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageRequest,
     ApplyCodeCoverageResult,
@@ -27,8 +29,8 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
@@ -49,6 +51,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
         coverage_config: GoCoverageConfig | None = None,
+        cgo_file_names: tuple[str, ...] = (),
+        cgo_flags: CGoCompilerFlags | None = None,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -67,6 +71,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.for_tests = for_tests
         self.embed_config = embed_config
         self.coverage_config = coverage_config
+        self.cgo_file_names = cgo_file_names
+        self.cgo_flags = cgo_flags
         self._hashcode = hash(
             (
                 self.import_path,
@@ -80,6 +86,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.for_tests,
                 self.embed_config,
                 self.coverage_config,
+                self.cgo_file_names,
+                self.cgo_flags,
             )
         )
 
@@ -98,7 +106,9 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
-            f"coverage_config={self.coverage_config}"
+            f"coverage_config={self.coverage_config}, "
+            f"cgo_file_names={self.cgo_file_names}, "
+            f"cgo_flags={self.cgo_flags}"
             ")"
         )
 
@@ -120,6 +130,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
             and self.coverage_config == other.coverage_config
+            and self.cgo_file_names == other.cgo_file_names
+            and self.cgo_flags == other.cgo_flags
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -226,6 +238,36 @@ class GoCompileActionIdResult:
     action_id: str
 
 
+# TODO(#16831): Merge this rule helper and the AssemblyPostCompilationRequest.
+@rule_helper
+async def _add_objects_to_archive(
+    input_digest: Digest,
+    pkg_archive_path: str,
+    obj_file_paths: Iterable[str],
+) -> ProcessResult:
+    # Use `go tool asm` tool ID since `go tool pack` does not have a version argument.
+    asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
+    pack_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            input_digest=input_digest,
+            command=(
+                "tool",
+                "pack",
+                "r",
+                pkg_archive_path,
+                *obj_file_paths,
+            ),
+            env={
+                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+            },
+            description="Link objects to Go package archive",
+            output_files=(pkg_archive_path,),
+        ),
+    )
+    return pack_result
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -255,10 +297,17 @@ async def build_go_package(
         Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )
 
+    unmerged_input_digests = [
+        merged_deps_digest,
+        import_config.digest,
+        embedcfg.digest,
+        request.digest,
+    ]
+
     # If coverage is enabled for this package, then replace the Go source files with versions modified to
     # contain coverage code.
-    # Note: When cgo is implemented, coverage should be applied *after* cgo processing.
-    go_file_names = request.go_file_names
+    go_files = request.go_file_names
+    cgo_files = request.cgo_file_names
     go_files_digest = request.digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
     if request.coverage_config:
@@ -267,22 +316,38 @@ async def build_go_package(
             ApplyCodeCoverageRequest(
                 digest=request.digest,
                 dir_path=request.dir_path,
-                go_files=go_file_names,
+                go_files=go_files,
+                cgo_files=cgo_files,
                 cover_mode=request.coverage_config.cover_mode,
                 import_path=request.import_path,
             ),
         )
-        go_files_digest = await Get(Digest, MergeDigests([go_files_digest, coverage_result.digest]))
+        go_files_digest = coverage_result.digest
+        unmerged_input_digests.append(go_files_digest)
+        go_files = coverage_result.go_files
+        cgo_files = coverage_result.cgo_files
         cover_file_metadatas = coverage_result.cover_file_metadatas
-        new_go_file_names = list(go_file_names)
-        for cover_file_metadata in cover_file_metadatas:
-            idx = new_go_file_names.index(cover_file_metadata.go_file)
-            new_go_file_names[idx] = cover_file_metadata.cover_go_file
-        go_file_names = tuple(new_go_file_names)
+
+    cgo_compile_result: CGoCompileResult | None = None
+    if cgo_files:
+        assert request.cgo_flags is not None
+        cgo_compile_result = await Get(
+            CGoCompileResult,
+            CGoCompileRequest(
+                import_path=request.import_path,
+                pkg_name=request.pkg_name,
+                digest=go_files_digest,
+                dir_path=request.dir_path,
+                cgo_files=cgo_files,
+                cgo_flags=request.cgo_flags,
+            ),
+        )
+        assert cgo_compile_result is not None
+        unmerged_input_digests.append(cgo_compile_result.digest)
 
     input_digest = await Get(
         Digest,
-        MergeDigests([merged_deps_digest, import_config.digest, embedcfg.digest, go_files_digest]),
+        MergeDigests(unmerged_input_digests),
     )
 
     assembly_digests = None
@@ -341,10 +406,10 @@ async def build_go_package(
         compile_args.append("-complete")
 
     relativized_sources = (
-        f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}"
-        for name in go_file_names
+        f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
     )
-    compile_args.extend(["--", *relativized_sources])
+    generated_cgo_file_paths = cgo_compile_result.output_go_files if cgo_compile_result else ()
+    compile_args.extend(["--", *relativized_sources, *generated_cgo_file_paths])
     compile_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
@@ -369,10 +434,10 @@ async def build_go_package(
         assembly_result = await Get(
             AssemblyPostCompilation,
             AssemblyPostCompilationRequest(
-                compilation_digest,
-                assembly_digests,
-                request.s_file_names,
-                request.dir_path,
+                compilation_result=compilation_digest,
+                assembly_digests=assembly_digests,
+                s_files=request.s_file_names,
+                dir_path=request.dir_path,
             ),
         )
         if assembly_result.result.exit_code != 0:
@@ -385,6 +450,23 @@ async def build_go_package(
             )
         assert assembly_result.merged_output_digest
         compilation_digest = assembly_result.merged_output_digest
+
+    if cgo_compile_result:
+        cgo_link_input_digest = await Get(
+            Digest,
+            MergeDigests(
+                [
+                    compilation_digest,
+                    cgo_compile_result.digest,
+                ]
+            ),
+        )
+        cgo_link_result = await _add_objects_to_archive(
+            input_digest=cgo_link_input_digest,
+            pkg_archive_path="__pkg__.a",
+            obj_file_paths=cgo_compile_result.output_obj_files,
+        )
+        compilation_digest = cgo_link_result.output_digest
 
     path_prefix = os.path.join("__pkgs__", path_safe(request.import_path))
     import_paths_to_pkg_a_files[request.import_path] = os.path.join(path_prefix, "__pkg__.a")
@@ -479,5 +561,6 @@ async def compute_compile_action_id(
 def rules():
     return (
         *collect_rules(),
+        *cgo.rules(),
         *coverage.rules(),
     )

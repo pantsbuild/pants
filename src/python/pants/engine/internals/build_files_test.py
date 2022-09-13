@@ -62,12 +62,12 @@ def test_parse_address_family_empty() -> None:
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
-                input_type=PathGlobs,
+                input_types=(PathGlobs,),
                 mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
             ),
             MockGet(
                 output_type=OptionalAddressFamily,
-                input_type=AddressFamilyDir,
+                input_types=(AddressFamilyDir,),
                 mock=lambda _: OptionalAddressFamily("/dev"),
             ),
         ],
@@ -86,7 +86,7 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
-                input_type=PathGlobs,
+                input_types=(PathGlobs,),
                 mock=lambda _: DigestContents(
                     [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
                 ),
