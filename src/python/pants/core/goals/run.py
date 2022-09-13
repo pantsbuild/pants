@@ -6,7 +6,6 @@ from __future__ import annotations
 import dataclasses
 import logging
 from abc import ABCMeta
-from collections import namedtuple
 from dataclasses import dataclass
 from itertools import filterfalse, tee
 from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
@@ -153,8 +152,8 @@ class Run(Goal):
 
 
 class RankedFieldSets(NamedTuple):
-    primary: tuple[FieldSet, ...]
-    secondary: tuple[FieldSet, ...]
+    primary: tuple[RunFieldSet, ...]
+    secondary: tuple[RunFieldSet, ...]
 
 
 def _partition(
