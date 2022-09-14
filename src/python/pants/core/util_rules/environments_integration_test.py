@@ -29,3 +29,10 @@ def test_unrecognized_build_file_symbols_during_bootstrap() -> None:
             "--plugins=ansicolors",
         ]
         run_pants([*args, "list", tmpdir]).assert_success()
+
+
+def test_environment_sensitive_option_fields_exist() -> None:
+    pants = run_pants(["help", "_local_environment"])
+    pants.assert_success()
+    assert "python_bootstrap_names" in pants.stdout
+    assert "python_bootstrap_search_path" in pants.stdout

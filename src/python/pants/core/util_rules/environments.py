@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, ClassVar, Iterable, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -18,15 +18,18 @@ from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    Field,
     FieldSet,
     StringField,
     StringSequenceField,
     Target,
     WrappedTargetRequest,
 )
-from pants.option.option_types import DictOption
+from pants.engine.unions import UnionRule
+from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 
 
@@ -77,58 +80,6 @@ class EnvironmentField(StringField):
     )
 
 
-class PythonInterpreterSearchPathsField(StringSequenceField):
-    alias = "python_interpreter_search_paths"
-    default = ("<PYENV>", "<PATH>")
-    value: tuple[str, ...]
-    help = softwrap(
-        """
-        A list of paths to search for Python interpreters.
-
-        Which interpreters are actually used from these paths is context-specific:
-        the Python backend selects interpreters using options on the `python` subsystem,
-        in particular, the `[python].interpreter_constraints` option.
-
-        You can specify absolute paths to interpreter binaries
-        and/or to directories containing interpreter binaries. The order of entries does
-        not matter.
-
-        The following special strings are supported:
-
-          * `<PATH>`, the contents of the PATH env var
-          * `<ASDF>`, all Python versions currently configured by ASDF \
-              `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-          * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
-          * `<PYENV>`, all Python versions under $(pyenv root)/versions
-          * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
-          * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
-        """
-    )
-
-
-class PythonBootstrapBinaryNamesField(StringSequenceField):
-    alias = "python_bootstrap_binary_names"
-    default = ("python", "python3")
-    value: tuple[str, ...]
-    help = softwrap(
-        f"""
-        The names of Python binaries to search for. See the
-        `{PythonInterpreterSearchPathsField.alias}` field to influence where interpreters are
-        searched for.
-
-        This does not impact which Python interpreter is used to run your code, only what
-        is used to run internal tools.
-        """
-    )
-
-
-_COMMON_ENV_FIELDS = (
-    *COMMON_TARGET_FIELDS,
-    PythonInterpreterSearchPathsField,
-    PythonBootstrapBinaryNamesField,
-)
-
-
 class CompatiblePlatformsField(StringSequenceField):
     alias = "compatible_platforms"
     default = tuple(plat.value for plat in Platform)
@@ -147,7 +98,7 @@ class CompatiblePlatformsField(StringSequenceField):
 
 class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
-    core_fields = (*_COMMON_ENV_FIELDS, CompatiblePlatformsField)
+    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
@@ -173,7 +124,7 @@ class DockerImageField(StringField):
 
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*_COMMON_ENV_FIELDS, DockerImageField)
+    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField)
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment
@@ -410,6 +361,124 @@ def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessCo
         tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
     )
     return ProcessConfigFromEnvironment(docker_image=docker_image)
+
+
+class EnvironmentSensitiveOptionFieldMixin:
+    subsystem: ClassVar[type[Subsystem]]
+    option_name: ClassVar[str]
+
+
+# Maps between non-list option value types and corresponding fields
+_SIMPLE_OPTIONS: dict[type, type[Field]] = {
+    str: StringField,
+}
+
+# Maps between the member types for list options. Each element is the
+# field type, and the `value` type for the field.
+_LIST_OPTIONS: dict[type, type[Field]] = {
+    str: StringSequenceField,
+}
+
+
+@memoized
+def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
+    """Register environment fields for the `environment_sensitive` options of `subsystem`
+
+    This should be called in the `rules()` method in the file where `subsystem` is defined. It will
+    register the relevant fields under the `local_environment` and `docker_environment` targets.
+    """
+    field_rules: set[UnionRule] = set()
+
+    for option_attrname, option in _collect_options_info_extended(subsystem):
+        if option.flag_options["environment_sensitive"]:
+            field_rules.update(_add_option_field_for(subsystem, option, option_attrname))
+
+    return field_rules
+
+
+def _add_option_field_for(
+    subsystem_t: type[Subsystem], option: OptionsInfo, attrname: str
+) -> Iterable[UnionRule]:
+    option_type: type = option.flag_options["type"]
+    scope = subsystem_t.options_scope
+
+    # Note that there is not presently good support for enum options. `str`-backed enums should
+    # be easy enough to add though...
+
+    if option_type != list:
+        try:
+            field_type = _SIMPLE_OPTIONS[option_type]
+        except KeyError:
+            raise AssertionError(
+                f"The option `{subsystem_t.__name__}.{attrname}` has a value type that does "
+                "not yet have a mapping in `environments.py`. To fix, map the value type in "
+                "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
+            )
+    else:
+        member_type = option.flag_options["member_type"]
+        try:
+            field_type = _LIST_OPTIONS[member_type]
+        except KeyError:
+            raise AssertionError(
+                f"The option `{subsystem_t.__name__}.{attrname}` has a member value type that "
+                "does yet have a mapping in `environments.py`. To fix, map the member value type "
+                "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
+                "member value type."
+            )
+
+    # The below class will never be used for static type checking outside of this function.
+    # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
+    # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
+    class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
+        # TODO: use envvar-like normalization logic here
+        alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
+        required = False
+        value: Any
+        help = (
+            f"Overrides the default value from the option `[{scope}].{attrname}` when this "
+            "environment target is active."
+        )
+        subsystem = subsystem_t
+        option_name = attrname
+
+    return [
+        LocalEnvironmentTarget.register_plugin_field(OptionField),
+        DockerEnvironmentTarget.register_plugin_field(OptionField),
+    ]
+
+
+def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
+    """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
+
+    This is slated for quick deprecation once we can construct `Subsystems` per environment.
+    """
+
+    if env_tgt.val is None:
+        return getattr(subsystem, name)
+
+    options = _options(env_tgt)
+
+    maybe = options.get((type(subsystem), name))
+    if maybe is None or maybe.value is None:
+        return getattr(subsystem, name)
+    else:
+        return maybe.value
+
+
+@memoized
+def _options(env_tgt: EnvironmentTarget) -> dict[tuple[type[Subsystem], str], Field]:
+    """Index the environment-specific `fields` on an environment target by subsystem and name."""
+
+    options: dict[tuple[type[Subsystem], str], Field] = {}
+
+    if env_tgt.val is None:
+        return options
+
+    for _, field in env_tgt.val.field_values.items():
+        if isinstance(field, EnvironmentSensitiveOptionFieldMixin):
+            options[(field.subsystem, field.option_name)] = field
+
+    return options
 
 
 def rules():

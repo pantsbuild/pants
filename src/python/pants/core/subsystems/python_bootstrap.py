@@ -17,8 +17,8 @@ from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import (
     EnvironmentsSubsystem,
     EnvironmentTarget,
-    PythonBootstrapBinaryNamesField,
-    PythonInterpreterSearchPathsField,
+    add_option_fields_for,
+    get_option,
 )
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
@@ -69,6 +69,7 @@ class PythonBootstrapSubsystem(Subsystem):
         ),
         advanced=True,
         metavar="<binary-paths>",
+        environment_sensitive=True,
     )
     names = StrListOption(
         default=["python", "python3"],
@@ -83,6 +84,7 @@ class PythonBootstrapSubsystem(Subsystem):
         ),
         advanced=True,
         metavar="<python-binary-names>",
+        environment_sensitive=True,
     )
 
     # TODO(#7735): Move to `Subsystem`?
@@ -251,14 +253,10 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget
 ) -> PythonBootstrap:
-    if env_tgt.val is not None:
-        interpreter_search_paths = env_tgt.val[PythonInterpreterSearchPathsField].value
-        interpreter_names = env_tgt.val[PythonBootstrapBinaryNamesField].value
-        for opt in ("search_path", "names"):
-            python_bootstrap_subsystem.error_if_environment_mechanism_ambiguity(opt)
-    else:
-        interpreter_search_paths = python_bootstrap_subsystem.search_path
-        interpreter_names = python_bootstrap_subsystem.names
+
+    # TODO: use subsystems directly again once we do overrides at subsystem contruct time.
+    interpreter_search_paths = get_option("search_path", python_bootstrap_subsystem, env_tgt)
+    interpreter_names = get_option("names", python_bootstrap_subsystem, env_tgt)
 
     has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
         interpreter_search_paths
@@ -288,4 +286,5 @@ def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
+        *add_option_fields_for(PythonBootstrapSubsystem),
     )
