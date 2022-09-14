@@ -532,22 +532,24 @@ async def lint(
     all_partitions = await MultiGet(
         partition_request_get(request_type) for request_type in lint_request_types
     )
-    lint_partitions_by_rt = defaultdict(list)
+    lint_partitions_by_request_type = defaultdict(list)
     for request_type, lint_partition in zip(lint_request_types, all_partitions):
-        lint_partitions_by_rt[request_type].append(lint_partition)
+        lint_partitions_by_request_type[request_type].append(lint_partition)
 
-    lint_batches_by_rt = {
+    lint_batches_by_request_type = {
         rt: [
             subpartition
             for partitions in lint_partitions
             for partition in partitions
             for subpartition in batch(partition)
         ]
-        for rt, lint_partitions in lint_partitions_by_rt.items()
+        for rt, lint_partitions in lint_partitions_by_request_type.items()
     }
 
     lint_batches = (
-        rt.SubPartition(elements) for rt, batch in lint_batches_by_rt.items() for elements in batch
+        rt.SubPartition(elements)
+        for rt, batch in lint_batches_by_request_type.items()
+        for elements in batch
     )
 
     fmt_target_requests: Iterable[FmtTargetsRequest] = ()
