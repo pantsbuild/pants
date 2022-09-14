@@ -171,9 +171,18 @@ class DockerImageField(StringField):
     )
 
 
+class DockerPlatformField(StringField):
+    alias = "platform"
+    required = True
+    valid_choices = Platform
+    help = (
+        f"The intended platform for the Docker image, one of: {[plat.value for plat in Platform]}"
+    )
+
+
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*_COMMON_ENV_FIELDS, DockerImageField)
+    core_fields = (*_COMMON_ENV_FIELDS, DockerImageField, DockerPlatformField)
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment

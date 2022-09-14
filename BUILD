@@ -24,4 +24,5 @@ _local_environment(
 _docker_environment(
     name="docker_env",
     image="python:3.9",
+    platform="linux_x86_64",
 )
