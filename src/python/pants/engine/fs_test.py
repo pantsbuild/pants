@@ -552,21 +552,6 @@ def test_create_digest_with_file_entries(rule_runner: RuleRunner) -> None:
     assert snapshot.digest != EMPTY_DIGEST
 
 
-def test_create_digest_with_symlink_entries(rule_runner: RuleRunner) -> None:
-    res = rule_runner.request(Snapshot, [CreateDigest([SymlinkEntry("a/4.txt.ln", "../4.txt")])])
-    assert res.dirs == ("a",)
-    assert not res.files
-    assert res.symlinks == ("a/4.txt.ln",)
-    assert res.digest != EMPTY_DIGEST
-
-    res = rule_runner.request(
-        Snapshot, [CreateDigest([Directory("x/y/z"), Directory("m"), Directory("m/n")])]
-    )
-    assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
-    assert not res.files
-    assert res.digest != EMPTY_DIGEST
-
-
 # -----------------------------------------------------------------------------------------------
 # `MergeDigests`
 # -----------------------------------------------------------------------------------------------

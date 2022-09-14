@@ -363,6 +363,7 @@ impl From<&Symlink> for remexec::SymlinkNode {
 // whether these types can be merged.
 enum TypedPath<'a> {
   File { path: &'a Path, is_executable: bool },
+  Link(&'a Path),
   Dir(&'a Path),
 }
 
@@ -372,6 +373,7 @@ impl<'a> Deref for TypedPath<'a> {
   fn deref(&self) -> &Path {
     match self {
       TypedPath::File { path, .. } => path,
+      TypedPath::Link(l) => l,
       TypedPath::Dir(d) => d,
     }
   }
@@ -384,6 +386,7 @@ impl<'a> From<&'a PathStat> for TypedPath<'a> {
         path,
         is_executable: stat.is_executable,
       },
+      PathStat::Link { path, .. } => TypedPath::Link(path),
       PathStat::Dir { path, .. } => TypedPath::Dir(path),
     }
   }
@@ -465,13 +468,18 @@ impl DigestTrie {
               is_executable,
             }));
           }
+          TypedPath::Link {
+            entries.push(Entry::Symlink(Symlink {
+              name,
+              target,
+            }));
+          }
           TypedPath::Dir { .. } => {
             // Because there are no children of this Dir, it must be empty.
             entries.push(Entry::Directory(Directory::new(name, vec![])));
           }
         }
       } else {
-        // Because there are no children of this Dir, it must be empty.
         entries.push(Entry::Directory(Directory::from_digest_tree(
           name,
           Self::from_sorted_paths(

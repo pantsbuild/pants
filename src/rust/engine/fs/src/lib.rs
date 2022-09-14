@@ -174,6 +174,10 @@ impl Stat {
       is_executable,
     })
   }
+
+  pub fn link(path: PathBuf) -> Stat {
+    Stat::Link(Link(path))
+  }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
@@ -202,6 +206,12 @@ pub enum PathStat {
     // The canonical Stat that underlies the Path.
     stat: File,
   },
+  Link {
+    // The symbolic name of some filesystem Path, which is context specific.
+    path: PathBuf,
+    // The canonical Stat that underlies the Path.
+    stat: Link
+  }
 }
 
 impl PathStat {
@@ -213,10 +223,15 @@ impl PathStat {
     PathStat::File { path, stat }
   }
 
+  pub fn link(path: PathBuf, stat: Link) -> PathStat {
+    PathStat::Link { path, stat }
+  }
+
   pub fn path(&self) -> &Path {
     match self {
       &PathStat::Dir { ref path, .. } => path.as_path(),
       &PathStat::File { ref path, .. } => path.as_path(),
+      &PathStat::Link { ref path, .. } => path.as_path(),
     }
   }
 }
