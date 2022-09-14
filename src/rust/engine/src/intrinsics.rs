@@ -456,7 +456,8 @@ fn create_digest_to_digest(
   async move {
     // The digests returned here are already in the `file_digests` map.
     let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
-    let trie = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+    let trie =
+      DigestTrie::from_path_stats(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
 
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;

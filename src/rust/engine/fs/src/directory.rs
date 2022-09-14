@@ -313,7 +313,7 @@ impl From<&File> for remexec::FileNode {
 
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
 // whether these types can be merged.
-enum TypedPath<'a> {
+pub enum TypedPath<'a> {
   File { path: &'a Path, is_executable: bool },
   Dir(&'a Path),
 }
@@ -359,30 +359,29 @@ impl From<DigestTrie> for DirectoryDigest {
 impl DigestTrie {
   /// Create a DigestTrie from unique PathStats. Fails for duplicate items.
   pub fn from_path_stats(
-    mut path_stats: Vec<PathStat>,
+    mut path_stats: Vec<TypedPath>,
     file_digests: &HashMap<PathBuf, Digest>,
   ) -> Result<Self, String> {
     // Sort and ensure that there were no duplicate entries.
-    //#[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+    #[allow(clippy::unnecessary_sort_by)]
+    path_stats.sort_by(|a, b| (**a).cmp(&**b));
 
     // The helper assumes that if a Path has multiple children, it must be a directory.
     // Proactively error if we run into identically named files, because otherwise we will treat
     // them like empty directories.
     let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
+    path_stats.dedup_by(|a, b| **a == **b);
     if path_stats.len() != pre_dedupe_len {
       return Err(format!(
         "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
         path_stats
+          .iter()
+          .map(|p| (**p).to_str())
+          .collect::<Vec<_>>()
       ));
     }
 
-    Self::from_sorted_paths(
-      PathBuf::new(),
-      path_stats.iter().map(|p| p.into()).collect(),
-      file_digests,
-    )
+    Self::from_sorted_paths(PathBuf::new(), path_stats, file_digests)
   }
 
   fn from_sorted_paths(
@@ -504,24 +503,28 @@ impl DigestTrie {
     digests
   }
 
-  /// Return a pair of Vecs of the file paths and directory paths in this DigestTrie, each in
-  /// sorted order.
-  ///
-  /// TODO: This should probably be implemented directly by consumers via `walk`, since they
-  /// can directly allocate the collections that they need.
-  pub fn files_and_directories(&self) -> (Vec<PathBuf>, Vec<PathBuf>) {
+  pub fn files(&self) -> Vec<PathBuf> {
     let mut files = Vec::new();
+    self.walk(&mut |path, entry| {
+      if let Entry::File(_) = entry {
+        files.push(path.to_owned())
+      }
+    });
+    files
+  }
+
+  pub fn directories(&self) -> Vec<PathBuf> {
     let mut directories = Vec::new();
     self.walk(&mut |path, entry| {
       match entry {
-        Entry::File(_) => files.push(path.to_owned()),
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory, which is not emitted here.
         }
         Entry::Directory(_) => directories.push(path.to_owned()),
+        _ => (),
       }
     });
-    (files, directories)
+    directories
   }
 
   /// Visit every node in the tree, calling the given function with the path to the Node, and its

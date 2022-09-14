@@ -230,7 +230,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       directory::Entry::Directory(_) => (),
     });
 
-    Ok(DigestTrie::from_path_stats(path_stats, &files)?.into())
+    Ok(DigestTrie::from_path_stats(path_stats.iter().map(|p| p.into()).collect(), &files)?.into())
   }
 
   async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, Self::Error> {
