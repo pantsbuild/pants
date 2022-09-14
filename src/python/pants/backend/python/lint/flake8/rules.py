@@ -72,7 +72,7 @@ async def partition_flake8(
 
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
-async def flake8_lint_partition(
+async def run_flake8(
     request: Flake8Request.SubPartition[PartitionElement],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
