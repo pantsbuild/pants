@@ -785,7 +785,7 @@ pub struct FileEntry {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct LinkEntry {
+pub struct SymlinkEntry {
   pub path: PathBuf,
   pub target: String,
 }
@@ -793,7 +793,7 @@ pub struct LinkEntry {
 #[derive(Debug, Eq, PartialEq)]
 pub enum DigestEntry {
   File(FileEntry),
-  Symlink(LinkEntry),
+  Symlink(SymlinkEntry),
   EmptyDirectory(PathBuf),
 }
 

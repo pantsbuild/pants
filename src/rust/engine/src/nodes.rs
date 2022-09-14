@@ -28,7 +28,7 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
-  GlobExpansionConjunction, GlobMatching, Link, LinkEntry, PathGlobs, PathStat, PreparedPathGlobs,
+  GlobExpansionConjunction, GlobMatching, Link, SymlinkEntry, PathGlobs, PathStat, PreparedPathGlobs,
   RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
@@ -848,7 +848,7 @@ impl Snapshot {
   fn store_symlink_entry(
     py: Python,
     types: &crate::types::Types,
-    item: &LinkEntry,
+    item: &SymlinkEntry,
   ) -> Result<Value, String> {
     Ok(externs::unsafe_call(
       py,

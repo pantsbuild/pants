@@ -50,7 +50,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, LinkEntry, PathStat, Permissions, RelativePath, SymlinkBehavior,
+  FileEntry, SymlinkEntry, PathStat, Permissions, RelativePath, SymlinkBehavior,
   EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
@@ -1380,7 +1380,7 @@ impl Store {
           }));
         }
         directory::Entry::Symlink(s) => {
-          entries.push(DigestEntry::Symlink(LinkEntry {
+          entries.push(DigestEntry::Symlink(SymlinkEntry {
             path: path.to_owned(),
             target: s.target().to_str().unwrap().to_string(),
           }));
