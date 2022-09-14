@@ -46,6 +46,7 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, shell_quote
@@ -135,6 +136,7 @@ async def mypy_typecheck_partition(
     mkdir: MkdirBinary,
     cp: CpBinary,
     mv: MvBinary,
+    global_options: GlobalOptions,
 ) -> CheckResult:
 
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
@@ -306,6 +308,13 @@ async def mypy_typecheck_partition(
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
+        # Always emit colors to improve cache hit rates, the results are post-processed to match the
+        # global setting
+        "MYPY_FORCE_COLOR": "1",
+        # Mypy needs to know the terminal so it can use appropriate escape sequences. ansi is a
+        # reasonable lowest common denominator for the sort of escapes mypy uses (NB. TERM=xterm
+        # uses some additional codes that colors.strip_color doesn't remove).
+        "TERM": "ansi",
         # Force a fixed terminal width. This is effectively infinite, disabling mypy's
         # builtin truncation and line wrapping. Terminals do an acceptable job of soft-wrapping
         # diagnostic text and source code is typically already hard-wrapped to a limited width.
@@ -329,7 +338,10 @@ async def mypy_typecheck_partition(
     result = await Get(FallibleProcessResult, Process, process)
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
-        result, partition_description=partition.description(), report=report
+        result,
+        partition_description=partition.description(),
+        report=report,
+        strip_formatting=not global_options.colors,
     )
 
 

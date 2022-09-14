@@ -172,6 +172,8 @@ async def setup_build_go_package_target_request(
                 else:
                     embed_config = _first_party_pkg_digest.test_embed_config
         s_file_names = _first_party_pkg_analysis.s_files
+        cgo_file_names = _first_party_pkg_analysis.cgo_files
+        cgo_flags = _first_party_pkg_analysis.cgo_flags
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
         import_path = target[GoImportPathField].value
@@ -195,6 +197,8 @@ async def setup_build_go_package_target_request(
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
         embed_config = _third_party_pkg_info.embed_config
+        cgo_file_names = _third_party_pkg_info.cgo_files
+        cgo_flags = _third_party_pkg_info.cgo_flags
 
     else:
         raise AssertionError(
@@ -230,6 +234,8 @@ async def setup_build_go_package_target_request(
         dir_path=dir_path,
         go_file_names=go_file_names,
         s_file_names=s_file_names,
+        cgo_file_names=cgo_file_names,
+        cgo_flags=cgo_flags,
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,

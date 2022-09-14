@@ -17,6 +17,7 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Workspace
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.strutil import softwrap
 
 
 def test_determine_specified_tool_names() -> None:
@@ -31,9 +32,15 @@ def test_determine_specified_tool_names() -> None:
             extra_valid_names=["extra-tool"],
         )
     assert (
-        "Unrecognized name with the option `--fake-goal-only`: 'bad'\n\n"
-        "All valid names: ['extra-tool', 'my-tool']"
-    ) in str(exc.value)
+        softwrap(
+            """
+            Unrecognized name with the option `--fake-goal-only`: 'bad'
+
+            All valid names: ['extra-tool', 'my-tool']
+            """
+        )
+        in str(exc.value)
+    )
 
 
 def test_write_reports() -> None:

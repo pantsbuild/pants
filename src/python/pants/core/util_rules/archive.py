@@ -36,6 +36,7 @@ from pants.engine.fs import (
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,11 @@ async def create_archive(request: CreateArchive) -> Digest:
         argv: tuple[str, ...] = (
             bash_binary.path,
             "-c",
-            (
-                f"{zip_binary.path} --names-stdin {shlex.quote(request.output_filename)} "
-                f"< {FILE_LIST_FILENAME}"
+            softwrap(
+                f"""
+                {zip_binary.path} --names-stdin {shlex.quote(request.output_filename)}
+                < {FILE_LIST_FILENAME}
+                """
             ),
         )
     else:

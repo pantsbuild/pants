@@ -629,7 +629,11 @@ def test_determine_pex_python_and_platforms() -> None:
             _determine_pex_python_and_platforms,
             rule_args=[request],
             mock_gets=[
-                MockGet(PythonExecutable, InterpreterConstraints, lambda _: discovered_python)
+                MockGet(
+                    output_type=PythonExecutable,
+                    input_types=(InterpreterConstraints,),
+                    mock=lambda _: discovered_python,
+                )
             ],
         )
         assert result == expected
@@ -704,14 +708,14 @@ def test_setup_pex_requirements() -> None:
             rule_args=[request, create_subsystem(PythonSetup)],
             mock_gets=[
                 MockGet(
-                    LoadedLockfile,
-                    LoadedLockfileRequest,
-                    lambda _: create_loaded_lockfile(is_pex_lock),
+                    output_type=LoadedLockfile,
+                    input_types=(LoadedLockfileRequest,),
+                    mock=lambda _: create_loaded_lockfile(is_pex_lock),
                 ),
                 MockGet(
-                    ResolvePexConfig,
-                    ResolvePexConfigRequest,
-                    lambda _: ResolvePexConfig(
+                    output_type=ResolvePexConfig,
+                    input_types=(ResolvePexConfigRequest,),
+                    mock=lambda _: ResolvePexConfig(
                         indexes=("custom-index",),
                         find_links=("custom-find-links",),
                         manylinux=None,
@@ -721,7 +725,11 @@ def test_setup_pex_requirements() -> None:
                         path_mappings=(),
                     ),
                 ),
-                MockGet(Digest, CreateDigest, lambda _: constraints_digest),
+                MockGet(
+                    output_type=Digest,
+                    input_types=(CreateDigest,),
+                    mock=lambda _: constraints_digest,
+                ),
             ],
         )
         assert result == expected

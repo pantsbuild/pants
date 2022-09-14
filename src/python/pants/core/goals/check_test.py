@@ -8,6 +8,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Type
 
+import pytest
+
 from pants.core.goals.check import (
     Check,
     CheckRequest,
@@ -18,7 +20,9 @@ from pants.core.goals.check import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
+from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
@@ -140,7 +144,7 @@ def run_typecheck_rule(
             mock_gets=[
                 MockGet(
                     output_type=CheckResults,
-                    input_type=CheckRequest,
+                    input_types=(CheckRequest,),
                     mock=lambda field_set_collection: field_set_collection.check_results,
                 ),
             ],
@@ -242,3 +246,34 @@ def test_streaming_output_partitions() -> None:
 
         """
     )
+
+
+@pytest.mark.parametrize(
+    ("strip_chroot_path", "strip_formatting", "expected"),
+    [
+        (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
+        (False, True, "/var/pants-sandbox-123/red/path.py bold"),
+        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "red/path.py bold"),
+    ],
+)
+def test_from_fallible_process_result_output_prepping(
+    strip_chroot_path: bool, strip_formatting: bool, expected: str
+) -> None:
+    result = CheckResult.from_fallible_process_result(
+        FallibleProcessResult(
+            exit_code=0,
+            stdout=b"stdout \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            platform=Platform.current,
+            metadata=ProcessResultMetadata(0, "ran_locally", 0),
+        ),
+        strip_chroot_path=strip_chroot_path,
+        strip_formatting=strip_formatting,
+    )
+
+    assert result.stdout == "stdout " + expected
+    assert result.stderr == "stderr " + expected

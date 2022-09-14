@@ -321,8 +321,8 @@ def test_url_assets() -> None:
     )
     http_source_info = (
         'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
-        "len=500,"
-        'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
+        + "len=500,"
+        + 'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
     )
     rule_runner.write_files(
         {

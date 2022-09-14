@@ -75,10 +75,15 @@ class AmbiguousRequestNamesError(Exception):
         }
 
         super().__init__(
-            f"The same name `{ambiguous_name}` is used by multiple requests, "
-            f"which causes ambiguity: {request_names}\n\n"
-            f"To fix, please update these requests so that `{ambiguous_name}` "
-            f"is not used more than once."
+            softwrap(
+                f"""
+                The same name `{ambiguous_name}` is used by multiple requests,
+                which causes ambiguity: {request_names}
+
+                To fix, please update these requests so that `{ambiguous_name}`
+                is not used more than once.
+                """
+            )
         )
 
 

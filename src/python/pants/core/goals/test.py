@@ -614,8 +614,12 @@ async def run_tests(
         for coverage_reports in coverage_reports_collections:
             if coverage_reports.coverage_insufficient:
                 logger.error(
-                    "Test goal failed due to insufficient coverage. "
-                    "See coverage reports for details."
+                    softwrap(
+                        """
+                        Test goal failed due to insufficient coverage.
+                        See coverage reports for details.
+                        """
+                    )
                 )
                 # coverage.py uses 2 to indicate failure due to insufficient coverage.
                 # We may as well follow suit in the general case, for all languages.

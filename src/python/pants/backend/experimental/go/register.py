@@ -14,8 +14,10 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import (
     assembly,
+    binary,
     build_pkg,
     build_pkg_target,
+    cgo,
     coverage,
     coverage_output,
     first_party_pkg,
@@ -38,11 +40,13 @@ def target_types():
 def rules():
     return [
         *assembly.rules(),
+        *binary.rules(),
         *build_pkg.rules(),
         *build_pkg_target.rules(),
         *check.rules(),
         *coverage.rules(),
         *coverage_output.rules(),
+        *cgo.rules(),
         *third_party_pkg.rules(),
         *go_bootstrap.rules(),
         *goroot.rules(),

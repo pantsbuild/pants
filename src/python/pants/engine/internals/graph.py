@@ -24,7 +24,6 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
-from pants.engine.internals.build_files import IgnoreUnrecognizedBuildFileSymbols
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -170,20 +169,13 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@rule
-async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
-    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
-    ignore_unrecognized_build_file_symbols: IgnoreUnrecognizedBuildFileSymbols,
-) -> _TargetParametrizations:
-    address = request.address
-
+@rule_helper
+async def _determine_target_adaptor_and_type(
+    address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
+) -> tuple[TargetAdaptor, type[Target]]:
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(address, description_of_origin=request.description_of_origin),
+        TargetAdaptorRequest(address, description_of_origin=description_of_origin),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -196,6 +188,21 @@ async def resolve_target_parametrizations(
         and not address.is_generated_target
     ):
         warn_deprecated_target_type(target_type)
+    return target_adaptor, target_type
+
+
+@rule
+async def resolve_target_parametrizations(
+    request: _TargetParametrizationsRequest,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
+) -> _TargetParametrizations:
+    address = request.address
+    target_adaptor, target_type = await _determine_target_adaptor_and_type(
+        address, registered_target_types, description_of_origin=request.description_of_origin
+    )
 
     target = None
     parametrizations: list[_TargetParametrization] = []
@@ -300,7 +307,6 @@ async def resolve_target_parametrizations(
                         parameterized_address,
                         name_explicitly_set=target_adaptor.name_explicitly_set,
                         union_membership=union_membership,
-                        ignore_unrecognized_fields=ignore_unrecognized_build_file_symbols.val,
                     ),
                 )
                 for parameterized_address, parameterized_fields in (first, *rest)
@@ -313,7 +319,6 @@ async def resolve_target_parametrizations(
                 address,
                 name_explicitly_set=target_adaptor.name_explicitly_set,
                 union_membership=union_membership,
-                ignore_unrecognized_fields=ignore_unrecognized_build_file_symbols.val,
             )
             parametrizations.append(_TargetParametrization(target, FrozenDict()))
 
@@ -354,6 +359,41 @@ async def resolve_target(
             )
         )
     return WrappedTarget(target)
+
+
+@dataclass(frozen=True)
+class WrappedTargetForBootstrap:
+    """Used to avoid a rule graph cycle when evaluating bootstrap targets.
+
+    This does not work with target generation and parametrization. It also ignores any unrecognized
+    fields in the target, to accommodate plugin fields which are not yet registered during
+    bootstrapping.
+
+    This should only be used by bootstrapping code.
+    """
+
+    val: Target
+
+
+@rule
+async def resolve_target_for_bootstrapping(
+    request: WrappedTargetRequest,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> WrappedTargetForBootstrap:
+    target_adaptor, target_type = await _determine_target_adaptor_and_type(
+        request.address,
+        registered_target_types,
+        description_of_origin=request.description_of_origin,
+    )
+    target = target_type(
+        target_adaptor.kwargs,
+        request.address,
+        name_explicitly_set=target_adaptor.name_explicitly_set,
+        union_membership=union_membership,
+        ignore_unrecognized_fields=True,
+    )
+    return WrappedTargetForBootstrap(target)
 
 
 @rule

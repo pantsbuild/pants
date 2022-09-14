@@ -32,11 +32,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *environments.rules(),
             QueryRule(AllEnvironmentTargets, []),
-            QueryRule(ChosenLocalEnvironmentName, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
+        singleton_environment=None,
     )
 
 

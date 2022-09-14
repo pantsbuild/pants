@@ -150,6 +150,7 @@ tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
 tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
@@ -163,4 +164,4 @@ fs = { path = "./fs" }
 env_logger = "0.9.0"
 
 [build-dependencies]
-pyo3-build-config = "0.16"
+pyo3-build-config = "0.17"

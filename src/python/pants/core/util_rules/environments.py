@@ -5,17 +5,22 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName as EnvironmentName
+from pants.engine.internals.graph import WrappedTargetForBootstrap
+from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
+from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     StringField,
     StringSequenceField,
     Target,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.option.option_types import DictOption
@@ -172,6 +177,14 @@ class DockerEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
+def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
+    local_env = cast(
+        ChosenLocalEnvironmentName,
+        session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
+    )
+    return EnvironmentName(local_env.val)
+
+
 class NoCompatibleEnvironmentError(Exception):
     pass
 
@@ -190,26 +203,9 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 
 @dataclass(frozen=True)
 class ChosenLocalEnvironmentName:
-    f"""Which environment name from `[environments-preview].names` that
-    {LOCAL_ENVIRONMENT_MATCHER} resolves to."""
+    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
 
     val: str | None
-
-
-@dataclass(frozen=True)
-class EnvironmentName(EngineAwareParameter):
-    f"""The normalized name for an environment, from `[environments-preview].names`, after
-    applying things like {LOCAL_ENVIRONMENT_MATCHER}.
-
-    Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient
-    rule graph. This node impacts the equality of many downstream nodes, so we want its identity
-    to only be a single string, rather than a Target instance.
-    """
-
-    val: str | None
-
-    def debug_hint(self) -> str:
-        return self.val or "<none>"
 
 
 @dataclass(frozen=True)
@@ -245,8 +241,9 @@ async def determine_all_environments(
 
 @rule
 async def determine_local_environment(
-    platform: Platform, all_environment_targets: AllEnvironmentTargets
+    all_environment_targets: AllEnvironmentTargets,
 ) -> ChosenLocalEnvironmentName:
+    platform = Platform.create_for_localhost()
     if not all_environment_targets:
         return ChosenLocalEnvironmentName(None)
     compatible_name_and_targets = [
@@ -340,10 +337,10 @@ async def get_target_for_environment_name(
         ),
     )
     wrapped_target = await Get(
-        WrappedTarget,
+        WrappedTargetForBootstrap,
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
-    tgt = wrapped_target.target
+    tgt = wrapped_target.val
     if not tgt.has_field(CompatiblePlatformsField) and not tgt.has_field(DockerImageField):
         raise ValueError(
             softwrap(
@@ -351,12 +348,20 @@ async def get_target_for_environment_name(
                 Expected to use the address to a `_local_environment` or `_docker_environment`
                 target in the option `[environments-preview].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
-                `{wrapped_target.target.alias}`.
+                `{tgt.alias}`.
                 """
             )
         )
     return EnvironmentTarget(tgt)
 
 
+@rule
+def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessConfigFromEnvironment:
+    docker_image = (
+        tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
+    )
+    return ProcessConfigFromEnvironment(docker_image=docker_image)
+
+
 def rules():
-    return collect_rules()
+    return (*collect_rules(), QueryRule(ChosenLocalEnvironmentName, []))

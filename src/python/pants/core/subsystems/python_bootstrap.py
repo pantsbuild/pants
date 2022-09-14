@@ -15,8 +15,6 @@ from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import (
-    LOCAL_ENVIRONMENT_MATCHER,
-    EnvironmentRequest,
     EnvironmentsSubsystem,
     EnvironmentTarget,
     PythonBootstrapBinaryNamesField,
@@ -150,9 +148,14 @@ class PythonBootstrap:
         # Some special-case logging to avoid misunderstandings.
         if from_pexrc and len(expanded) > len(from_pexrc):
             logger.info(
-                "pexrc interpreters requested and found, but other paths were also specified, "
-                "so interpreters may not be restricted to the pexrc ones. Full search path is: "
-                "{}".format(":".join(expanded))
+                softwrap(
+                    f"""
+                    pexrc interpreters requested and found, but other paths were also specified,
+                    so interpreters may not be restricted to the pexrc ones. Full search path is:
+
+                    {":".join(expanded)}
+                    """
+                )
             )
         return expanded
 
@@ -210,8 +213,12 @@ class PythonBootstrap:
             local_version_file = Path(get_buildroot(), ".python-version")
             if not local_version_file.exists():
                 logger.warning(
-                    "No `.python-version` file found in the build root, "
-                    "but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`."
+                    softwrap(
+                        """
+                        No `.python-version` file found in the build root,
+                        but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`.
+                        """
+                    )
                 )
                 return []
 
@@ -241,11 +248,9 @@ def get_pyenv_root(env: Environment) -> str | None:
 
 
 @rule
-async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem) -> PythonBootstrap:
-    env_tgt = await Get(
-        EnvironmentTarget,
-        EnvironmentRequest(LOCAL_ENVIRONMENT_MATCHER, description_of_origin="<infallible>"),
-    )
+async def python_bootstrap(
+    python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget
+) -> PythonBootstrap:
     if env_tgt.val is not None:
         interpreter_search_paths = env_tgt.val[PythonInterpreterSearchPathsField].value
         interpreter_names = env_tgt.val[PythonBootstrapBinaryNamesField].value

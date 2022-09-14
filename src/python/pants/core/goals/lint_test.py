@@ -237,47 +237,47 @@ def run_lint_rule(
             mock_gets=[
                 MockGet(
                     output_type=SourceFiles,
-                    input_type=SourceFilesRequest,
+                    input_types=(SourceFilesRequest,),
                     mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
                 ),
                 MockGet(
                     output_type=Partitions,
-                    input_type=LintTargetsRequest.PartitionRequest,
+                    input_types=(LintTargetsRequest.PartitionRequest,),
                     mock=mock_target_partitioner,
                 ),
                 MockGet(
                     output_type=Partitions,
-                    input_type=LintFilesRequest.PartitionRequest,
+                    input_types=(LintFilesRequest.PartitionRequest,),
                     mock=mock_file_partitioner,
                 ),
                 MockGet(
                     output_type=LintResult,
-                    input_type=LintRequest.SubPartition,
+                    input_types=(LintRequest.SubPartition,),
                     mock=mock_lint_partition,
                 ),
                 MockGet(
                     output_type=FmtResult,
-                    input_type=FmtTargetsRequest,
+                    input_types=(FmtTargetsRequest,),
                     mock=lambda request: request.fmt_result,
                 ),
                 MockGet(
                     output_type=FmtResult,
-                    input_type=_FmtBuildFilesRequest,
+                    input_types=(_FmtBuildFilesRequest,),
                     mock=lambda request: request.fmt_result,
                 ),
                 MockGet(
                     output_type=FilteredTargets,
-                    input_type=Specs,
+                    input_types=(Specs,),
                     mock=lambda _: FilteredTargets(tuple(targets)),
                 ),
                 MockGet(
                     output_type=SpecsPaths,
-                    input_type=Specs,
+                    input_types=(Specs,),
                     mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
                 ),
                 MockGet(
                     output_type=Snapshot,
-                    input_type=PathGlobs,
+                    input_types=(PathGlobs,),
                     mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],

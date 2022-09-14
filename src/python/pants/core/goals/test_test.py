@@ -231,38 +231,38 @@ def run_test_rule(
             mock_gets=[
                 MockGet(
                     output_type=TargetRootsToFieldSets,
-                    input_type=TargetRootsToFieldSetsRequest,
+                    input_types=(TargetRootsToFieldSetsRequest,),
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
                     output_type=TestResult,
-                    input_type=TestFieldSet,
+                    input_types=(TestFieldSet,),
                     mock=lambda fs: fs.test_result,
                 ),
                 MockGet(
                     output_type=TestDebugRequest,
-                    input_type=TestFieldSet,
+                    input_types=(TestFieldSet,),
                     mock=mock_debug_request,
                 ),
                 MockGet(
                     output_type=TestDebugAdapterRequest,
-                    input_type=TestFieldSet,
+                    input_types=(TestFieldSet,),
                     mock=mock_debug_adapter_request,
                 ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
-                    input_type=MergeDigests,
+                    input_types=(MergeDigests,),
                     mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     output_type=CoverageReports,
-                    input_type=CoverageDataCollection,
+                    input_types=(CoverageDataCollection,),
                     mock=mock_coverage_report_generation,
                 ),
                 MockGet(
                     output_type=OpenFiles,
-                    input_type=OpenFilesRequest,
+                    input_types=(OpenFilesRequest,),
                     mock=lambda _: OpenFiles(()),
                 ),
                 MockEffect(

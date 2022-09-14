@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -13,7 +14,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::{ImagePullPolicy, SANDBOX_PATH_IN_CONTAINER};
+use super::docker::{ImagePullPolicy, SANDBOX_BASE_PATH_IN_CONTAINER};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -34,12 +35,13 @@ struct LocalTestResult {
   stderr_bytes: Vec<u8>,
 }
 
-macro_rules! setup_docker {
+/// Skips a test if Docker is not available in macOS CI.
+macro_rules! skip_if_no_docker_available_in_macos_ci {
   () => {{
     let docker = match Docker::connect_with_local_defaults() {
       Ok(docker) => docker,
       Err(err) => {
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && env::var_os("GITHUB_ACTIONS").is_some() {
           println!("Skipping test due to Docker not being available: {:?}", err);
           return;
         } else {
@@ -50,7 +52,7 @@ macro_rules! setup_docker {
 
     let ping_response = docker.ping().await;
     if ping_response.is_err() {
-      if cfg!(target_os = "macos") {
+      if cfg!(target_os = "macos") && env::var_os("GITHUB_ACTIONS").is_some() {
         println!(
           "Skipping test due to Docker not being available: {:?}",
           ping_response
@@ -63,15 +65,44 @@ macro_rules! setup_docker {
         );
       }
     }
-
-    docker
   }};
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[cfg(unix)]
+async fn runner_errors_if_docker_image_not_set() {
+  skip_if_no_docker_available_in_macos_ci!();
+
+  // Because `docker_image` is set but it does not exist, this process should fail.
+  let err = run_command_via_docker(
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
+      .docker_image("does-not-exist:latest".to_owned()),
+  )
+  .await
+  .unwrap_err();
+  if let ProcessError::Unclassified(msg) = err {
+    assert!(msg.contains("Failed to pull Docker image"));
+  } else {
+    panic!("unexpected value: {:?}", err)
+  }
+
+  // Otherwise, if docker_image is not set, use the local runner.
+  let err = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
+    .await
+    .unwrap_err();
+  if let ProcessError::Unclassified(msg) = &err {
+    assert!(
+      msg.contains("docker_image not set on the Process, but the Docker CommandRunner was used")
+    );
+  } else {
+    panic!("unexpected value: {:?}", err)
+  }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn stdout() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
   )
@@ -84,10 +115,10 @@ async fn stdout() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&[
       SH_PATH,
@@ -105,10 +136,10 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   // Launch a process that kills itself with a signal.
   let result = run_command_via_docker(
@@ -148,10 +179,10 @@ fn extract_env(
   Ok(result)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn env() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
@@ -170,10 +201,10 @@ async fn env() {
   assert_eq!(env, got_env);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
@@ -193,9 +224,9 @@ async fn env_is_deterministic() {
   assert_eq!(env1, env2);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn binary_not_found() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   // Use `xyzzy` as a command that should not exist.
   let result = run_command_via_docker(
@@ -203,15 +234,13 @@ async fn binary_not_found() {
   )
   .await
   .unwrap();
-  let stderr = String::from_utf8(result.stderr_bytes).unwrap();
-  // Note: The error message is dependent on the fact that `tini` is used as the init process
-  // in the container for the execution.
-  assert!(stderr.contains("exec xyzzy failed: No such file or directory"));
+  let stdout = String::from_utf8(result.stdout_bytes).unwrap();
+  assert!(stdout.contains("exec failed"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_none() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker_image(IMAGE.to_owned()),
@@ -225,9 +254,9 @@ async fn output_files_none() {
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_one() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -251,9 +280,9 @@ async fn output_files_one() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_dirs() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -282,9 +311,9 @@ async fn output_dirs() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_many() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -312,9 +341,9 @@ async fn output_files_many() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_execution_failure() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -341,9 +370,9 @@ async fn output_files_execution_failure() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_partial_output() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -371,9 +400,9 @@ async fn output_files_partial_output() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_overlapping_file_and_dir() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -398,9 +427,9 @@ async fn output_overlapping_file_and_dir() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn append_only_cache_created() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let name = "geo";
   let dest_base = ".cache";
@@ -421,7 +450,7 @@ async fn append_only_cache_created() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn test_apply_chroot() {
   let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -438,9 +467,9 @@ async fn test_apply_chroot() {
   assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_chroot_placeholder() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -463,16 +492,14 @@ async fn test_chroot_placeholder() {
   .unwrap();
 
   let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
-  let actual_path = got_env.get("PATH").unwrap();
-  assert_eq!(
-    *actual_path,
-    format!("/usr/bin:{}/bin", SANDBOX_PATH_IN_CONTAINER)
-  );
+  let path = format!("/usr/bin:{}", SANDBOX_BASE_PATH_IN_CONTAINER);
+  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
+  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn all_containing_directories_for_outputs_are_created() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -503,9 +530,9 @@ async fn all_containing_directories_for_outputs_are_created() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_empty_dir() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
     Process::new(vec![
@@ -529,14 +556,14 @@ async fn output_empty_dir() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn timeout() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
 
   let argv = vec![
     SH_PATH.to_string(),
     "-c".to_owned(),
-    "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 2; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
@@ -547,14 +574,16 @@ async fn timeout() {
   let result = run_command_via_docker(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
-  assert_that(&error_msg).contains("sleepy-cat");
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
+  assert_that(&stdout).contains("Calculating...");
+  assert_that(&stderr).contains("Exceeded timeout");
+  assert_that(&stderr).contains("sleepy-cat");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn working_directory() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
@@ -612,9 +641,9 @@ async fn working_directory() {
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn immutable_inputs() {
-  let _docker = setup_docker!();
+  skip_if_no_docker_available_in_macos_ci!();
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
