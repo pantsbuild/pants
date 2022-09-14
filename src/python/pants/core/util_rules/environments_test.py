@@ -50,9 +50,7 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='no-name')
-                _docker_environment(
-                    name='docker', image="centos6:latest", platform="linux_x86_64"
-                )
+                _docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
@@ -76,9 +74,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='not-compatible', compatible_platforms=[])
-                _docker_environment(
-                    name='docker', docker_image="centos6:latest", platform="linux_x86_64"
-                )
+                _docker_environment(name='docker', docker_image="centos6:latest")
                 """
             )
         }
@@ -113,9 +109,7 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
                 _local_environment(name='local')
                 # Intentionally set this to no platforms so that it cannot be autodiscovered.
                 _local_environment(name='hardcoded', compatible_platforms=[])
-                _docker_environment(
-                    name='docker', image="centos6:latest", platform="linux_x86_64"
-                )
+                _docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
