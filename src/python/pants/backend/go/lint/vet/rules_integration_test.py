@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet
 from pants.backend.go import target_type_rules
 from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
@@ -23,7 +24,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -49,7 +50,8 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             *build_pkg.rules(),
             *assembly.rules(),
-            QueryRule(LintResults, (GoVetRequest,)),
+            QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
+            QueryRule(LintResult, [GoVetRequest.SubPartition]),
             SubsystemRule(GoVetSubsystem),
         ],
     )
@@ -94,9 +96,18 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    field_sets = [GoVetFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [GoVetRequest(field_sets)])
-    return lint_results.results
+    partition = rule_runner.request(
+        Partitions[HadolintFieldSet],
+        [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
+    )
+    results = []
+    for subpartition in partition:
+        result = rule_runner.request(
+            LintResult,
+            [GoVetRequest.SubPartition(subpartition)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:

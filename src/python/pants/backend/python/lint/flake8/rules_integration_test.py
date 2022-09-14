@@ -8,14 +8,14 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.flake8.rules import Flake8Request
+from pants.backend.python.lint.flake8.rules import Flake8Request, PartitionElement
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -36,7 +36,8 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, [Flake8Request]),
+            QueryRule(Partitions, [Flake8Request.PartitionRequest]),
+            QueryRule(LintResult, [Flake8Request.SubPartition]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -53,13 +54,18 @@ def run_flake8(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [
-            Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
-        ],
+    partition = rule_runner.request(
+        Partitions[PartitionElement],
+        [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
-    return results.results
+    results = []
+    for subpartition in partition:
+        result = rule_runner.request(
+            LintResult,
+            [Flake8Request.SubPartition(subpartition)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def assert_success(

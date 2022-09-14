@@ -8,7 +8,7 @@ from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -16,7 +16,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -48,21 +47,24 @@ def generate_argv(
     return tuple(args)
 
 
+@rule
+async def partition_hadolint(
+    request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
+) -> Partitions[HadolintFieldSet]:
+    return Partitions() if hadolint.skip else Partitions([request.field_sets])
+
+
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(
-    request: HadolintRequest, hadolint: Hadolint, platform: Platform
-) -> LintResults:
-    if hadolint.skip:
-        return LintResults([], linter_name=request.name)
-
+    request: HadolintRequest.SubPartition[HadolintFieldSet], hadolint: Hadolint, platform: Platform
+) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
         Get(ConfigFiles, ConfigFilesRequest, hadolint.config_request()),
     )
 
     dockerfile_infos = await MultiGet(
-        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address))
-        for field_set in request.field_sets
+        Get(DockerfileInfo, DockerfileInfoRequest(field_set.address)) for field_set in request
     )
 
     input_digest = await Get(
@@ -98,13 +100,13 @@ async def run_hadolint(
         ),
     )
 
-    return LintResults(
-        [LintResult.from_fallible_process_result(process_result)], linter_name=request.name
+    return LintResult.from_fallible_process_result(
+        process_result, linter_name=Hadolint.options_scope
     )
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, HadolintRequest),
+        *HadolintRequest.registration_rules(),
     ]

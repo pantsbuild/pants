@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -15,7 +15,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, FieldSet, SourcesField, Target, Targets
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -37,23 +36,28 @@ class ShellcheckRequest(LintTargetsRequest):
     name = Shellcheck.options_scope
 
 
+@rule
+async def partition_shellcheck(
+    request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
+) -> Partitions[ShellcheckFieldSet]:
+    return Partitions() if shellcheck.skip else Partitions([request.field_sets])
+
+
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(
-    request: ShellcheckRequest, shellcheck: Shellcheck, platform: Platform
-) -> LintResults:
-    if shellcheck.skip:
-        return LintResults([], linter_name=request.name)
-
+    request: ShellcheckRequest.SubPartition[ShellcheckFieldSet],
+    shellcheck: Shellcheck,
+    platform: Platform,
+) -> LintResult:
     # Shellcheck looks at direct dependencies to make sure that every symbol is defined, so we must
     # include those in the run.
     all_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies))
-        for field_set in request.field_sets
+        Get(Targets, DependenciesRequest(field_set.dependencies)) for field_set in request
     )
     direct_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(
-            (field_set.sources for field_set in request.field_sets),
+            (field_set.sources for field_set in request),
             for_sources_types=(ShellSourceField,),
             enable_codegen=True,
         ),
@@ -96,13 +100,14 @@ async def run_shellcheck(
         Process(
             argv=[downloaded_shellcheck.exe, *shellcheck.args, *direct_sources.snapshot.files],
             input_digest=input_digest,
-            description=f"Run Shellcheck on {pluralize(len(request.field_sets), 'file')}.",
+            description=f"Run Shellcheck on {pluralize(len(request), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name=request.name)
+    return LintResult.from_fallible_process_result(
+        process_result, linter_name=Shellcheck.options_scope
+    )
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, ShellcheckRequest)]
+    return [*collect_rules(), *ShellcheckRequest.registration_rules()]

@@ -58,6 +58,33 @@ with an @classproperty decorator.""".format(
         return callable_field()
 
 
+def runtime_ignore_subscripts(cls: C) -> C:
+    """Use as a decorator on a class to make it subscriptable at runtime, returning the class.
+
+    Generally, this is used inside the `else` of a `TYPE_CHECKING` check.
+
+    Usage:
+    >>> if TYPE_CHECKING:
+    ...     class MyClass(Generic[...]):
+    ...         ...
+    ... else:
+    ...     @runtime_ignore_subscripts
+    ...     class MyClass:
+    ...         ...
+    ...
+    >>> MyClass[int] is MyClass
+    True
+    """
+
+    @classmethod  # type: ignore[misc]
+    def __class_getitem__(cls, item):
+        return cls
+
+    cls.__class_getitem__ = __class_getitem__
+
+    return cls
+
+
 def classproperty(func: Callable[..., T]) -> T:
     """Use as a decorator on a method definition to make it a class-level attribute.
 
