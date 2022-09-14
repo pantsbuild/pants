@@ -131,7 +131,7 @@ class DockerPlatformField(StringField):
     valid_choices = Platform
     help = softwrap(
         """
-        If set, Docker will always use thespecified platform when pulling and running the image.
+        If set, Docker will always use the specified platform when pulling and running the image.
 
         If unset, Pants will default to the CPU architecture of your local host machine. For 
         example, if you are running on Apple Silicon, it will use `linux_arm64`, whereas running on
