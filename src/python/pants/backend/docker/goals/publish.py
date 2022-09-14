@@ -20,7 +20,7 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
 
@@ -71,7 +71,7 @@ async def push_docker_images(
             ]
         )
 
-    env = await Get(Environment, EnvironmentRequest(options.env_vars))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(options.env_vars))
     skip_push = defaultdict(set)
     jobs: list[PublishPackages] = []
     refs: list[str] = []

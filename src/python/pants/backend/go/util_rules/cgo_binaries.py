@@ -12,7 +12,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
@@ -30,7 +30,7 @@ class CGoBinaryPathRequest(EngineAwareParameter):
 async def find_cgo_binary_path(
     request: CGoBinaryPathRequest, golang_subsystem: GolangSubsystem
 ) -> BinaryPath:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     path_request = BinaryPathRequest(
         binary_name=request.binary_name,
         search_path=golang_subsystem.cgo_tool_search_paths(env),

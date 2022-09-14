@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -51,7 +51,9 @@ async def get_subprocess_environment(
     subproc_env: SubprocessEnvironment,
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        await Get(Environment, EnvironmentRequest(subproc_env.env_vars_to_pass_to_subprocesses))
+        await Get(
+            EnvironmentVars, EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses)
+        )
     )
 
 

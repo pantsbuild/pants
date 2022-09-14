@@ -11,7 +11,8 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
@@ -126,7 +127,7 @@ async def export(
     merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
-    environment = await Get(Environment, EnvironmentRequest(["PATH"]))
+    environment = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     for result in flattened_results:
         result_dir = os.path.join(output_dir, result.reldir)
         digest_root = os.path.join(build_root.path, result_dir)

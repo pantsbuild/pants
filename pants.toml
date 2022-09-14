@@ -37,6 +37,9 @@ plugins = [
   "toolchain.pants.plugin==0.22.0",
 ]
 
+# Remove once Toolchain plugin is updated.
+ignore_warnings = ["DEPRECATED: `pants.engine.environment"]
+
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
 pantsd_invalidation_globs.add = [

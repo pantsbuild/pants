@@ -8,7 +8,7 @@ from typing import Iterable, Mapping, Sequence, TypeVar
 
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult, get_asdf_data_dir
-from pants.engine.environment import CompleteEnvironment, Environment
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
@@ -70,9 +70,11 @@ def test_get_asdf_dir() -> None:
     default_root = home / ".asdf"
     explicit_root = home / "explicit"
 
-    assert explicit_root == get_asdf_data_dir(Environment({"ASDF_DATA_DIR": f"{explicit_root}"}))
-    assert default_root == get_asdf_data_dir(Environment({"HOME": f"{home}"}))
-    assert get_asdf_data_dir(Environment({})) is None
+    assert explicit_root == get_asdf_data_dir(
+        EnvironmentVars({"ASDF_DATA_DIR": f"{explicit_root}"})
+    )
+    assert default_root == get_asdf_data_dir(EnvironmentVars({"HOME": f"{home}"}))
+    assert get_asdf_data_dir(EnvironmentVars({})) is None
 
 
 def get_asdf_paths(
@@ -85,7 +87,7 @@ def get_asdf_paths(
 ) -> AsdfToolPathsResult:
     rule_runner.set_session_values(
         {
-            CompleteEnvironment: CompleteEnvironment(env),
+            CompleteEnvironmentVars: CompleteEnvironmentVars(env),
         }
     )
     return rule_runner.request(

@@ -32,7 +32,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -133,7 +133,7 @@ async def prepare_shell_command_process(
                 f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
 
-        env = await Get(Environment, EnvironmentRequest(["PATH"]))
+        env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
         search_path = shell_setup.executable_search_path(env)
         tool_requests = [
             BinaryPathRequest(
@@ -164,7 +164,7 @@ async def prepare_shell_command_process(
                     rationale=f"execute `{shell_command.alias}` {shell_command.address}",
                 )
 
-    extra_env = await Get(Environment, EnvironmentRequest(extra_env_vars))
+    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     command_env.update(extra_env)
 
     transitive_targets = await Get(

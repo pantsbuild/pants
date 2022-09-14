@@ -24,7 +24,7 @@ from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationV
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -177,7 +177,7 @@ class RenderedHelmFiles(EngineAwareReturnType):
 async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
     interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
-    env = await Get(Environment, EnvironmentRequest(helm_subsystem.extra_env_vars))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars))
     interpolation_context["env"] = HelmEnvironmentInterpolationValue(env)
 
     return InterpolationContext.from_dict(interpolation_context)

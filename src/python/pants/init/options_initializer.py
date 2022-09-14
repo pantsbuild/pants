@@ -12,7 +12,7 @@ from typing import Iterator
 import pkg_resources
 
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
 from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.init.bootstrap_scheduler import BootstrapScheduler
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 def _initialize_build_configuration(
     plugin_resolver: PluginResolver,
     options_bootstrapper: OptionsBootstrapper,
-    env: CompleteEnvironment,
+    env: CompleteEnvironmentVars,
 ) -> BuildConfiguration:
     """Initialize a BuildConfiguration for the given OptionsBootstrapper.
 
@@ -103,7 +103,11 @@ class OptionsInitializer:
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
 
     def build_config_and_options(
-        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment, *, raise_: bool
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironmentVars,
+        *,
+        raise_: bool,
     ) -> tuple[BuildConfiguration, Options]:
         build_config = _initialize_build_configuration(
             self._plugin_resolver, options_bootstrapper, env
@@ -114,7 +118,11 @@ class OptionsInitializer:
 
     @contextmanager
     def handle_unknown_flags(
-        self, options_bootstrapper: OptionsBootstrapper, env: CompleteEnvironment, *, raise_: bool
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironmentVars,
+        *,
+        raise_: bool,
     ) -> Iterator[None]:
         """If there are any unknown flags, print "Did you mean?" and possibly error."""
         try:

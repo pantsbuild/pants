@@ -29,7 +29,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
     DigestContents,
@@ -324,7 +324,10 @@ async def _cc(
     wrapper_script = await Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest())
     compiler_args_result, env, input_digest = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), work_dir)),
-        Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
+        Get(
+            EnvironmentVars,
+            EnvironmentVarsRequest(golang_subsystem.env_vars_to_pass_to_subprocesses),
+        ),
         Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
     )
     replaced_flags = _replace_srcdir_in_flags(flags, work_dir)
@@ -369,7 +372,7 @@ async def _gccld(
     # TODO(#16830): Select CXX if any C++ code is present.
     compiler_args_result, env = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), obj_dir_path)),
-        Get(Environment, EnvironmentRequest(["PATH"])),
+        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
     )
 
     args = [*compiler_args_result.args, "-o", outfile, *objs, *flags]

@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 
-from pants.engine.environment import Environment
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -228,7 +228,7 @@ class GolangSubsystem(Subsystem):
         return tuple(sorted(set(self._subprocess_env_vars)))
 
     @memoized_method
-    def cgo_tool_search_paths(self, env: Environment) -> tuple[str, ...]:
+    def cgo_tool_search_paths(self, env: EnvironmentVars) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self._cgo_tool_search_paths:
                 if entry == "<PATH>":

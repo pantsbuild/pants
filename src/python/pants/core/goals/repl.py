@@ -9,7 +9,8 @@ from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -99,7 +100,7 @@ async def run_repl(
     repl_subsystem: ReplSubsystem,
     specified_targets: FilteredTargets,
     union_membership: UnionMembership,
-    complete_env: CompleteEnvironment,
+    complete_env: CompleteEnvironmentVars,
 ) -> Repl:
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.

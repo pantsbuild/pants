@@ -10,7 +10,7 @@ from pants.core.subsystems.python_bootstrap import PythonBootstrap, get_pyenv_ro
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
-from pants.engine.environment import Environment
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
@@ -59,7 +59,9 @@ def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[
 
 
 def test_get_environment_paths() -> None:
-    paths = PythonBootstrap.get_environment_paths(Environment({"PATH": "foo/bar:baz:/qux/quux"}))
+    paths = PythonBootstrap.get_environment_paths(
+        EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"})
+    )
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
@@ -74,9 +76,9 @@ def test_get_pyenv_root() -> None:
     default_root = f"{home}/.pyenv"
     explicit_root = f"{home}/explicit"
 
-    assert explicit_root == get_pyenv_root(Environment({"PYENV_ROOT": explicit_root}))
-    assert default_root == get_pyenv_root(Environment({"HOME": home}))
-    assert get_pyenv_root(Environment({})) is None
+    assert explicit_root == get_pyenv_root(EnvironmentVars({"PYENV_ROOT": explicit_root}))
+    assert default_root == get_pyenv_root(EnvironmentVars({"HOME": home}))
+    assert get_pyenv_root(EnvironmentVars({})) is None
 
 
 def test_get_pyenv_paths() -> None:
@@ -88,9 +90,9 @@ def test_get_pyenv_paths() -> None:
         expected_paths,
         expected_local_paths,
     ):
-        paths = PythonBootstrap.get_pyenv_paths(Environment({"PYENV_ROOT": pyenv_root}))
+        paths = PythonBootstrap.get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
         local_paths = PythonBootstrap.get_pyenv_paths(
-            Environment({"PYENV_ROOT": pyenv_root}), pyenv_local=True
+            EnvironmentVars({"PYENV_ROOT": pyenv_root}), pyenv_local=True
         )
     assert expected_paths == paths
     assert expected_local_paths == local_paths

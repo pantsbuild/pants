@@ -10,7 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DynamicRemoteOptions, GlobalOptions
@@ -40,7 +40,7 @@ def create_dynamic_remote_options(
     if plugin:
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
-    env = CompleteEnvironment({})
+    env = CompleteEnvironmentVars({})
     _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
     return DynamicRemoteOptions.from_options(
         options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func

@@ -20,7 +20,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
@@ -674,12 +674,14 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
 
 @dataclass(frozen=True)
 class TestExtraEnv:
-    env: Environment
+    env: EnvironmentVars
 
 
 @rule
 async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEnv:
-    return TestExtraEnv(await Get(Environment, EnvironmentRequest(test_subsystem.extra_env_vars)))
+    return TestExtraEnv(
+        await Get(EnvironmentVars, EnvironmentVarsRequest(test_subsystem.extra_env_vars))
+    )
 
 
 # -------------------------------------------------------------------------------------------

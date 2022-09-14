@@ -14,7 +14,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
@@ -122,7 +122,7 @@ async def generate_apache_thrift_sources(
 
 @rule
 async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThriftSetup:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     search_paths = apache_thrift.thrift_search_paths(env)
     all_thrift_binary_paths = await Get(
         BinaryPaths,

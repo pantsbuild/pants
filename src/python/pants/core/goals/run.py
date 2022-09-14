@@ -12,7 +12,8 @@ from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, Typ
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.specs_rules import (
@@ -224,7 +225,7 @@ async def run(
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
-    complete_env: CompleteEnvironment,
+    complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
 
