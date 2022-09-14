@@ -62,7 +62,7 @@ async fn snapshot_one_file() {
     )
   );
   assert_eq!(snapshot.tree.files(), vec![PathBuf::from("roland")],);
-  assert_eq!(snapshot.tree.directories(), vec![],);
+  assert_eq!(snapshot.tree.directories(), Vec::<PathBuf>::new(),);
 }
 
 #[tokio::test]
