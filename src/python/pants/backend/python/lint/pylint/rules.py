@@ -107,7 +107,7 @@ async def partition_pylint(
 
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
-async def pylint_lint_partition(
+async def run_pylint(
     request: PylintRequest.SubPartition[PartitionElement],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
