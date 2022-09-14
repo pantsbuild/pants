@@ -242,8 +242,8 @@ class RuleRunner:
             *self.rules,
             *source_root.rules(),
             *([] if singleton_environment is None else [environment_name_singleton]),
-            QueryRule(WrappedTarget, [WrappedTargetRequest, EnvironmentName]),
-            QueryRule(AllTargets, [EnvironmentName]),
+            QueryRule(WrappedTarget, [WrappedTargetRequest]),
+            QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()
