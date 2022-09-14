@@ -641,6 +641,8 @@ impl ContainerCache {
       &config
     );
 
+    // TODO: Pass `platform` parameter via options argument once https://github.com/fussybeaver/bollard/pull/259
+    // is approved upstream.
     let container = docker
       .create_container::<&str, String>(None, config)
       .await
