@@ -16,8 +16,6 @@ from pants.core.util_rules.environments import (
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
-    DockerImageField,
-    DockerPlatformField,
     EnvironmentField,
     EnvironmentName,
     EnvironmentNameRequest,
@@ -26,7 +24,6 @@ from pants.core.util_rules.environments import (
     NoCompatibleEnvironmentError,
     UnrecognizedEnvironmentError,
 )
-from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -64,19 +61,11 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
         ["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
     )
     result = rule_runner.request(AllEnvironmentTargets, [])
-    assert result == AllEnvironmentTargets(
-        {
-            "e1": LocalEnvironmentTarget({}, Address("", target_name="e1")),
-            "e2": LocalEnvironmentTarget({}, Address("", target_name="e2")),
-            "docker": DockerEnvironmentTarget(
-                {
-                    DockerImageField.alias: "centos6:latest",
-                    DockerPlatformField.alias: Platform.linux_x86_64.value,
-                },
-                Address("", target_name="docker"),
-            ),
-        }
-    )
+    assert {i: j.address for (i, j) in result.items()} == {
+        "e1": Address("", target_name="e1"),
+        "e2": Address("", target_name="e2"),
+        "docker": Address("", target_name="docker"),
+    }
 
 
 def test_choose_local_environment(rule_runner: RuleRunner) -> None:
@@ -103,7 +92,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
     assert get_env().val is None
 
     rule_runner.set_options(["--environments-preview-names={'e': '//:e1'}"])
-    assert get_env().val == LocalEnvironmentTarget({}, Address("", target_name="e1"))
+    assert get_env().val.address == Address("", target_name="e1")  # type: ignore[union-attr]
 
     # Error if `--names` set, but no compatible platforms
     rule_runner.set_options(["--environments-preview-names={'e': '//:not-compatible'}"])
@@ -170,7 +159,7 @@ def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     with engine_error(AssertionError):
         get_tgt("bad")
 
-    assert get_tgt("env").val == LocalEnvironmentTarget({}, Address("", target_name="env"))
+    assert get_tgt("env").val.address == Address("", target_name="env")  # type: ignore[union-attr]
     with engine_error(ResolveError):
         get_tgt("bad-address")
 

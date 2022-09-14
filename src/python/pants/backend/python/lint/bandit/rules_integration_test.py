@@ -9,13 +9,13 @@ from typing import Sequence
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.bandit.rules import BanditRequest
+from pants.backend.python.lint.bandit.rules import BanditRequest, PartitionElement
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -37,7 +37,8 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, (BanditRequest,)),
+            QueryRule(Partitions, [BanditRequest.PartitionRequest]),
+            QueryRule(LintResult, [BanditRequest.SubPartition]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -57,11 +58,18 @@ def run_bandit(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [BanditRequest(BanditFieldSet.create(tgt) for tgt in targets)],
+    partition = rule_runner.request(
+        Partitions[PartitionElement],
+        [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
-    return results.results
+    results = []
+    for subpartition in partition:
+        result = rule_runner.request(
+            LintResult,
+            [BanditRequest.SubPartition(subpartition)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def assert_success(

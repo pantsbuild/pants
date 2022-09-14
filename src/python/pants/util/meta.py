@@ -58,6 +58,33 @@ with an @classproperty decorator.""".format(
         return callable_field()
 
 
+def runtime_ignore_subscripts(cls: C) -> C:
+    """Use as a decorator on a class to make it subscriptable at runtime, returning the class.
+
+    Generally, this is used inside the `else` of a `TYPE_CHECKING` check.
+
+    Usage:
+    >>> if TYPE_CHECKING:
+    ...     class MyClass(Generic[...]):
+    ...         ...
+    ... else:
+    ...     @runtime_ignore_subscripts
+    ...     class MyClass:
+    ...         ...
+    ...
+    >>> MyClass[int] is MyClass
+    True
+    """
+
+    @classmethod  # type: ignore[misc]
+    def __class_getitem__(cls, item):
+        return cls
+
+    cls.__class_getitem__ = __class_getitem__
+
+    return cls
+
+
 def classproperty(func: Callable[..., T]) -> T:
     """Use as a decorator on a method definition to make it a class-level attribute.
 
@@ -123,9 +150,6 @@ def frozen_after_init(cls: C) -> C:
     def freeze_instance(self) -> None:
         self._is_frozen = True
 
-    def unfreeze_instance(self) -> None:
-        self._is_frozen = False
-
     @contextmanager
     def unfrozen(self) -> Iterator:
         old_is_frozen = self._is_frozen
@@ -149,7 +173,6 @@ def frozen_after_init(cls: C) -> C:
         prev_setattr(self, key, value)  # type: ignore[call-arg]
 
     cls._freeze_instance = freeze_instance
-    cls._unfreeze_instance = unfreeze_instance
     cls._unfrozen = unfrozen
     cls.__init__ = new_init
     cls.__setattr__ = new_setattr  # type: ignore[assignment]
