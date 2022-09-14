@@ -97,7 +97,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -240,7 +240,7 @@ class _ListOptionBase(
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -459,7 +459,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -485,7 +485,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -511,7 +511,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -535,7 +535,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version=None,
         removal_hint=None,
         deprecation_start_version=None,
-        environment_sensitive=False,
+        environment_sensitive=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -607,7 +607,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -633,7 +633,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -658,7 +658,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -682,7 +682,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version=None,
         removal_hint=None,
         deprecation_start_version=None,
-        environment_sensitive=False,
+        environment_sensitive=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -767,7 +767,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool = False,
+        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any, cast
 
 import pytest
 
@@ -27,6 +28,7 @@ from pants.core.util_rules.environments import (
 )
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -41,6 +43,35 @@ def rule_runner() -> RuleRunner:
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
         singleton_environment=None,
     )
+
+
+class ScrubPluginFields:
+    """Helper functions to scrub the plugin field values from test return values.
+
+    Installing subsystems with environment-sensisitve options adds plugin fields that are visible
+    even when testing, which do not appear when manually constructing a target instance. These
+    methods will delete the plugin field instances from targets, so that youc an test for equality
+    with manually constructed targets.
+    """
+
+    @classmethod
+    def all_environment_targets(cls, tgts: AllEnvironmentTargets) -> None:
+        for target in tgts.values():
+            cls.target(target)
+
+    @classmethod
+    def environment_target(cls, env_tgt: EnvironmentTarget) -> EnvironmentTarget:
+        if env_tgt.val is not None:
+            cls.target(env_tgt.val)
+        return env_tgt
+
+    @classmethod
+    def target(cls, target: Target) -> None:
+        plugin_fields = set(target.plugin_fields)
+        with cast(Any, target)._unfrozen():
+            target.field_values = FrozenDict(
+                (i, j) for (i, j) in target.field_values.items() if i not in plugin_fields
+            )
 
 
 def test_all_environments(rule_runner: RuleRunner) -> None:
@@ -60,6 +91,8 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
         ["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
     )
     result = rule_runner.request(AllEnvironmentTargets, [])
+    ScrubPluginFields.all_environment_targets(result)
+
     assert result == AllEnvironmentTargets(
         {
             "e1": LocalEnvironmentTarget({}, Address("", target_name="e1")),
@@ -87,7 +120,9 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
 
     def get_env() -> EnvironmentTarget:
         name = rule_runner.request(ChosenLocalEnvironmentName, [])
-        return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
+        return ScrubPluginFields.environment_target(
+            rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
+        )
 
     # If `--names` is not set, do not choose an environment.
     assert get_env().val is None
@@ -150,7 +185,9 @@ def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     )
 
     def get_tgt(v: str | None) -> EnvironmentTarget:
-        return rule_runner.request(EnvironmentTarget, [EnvironmentName(v)])
+        return ScrubPluginFields.environment_target(
+            rule_runner.request(EnvironmentTarget, [EnvironmentName(v)])
+        )
 
     assert get_tgt(None).val is None
 
