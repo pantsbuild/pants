@@ -1382,7 +1382,7 @@ impl Store {
         directory::Entry::Symlink(s) => {
           entries.push(DigestEntry::Symlink(SymlinkEntry {
             path: path.to_owned(),
-            target: s.target().to_str().unwrap().to_string(),
+            target: s.target().to_path_buf(),
           }));
         }
         directory::Entry::Directory(d) => {

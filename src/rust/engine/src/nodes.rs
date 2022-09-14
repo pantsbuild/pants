@@ -855,7 +855,7 @@ impl Snapshot {
       types.symlink_entry,
       &[
         Self::store_path(py, &item.path)?,
-        externs::store_utf8(py, &item.target),
+        externs::store_utf8(py, item.target.to_str().unwrap()),
       ],
     ))
   }

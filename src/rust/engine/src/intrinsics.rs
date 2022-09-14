@@ -385,6 +385,7 @@ fn path_globs_to_paths(
 enum CreateDigestItem {
   FileContent(RelativePath, bytes::Bytes, bool),
   FileEntry(RelativePath, Digest, bool),
+  SymlinkEntry(RelativePath, RelativePath),
   Dir(RelativePath),
 }
 
@@ -413,6 +414,9 @@ fn create_digest_to_digest(
           let py_file_digest: PyFileDigest = externs::getattr(obj, "file_digest").unwrap();
           let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
           CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
+        } else if obj.hasattr("target").unwrap() {
+          let target: String = externs::getattr(obj, "target").unwrap();
+          CreateDigestItem::SymlinkEntry(path, RelativePath::new(target).unwrap())
         } else {
           CreateDigestItem::Dir(path)
         }
@@ -443,6 +447,9 @@ fn create_digest_to_digest(
         };
         path_stats.push(PathStat::file(path.to_path_buf(), stat));
         file_digests.insert(path.to_path_buf(), digest);
+      }
+      CreateDigestItem::SymlinkEntry(_path, _target) => {
+
       }
       CreateDigestItem::Dir(path) => {
         let stat = fs::Dir(path.to_path_buf());

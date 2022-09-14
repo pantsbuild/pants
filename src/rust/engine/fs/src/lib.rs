@@ -787,7 +787,7 @@ pub struct FileEntry {
 #[derive(Debug, Eq, PartialEq)]
 pub struct SymlinkEntry {
   pub path: PathBuf,
-  pub target: String,
+  pub target: PathBuf,
 }
 
 #[derive(Debug, Eq, PartialEq)]
