@@ -162,9 +162,10 @@ impl PySnapshot {
     py_digest: PyDigest,
     files: Vec<String>,
     dirs: Vec<String>,
+    symlinks: Vec<String>,
   ) -> PyResult<Self> {
     let snapshot =
-      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs) };
+      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs, symlinks) };
     Ok(Self(snapshot.map_err(PyException::new_err)?))
   }
 
@@ -235,6 +236,18 @@ impl PySnapshot {
     PyTuple::new(
       py,
       dirs
+        .into_iter()
+        .map(|path| PyString::new(py, &path.to_string_lossy()))
+        .collect::<Vec<_>>(),
+    )
+  }
+
+  #[getter]
+  fn symlinks<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+    let symlinks = self.0.tree.symlinks();
+    PyTuple::new(
+      py,
+      symlinks
         .into_iter()
         .map(|path| PyString::new(py, &path.to_string_lossy()))
         .collect::<Vec<_>>(),

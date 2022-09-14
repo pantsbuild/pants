@@ -336,10 +336,10 @@ def test_no_targets() -> None:
 
 def test_message_lists_added_files() -> None:
     input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"], []
     )
     output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"], []
     )
     result = FmtResult(
         input=input_snapshot,
@@ -353,10 +353,10 @@ def test_message_lists_added_files() -> None:
 
 def test_message_lists_removed_files() -> None:
     input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"], []
     )
     output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"], []
     )
     result = FmtResult(
         input=input_snapshot,
@@ -372,10 +372,10 @@ def test_message_lists_files() -> None:
     # _unsafe_create() cannot be used to simulate changed files,
     # so just make sure added and removed work together.
     input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
+        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"], []
     )
     output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
+        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"], []
     )
     result = FmtResult(
         input=input_snapshot,
@@ -396,7 +396,7 @@ def test_streaming_output_skip() -> None:
 def test_streaming_output_changed(caplog) -> None:
     caplog.set_level(logging.DEBUG)
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
-    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
+    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [], [])
     result = FmtResult(
         input=EMPTY_SNAPSHOT,
         output=changed_snapshot,

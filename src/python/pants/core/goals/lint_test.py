@@ -146,7 +146,7 @@ class FailingFormatter(MockFmtRequest):
     @property
     def fmt_result(self) -> FmtResult:
         before = EMPTY_SNAPSHOT
-        after = Snapshot._unsafe_create(Digest(EMPTY_DIGEST.fingerprint, 2), [], [])
+        after = Snapshot._unsafe_create(Digest(EMPTY_DIGEST.fingerprint, 2), [], [], [])
         return FmtResult(before, after, "", "", formatter_name=self.name)
 
 
