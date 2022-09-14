@@ -123,9 +123,6 @@ def frozen_after_init(cls: C) -> C:
     def freeze_instance(self) -> None:
         self._is_frozen = True
 
-    def unfreeze_instance(self) -> None:
-        self._is_frozen = False
-
     @contextmanager
     def unfrozen(self) -> Iterator:
         old_is_frozen = self._is_frozen
@@ -149,7 +146,6 @@ def frozen_after_init(cls: C) -> C:
         prev_setattr(self, key, value)  # type: ignore[call-arg]
 
     cls._freeze_instance = freeze_instance
-    cls._unfreeze_instance = unfreeze_instance
     cls._unfrozen = unfrozen
     cls.__init__ = new_init
     cls.__setattr__ = new_setattr  # type: ignore[assignment]
