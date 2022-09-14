@@ -8,10 +8,11 @@ use async_trait::async_trait;
 use bollard::container::{LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
+use bollard::service::CreateImageInfo;
 use bollard::{errors::Error as DockerError, Docker};
-use bollard_stubs::models::CreateImageInfo;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
+use log::Level;
 use nails::execution::ExitCode;
 use parking_lot::Mutex;
 use store::Store;
@@ -186,44 +187,52 @@ async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Re
   };
 
   if do_pull {
-    log::info!("Pulling Docker image `{image}` because {pull_reason}.");
+    in_workunit!(
+      "pull_docker_image",
+      Level::Info,
+      desc = Some(format!(
+        "Pulling Docker image `{image}` because {pull_reason}."
+      )),
+      |_workunit| async move {
+        let create_image_options = CreateImageOptions::<String> {
+          from_image: image.to_string(),
+          ..CreateImageOptions::default()
+        };
 
-    let create_image_options = CreateImageOptions::<String> {
-      from_image: image.to_string(),
-      ..CreateImageOptions::default()
-    };
-
-    let mut result_stream = docker.create_image(Some(create_image_options), None, None);
-    while let Some(msg) = result_stream.next().await {
-      log::trace!("pull {}: {:?}", image, msg);
-      match msg {
-        Ok(msg) => match msg {
-          CreateImageInfo {
-            error: Some(error), ..
-          } => {
-            let error_msg = format!("Failed to pull Docker image `{image}`: {error}");
-            log::error!("{error_msg}");
-            return Err(error_msg);
+        let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+        while let Some(msg) = result_stream.next().await {
+          log::trace!("pull {}: {:?}", image, msg);
+          match msg {
+            Ok(msg) => match msg {
+              CreateImageInfo {
+                error: Some(error), ..
+              } => {
+                let error_msg = format!("Failed to pull Docker image `{image}`: {error}");
+                log::error!("{error_msg}");
+                return Err(error_msg);
+              }
+              CreateImageInfo {
+                status: Some(status),
+                ..
+              } => {
+                log::debug!("Docker pull status: {status}");
+              }
+              // Ignore content in other event fields, namely `id`, `progress`, and `progress_detail`.
+              _ => (),
+            },
+            Err(err) => {
+              return Err(format!(
+                "Failed to pull Docker image `{}`: {:?}",
+                image, err
+              ))
+            }
           }
-          CreateImageInfo {
-            status: Some(status),
-            ..
-          } => {
-            log::info!("Docker pull status: {status}");
-          }
-          // Ignore content in other event fields, namely `id`, `progress`, and `progress_detail`.
-          _ => (),
-        },
-        Err(err) => {
-          return Err(format!(
-            "Failed to pull Docker image `{}`: {:?}",
-            image, err
-          ))
         }
-      };
-    }
 
-    log::info!("Finished pull of Docker image `{image}`.");
+        Ok(())
+      }
+    )
+    .await?;
   }
 
   Ok(())
