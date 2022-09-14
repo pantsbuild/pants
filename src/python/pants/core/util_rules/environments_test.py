@@ -17,6 +17,7 @@ from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
     DockerImageField,
+    DockerPlatformField,
     EnvironmentField,
     EnvironmentName,
     EnvironmentNameRequest,
@@ -25,6 +26,7 @@ from pants.core.util_rules.environments import (
     NoCompatibleEnvironmentError,
     UnrecognizedEnvironmentError,
 )
+from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -51,7 +53,9 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='no-name')
-                _docker_environment(name='docker', image="centos6:latest")
+                _docker_environment(
+                    name='docker', image="centos6:latest", platform="linux_x86_64"
+                )
                 """
             )
         }
@@ -65,7 +69,11 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
             "e1": LocalEnvironmentTarget({}, Address("", target_name="e1")),
             "e2": LocalEnvironmentTarget({}, Address("", target_name="e2")),
             "docker": DockerEnvironmentTarget(
-                {DockerImageField.alias: "centos6:latest"}, Address("", target_name="docker")
+                {
+                    DockerImageField.alias: "centos6:latest",
+                    DockerPlatformField.alias: Platform.linux_x86_64.value,
+                },
+                Address("", target_name="docker"),
             ),
         }
     )
@@ -79,7 +87,9 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
                 _local_environment(name='e1')
                 _local_environment(name='e2')
                 _local_environment(name='not-compatible', compatible_platforms=[])
-                _docker_environment(name='docker', docker_image="centos6:latest")
+                _docker_environment(
+                    name='docker', docker_image="centos6:latest", platform="linux_x86_64"
+                )
                 """
             )
         }
@@ -114,7 +124,9 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
                 _local_environment(name='local')
                 # Intentionally set this to no platforms so that it cannot be autodiscovered.
                 _local_environment(name='hardcoded', compatible_platforms=[])
-                _docker_environment(name='docker', image="centos6:latest")
+                _docker_environment(
+                    name='docker', image="centos6:latest", platform="linux_x86_64"
+                )
                 """
             )
         }
