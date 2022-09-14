@@ -16,7 +16,6 @@ from typing import ClassVar, Iterable, Mapping
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
@@ -320,7 +319,6 @@ class JvmProcess:
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     timeout_seconds: int | float | None
-    platform: Platform | None
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_env: FrozenDict[str, str]
     cache_scope: ProcessCacheScope | None
@@ -341,7 +339,6 @@ class JvmProcess:
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         extra_env: Mapping[str, str] | None = None,
         timeout_seconds: int | float | None = None,
-        platform: Platform | None = None,
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
     ):
@@ -356,7 +353,6 @@ class JvmProcess:
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
         self.timeout_seconds = timeout_seconds
-        self.platform = platform
         self.cache_scope = cache_scope
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.extra_env = FrozenDict(extra_env or {})
@@ -427,7 +423,6 @@ async def jvm_process(
         level=request.level,
         output_directories=request.output_directories,
         env=env,
-        platform=request.platform,
         timeout_seconds=request.timeout_seconds,
         append_only_caches=jdk.append_only_caches,
         output_files=request.output_files,

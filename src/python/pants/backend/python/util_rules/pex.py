@@ -555,8 +555,8 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             python=pex_python_setup.python,
             subcommand=(),
@@ -568,13 +568,6 @@ async def build_pex(
             concurrency_available=requirements_setup.concurrency_available,
         ),
     )
-
-    process = dataclasses.replace(process, platform=platform)
-
-    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
-    # without cross-building, we specify that our PEX command should be run on the current local
-    # platform.
-    result = await Get(ProcessResult, Process, process)
 
     if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()

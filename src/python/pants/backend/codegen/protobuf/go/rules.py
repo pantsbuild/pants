@@ -557,7 +557,7 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 
 @rule
-async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
+async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
     go_mod_digest = await Get(
         Digest,
         CreateDigest(
@@ -587,7 +587,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
         Get(
@@ -600,7 +599,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
     )

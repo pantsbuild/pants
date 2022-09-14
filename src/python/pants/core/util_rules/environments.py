@@ -356,11 +356,13 @@ async def get_target_for_environment_name(
 
 
 @rule
-def extract_process_config_from_environment(tgt: EnvironmentTarget) -> ProcessConfigFromEnvironment:
+def extract_process_config_from_environment(
+    tgt: EnvironmentTarget, platform: Platform
+) -> ProcessConfigFromEnvironment:
     docker_image = (
         tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
     )
-    return ProcessConfigFromEnvironment(docker_image=docker_image)
+    return ProcessConfigFromEnvironment(platform=platform.value, docker_image=docker_image)
 
 
 class EnvironmentSensitiveOptionFieldMixin:

@@ -268,7 +268,7 @@ def test_from_fallible_process_result_output_prepping(
             stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
             stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
-            platform=Platform.current,
+            platform=Platform.create_for_localhost(),
             metadata=ProcessResultMetadata(0, "ran_locally", 0),
         ),
         strip_chroot_path=strip_chroot_path,
