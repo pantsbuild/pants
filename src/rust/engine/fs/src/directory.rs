@@ -621,7 +621,20 @@ impl DigestTrie {
   ) {
     for entry in &*self.0 {
       let path = path_so_far.join(entry.name().as_ref());
-      f(&path, entry);
+
+      match (symlink_behavior.clone(), entry) {
+        (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
+          match self.entry(&s.target) {
+            Ok(maybe_entry) => match maybe_entry {
+              Some(entry) => f(&path, entry),
+              None => (),
+            },
+            Err(_) => (),
+          };
+        }
+        _ => f(&path, entry),
+      };
+
       if let Entry::Directory(d) = entry {
         d.tree.walk_helper(path, symlink_behavior.clone(), f);
       }
