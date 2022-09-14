@@ -31,7 +31,7 @@ lazy_static! {
   };
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum SymlinkBehavior {
   /// Treat symlinks as a distinctive element.
   Aware,
@@ -636,7 +636,7 @@ impl DigestTrie {
       };
 
       if let Entry::Directory(d) = entry {
-        d.tree.walk_helper(path, symlink_behavior.clone(), f);
+        d.tree.walk_helper(path, symlink_behavior, f);
       }
     }
   }
