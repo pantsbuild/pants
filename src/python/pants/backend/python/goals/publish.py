@@ -17,7 +17,7 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -112,9 +112,9 @@ def twine_env_suffix(repo: str) -> str:
     return f"_{repo[1:]}".replace("-", "_").upper() if repo.startswith("@") else ""
 
 
-def twine_env_request(repo: str) -> EnvironmentRequest:
+def twine_env_request(repo: str) -> EnvironmentVarsRequest:
     suffix = twine_env_suffix(repo)
-    req = EnvironmentRequest(
+    req = EnvironmentVarsRequest(
         [
             f"{var}{suffix}"
             for var in [
@@ -127,12 +127,12 @@ def twine_env_request(repo: str) -> EnvironmentRequest:
     return req
 
 
-def twine_env(env: Environment, repo: str) -> Environment:
+def twine_env(env: EnvironmentVars, repo: str) -> EnvironmentVars:
     suffix = twine_env_suffix(repo)
     if not suffix:
         return env
 
-    return Environment({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
+    return EnvironmentVars({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
 
 
 @rule
@@ -185,7 +185,7 @@ async def twine_upload(
     )
     pex_proc_requests = []
     twine_envs = await MultiGet(
-        Get(Environment, EnvironmentRequest, twine_env_request(repo))
+        Get(EnvironmentVars, EnvironmentVarsRequest, twine_env_request(repo))
         for repo in request.field_set.repositories.value
     )
 

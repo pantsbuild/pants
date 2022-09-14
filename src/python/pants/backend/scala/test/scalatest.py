@@ -23,7 +23,7 @@ from pants.core.goals.test import (
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
     FallibleProcessResult,
@@ -127,7 +127,7 @@ async def setup_scalatest_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     field_set_extra_env = await Get(
-        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
     )
 
     process = JvmProcess(

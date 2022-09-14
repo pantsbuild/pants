@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.environment import Environment
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -234,7 +234,7 @@ class DockerOptions(Subsystem):
         return DockerRegistries.from_dict(self._registries)
 
     @memoized_method
-    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
+    def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self._executable_search_paths:
                 if entry == "<PATH>":

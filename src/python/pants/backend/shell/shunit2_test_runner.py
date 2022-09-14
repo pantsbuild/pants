@@ -34,7 +34,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.addresses import Address
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -140,7 +140,7 @@ async def determine_shunit2_shell(
             )
         tgt_shell = parse_result
 
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     path_request = BinaryPathRequest(
         binary_name=tgt_shell.name,
         search_path=shell_setup.executable_search_path(env),
@@ -174,7 +174,7 @@ async def setup_shunit2_for_target(
             BuiltPackageDependencies,
             BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
         ),
-        Get(Environment, EnvironmentRequest(["PATH"])),
+        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
     )
 
     dependencies_source_files_request = Get(

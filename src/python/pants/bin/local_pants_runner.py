@@ -12,7 +12,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
@@ -63,7 +63,7 @@ class LocalPantsRunner:
         options_initializer: OptionsInitializer,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         run_id: str,
         options: Options,
         scheduler: GraphScheduler | None = None,
@@ -98,7 +98,7 @@ class LocalPantsRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    CompleteEnvironment: env,
+                    CompleteEnvironmentVars: env,
                 }
             ),
             cancellation_latch=cancellation_latch,
@@ -107,7 +107,7 @@ class LocalPantsRunner:
     @classmethod
     def create(
         cls,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         options_bootstrapper: OptionsBootstrapper,
         options_initializer: OptionsInitializer | None = None,
         scheduler: GraphScheduler | None = None,

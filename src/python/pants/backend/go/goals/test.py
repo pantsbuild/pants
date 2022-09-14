@@ -46,7 +46,7 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
@@ -347,7 +347,7 @@ async def run_go_tests(
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
     field_set_extra_env_get = Get(
-        Environment, EnvironmentRequest(field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
     )
     binary_with_prefix, files_sources, field_set_extra_env = await MultiGet(
         Get(Digest, AddPrefix(binary.digest, working_dir)),

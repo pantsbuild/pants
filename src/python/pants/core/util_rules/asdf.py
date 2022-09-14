@@ -10,7 +10,7 @@ from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
 from pants.util.strutil import softwrap
@@ -32,7 +32,7 @@ class AsdfToolPathsRequest:
 @dataclass(frozen=True)
 class AsdfToolPathsResult:
     tool_name: str
-    env: Environment
+    env: EnvironmentVars
     standard_tool_paths: tuple[str, ...] = ()
     local_tool_paths: tuple[str, ...] = ()
 
@@ -44,7 +44,7 @@ async def _resolve_asdf_tool_paths(
     tool_description: str,
     tool_env_name: str,
     bin_relpath: str,
-    env: Environment,
+    env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
     asdf_dir = get_asdf_data_dir(env)
@@ -195,7 +195,7 @@ async def resolve_asdf_tool_paths(
         "HOME",
         *request.extra_env_var_names,
     ]
-    env = await Get(Environment, EnvironmentRequest(env_vars_to_request))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(env_vars_to_request))
 
     standard_tool_paths: tuple[str, ...] = ()
     if request.resolve_standard:
@@ -229,7 +229,7 @@ async def resolve_asdf_tool_paths(
     )
 
 
-def get_asdf_data_dir(env: Environment) -> PurePath | None:
+def get_asdf_data_dir(env: EnvironmentVars) -> PurePath | None:
     """Returns the location of asdf's installed tool versions.
 
     See https://asdf-vm.com/manage/configuration.html#environment-variables.

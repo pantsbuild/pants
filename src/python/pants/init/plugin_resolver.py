@@ -19,7 +19,8 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.environment import CompleteEnvironment, EnvironmentName
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
@@ -128,7 +129,7 @@ class PluginResolver:
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
 
@@ -145,7 +146,7 @@ class PluginResolver:
     def _resolve_plugins(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         request: PluginsRequest,
     ) -> ResolvedPluginDistributions:
         session = self._scheduler.scheduler.new_session(
@@ -153,7 +154,7 @@ class PluginResolver:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    CompleteEnvironment: env,
+                    CompleteEnvironmentVars: env,
                 }
             ),
         )
