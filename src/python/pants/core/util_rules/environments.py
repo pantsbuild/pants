@@ -133,7 +133,7 @@ class DockerPlatformField(StringField):
         """
         If set, Docker will always use the specified platform when pulling and running the image.
 
-        If unset, Pants will default to the CPU architecture of your local host machine. For 
+        If unset, Pants will default to the CPU architecture of your local host machine. For
         example, if you are running on Apple Silicon, it will use `linux_arm64`, whereas running on
         Intel macOS will use `linux_x86_64`. This mirrors Docker's behavior when `--platform` is
         left off.
