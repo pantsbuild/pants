@@ -622,7 +622,7 @@ impl DigestTrie {
     for entry in &*self.0 {
       let path = path_so_far.join(entry.name().as_ref());
 
-      match (symlink_behavior.clone(), entry) {
+      match (&symlink_behavior, entry) {
         (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
           match self.entry(&s.target) {
             Ok(maybe_entry) => match maybe_entry {
