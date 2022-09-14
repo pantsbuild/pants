@@ -40,10 +40,7 @@ class ShellcheckRequest(LintTargetsRequest):
 async def partition_shellcheck(
     request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
 ) -> Partitions[ShellcheckFieldSet]:
-    if shellcheck.skip:
-        return Partitions()
-
-    return Partitions([request.field_sets])
+    return Partitions() if shellcheck.skip else Partitions([request.field_sets])
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
@@ -107,10 +104,9 @@ async def run_shellcheck(
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(
+    return LintResult.from_fallible_process_result(
         process_result, linter_name=Shellcheck.options_scope
     )
-    return result
 
 
 def rules():

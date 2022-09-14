@@ -51,10 +51,7 @@ def generate_argv(
 async def partition_hadolint(
     request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
 ) -> Partitions[HadolintFieldSet]:
-    if hadolint.skip:
-        return Partitions()
-
-    return Partitions([request.field_sets])
+    return Partitions() if hadolint.skip else Partitions([request.field_sets])
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)

@@ -42,10 +42,7 @@ class BufLintRequest(LintTargetsRequest):
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
 ) -> Partitions[BufFieldSet]:
-    if buf.lint_skip:
-        return Partitions()
-
-    return Partitions([request.field_sets])
+    return Partitions() if buf.lint_skip else Partitions([request.field_sets])
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
@@ -106,10 +103,7 @@ async def run_buf(
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(
-        process_result, linter_name=BufLintRequest.name
-    )
-    return result
+    return LintResult.from_fallible_process_result(process_result, linter_name=BufLintRequest.name)
 
 
 def rules():

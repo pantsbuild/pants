@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import NamedTuple, Tuple
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -31,7 +32,8 @@ class Flake8Request(LintTargetsRequest):
     name = Flake8.options_scope
 
 
-class PartitionElement(NamedTuple):
+@dataclass(frozen=True)
+class PartitionElement:
     field_set: Flake8FieldSet
     # NB: The interpreter_constraints are the same for every element in a partition
     interpreter_constraints: InterpreterConstraints

@@ -52,7 +52,7 @@ from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import runtime_subscriptable
+from pants.util.meta import runtime_ignore_subscripts
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ class LintRequest:
         @memoized_classproperty
         def SubPartition(cls) -> type:
             @union(in_scope_types=[EnvironmentName])
-            @runtime_subscriptable
+            @runtime_ignore_subscripts
             class SubPartition(Collection):
                 pass
 
@@ -220,7 +220,7 @@ class LintRequest:
         yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
 
 
-@runtime_subscriptable
+@runtime_ignore_subscripts
 class Partitions(Collection[Tuple[_ElementT, ...]]):
     """A collection of partitions.
 
@@ -266,7 +266,7 @@ class LintTargetsRequest(LintRequest, StyleRequest):
 
             @union(in_scope_types=[EnvironmentName])
             @dataclass(frozen=True)
-            @runtime_subscriptable
+            @runtime_ignore_subscripts
             class PartitionRequest:
                 field_sets: tuple
 
@@ -400,6 +400,7 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
     return 0
 
 
+# TODO(16868): Rule parser requires arguments to be values in module scope
 _LintTargetsPartitionRequest = LintTargetsRequest.PartitionRequest
 _LintFilesPartitionRequest = LintFilesRequest.PartitionRequest
 _LintSubPartition = LintRequest.SubPartition

@@ -47,10 +47,7 @@ class GoVetRequest(LintTargetsRequest):
 async def partition_go_vet(
     request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
 ) -> Partitions[GoVetFieldSet]:
-    if go_vet_subsystem.skip:
-        return Partitions()
-
-    return Partitions([request.field_sets])
+    return Partitions() if go_vet_subsystem.skip else Partitions([request.field_sets])
 
 
 @rule(level=LogLevel.DEBUG)
@@ -86,10 +83,9 @@ async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintR
         ),
     )
 
-    result = LintResult.from_fallible_process_result(
+    return LintResult.from_fallible_process_result(
         process_result, linter_name=GoVetSubsystem.options_scope
     )
-    return result
 
 
 def rules():

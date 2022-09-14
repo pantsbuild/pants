@@ -57,8 +57,8 @@ with an @classproperty decorator.""".format(
         return callable_field()
 
 
-def runtime_subscriptable(cls: C) -> C:
-    """Use as a decorator on a class to make it runtime subscriptable.
+def runtime_ignore_subscripts(cls: C) -> C:
+    """Use as a decorator on a class to make it subscriptable at runtime, returning the class.
 
     Generally, this is used inside the `else` of a `TYPE_CHECKING` check.
 
@@ -67,7 +67,7 @@ def runtime_subscriptable(cls: C) -> C:
     ...     class MyClass(Generic[...]):
     ...         ...
     ... else:
-    ...     @runtime_subscriptable
+    ...     @runtime_ignore_subscripts
     ...     class MyClass:
     ...         ...
     ...

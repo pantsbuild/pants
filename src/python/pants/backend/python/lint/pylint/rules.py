@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple, Tuple
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -38,7 +39,8 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class PartitionElement(NamedTuple):
+@dataclass(frozen=True)
+class PartitionElement:
     source_path: str
     coarsened_target: CoarsenedTarget
     # NB: These are the same across every element in a partition
