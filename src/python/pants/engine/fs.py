@@ -268,10 +268,13 @@ class SpecsPaths(Paths):
 @dataclass(frozen=True)
 class SnapshotDiff:
     our_unique_files: tuple[str, ...] = ()
+    our_unique_symlinks: tuple[str, ...] = ()
     our_unique_dirs: tuple[str, ...] = ()
     their_unique_files: tuple[str, ...] = ()
+    their_unique_symlinks: tuple[str, ...] = ()
     their_unique_dirs: tuple[str, ...] = ()
     changed_files: tuple[str, ...] = ()
+    changed_symlinks: tuple[str, ...] = ()
 
     @classmethod
     def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":

@@ -98,6 +98,9 @@ class Snapshot:
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
     ]: ...
     def __eq__(self, other: Snapshot | Any) -> bool: ...
     def __hash__(self) -> int: ...

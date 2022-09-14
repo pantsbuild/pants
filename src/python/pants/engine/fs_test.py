@@ -1265,10 +1265,13 @@ def test_snapshot_diff(
     )
 
     assert diff.our_unique_files == expected_diff.our_unique_files
+    assert diff.our_unique_symlinks == expected_diff.our_unique_symlinks
     assert diff.our_unique_dirs == expected_diff.our_unique_dirs
     assert diff.their_unique_files == expected_diff.their_unique_files
+    assert diff.their_unique_symlinks == expected_diff.their_unique_symlinks
     assert diff.their_unique_dirs == expected_diff.their_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
+    assert diff.changed_symlinks == expected_diff.changed_symlinks
 
     # test with the arguments reversed
     diff = SnapshotDiff.from_snapshots(
@@ -1276,7 +1279,10 @@ def test_snapshot_diff(
     )
 
     assert diff.our_unique_files == expected_diff.their_unique_files
+    assert diff.our_unique_symlinks == expected_diff.their_unique_symlinks
     assert diff.our_unique_dirs == expected_diff.their_unique_dirs
     assert diff.their_unique_files == expected_diff.our_unique_files
+    assert diff.their_unique_symlinks == expected_diff.our_unique_symlinks
     assert diff.their_unique_dirs == expected_diff.our_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
+    assert diff.changed_symlinks == expected_diff.changed_symlinks

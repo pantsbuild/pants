@@ -50,7 +50,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, SymlinkEntry, PathStat, Permissions, RelativePath, SymlinkBehavior,
+  FileEntry, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};

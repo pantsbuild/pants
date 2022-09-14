@@ -28,8 +28,8 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
-  GlobExpansionConjunction, GlobMatching, Link, SymlinkEntry, PathGlobs, PathStat, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching, Vfs,
+  GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
+  RelativePath, StrictGlobMatching, SymlinkEntry, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,

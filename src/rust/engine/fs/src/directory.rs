@@ -566,9 +566,10 @@ impl DigestTrie {
   /// Returns the files in the trie, not including symlinks pointing to files.
   pub fn files(&self) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    self.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
-      Entry::File(_) => files.push(path.to_owned()),
-      _ => (),
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+      if let Entry::File(_) = entry {
+        files.push(path.to_owned())
+      }
     });
     files
   }
@@ -590,9 +591,10 @@ impl DigestTrie {
 
   pub fn symlinks(&self) -> Vec<PathBuf> {
     let mut symlinks = Vec::new();
-    self.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
-      Entry::Symlink(_) => symlinks.push(path.to_owned()),
-      _ => (),
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+      if let Entry::Symlink(_) = entry {
+        symlinks.push(path.to_owned())
+      }
     });
     symlinks
   }
@@ -624,12 +626,8 @@ impl DigestTrie {
 
       match (&symlink_behavior, entry) {
         (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
-          match self.entry(&s.target) {
-            Ok(maybe_entry) => match maybe_entry {
-              Some(entry) => f(&path, entry),
-              None => (),
-            },
-            Err(_) => (),
+          if let Ok(Some(entry)) = self.entry(&s.target) {
+            f(&path, entry);
           };
         }
         _ => f(&path, entry),
