@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError as FrozenInstanceError
 from functools import wraps
-from typing import Any, Callable, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
 
 T = TypeVar("T")
 C = TypeVar("C", bound=Type)
@@ -125,6 +126,15 @@ def frozen_after_init(cls: C) -> C:
     def unfreeze_instance(self) -> None:
         self._is_frozen = False
 
+    @contextmanager
+    def unfrozen(self) -> Iterator:
+        old_is_frozen = self._is_frozen
+        try:
+            self._is_frozen = False
+            yield
+        finally:
+            self._is_frozen = old_is_frozen
+
     @wraps(prev_init)
     def new_init(self, *args: Any, **kwargs: Any) -> None:
         prev_init(self, *args, **kwargs)
@@ -140,6 +150,7 @@ def frozen_after_init(cls: C) -> C:
 
     cls._freeze_instance = freeze_instance
     cls._unfreeze_instance = unfreeze_instance
+    cls._unfrozen = unfrozen
     cls.__init__ = new_init
     cls.__setattr__ = new_setattr  # type: ignore[assignment]
 
