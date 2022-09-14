@@ -551,7 +551,7 @@ impl ContainerCache {
 
     let config = bollard::container::Config {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
-      host_config: Some(bollard_stubs::models::HostConfig {
+      host_config: Some(bollard::service::HostConfig {
         binds: Some(vec![
           format!("{}:{}", work_dir_base, SANDBOX_BASE_PATH_IN_CONTAINER),
           // DOCKER-TODO: Consider making this bind mount read-only.
@@ -566,7 +566,7 @@ impl ContainerCache {
         ]),
         // The init process ensures that child processes are properly reaped.
         init: Some(true),
-        ..bollard_stubs::models::HostConfig::default()
+        ..bollard::service::HostConfig::default()
       }),
       image: Some(image.clone()),
       tty: Some(true),

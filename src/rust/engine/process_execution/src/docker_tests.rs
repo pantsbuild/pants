@@ -563,11 +563,11 @@ async fn timeout() {
   let argv = vec![
     SH_PATH.to_string(),
     "-c".to_owned(),
-    "/bin/echo -n 'Calculating...'; /bin/sleep 2; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 5; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
-  process.timeout = Some(Duration::from_millis(100));
+  process.timeout = Some(Duration::from_millis(500));
   process.description = "sleepy-cat".to_string();
   process.docker_image = Some(IMAGE.to_owned());
 

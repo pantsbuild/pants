@@ -178,11 +178,10 @@ dependencies = [
 [[package]]
 name = "bollard"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d82e7850583ead5f8bbef247e2a3c37a19bd576e8420cd262a6711921827e1e5"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
 dependencies = [
  "base64",
- "bollard-stubs",
+ "bollard-stubs 1.42.0-rc.4",
  "bytes",
  "futures-core",
  "futures-util",
@@ -208,6 +207,15 @@ name = "bollard-stubs"
 version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
+dependencies = [
+ "serde",
+ "serde_with",
+]
+
+[[package]]
+name = "bollard-stubs"
+version = "1.42.0-rc.4"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
 dependencies = [
  "serde",
  "serde_with",
@@ -995,9 +1003,9 @@ checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 
 [[package]]
 name = "fuser"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aef8400a4ea1d18a8302e2952f5137a9a21ab257825ccc7d67db4a8018b89022"
+checksum = "104ed58f182bc2975062cd3fab229e82b5762de420e26cf5645f661402694599"
 dependencies = [
  "libc",
  "log",
@@ -1256,9 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "hdrhistogram"
-version = "7.5.0"
+version = "7.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31672b7011be2c4f7456c4ddbcb40e7e9a4a9fad8efe49a6ebaf5f307d0109c0"
+checksum = "6ea9fe3952d32674a14e0975009a3547af9ea364995b5ec1add2e23c2ae523ab"
 dependencies = [
  "base64",
  "byteorder",
@@ -1518,9 +1526,9 @@ checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
 name = "itertools"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+checksum = "d8bf247779e67a9082a4790b45e71ac7cfd1321331a5c856a74a9faebdab78d0"
 dependencies = [
  "either",
 ]
@@ -2282,7 +2290,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bollard",
- "bollard-stubs",
+ "bollard-stubs 1.42.0-rc.3",
  "bytes",
  "cache",
  "concrete_time",
@@ -2432,9 +2440,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.16.5"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e6302e85060011447471887705bb7838f14aba43fcb06957d823739a496b3dc"
+checksum = "0220c44442c9b239dd4357aa856ac468a4f5e1f0df19ddb89b2522952eb4c6ca"
 dependencies = [
  "cfg-if 1.0.0",
  "indoc",
@@ -2468,9 +2476,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.16.5"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c275a07127c1aca33031a563e384ffdd485aee34ef131116fcd58e3430d1742b"
+checksum = "ca882703ab55f54702d7bfe1189b41b0af10272389f04cae38fe4cd56c65f75f"
 dependencies = [
  "libc",
  "pyo3-build-config 0.16.6",
@@ -2478,9 +2486,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros"
-version = "0.16.5"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "284fc4485bfbcc9850a6d661d627783f18d19c2ab55880b021671c4ba83e90f7"
+checksum = "568749402955ad7be7bad9a09b8593851cd36e549ac90bfd44079cea500f3f21"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2490,9 +2498,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.16.5"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53bda0f58f73f5c5429693c96ed57f7abdb38fdfc28ae06da4101a257adb7faf"
+checksum = "611f64e82d98f447787e82b8e7b0ebc681e1eb78fc1252668b2c605ffb4e1eb8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2975,9 +2983,9 @@ dependencies = [
 
 [[package]]
 name = "serde_test"
-version = "1.0.143"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4b5b007c1bccdc70f8d8b5804da305a64d4279f990f1ae9e3b06eaae46f42e0"
+checksum = "6c7f3621491f256177206a7c2152c17f322c0d0b30af05359088172437d29e25"
 dependencies = [
  "serde",
 ]
