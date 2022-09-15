@@ -52,7 +52,7 @@ impl Snapshot {
     }
   }
 
-  pub async fn from_unique_paths<
+  pub async fn from_path_stats<
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
   >(
@@ -141,7 +141,7 @@ impl Snapshot {
         .expand_globs(path_globs, None)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
-      Snapshot::from_unique_paths(
+      Snapshot::from_path_stats(
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )

@@ -22,7 +22,7 @@ async fn get_duplicate_rolands<T: SnapshotOps>(
 
   make_file(&base_path.join("subdir/roland1"), STR.as_bytes(), 0o600);
   let path_stats1 = expand_all_sorted(posix_fs).await;
-  let snapshot1 = Snapshot::from_unique_paths(digester.clone(), path_stats1)
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), path_stats1)
     .await
     .unwrap();
 
@@ -34,7 +34,7 @@ async fn get_duplicate_rolands<T: SnapshotOps>(
     0o600,
   );
   let path_stats2 = expand_all_sorted(posix_fs2).await;
-  let snapshot2 = Snapshot::from_unique_paths(digester2, path_stats2)
+  let snapshot2 = Snapshot::from_path_stats(digester2, path_stats2)
     .await
     .unwrap();
 

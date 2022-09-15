@@ -427,7 +427,7 @@ impl Store {
       }
     }
 
-    Snapshot::from_unique_paths(
+    Snapshot::from_path_stats(
       Digester { digest },
       vec![fs::PathStat::File {
         path: name.clone().into(),

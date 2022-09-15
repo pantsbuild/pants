@@ -1249,7 +1249,7 @@ pub fn extract_output_files(
 
   async move {
     let files_snapshot =
-      Snapshot::from_unique_paths(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
+      Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
         move |error| {
           format!(
             "Error when storing the output file directory info in the remote CAS: {:?}",
