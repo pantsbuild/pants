@@ -31,9 +31,12 @@ def test_docker_complete_env_vars() -> None:
         }
     )
     rule_runner.set_options(["--environments-preview-names={'docker': '//:docker'}"])
-    result = rule_runner.request(CompleteEnvironmentVars, [])
+    result = dict(rule_runner.request(CompleteEnvironmentVars, []))
+
+    # HOSTNAME is not deterministic across machines, so we don't care about the value.
+    assert "HOSTNAME" in result
+    result.pop("HOSTNAME")
     assert dict(result) == {
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "HOSTNAME": "85277b717746",
         "HOME": "/root",
     }
