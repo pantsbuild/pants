@@ -357,8 +357,8 @@ impl From<DigestTrie> for DirectoryDigest {
 }
 
 impl DigestTrie {
-  /// Create a DigestTrie from unique PathStats. Fails for duplicate items.
-  pub fn from_path_stats(
+  /// Create a DigestTrie from unique TypedPath. Fails for duplicate items.
+  pub fn from_unique_paths(
     mut path_stats: Vec<TypedPath>,
     file_digests: &HashMap<PathBuf, Digest>,
   ) -> Result<Self, String> {

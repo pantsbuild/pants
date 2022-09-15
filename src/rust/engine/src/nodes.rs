@@ -906,7 +906,7 @@ impl Snapshot {
       .map_err(|e| throw(format!("{}", e)))
       .await?;
 
-    store::Snapshot::from_path_stats(context.clone(), path_stats)
+    store::Snapshot::from_unique_paths(context.clone(), path_stats)
       .map_err(|e| throw(format!("Snapshot failed: {}", e)))
       .await
   }

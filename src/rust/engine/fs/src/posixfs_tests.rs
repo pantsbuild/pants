@@ -326,7 +326,7 @@ async fn memfs_expand_basic() {
   let p2 = PathBuf::from("some/other");
   let p3 = p2.join("file");
 
-  let fs = DigestTrie::from_path_stats(
+  let fs = DigestTrie::from_unique_paths(
     vec![
       PathStat::file(
         p1.clone(),

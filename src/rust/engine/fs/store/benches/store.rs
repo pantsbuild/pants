@@ -84,7 +84,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 }
 
 ///
-/// NB: More accurately, this benchmarks `Snapshot::from_path_stats`, which avoids
+/// NB: More accurately, this benchmarks `Snapshot::from_unique_paths`, which avoids
 /// filesystem traversal overheads and focuses on digesting/capturing.
 ///
 pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
@@ -119,7 +119,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         b.iter(|| {
           for _ in 0..captures {
             let _ = executor
-              .block_on(Snapshot::from_path_stats(
+              .block_on(Snapshot::from_unique_paths(
                 OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), immutable),
                 path_stats.clone(),
               ))
@@ -352,7 +352,7 @@ fn snapshot(
         executor.clone(),
       )
       .unwrap();
-      Snapshot::from_path_stats(
+      Snapshot::from_unique_paths(
         OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
         path_stats,
       )

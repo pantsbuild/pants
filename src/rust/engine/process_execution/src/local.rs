@@ -128,7 +128,7 @@ impl CommandRunner {
       .expand_globs(output_globs, None)
       .map_err(|err| format!("Error expanding output globs: {}", err))
       .await?;
-    Snapshot::from_path_stats(
+    Snapshot::from_unique_paths(
       OneOffStoreFileByDigest::new(store, posix_fs, true),
       path_stats,
     )

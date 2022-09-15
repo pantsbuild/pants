@@ -52,7 +52,7 @@ impl Snapshot {
     }
   }
 
-  pub async fn from_path_stats<
+  pub async fn from_unique_paths<
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
   >(
@@ -80,7 +80,7 @@ impl Snapshot {
       .zip(file_digests)
       .collect::<HashMap<_, _>>();
 
-    let tree = DigestTrie::from_path_stats(
+    let tree = DigestTrie::from_unique_paths(
       path_stats.iter().map(|p| p.into()).collect(),
       &file_digests_map,
     )?;
@@ -141,7 +141,7 @@ impl Snapshot {
         .expand_globs(path_globs, None)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
-      Snapshot::from_path_stats(
+      Snapshot::from_unique_paths(
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
@@ -179,7 +179,7 @@ impl Snapshot {
       .map(|s| PathStat::dir(PathBuf::from(&s), Dir(PathBuf::from(s))))
       .collect();
 
-    let tree = DigestTrie::from_path_stats(
+    let tree = DigestTrie::from_unique_paths(
       [file_path_stats, dir_path_stats]
         .concat()
         .iter()

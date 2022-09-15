@@ -427,7 +427,7 @@ impl Store {
       }
     }
 
-    Snapshot::from_path_stats(
+    Snapshot::from_unique_paths(
       Digester { digest },
       vec![fs::PathStat::File {
         path: name.clone().into(),
@@ -561,7 +561,7 @@ impl Store {
     let file_digests = maybe_digests.into_iter().flatten().collect();
 
     let tree =
-      DigestTrie::from_path_stats(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
+      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
     let computed_digest = tree.compute_root_digest();
     if digest.as_digest() != computed_digest {
       return Err(
