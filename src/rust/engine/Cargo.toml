@@ -151,6 +151,7 @@ tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
 tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
