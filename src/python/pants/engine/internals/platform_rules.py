@@ -33,7 +33,7 @@ async def complete_environment_vars(
     env_process_result = await Get(
         ProcessResult,
         Process(
-            ["env"],
+            ["env", "-0"],
             description=softwrap(
                 f"""
                 Extract environment variables from the Docker image
@@ -44,7 +44,9 @@ async def complete_environment_vars(
         ),
     )
     result = {}
-    for line in env_process_result.stdout.decode("utf-8").splitlines():
+    for line in env_process_result.stdout.decode("utf-8").rstrip().split("\0"):
+        if not line:
+            continue
         k, v = line.split("=", maxsplit=1)
         result[k] = v
     return CompleteEnvironmentVars(result)

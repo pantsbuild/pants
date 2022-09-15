@@ -22,7 +22,9 @@ def test_docker_complete_env_vars() -> None:
             "BUILD": dedent(
                 """\
                 _docker_environment(
-                    name='docker', image='centos:7.9.2009', platform='linux_x86_64'
+                    name='docker',
+                    image='centos@sha256:a1801b843b1bfaf77c501e7a6d3f709401a1e0c83863037fa3aab063a7fdb9dc',
+                    platform='linux_x86_64',
                 )
                 """
             )
@@ -32,6 +34,6 @@ def test_docker_complete_env_vars() -> None:
     result = rule_runner.request(CompleteEnvironmentVars, [])
     assert dict(result) == {
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "HOSTNAME": "cba3dbdb7962",
+        "HOSTNAME": "85277b717746",
         "HOME": "/root",
     }
