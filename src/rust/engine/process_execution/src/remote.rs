@@ -43,7 +43,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -748,10 +748,8 @@ impl crate::CommandRunner for CommandRunner {
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let (action, command, execute_request) = make_execute_request(
       &request,
-      ProcessMetadata {
-        instance_name: self.instance_name.clone(),
-        cache_key_gen_version: self.process_cache_namespace.clone(),
-      },
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
     )?;
     let build_id = context.build_id.clone();
 
@@ -850,7 +848,8 @@ fn maybe_add_workunit(
 
 pub fn make_execute_request(
   req: &Process,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
@@ -876,10 +875,6 @@ pub fn make_execute_request(
   }
 
   let mut platform_properties = req.platform_properties.clone();
-  let ProcessMetadata {
-    instance_name,
-    cache_key_gen_version,
-  } = metadata;
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
   //       interaction with how servers match platform properties.

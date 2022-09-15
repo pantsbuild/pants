@@ -37,7 +37,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
-  Platform, ProcessCacheScope, ProcessMetadata,
+  Platform, ProcessCacheScope,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -46,6 +46,12 @@ use protos::require_digest;
 use store::Store;
 use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
+
+#[derive(Clone, Debug, Default)]
+struct ProcessMetadata {
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+}
 
 #[derive(StructOpt)]
 struct CommandSpec {

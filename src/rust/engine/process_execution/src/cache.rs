@@ -17,7 +17,7 @@ use workunit_store::{
 
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
+  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -76,16 +76,7 @@ impl crate::CommandRunner for CommandRunner {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
-      digest: Some(
-        crate::digest(
-          &req,
-          &ProcessMetadata {
-            instance_name: None,
-            cache_key_gen_version: self.process_cache_namespace.clone(),
-          },
-        )
-        .into(),
-      ),
+      digest: Some(crate::digest(&req, None, self.process_cache_namespace.clone()).into()),
       key_type: CacheKeyType::Process.into(),
     };
 

@@ -24,7 +24,7 @@ use workunit_store::{RunId, WorkunitStore};
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessError, ProcessMetadata,
+  Platform, Process, ProcessCacheScope, ProcessError,
 };
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
@@ -141,7 +141,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -226,13 +226,7 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: Some("dark-tower".to_owned()),
-        cache_key_gen_version: None,
-      }
-    ),
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None,),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -318,13 +312,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: None,
-        cache_key_gen_version: Some("meep".to_owned()),
-      }
-    ),
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()),),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -382,7 +370,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -463,13 +451,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: None,
-        cache_key_gen_version: None,
-      },
-    ),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -549,7 +531,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -655,7 +637,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -667,11 +649,9 @@ async fn successful_with_only_call_to_execute() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -708,11 +688,9 @@ async fn successful_after_reconnect_with_wait_execution() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -753,11 +731,9 @@ async fn successful_after_reconnect_from_retryable_error() {
   let op_name_2 = "gimme-bar".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     let execute_request_2 = execute_request.clone();
 
@@ -808,7 +784,8 @@ async fn server_rejecting_execute_request_gives_error() {
     mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
       execute_request: crate::remote::make_execute_request(
         &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-        ProcessMetadata::default(),
+        None,
+        None,
       )
       .unwrap()
       .2,
@@ -831,11 +808,9 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -860,11 +835,9 @@ async fn sends_headers() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1053,11 +1026,9 @@ async fn ensure_inline_stdio_is_stored() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &echo_roland_request().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&echo_roland_request().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1152,7 +1123,8 @@ async fn bad_result_bytes() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
         execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
-          ProcessMetadata::default(),
+          None,
+          None,
         )
         .unwrap()
         .2,
@@ -1189,11 +1161,9 @@ async fn initial_response_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1231,11 +1201,9 @@ async fn initial_response_missing_response_and_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1268,11 +1236,9 @@ async fn fails_after_retry_limit_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1322,11 +1288,9 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
 
   let mock_server = {
     let op_name = "foo-bar".to_owned();
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1379,11 +1343,9 @@ async fn execute_missing_file_uploads_if_known() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &cat_roland_request().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&cat_roland_request().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1399,7 +1361,8 @@ async fn execute_missing_file_uploads_if_known() {
         ExpectedAPICall::Execute {
           execute_request: crate::remote::make_execute_request(
             &cat_roland_request().try_into().unwrap(),
-            ProcessMetadata::default(),
+            None,
+            None,
           )
           .unwrap()
           .2,

@@ -639,17 +639,6 @@ impl Process {
 }
 
 ///
-/// Metadata surrounding an Process which factors into its cache key when cached
-/// externally from the engine graph (e.g. when using remote execution or an external process
-/// cache).
-///
-#[derive(Clone, Debug, Default)]
-pub struct ProcessMetadata {
-  pub instance_name: Option<String>,
-  pub cache_key_gen_version: Option<String>,
-}
-
-///
 /// The result of running a process.
 ///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
@@ -900,9 +889,13 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+pub fn digest(
+  process: &Process,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
+) -> Digest {
   let (_, _, execute_request) =
-    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 
