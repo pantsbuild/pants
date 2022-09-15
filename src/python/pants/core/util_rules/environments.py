@@ -19,6 +19,8 @@ from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Field,
+    FieldDefaultFactoryRequest,
+    FieldDefaultFactoryResult,
     FieldSet,
     StringField,
     StringSequenceField,
@@ -28,6 +30,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
 from pants.option.subsystem import Subsystem
+from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
@@ -122,9 +125,50 @@ class DockerImageField(StringField):
     )
 
 
+class DockerPlatformField(StringField):
+    alias = "platform"
+    default = None
+    valid_choices = Platform
+    help = softwrap(
+        """
+        If set, Docker will always use the specified platform when pulling and running the image.
+
+        If unset, Pants will default to the CPU architecture of your local host machine. For
+        example, if you are running on Apple Silicon, it will use `linux_arm64`, whereas running on
+        Intel macOS will use `linux_x86_64`. This mirrors Docker's behavior when `--platform` is
+        left off.
+        """
+    )
+
+    @property
+    def normalized_value(self) -> Platform:
+        if self.value is not None:
+            return Platform(self.value)
+        return match(
+            Platform.create_for_localhost(),
+            {
+                Platform.linux_x86_64: Platform.linux_x86_64,
+                Platform.macos_x86_64: Platform.linux_x86_64,
+                Platform.linux_arm64: Platform.linux_arm64,
+                Platform.macos_arm64: Platform.linux_arm64,
+            },
+        )
+
+
+class DockerPlatformFieldDefaultFactoryRequest(FieldDefaultFactoryRequest):
+    field_type = DockerPlatformField
+
+
+@rule
+def docker_platform_field_default_factory(
+    _: DockerPlatformFieldDefaultFactoryRequest,
+) -> FieldDefaultFactoryResult:
+    return FieldDefaultFactoryResult(lambda f: f.normalized_value)
+
+
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField)
+    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField, DockerPlatformField)
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment
@@ -484,4 +528,8 @@ def _options(env_tgt: EnvironmentTarget) -> dict[tuple[type[Subsystem], str], Fi
 
 
 def rules():
-    return (*collect_rules(), QueryRule(ChosenLocalEnvironmentName, []))
+    return (
+        *collect_rules(),
+        UnionRule(FieldDefaultFactoryRequest, DockerPlatformFieldDefaultFactoryRequest),
+        QueryRule(ChosenLocalEnvironmentName, []),
+    )
