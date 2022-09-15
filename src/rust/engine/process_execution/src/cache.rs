@@ -34,7 +34,8 @@ pub struct CommandRunner {
   file_store: Store,
   cache_read: bool,
   cache_content_behavior: CacheContentBehavior,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
 }
 
 impl CommandRunner {
@@ -44,7 +45,8 @@ impl CommandRunner {
     file_store: Store,
     cache_read: bool,
     cache_content_behavior: CacheContentBehavior,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
   ) -> CommandRunner {
     CommandRunner {
       inner,
@@ -52,7 +54,8 @@ impl CommandRunner {
       file_store,
       cache_read,
       cache_content_behavior,
-      metadata,
+      instance_name,
+      process_cache_namespace,
     }
   }
 }
@@ -76,7 +79,17 @@ impl crate::CommandRunner for CommandRunner {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
-      digest: Some(crate::digest(&req, &self.metadata).into()),
+      digest: Some(
+        crate::digest(
+          &req,
+          &ProcessMetadata {
+            instance_name: self.instance_name.clone(),
+            cache_key_gen_version: self.process_cache_namespace.clone(),
+            platform_properties: req.platform_properties.clone(),
+          },
+        )
+        .into(),
+      ),
       key_type: CacheKeyType::Process.into(),
     };
 

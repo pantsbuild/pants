@@ -293,7 +293,8 @@ async fn main() {
 
       let remote_runner = process_execution::remote::CommandRunner::new(
         &address,
-        process_metadata.clone(),
+        process_metadata.instance_name.clone(),
+        process_metadata.cache_key_gen_version.clone(),
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
@@ -309,7 +310,8 @@ async fn main() {
         Box::new(
           process_execution::remote_cache::CommandRunner::new(
             Arc::new(remote_runner),
-            process_metadata,
+            process_metadata.instance_name.clone(),
+            process_metadata.cache_key_gen_version.clone(),
             executor,
             store.clone(),
             &address,
@@ -456,6 +458,7 @@ async fn make_request_from_flat_args(
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let metadata = ProcessMetadata {
@@ -550,6 +553,7 @@ async fn extract_request_from_action_digest(
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let metadata = ProcessMetadata {

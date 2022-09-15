@@ -539,6 +539,10 @@ pub struct Process {
 
   /// The docker image to run the process with.
   pub docker_image: Option<String>,
+
+  /// Properties used for remote execution configuration. Regardless of remote execution, these
+  /// should impact the cache key.
+  pub platform_properties: Vec<(String, String)>,
 }
 
 impl Process {
@@ -570,6 +574,7 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       docker_image: None,
+      platform_properties: vec![],
     }
   }
 

@@ -186,10 +186,6 @@ class Scheduler:
             cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
             cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
-            execution_extra_platform_properties=tuple(
-                tuple(pair.split("=", 1))
-                for pair in execution_options.remote_execution_extra_platform_properties
-            ),
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,

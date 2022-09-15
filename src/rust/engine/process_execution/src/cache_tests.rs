@@ -13,7 +13,6 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 use crate::{
   local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Process, ProcessError,
-  ProcessMetadata,
 };
 
 struct RoundtripResults {
@@ -61,7 +60,8 @@ fn create_cached_runner(
     store,
     true,
     CacheContentBehavior::Fetch,
-    ProcessMetadata::default(),
+    None,
+    None,
   ));
 
   (runner, cache_dir)

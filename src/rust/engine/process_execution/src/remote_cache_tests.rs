@@ -132,7 +132,8 @@ fn create_cached_runner(
   Box::new(
     crate::remote_cache::CommandRunner::new(
       local.into(),
-      ProcessMetadata::default(),
+      None,
+      None,
       store_setup.executor.clone(),
       store_setup.store.clone(),
       &store_setup.cas.address(),
@@ -608,7 +609,8 @@ async fn make_action_result_basic() {
   let cas = StubCAS::builder().build();
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
-    ProcessMetadata::default(),
+    None,
+    None,
     executor.clone(),
     store.clone(),
     &cas.address(),

@@ -90,6 +90,7 @@ async fn make_execute_request() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -168,6 +169,7 @@ async fn make_execute_request_with_instance_name() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -259,6 +261,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let mut want_command = remexec::Command {
@@ -497,6 +500,7 @@ async fn make_execute_request_with_timeout() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -603,6 +607,7 @@ async fn make_execute_request_using_immutable_inputs() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -901,7 +906,8 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     btreemap! {
       String::from("cat") => String::from("roland"),
@@ -1095,7 +1101,8 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),
@@ -1443,7 +1450,8 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),
@@ -1503,7 +1511,8 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store,
@@ -2175,7 +2184,8 @@ fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &execution_address,
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),

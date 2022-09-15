@@ -47,7 +47,8 @@ pub enum RemoteCacheWarningsBehavior {
 #[derive(Clone)]
 pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -64,7 +65,8 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     inner: Arc<dyn crate::CommandRunner>,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     executor: task_executor::Executor,
     store: Store,
     action_cache_address: &str,
@@ -99,7 +101,8 @@ impl CommandRunner {
 
     Ok(CommandRunner {
       inner,
-      metadata,
+      instance_name,
+      process_cache_namespace,
       executor,
       store,
       action_cache_client,
@@ -112,6 +115,14 @@ impl CommandRunner {
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       read_timeout,
     })
+  }
+
+  fn process_metadata(&self, platform_properties: Vec<(String, String)>) -> ProcessMetadata {
+    ProcessMetadata {
+      instance_name: self.instance_name.clone(),
+      cache_key_gen_version: self.process_cache_namespace.clone(),
+      platform_properties: platform_properties,
+    }
   }
 
   /// Create a REAPI `Tree` protobuf for an output directory by traversing down from a Pants
@@ -259,7 +270,7 @@ impl CommandRunner {
       let response = check_action_cache(
         action_digest,
         &request.description,
-        &self.metadata,
+        &self.process_metadata(request.platform_properties.clone()),
         self.platform,
         &context,
         self.action_cache_client.clone(),
@@ -437,13 +448,17 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, _execute_request) =
-      make_execute_request(&request, self.metadata.clone())?;
+    let (action, command, _execute_request) = make_execute_request(
+      &request,
+      self.process_metadata(request.platform_properties.clone()),
+    )?;
     let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
+
+    let process_platform_properties = request.platform_properties.clone();
 
     let (result, hit_cache) = if self.cache_read {
       self
@@ -473,7 +488,7 @@ impl crate::CommandRunner for CommandRunner {
           let write_result = command_runner
             .update_action_cache(
               &result,
-              &command_runner.metadata,
+              &command_runner.process_metadata(process_platform_properties),
               &command,
               action_digest,
               command_digest,

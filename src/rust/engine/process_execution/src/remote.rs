@@ -97,7 +97,8 @@ pub enum ExecutionError {
 /// optimizations to shave off a round-trip in the future.
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   platform: Platform,
   store: Store,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -116,7 +117,8 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     execution_address: &str,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
@@ -151,7 +153,8 @@ impl CommandRunner {
     let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
-      metadata,
+      instance_name,
+      process_cache_namespace,
       execution_client,
       store,
       platform,
@@ -171,7 +174,7 @@ impl CommandRunner {
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
     let capabilities_fut = async {
       let mut request = remexec::GetCapabilitiesRequest::default();
-      if let Some(s) = self.metadata.instance_name.as_ref() {
+      if let Some(s) = self.instance_name.as_ref() {
         request.instance_name = s.clone();
       }
 
@@ -743,7 +746,14 @@ impl crate::CommandRunner for CommandRunner {
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
+    let (action, command, execute_request) = make_execute_request(
+      &request,
+      ProcessMetadata {
+        instance_name: self.instance_name.clone(),
+        cache_key_gen_version: self.process_cache_namespace.clone(),
+        platform_properties: request.platform_properties.clone(),
+      },
+    )?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
