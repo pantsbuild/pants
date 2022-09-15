@@ -78,7 +78,7 @@ impl DockerOnceCell {
               return Err(format!("Pants requires Docker to support API version 1.41 or higher. Local Docker only supports: {:?}", &version.api_version));
             }
           }
-          _ => return Err(format!("Unparesable API version `{}` returned by Docker.", &api_version)),
+          _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
         }
 
         Ok(docker)
