@@ -44,7 +44,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import FieldSet, FilteredTargets, SourcesField
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -546,11 +546,11 @@ async def lint(
         for rt, lint_partitions in lint_partitions_by_request_type.items()
     }
 
-    lint_batches = (
+    lint_batches = [
         rt.SubPartition(elements)
         for rt, batch in lint_batches_by_request_type.items()
         for elements in batch
-    )
+    ]
 
     fmt_target_requests: Iterable[FmtTargetsRequest] = ()
     fmt_build_requests: Iterable[_FmtBuildFilesRequest] = ()
@@ -590,36 +590,16 @@ async def lint(
 
     all_requests = [
         *(Get(LintResult, _LintSubPartition, request) for request in lint_batches),
-        *(Get(FmtResult, FmtTargetsRequest, request) for request in fmt_target_requests),
-        *(Get(FmtResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
+        *(Get(LintResult, FmtTargetsRequest, request) for request in fmt_target_requests),
+        *(Get(LintResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
     ]
-    all_batch_results = cast(
-        "tuple[LintResult | FmtResult, ...]",
-        await MultiGet(all_requests),  # type: ignore[arg-type]
-    )
+    all_batch_results = await MultiGet(all_requests)
 
-    def get_name(result: LintResult | FmtResult):
-        if isinstance(result, FmtResult):
-            return result.formatter_name
-        return result.linter_name
-
-    formatter_failed = False
-
-    def coerce_to_lintresult(batch_result: LintResult | FmtResult) -> LintResult:
-        if isinstance(batch_result, FmtResult):
-            nonlocal formatter_failed
-            formatter_failed = formatter_failed or batch_result.did_change
-            return LintResult(
-                1 if batch_result.did_change else 0,
-                batch_result.stdout,
-                batch_result.stderr,
-                linter_name=batch_result.formatter_name,
-            )
-        return batch_result
+    formatter_failed = any(result.exit_code for result in all_batch_results[len(lint_batches) :])
 
     results_by_tool = defaultdict(list)
     for result in all_batch_results:
-        results_by_tool[get_name(result)].append(coerce_to_lintresult(result))
+        results_by_tool[result.linter_name].append(result)
 
     write_reports(
         results_by_tool,
@@ -633,7 +613,17 @@ async def lint(
         results_by_tool,
         formatter_failed,
     )
-    return Lint(_get_error_code([coerce_to_lintresult(r) for r in all_batch_results]))
+    return Lint(_get_error_code(all_batch_results))
+
+
+@rule
+async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
+    return LintResult(
+        1 if fmt_result.did_change else 0,
+        fmt_result.stdout,
+        fmt_result.stderr,
+        linter_name=fmt_result.formatter_name,
+    )
 
 
 def rules():

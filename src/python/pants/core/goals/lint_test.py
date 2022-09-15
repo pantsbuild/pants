@@ -12,7 +12,7 @@ from typing import Any, Iterable, Optional, Sequence, Tuple, Type
 import pytest
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
+from pants.core.goals.fmt import FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
     Lint,
@@ -29,7 +29,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.build_files import BuildFileOptions
-from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -156,26 +156,24 @@ class SuccessfulFormatter(MockFmtRequest):
     name = "SuccessfulFormatter"
 
     @property
-    def fmt_result(self) -> FmtResult:
-        return FmtResult(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, "", "", formatter_name=self.name)
+    def lint_result(self) -> LintResult:
+        return LintResult(0, "", "", self.name)
 
 
 class FailingFormatter(MockFmtRequest):
     name = "FailingFormatter"
 
     @property
-    def fmt_result(self) -> FmtResult:
-        before = EMPTY_SNAPSHOT
-        after = Snapshot._unsafe_create(Digest(EMPTY_DIGEST.fingerprint, 2), [], [])
-        return FmtResult(before, after, "", "", formatter_name=self.name)
+    def lint_result(self) -> LintResult:
+        return LintResult(1, "", "", self.name)
 
 
 class BuildFileFormatter(_FmtBuildFilesRequest):
     name = "BobTheBUILDer"
 
     @property
-    def fmt_result(self) -> FmtResult:
-        return FmtResult(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, "", "", formatter_name=self.name)
+    def lint_result(self) -> LintResult:
+        return LintResult(0, "", "", self.name)
 
 
 @pytest.fixture
@@ -256,14 +254,14 @@ def run_lint_rule(
                     mock=mock_lint_partition,
                 ),
                 MockGet(
-                    output_type=FmtResult,
+                    output_type=LintResult,
                     input_types=(FmtTargetsRequest,),
-                    mock=lambda request: request.fmt_result,
+                    mock=lambda request: request.lint_result,
                 ),
                 MockGet(
-                    output_type=FmtResult,
+                    output_type=LintResult,
                     input_types=(_FmtBuildFilesRequest,),
-                    mock=lambda request: request.fmt_result,
+                    mock=lambda request: request.lint_result,
                 ),
                 MockGet(
                     output_type=FilteredTargets,
