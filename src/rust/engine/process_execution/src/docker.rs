@@ -63,10 +63,23 @@ impl DockerOnceCell {
         let docker = Docker::connect_with_local_defaults()
           .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
 
-        docker
-          .ping()
-          .await
-          .map_err(|err| format!("Failed to receive response from local Docker: {err}"))?;
+        let version = docker.version().await
+          .map_err(|err| format!("Failed to obtain version from local Docker: {err}"))?;
+
+        let api_version = version.api_version.as_ref().ok_or("Docker failed to report its API version.")?;
+        let api_version_parts = api_version
+          .split('.')
+          .collect::<Vec<_>>();
+        match api_version_parts[..] {
+          [major, minor, ..] => {
+            let major = (*major).parse::<usize>().map_err(|err| format!("Failed to decode Docker API major version `{major}`: {err}"))?;
+            let minor = (*minor).parse::<usize>().map_err(|err| format!("Failed to decode Docker API minor version `{minor}`: {err}"))?;
+            if major < 1 || (major == 1 && minor < 41) {
+              return Err(format!("Pants requires Docker to support API version 1.41 or higher. Local Docker only supports: {:?}", &version.api_version));
+            }
+          }
+          _ => return Err(format!("Unparesable API version `{}` returned by Docker.", &api_version)),
+        }
 
         Ok(docker)
       })
