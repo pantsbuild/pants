@@ -32,7 +32,7 @@ use fs::{
   RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
-  self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
+  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
@@ -386,13 +386,6 @@ impl ExecuteProcess {
         .try_into()?
     };
 
-    let platform_constraint =
-      if let Some(p) = externs::getattr_as_optional_string(value, "platform") {
-        Some(Platform::try_from(p)?)
-      } else {
-        None
-      };
-
     Ok(process_execution::Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -405,7 +398,7 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform_constraint,
+      platform_constraint: Some(process_config.platform),
       execution_slot_variable,
       concurrency_available,
       cache_scope,

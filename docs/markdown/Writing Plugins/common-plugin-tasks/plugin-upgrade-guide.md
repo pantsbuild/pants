@@ -9,6 +9,21 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `platform` kwarg for `Process` deprecated
+
+Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
+platforms (OS x CPU architecture). You had to opt into platform awareness by setting the kwarg
+`platform` on the `Process`; otherwise, remote caching could incorrectly use results from a
+different platform.
+
+This was not a safe default, and this behavior also breaks the new Docker support. So, now all
+processes automatically are marked as platform-specific.
+
+https://github.com/pantsbuild/pants/issues/16873 proposes how you will eventually be able to mark
+a `Process` as platform-agnostic.
+
+To fix this deprecation, simply delete the `platform` kwarg.
+
 ### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` renamed and moved
 
 The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have

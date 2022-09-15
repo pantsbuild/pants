@@ -42,6 +42,7 @@ from pants.engine.internals.native_engine import ProcessConfigFromEnvironment, P
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
+from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import rule
@@ -517,7 +518,11 @@ class RuleRunner:
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
         return native_engine.session_run_interactive_process(
-            self.scheduler.py_session, request, ProcessConfigFromEnvironment(docker_image=None)
+            self.scheduler.py_session,
+            request,
+            ProcessConfigFromEnvironment(
+                platform=Platform.create_for_localhost().value, docker_image=None
+            ),
         )
 
 
