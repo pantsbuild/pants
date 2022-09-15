@@ -13,10 +13,14 @@ Manual installation
 
 Pants is invoked via a launch script named `./pants` , saved at the root of the repository. This script will install Pants and handle upgrades.
 
-First, set up a minimal `pants.toml` config file to instruct the script to download the latest 2.13 release:
+First, pick a release version. You can see the available releases [on PyPI](https://pypi.org/project/pantsbuild.pants/).
+We recommend picking the current stable release, unless you have reason to need a more recent one,
+such as a release candidate or a development release.
+
+Then, set up a minimal `pants.toml` config file, filling in the version you selected:
 
 ```bash
-printf '[GLOBAL]\npants_version = "2.13.0.dev5"\n' > pants.toml
+printf '[GLOBAL]\npants_version = "X.Y.Z"\n' > pants.toml
 ```
 
 Then, download the script:
