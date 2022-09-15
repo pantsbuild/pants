@@ -94,6 +94,15 @@ struct ImagePullCache {
   image_pull_policy: ImagePullPolicy,
 }
 
+fn docker_platform_identifier(platform: &Platform) -> &'static str {
+  match platform {
+    Platform::Linux_x86_64 => "linux/amd64",
+    Platform::Linux_arm64 => "linux/arm64",
+    Platform::Macos_x86_64 => "darwin/amd64",
+    Platform::Macos_arm64 => "darwin/arm64",
+  }
+}
+
 impl ImagePullCache {
   pub fn new(image_pull_policy: ImagePullPolicy) -> Self {
     Self {
@@ -106,6 +115,7 @@ impl ImagePullCache {
     &self,
     docker: &Docker,
     image: &str,
+    platform: &Platform,
     build_generation: &str,
   ) -> Result<(), String> {
     let image_cell = {
@@ -124,7 +134,7 @@ impl ImagePullCache {
     };
 
     image_cell
-      .get_or_try_init(pull_image(docker, image, self.image_pull_policy))
+      .get_or_try_init(pull_image(docker, image, platform, self.image_pull_policy))
       .await?;
     Ok(())
   }
@@ -140,7 +150,12 @@ pub enum ImagePullPolicy {
 
 /// Pull an image given its name and the image pull policy. This method is debounced by
 /// the "image pull cache" in the `CommandRunner`.
-async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Result<(), String> {
+async fn pull_image(
+  docker: &Docker,
+  image: &str,
+  platform: &Platform,
+  policy: ImagePullPolicy,
+) -> Result<(), String> {
   let has_latest_tag = {
     if let Some((_, suffix)) = image.rsplit_once(':') {
       suffix == "latest"
@@ -196,6 +211,7 @@ async fn pull_image(docker: &Docker, image: &str, policy: ImagePullPolicy) -> Re
       |_workunit| async move {
         let create_image_options = CreateImageOptions::<String> {
           from_image: image.to_string(),
+          platform: docker_platform_identifier(platform).to_string(),
           ..CreateImageOptions::default()
         };
 
@@ -426,12 +442,14 @@ impl CapturedWorkdir for CommandRunner {
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
 
     // Obtain ID of the base container in which to run the execution for this process.
+    let platform = match req.platform_constraint {
+      Some(platform) => platform,
+      None => Platform::current()?,
+    };
     let container_id = self
       .container_cache
-      .container_id_for_image(&image, &context.build_id)
+      .container_id_for_image(&image, &platform, &context.build_id)
       .await?;
-
-    // DOCKER-TODO: Set creation options so we can set platform.
 
     let config = bollard::exec::CreateExecOptions {
       env: Some(env),
@@ -518,7 +536,8 @@ struct ContainerCache {
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
-  containers: Mutex<BTreeMap<String, Arc<OnceCell<String>>>>,
+  #[allow(clippy::type_complexity)]
+  containers: Mutex<BTreeMap<(String, Platform), Arc<OnceCell<String>>>>,
 }
 
 impl ContainerCache {
@@ -580,6 +599,7 @@ impl ContainerCache {
     docker: Docker,
     image_pull_cache: &ImagePullCache,
     image: String,
+    platform: Platform,
     build_generation: &str,
     work_dir_base: String,
     named_caches_base_dir: String,
@@ -587,7 +607,7 @@ impl ContainerCache {
   ) -> Result<String, String> {
     // Pull the image
     image_pull_cache
-      .pull_image(&docker, &image, build_generation)
+      .pull_image(&docker, &image, &platform, build_generation)
       .await?;
 
     let config = bollard::container::Config {
@@ -621,6 +641,8 @@ impl ContainerCache {
       &config
     );
 
+    // TODO: Pass `platform` parameter via options argument once https://github.com/fussybeaver/bollard/pull/259
+    // is approved upstream.
     let container = docker
       .create_container::<&str, String>(None, config)
       .await
@@ -656,6 +678,7 @@ impl ContainerCache {
   pub async fn container_id_for_image(
     &self,
     image: &str,
+    platform: &Platform,
     build_generation: &str,
   ) -> Result<String, String> {
     let docker = self.docker.get().await?;
@@ -664,7 +687,7 @@ impl ContainerCache {
     let container_id_cell = {
       let mut containers = self.containers.lock();
       let cell = containers
-        .entry(image.to_string())
+        .entry((image.to_string(), *platform))
         .or_insert_with(|| Arc::new(OnceCell::new()));
       cell.clone()
     };
@@ -679,6 +702,7 @@ impl ContainerCache {
           docker,
           &self.image_pull_cache,
           image.to_string(),
+          *platform,
           build_generation,
           work_dir_base,
           named_caches_base_dir,
@@ -707,7 +731,7 @@ impl Drop for ContainerCache {
           }
         };
 
-        let removal_futures = container_ids.into_iter().map(|id| async move {
+        let removal_futures = container_ids.into_iter().map(|(id, _platform)| async move {
           let remove_options = RemoveContainerOptions {
             force: true,
             ..RemoveContainerOptions::default()
