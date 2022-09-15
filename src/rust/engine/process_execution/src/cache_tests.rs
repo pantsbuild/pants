@@ -61,7 +61,6 @@ fn create_cached_runner(
     true,
     CacheContentBehavior::Fetch,
     None,
-    None,
   ));
 
   (runner, cache_dir)

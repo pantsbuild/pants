@@ -310,7 +310,7 @@ impl Core {
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
-        instance_name.clone(),
+        instance_name,
         process_cache_namespace.clone(),
         executor.clone(),
         full_store.clone(),
@@ -334,7 +334,6 @@ impl Core {
         full_store.clone(),
         local_cache_read,
         cache_content_behavior,
-        instance_name,
         process_cache_namespace,
       ));
     }

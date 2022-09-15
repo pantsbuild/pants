@@ -34,7 +34,6 @@ pub struct CommandRunner {
   file_store: Store,
   cache_read: bool,
   cache_content_behavior: CacheContentBehavior,
-  instance_name: Option<String>,
   process_cache_namespace: Option<String>,
 }
 
@@ -45,7 +44,6 @@ impl CommandRunner {
     file_store: Store,
     cache_read: bool,
     cache_content_behavior: CacheContentBehavior,
-    instance_name: Option<String>,
     process_cache_namespace: Option<String>,
   ) -> CommandRunner {
     CommandRunner {
@@ -54,7 +52,6 @@ impl CommandRunner {
       file_store,
       cache_read,
       cache_content_behavior,
-      instance_name,
       process_cache_namespace,
     }
   }
@@ -83,7 +80,7 @@ impl crate::CommandRunner for CommandRunner {
         crate::digest(
           &req,
           &ProcessMetadata {
-            instance_name: self.instance_name.clone(),
+            instance_name: None,
             cache_key_gen_version: self.process_cache_namespace.clone(),
             platform_properties: req.platform_properties.clone(),
           },
