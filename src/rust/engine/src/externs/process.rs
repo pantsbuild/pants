@@ -21,16 +21,22 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 pub struct PyProcessConfigFromEnvironment {
   pub platform: Platform,
   pub docker_image: Option<String>,
+  pub remote_execution_extra_platform_properties: Vec<(String, String)>,
 }
 
 #[pymethods]
 impl PyProcessConfigFromEnvironment {
   #[new]
-  fn __new__(platform: String, docker_image: Option<String>) -> PyResult<Self> {
+  fn __new__(
+    platform: String,
+    docker_image: Option<String>,
+    remote_execution_extra_platform_properties: Vec<(String, String)>,
+  ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
     Ok(Self {
       platform,
       docker_image,
+      remote_execution_extra_platform_properties,
     })
   }
 
@@ -38,14 +44,16 @@ impl PyProcessConfigFromEnvironment {
     let mut s = DefaultHasher::new();
     self.platform.hash(&mut s);
     self.docker_image.hash(&mut s);
+    self.remote_execution_extra_platform_properties.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
     format!(
-      "ProcessConfigFromEnvironment(platform={}, docker_image={})",
+      "ProcessConfigFromEnvironment(platform={}, docker_image={}, remote_execution_extra_platform_properties={:?})",
       String::from(self.platform),
-      self.docker_image.as_ref().unwrap_or(&"None".to_owned())
+      self.docker_image.as_ref().unwrap_or(&"None".to_owned()),
+      self.remote_execution_extra_platform_properties
     )
   }
 
@@ -60,10 +68,5 @@ impl PyProcessConfigFromEnvironment {
       CompareOp::Ne => (self != other).into_py(py),
       _ => py.NotImplemented(),
     }
-  }
-
-  #[getter]
-  fn docker_image(&self) -> Option<String> {
-    self.docker_image.clone()
   }
 }

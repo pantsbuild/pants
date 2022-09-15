@@ -172,12 +172,16 @@ class ProcessConfigFromEnvironment:
     `env` in the `Process` constructor.
     """
 
-    def __init__(self, *, platform: str, docker_image: str | None) -> None: ...
+    def __init__(
+        self,
+        *,
+        platform: str,
+        docker_image: str | None,
+        remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
+    ) -> None: ...
     def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
-    @property
-    def docker_image(self) -> str | None: ...
 
 # ------------------------------------------------------------------------------
 # Workunits
