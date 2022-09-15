@@ -178,7 +178,7 @@ dependencies = [
 [[package]]
 name = "bollard"
 version = "0.13.0"
-source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2d66d11b44aeff0373ece3d64a44b243e5152973#2d66d11b44aeff0373ece3d64a44b243e5152973"
 dependencies = [
  "base64",
  "bollard-stubs 1.42.0-rc.4",
@@ -215,7 +215,7 @@ dependencies = [
 [[package]]
 name = "bollard-stubs"
 version = "1.42.0-rc.4"
-source = "git+https://github.com/fussybeaver/bollard.git?rev=2e10fe31076a6e298697fc6e31fa3676b7498b6c#2e10fe31076a6e298697fc6e31fa3676b7498b6c"
+source = "git+https://github.com/fussybeaver/bollard.git?rev=2d66d11b44aeff0373ece3d64a44b243e5152973#2d66d11b44aeff0373ece3d64a44b243e5152973"
 dependencies = [
  "serde",
  "serde_with",

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
-use bollard::container::{LogOutput, RemoveContainerOptions};
+use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::service::CreateImageInfo;
@@ -641,10 +641,12 @@ impl ContainerCache {
       &config
     );
 
-    // TODO: Pass `platform` parameter via options argument once https://github.com/fussybeaver/bollard/pull/259
-    // is approved upstream.
+    let create_options = CreateContainerOptions::<&str> {
+      name: "",
+      platform: Some(docker_platform_identifier(&platform)),
+    };
     let container = docker
-      .create_container::<&str, String>(None, config)
+      .create_container::<&str, String>(Some(create_options), config)
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
 
