@@ -628,6 +628,14 @@ impl Process {
     self.docker_image = Some(docker_image);
     self
   }
+
+  ///
+  /// Replaces the platform_properties used for this process.
+  ///
+  pub fn platform_properties(mut self, properties: Vec<(String, String)>) -> Process {
+    self.platform_properties = properties;
+    self
+  }
 }
 
 ///
@@ -639,7 +647,6 @@ impl Process {
 pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
-  pub platform_properties: Vec<(String, String)>,
 }
 
 ///

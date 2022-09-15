@@ -82,7 +82,6 @@ impl crate::CommandRunner for CommandRunner {
           &ProcessMetadata {
             instance_name: None,
             cache_key_gen_version: self.process_cache_namespace.clone(),
-            platform_properties: req.platform_properties.clone(),
           },
         )
         .into(),

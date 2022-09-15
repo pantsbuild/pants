@@ -117,11 +117,10 @@ impl CommandRunner {
     })
   }
 
-  fn process_metadata(&self, platform_properties: Vec<(String, String)>) -> ProcessMetadata {
+  fn process_metadata(&self) -> ProcessMetadata {
     ProcessMetadata {
       instance_name: self.instance_name.clone(),
       cache_key_gen_version: self.process_cache_namespace.clone(),
-      platform_properties: platform_properties,
     }
   }
 
@@ -270,7 +269,7 @@ impl CommandRunner {
       let response = check_action_cache(
         action_digest,
         &request.description,
-        &self.process_metadata(request.platform_properties.clone()),
+        &self.process_metadata(),
         self.platform,
         &context,
         self.action_cache_client.clone(),
@@ -448,17 +447,13 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, _execute_request) = make_execute_request(
-      &request,
-      self.process_metadata(request.platform_properties.clone()),
-    )?;
+    let (action, command, _execute_request) =
+      make_execute_request(&request, self.process_metadata())?;
     let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
-
-    let process_platform_properties = request.platform_properties.clone();
 
     let (result, hit_cache) = if self.cache_read {
       self
@@ -488,7 +483,7 @@ impl crate::CommandRunner for CommandRunner {
           let write_result = command_runner
             .update_action_cache(
               &result,
-              &command_runner.process_metadata(process_platform_properties),
+              &command_runner.process_metadata(),
               &command,
               action_digest,
               command_digest,

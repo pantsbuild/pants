@@ -751,7 +751,6 @@ impl crate::CommandRunner for CommandRunner {
       ProcessMetadata {
         instance_name: self.instance_name.clone(),
         cache_key_gen_version: self.process_cache_namespace.clone(),
-        platform_properties: request.platform_properties.clone(),
       },
     )?;
     let build_id = context.build_id.clone();
@@ -876,10 +875,10 @@ pub fn make_execute_request(
       });
   }
 
+  let mut platform_properties = req.platform_properties.clone();
   let ProcessMetadata {
     instance_name,
     cache_key_gen_version,
-    mut platform_properties,
   } = metadata;
 
   // TODO: Disabling append-only caches in remoting until server support exists due to

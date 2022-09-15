@@ -458,13 +458,12 @@ async fn make_request_from_flat_args(
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
+    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
 
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
     cache_key_gen_version: args.command.cache_key_gen_version.clone(),
-    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
   Ok((process, metadata))
 }
@@ -553,12 +552,6 @@ async fn extract_request_from_action_digest(
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
-  };
-
-  let metadata = ProcessMetadata {
-    instance_name,
-    cache_key_gen_version: None,
     platform_properties: command
       .platform
       .iter()
@@ -569,6 +562,11 @@ async fn extract_request_from_action_digest(
           .map(|property| (property.name.clone(), property.value.clone()))
       })
       .collect(),
+  };
+
+  let metadata = ProcessMetadata {
+    instance_name,
+    cache_key_gen_version: None,
   };
 
   Ok((process, metadata))
