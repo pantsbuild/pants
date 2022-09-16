@@ -99,7 +99,6 @@ pub enum ExecutionError {
 pub struct CommandRunner {
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
-  platform: Platform,
   store: Store,
   execution_client: Arc<ExecutionClient<LayeredService>>,
   overall_deadline: Duration,
@@ -122,7 +121,6 @@ impl CommandRunner {
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: Platform,
     overall_deadline: Duration,
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
@@ -157,7 +155,6 @@ impl CommandRunner {
       process_cache_namespace,
       execution_client,
       store,
-      platform,
       overall_deadline,
       retry_interval_duration,
       capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
@@ -165,10 +162,6 @@ impl CommandRunner {
     };
 
     Ok(command_runner)
-  }
-
-  pub fn platform(&self) -> Platform {
-    self.platform
   }
 
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
@@ -425,6 +418,7 @@ impl CommandRunner {
   pub(crate) async fn extract_execute_response(
     &self,
     run_id: RunId,
+    platform: Platform,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -480,7 +474,7 @@ impl CommandRunner {
             self.store.clone(),
             run_id,
             action_result,
-            self.platform,
+            platform,
             false,
             if execute_response.cached_result {
               ProcessResultSource::HitRemotely
@@ -671,7 +665,7 @@ impl CommandRunner {
       };
 
       match self
-        .extract_execute_response(context.run_id, actionable_result)
+        .extract_execute_response(context.run_id, process.platform, actionable_result)
         .await
       {
         Ok(result) => return Ok(result),
@@ -714,7 +708,7 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              self.platform,
+              process.platform,
             )
             .await?;
             return Ok(result);

@@ -13,15 +13,22 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
 @rule
-def current_platform(env_tgt: EnvironmentTarget) -> Platform:
-    if env_tgt.val is None or not env_tgt.val.has_field(DockerPlatformField):
-        return Platform.create_for_localhost()
-    return Platform(env_tgt.val[DockerPlatformField].normalized_value)
+def current_platform(env_tgt: EnvironmentTarget, global_options: GlobalOptions) -> Platform:
+    if env_tgt.val and env_tgt.val.has_field(DockerPlatformField):
+        return Platform(env_tgt.val[DockerPlatformField].normalized_value)
+    return (
+        # For now, we assume remote execution always uses x86_64. Instead, this should be
+        # configurable via remote execution environment targets.
+        Platform.linux_x86_64
+        if global_options.remote_execution
+        else Platform.create_for_localhost()
+    )
 
 
 @rule
