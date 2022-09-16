@@ -92,7 +92,7 @@ async fn runner_errors_if_docker_image_not_set() {
     .unwrap_err();
   if let ProcessError::Unclassified(msg) = &err {
     assert!(
-      msg.contains("docker_image not set on the Process, but the Docker CommandRunner was used")
+      msg.contains("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used")
     );
   } else {
     panic!("unexpected value: {:?}", err)
