@@ -68,6 +68,14 @@ macro_rules! skip_if_no_docker_available_in_macos_ci {
   }};
 }
 
+fn platform_for_tests() -> Result<Platform, String> {
+  Platform::current().map(|platform| match platform {
+    Platform::Macos_arm64 => Platform::Linux_arm64,
+    Platform::Macos_x86_64 => Platform::Linux_x86_64,
+    p => p,
+  })
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn runner_errors_if_docker_image_not_set() {
@@ -155,7 +163,7 @@ async fn capture_exit_code_signal() {
   // assert_eq!(result.original.exit_code, -15);
   assert_eq!(result.original.exit_code, 143);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 fn extract_env(
@@ -277,7 +285,7 @@ async fn output_files_one() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -308,7 +316,7 @@ async fn output_dirs() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -338,7 +346,7 @@ async fn output_files_many() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -367,7 +375,7 @@ async fn output_files_execution_failure() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -397,7 +405,7 @@ async fn output_files_partial_output() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  // assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -424,7 +432,7 @@ async fn output_overlapping_file_and_dir() {
     result.original.output_directory,
     TestDirectory::nested().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -447,7 +455,7 @@ async fn append_only_cache_created() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -527,7 +535,7 @@ async fn all_containing_directories_for_outputs_are_created() {
     result.original.output_directory,
     TestDirectory::nested_dir_and_file().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -553,7 +561,7 @@ async fn output_empty_dir() {
     result.original.output_directory,
     TestDirectory::containing_falcons_dir().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -638,7 +646,7 @@ async fn working_directory() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -710,13 +718,18 @@ async fn immutable_inputs() {
 }
 
 async fn run_command_via_docker_in_dir(
-  req: Process,
+  mut req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
+  if req.platform_constraint.is_none() {
+    req.platform_constraint =
+      Some(platform_for_tests().map_err(|err| ProcessError::Unclassified(err))?);
+  }
+
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =

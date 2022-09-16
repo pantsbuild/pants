@@ -9,7 +9,7 @@ publish = false
 async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
-bollard = { git = "https://github.com/fussybeaver/bollard.git", rev = "2e10fe31076a6e298697fc6e31fa3676b7498b6c" }
+bollard = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
 bollard-stubs = "1.42.0-rc.3"
 walkdir = "2"
 protos = { path = "../protos" }
