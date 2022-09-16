@@ -440,9 +440,7 @@ def extract_process_config_from_environment(
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
-        remote_execution = global_options.remote_execution and tgt.val.has_field(
-            RemotePlatformField
-        )
+        remote_execution = tgt.val.has_field(RemotePlatformField)
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
@@ -536,6 +534,7 @@ def _add_option_field_for(
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
         DockerEnvironmentTarget.register_plugin_field(OptionField),
+        RemoteEnvironmentTarget.register_plugin_field(OptionField),
     ]
 
 

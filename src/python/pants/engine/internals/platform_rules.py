@@ -23,7 +23,7 @@ def current_platform(env_tgt: EnvironmentTarget, global_options: GlobalOptions) 
     if env_tgt.val:
         if env_tgt.val.has_field(DockerPlatformField):
             return Platform(env_tgt.val[DockerPlatformField].normalized_value)
-        if global_options.remote_execution and env_tgt.val.has_field(RemotePlatformField):
+        if env_tgt.val.has_field(RemotePlatformField):
             return Platform(env_tgt.val[RemotePlatformField].value)
         # Else, it's a local environment.
         return Platform.create_for_localhost()
@@ -51,7 +51,7 @@ async def complete_environment_vars(
     if env_tgt.val:
         if env_tgt.val.has_field(DockerImageField):
             description_of_env_source = f"the Docker image {env_tgt.val[DockerImageField].value}"
-        elif global_options.remote_execution and env_tgt.val.has_field(RemotePlatformField):
+        elif env_tgt.val.has_field(RemotePlatformField):
             description_of_env_source = "the remote execution environment"
         else:
             # Else, it's a local environment.

@@ -66,13 +66,14 @@ def test_current_platform() -> None:
             expected=Platform.linux_arm64,
         )
 
-    re_tgt = RemoteEnvironmentTarget(
-        {RemotePlatformField.alias: Platform.linux_arm64.value}, Address("dir")
-    )
-    assert_platform(env_tgt=re_tgt, remote_execution=True, expected=Platform.linux_arm64)
-    assert_platform(
-        env_tgt=re_tgt, remote_execution=False, expected=Platform.create_for_localhost()
-    )
+    for re in (False, True):
+        assert_platform(
+            env_tgt=RemoteEnvironmentTarget(
+                {RemotePlatformField.alias: Platform.linux_arm64.value}, Address("dir")
+            ),
+            remote_execution=re,
+            expected=Platform.linux_arm64,
+        )
 
 
 @pytest.mark.platform_specific_behavior
@@ -122,9 +123,12 @@ def test_complete_env_vars() -> None:
             expected_env="DOCKER",
         )
 
-    re_tgt = RemoteEnvironmentTarget({}, Address("dir"))
-    assert_env_vars(env_tgt=re_tgt, remote_execution=True, expected_env="REMOTE")
-    assert_env_vars(env_tgt=re_tgt, remote_execution=False, expected_env="LOCAL")
+    for re in (False, True):
+        assert_env_vars(
+            env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
+            remote_execution=re,
+            expected_env="REMOTE",
+        )
 
 
 def test_docker_complete_env_vars() -> None:

@@ -104,19 +104,13 @@ def test_extract_process_config_from_environment() -> None:
             expected_docker_image="my_img",
         )
 
-    re_tgt = RemoteEnvironmentTarget({}, Address("dir"))
-    assert_config(
-        env_tgt=re_tgt,
-        enable_remote_execution=True,
-        expected_remote_execution=True,
-        expected_docker_image=None,
-    )
-    assert_config(
-        env_tgt=re_tgt,
-        enable_remote_execution=False,
-        expected_remote_execution=False,
-        expected_docker_image=None,
-    )
+    for re in (False, True):
+        assert_config(
+            env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
+            enable_remote_execution=re,
+            expected_remote_execution=True,
+            expected_docker_image=None,
+        )
 
 
 def test_all_environments(rule_runner: RuleRunner) -> None:
