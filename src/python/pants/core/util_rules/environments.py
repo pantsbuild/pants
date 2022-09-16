@@ -180,6 +180,35 @@ class DockerEnvironmentTarget(Target):
     )
 
 
+class RemotePlatformField(StringField):
+    alias = "platform"
+    default = Platform.linux_x86_64.value
+    valid_choices = Platform
+    help = "The platform used by the remote execution environment."
+
+
+class RemoteEnvironmentTarget(Target):
+    alias = "_remote_environment"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        RemotePlatformField,
+    )
+    help = softwrap(
+        """
+        Configuration of a remote execution environment used for building your code, including the
+        environment variables and search paths used by Pants.
+
+        Note that you must also configure remote execution with the global options like
+        `remote_execution` and `remote_execution_address`.
+
+        Often, it is only necessary to have a single `_remote_environment` target for your
+        repository, but it can be useful to have >1 so that you can set different
+        `extra_platform_properties`. For example, with some servers, you could use this to
+        configure a different Docker image per environment.
+        """
+    )
+
+
 # -------------------------------------------------------------------------------------------
 # Rules
 # -------------------------------------------------------------------------------------------
@@ -404,13 +433,19 @@ async def get_target_for_environment_name(
 def extract_process_config_from_environment(
     tgt: EnvironmentTarget, platform: Platform, global_options: GlobalOptions
 ) -> ProcessConfigFromEnvironment:
-    docker_image = (
-        tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
-    )
+    if tgt.val is None:
+        docker_image = None
+        remote_execution = global_options.remote_execution
+    else:
+        docker_image = (
+            tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
+        )
+        remote_execution = tgt.val.has_field(RemotePlatformField)
+
     return ProcessConfigFromEnvironment(
         platform=platform.value,
         docker_image=docker_image,
-        remote_execution=global_options.remote_execution and not docker_image,
+        remote_execution=remote_execution,
         remote_execution_extra_platform_properties=[
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
             for pair in global_options.remote_execution_extra_platform_properties
@@ -499,6 +534,7 @@ def _add_option_field_for(
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
         DockerEnvironmentTarget.register_plugin_field(OptionField),
+        RemoteEnvironmentTarget.register_plugin_field(OptionField),
     ]
 
 

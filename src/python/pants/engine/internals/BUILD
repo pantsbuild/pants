@@ -5,7 +5,14 @@ python_sources(
     overrides={"native_engine.pyi": {"dependencies": [":native_engine"]}},
 )
 
-python_tests(name="tests", sources=["*_test.py", "!scheduler_integration_test.py"], timeout=90)
+python_tests(
+    name="tests",
+    sources=["*_test.py", "!scheduler_integration_test.py"],
+    timeout=90,
+    overrides={
+        "platform_rules_test.py": {"tags": ["platform_specific_behavior"]},
+    },
+)
 
 python_tests(
     name="scheduler_integration_test",

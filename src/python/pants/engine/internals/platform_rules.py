@@ -7,6 +7,7 @@ from pants.core.util_rules.environments import (
     DockerImageField,
     DockerPlatformField,
     EnvironmentTarget,
+    RemotePlatformField,
 )
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.session import SessionValues
@@ -15,16 +16,21 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
 
 
 @rule
 def current_platform(env_tgt: EnvironmentTarget, global_options: GlobalOptions) -> Platform:
-    if env_tgt.val and env_tgt.val.has_field(DockerPlatformField):
-        return Platform(env_tgt.val[DockerPlatformField].normalized_value)
+    if env_tgt.val:
+        if env_tgt.val.has_field(DockerPlatformField):
+            return Platform(env_tgt.val[DockerPlatformField].normalized_value)
+        if env_tgt.val.has_field(RemotePlatformField):
+            return Platform(env_tgt.val[RemotePlatformField].value)
+        # Else, it's a local environment.
+        return Platform.create_for_localhost()
+
+    # Else, the environments mechanism is not used. For now, at least, we continue to support
+    # enabling remote execution globally for every build via the `--remote-execution` option.
     return (
-        # For now, we assume remote execution always uses x86_64. Instead, this should be
-        # configurable via remote execution environment targets.
         Platform.linux_x86_64
         if global_options.remote_execution
         else Platform.create_for_localhost()
@@ -33,20 +39,34 @@ def current_platform(env_tgt: EnvironmentTarget, global_options: GlobalOptions) 
 
 @rule
 async def complete_environment_vars(
-    session_values: SessionValues, env_tgt: EnvironmentTarget
+    session_values: SessionValues, env_tgt: EnvironmentTarget, global_options: GlobalOptions
 ) -> CompleteEnvironmentVars:
-    if not env_tgt.val or not env_tgt.val.has_field(DockerImageField):
-        return session_values[CompleteEnvironmentVars]
+    # If a local environment is used, we simply use SessionValues. Otherwise, we need to run `env`
+    # and parse the output.
+    #
+    # Note that running `env` works for both Docker and Remote Execution because we intentionally
+    # do not strip the environment from either runtime. It is reasonable to not strip because
+    # every user will have the same consistent Docker image or Remote Execution environment, unlike
+    # local environments.
+    if env_tgt.val:
+        if env_tgt.val.has_field(DockerImageField):
+            description_of_env_source = f"the Docker image {env_tgt.val[DockerImageField].value}"
+        elif env_tgt.val.has_field(RemotePlatformField):
+            description_of_env_source = "the remote execution environment"
+        else:
+            # Else, it's a local environment.
+            return session_values[CompleteEnvironmentVars]
+    else:
+        if global_options.remote_execution:
+            description_of_env_source = "the remote execution environment"
+        else:
+            return session_values[CompleteEnvironmentVars]
+
     env_process_result = await Get(
         ProcessResult,
         Process(
             ["env", "-0"],
-            description=softwrap(
-                f"""
-                Extract environment variables from the Docker image
-                {env_tgt.val[DockerImageField].value}
-                """
-            ),
+            description=f"Extract environment variables from {description_of_env_source}",
             level=LogLevel.DEBUG,
         ),
     )
