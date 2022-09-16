@@ -24,7 +24,7 @@ use workunit_store::{RunId, WorkunitStore};
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessError,
+  Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
 };
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
@@ -89,7 +89,7 @@ async fn make_execute_request() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
     platform_properties: vec![],
   };
 
@@ -168,7 +168,7 @@ async fn make_execute_request_with_instance_name() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
     platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
   };
 
@@ -253,7 +253,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
     platform_properties: vec![],
   };
 
@@ -480,7 +480,7 @@ async fn make_execute_request_with_timeout() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
     platform_properties: vec![],
   };
 
@@ -587,7 +587,7 @@ async fn make_execute_request_using_immutable_inputs() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
     platform_properties: vec![],
   };
 

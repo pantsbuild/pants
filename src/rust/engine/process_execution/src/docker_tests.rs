@@ -84,7 +84,7 @@ async fn runner_errors_if_docker_image_not_set() {
   // Because `docker_image` is set but it does not exist, this process should fail.
   let err = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
-      .docker_image("does-not-exist:latest".to_owned()),
+      .docker("does-not-exist:latest".to_owned()),
   )
   .await
   .unwrap_err();
@@ -100,7 +100,7 @@ async fn runner_errors_if_docker_image_not_set() {
     .unwrap_err();
   if let ProcessError::Unclassified(msg) = &err {
     assert!(
-      msg.contains("docker_image not set on the Process, but the Docker CommandRunner was used")
+      msg.contains("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used")
     );
   } else {
     panic!("unexpected value: {:?}", err)
@@ -112,7 +112,7 @@ async fn runner_errors_if_docker_image_not_set() {
 async fn stdout() {
   skip_if_no_docker_available_in_macos_ci!();
   let result = run_command_via_docker(
-    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker_image(IMAGE.to_owned()),
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -133,7 +133,7 @@ async fn stdout_and_stderr_and_exit_code() {
       "-c",
       "echo -n foo ; echo >&2 -n bar ; exit 1",
     ]))
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -151,7 +151,7 @@ async fn capture_exit_code_signal() {
 
   // Launch a process that kills itself with a signal.
   let result = run_command_via_docker(
-    Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker_image(IMAGE.to_owned()),
+    Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -199,7 +199,7 @@ async fn env() {
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/env"]))
       .env(env.clone())
-      .docker_image(IMAGE.to_owned()),
+      .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -220,7 +220,7 @@ async fn env_is_deterministic() {
     env.insert("BAR".to_string(), "not foo".to_string());
     Process::new(owned_string_vec(&["/bin/env"]))
       .env(env)
-      .docker_image(IMAGE.to_owned())
+      .docker(IMAGE.to_owned())
   }
 
   let result1 = run_command_via_docker(make_request()).await.unwrap();
@@ -238,7 +238,7 @@ async fn binary_not_found() {
 
   // Use `xyzzy` as a command that should not exist.
   let result = run_command_via_docker(
-    Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker_image(IMAGE.to_owned()),
+    Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -251,7 +251,7 @@ async fn output_files_none() {
   skip_if_no_docker_available_in_macos_ci!();
 
   let result = run_command_via_docker(
-    Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker_image(IMAGE.to_owned()),
+    Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -273,7 +273,7 @@ async fn output_files_one() {
       format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
     .output_files(relative_paths(&["roland.ext"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -304,7 +304,7 @@ async fn output_dirs() {
     ])
     .output_files(relative_paths(&["treats.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -334,7 +334,7 @@ async fn output_files_many() {
       ),
     ])
     .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -363,7 +363,7 @@ async fn output_files_execution_failure() {
       ),
     ])
     .output_files(relative_paths(&["roland.ext"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -393,7 +393,7 @@ async fn output_files_partial_output() {
         .into_iter()
         .collect(),
     )
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -420,7 +420,7 @@ async fn output_overlapping_file_and_dir() {
     ])
     .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -446,7 +446,7 @@ async fn append_only_cache_created() {
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
-      .docker_image(IMAGE.to_owned()),
+      .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -467,7 +467,7 @@ async fn test_apply_chroot() {
   let work_dir = TempDir::new().unwrap();
   let mut req = Process::new(owned_string_vec(&["/usr/bin/env"]))
     .env(env.clone())
-    .docker_image(IMAGE.to_owned());
+    .docker(IMAGE.to_owned());
   local::apply_chroot(work_dir.path().to_str().unwrap(), &mut req);
 
   let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
@@ -489,7 +489,7 @@ async fn test_chroot_placeholder() {
   let result = run_command_via_docker_in_dir(
     Process::new(vec!["/bin/env".to_owned()])
       .env(env.clone())
-      .docker_image(IMAGE.to_owned()),
+      .docker(IMAGE.to_owned()),
     work_root.clone(),
     KeepSandboxes::Always,
     &mut workunit,
@@ -523,7 +523,7 @@ async fn all_containing_directories_for_outputs_are_created() {
     ])
     .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["birds/falcons"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -549,7 +549,7 @@ async fn output_empty_dir() {
       "/bin/mkdir falcons".to_string(),
     ])
     .output_directories(relative_paths(&["falcons"]).collect())
-    .docker_image(IMAGE.to_owned()),
+    .docker(IMAGE.to_owned()),
   )
   .await
   .unwrap();
@@ -574,10 +574,9 @@ async fn timeout() {
     "/bin/echo -n 'Calculating...'; /bin/sleep 5; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
-  let mut process = Process::new(argv);
+  let mut process = Process::new(argv).docker(IMAGE.to_owned());
   process.timeout = Some(Duration::from_millis(500));
   process.description = "sleepy-cat".to_string();
-  process.docker_image = Some(IMAGE.to_owned());
 
   let result = run_command_via_docker(process).await.unwrap();
 
@@ -619,14 +618,14 @@ async fn working_directory() {
     SH_PATH.to_string(),
     "-c".to_owned(),
     "/bin/ls".to_string(),
-  ]);
+  ])
+  .docker(IMAGE.to_owned());
   process.working_directory = Some(RelativePath::new("cats").unwrap());
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
   process.input_digests =
     InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.timeout = Some(Duration::from_secs(1));
   process.description = "confused-cat".to_string();
-  process.docker_image = Some(IMAGE.to_owned());
 
   let result = run_command_via_docker_in_dir(
     process,
@@ -677,7 +676,8 @@ async fn immutable_inputs() {
     SH_PATH.to_string(),
     "-c".to_owned(),
     "/bin/ls".to_string(),
-  ]);
+  ])
+  .docker(IMAGE.to_owned());
   process.input_digests = InputDigests::new(
     &store,
     TestDirectory::containing_falcons_dir().directory_digest(),
@@ -695,7 +695,6 @@ async fn immutable_inputs() {
   .unwrap();
   process.timeout = Some(Duration::from_secs(1));
   process.description = "confused-cat".to_string();
-  process.docker_image = Some(IMAGE.to_string());
 
   let result = run_command_via_docker_in_dir(
     process,

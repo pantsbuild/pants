@@ -28,7 +28,7 @@ use parking_lot::Mutex;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, Platform, RemoteCacheWarningsBehavior,
+  ImmutableInputs, NamedCaches, Platform, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -191,93 +191,107 @@ impl Core {
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    let (runner, parallelism): (Box<dyn CommandRunner>, usize) = if remoting_opts.execution_enable {
-      (
-        Box::new(remote::CommandRunner::new(
-          // We unwrap because global_options.py will have already validated these are defined.
-          remoting_opts.execution_address.as_ref().unwrap(),
-          instance_name,
-          process_cache_namespace,
-          root_ca_certs.clone(),
-          remoting_opts.execution_headers.clone(),
-          full_store.clone(),
-          // TODO if we ever want to configure the remote platform to be something else we
-          // need to take an option all the way down here and into the remote::CommandRunner struct.
-          Platform::Linux_x86_64,
-          remoting_opts.execution_overall_deadline,
-          Duration::from_millis(100),
-          remoting_opts.execution_rpc_concurrency,
-          capabilities_cell_opt,
-        )?),
-        exec_strategy_opts.remote_parallelism,
-      )
-    } else {
-      let local_command_runner = local::CommandRunner::new(
-        local_runner_store.clone(),
-        executor.clone(),
-        local_execution_root_dir.to_path_buf(),
-        named_caches.clone(),
-        immutable_inputs.clone(),
-        exec_strategy_opts.local_keep_sandboxes,
-      );
+    let local_command_runner = local::CommandRunner::new(
+      local_runner_store.clone(),
+      executor.clone(),
+      local_execution_root_dir.to_path_buf(),
+      named_caches.clone(),
+      immutable_inputs.clone(),
+      exec_strategy_opts.local_keep_sandboxes,
+    );
 
-      let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
-        // We set the nailgun pool size to the number of instances that fit within the memory
-        // parameters configured when a max child process memory has been given.
-        // Otherwise, pool size will be double of the local parallelism so we can always keep
-        // a jvm warmed up.
-        let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
-          max(
-            1,
-            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-          )
-        } else {
-          exec_strategy_opts.local_parallelism * 2
-        };
-
-        let nailgun_runner = nailgun::CommandRunner::new(
-          local_execution_root_dir.to_path_buf(),
-          local_runner_store.clone(),
-          executor.clone(),
-          named_caches.clone(),
-          immutable_inputs.clone(),
-          pool_size,
-        );
-
-        Box::new(SwitchedCommandRunner::new(
-          nailgun_runner,
-          local_command_runner,
-          |req| !req.input_digests.use_nailgun.is_empty(),
-        ))
+    let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
+      // We set the nailgun pool size to the number of instances that fit within the memory
+      // parameters configured when a max child process memory has been given.
+      // Otherwise, pool size will be double of the local parallelism so we can always keep
+      // a jvm warmed up.
+      let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
+        max(
+          1,
+          exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+        )
       } else {
-        Box::new(local_command_runner)
+        exec_strategy_opts.local_parallelism * 2
       };
 
-      // Note that the Docker command runner is only used if the Process sets docker_image. So,
-      // it's safe to always create this command runner.
-      let docker_runner = Box::new(docker::CommandRunner::new(
+      let nailgun_runner = nailgun::CommandRunner::new(
+        local_execution_root_dir.to_path_buf(),
         local_runner_store.clone(),
         executor.clone(),
-        local_execution_root_dir.to_path_buf(),
         named_caches.clone(),
         immutable_inputs.clone(),
-        exec_strategy_opts.local_keep_sandboxes,
-        // TODO(#16767): Allow users to specify this via an option.
-        docker::ImagePullPolicy::OnlyIfLatestOrMissing,
-      )?);
+        pool_size,
+      );
 
-      let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-        req.docker_image.is_some()
-      }));
-
-      (runner, exec_strategy_opts.local_parallelism)
+      Box::new(SwitchedCommandRunner::new(
+        nailgun_runner,
+        local_command_runner,
+        |req| !req.input_digests.use_nailgun.is_empty(),
+      ))
+    } else {
+      Box::new(local_command_runner)
     };
 
-    Ok(Arc::new(bounded::CommandRunner::new(
+    // Note that the Docker command runner is only used if the Process sets docker_image. So,
+    // it's safe to always create this command runner.
+    let docker_runner = Box::new(docker::CommandRunner::new(
+      local_runner_store.clone(),
+      executor.clone(),
+      local_execution_root_dir.to_path_buf(),
+      named_caches.clone(),
+      immutable_inputs.clone(),
+      exec_strategy_opts.local_keep_sandboxes,
+      // TODO(#16767): Allow users to specify this via an option.
+      docker::ImagePullPolicy::OnlyIfLatestOrMissing,
+    )?);
+    let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
+      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+    }));
+
+    let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
       executor,
       runner,
-      parallelism,
-    )))
+      exec_strategy_opts.local_parallelism,
+    ));
+
+    if remoting_opts.execution_enable {
+      // We always create the remote execution runner if it is globally enabled, but it may not
+      // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
+      // or remote execution will be used for any particular process.
+      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+        // We unwrap because global_options.py will have already validated this is defined.
+        remoting_opts.execution_address.as_ref().unwrap(),
+        instance_name,
+        process_cache_namespace,
+        root_ca_certs.clone(),
+        remoting_opts.execution_headers.clone(),
+        full_store.clone(),
+        // TODO if we ever want to configure the remote platform to be something else we
+        // need to take an option all the way down here and into the remote::CommandRunner struct.
+        Platform::Linux_x86_64,
+        remoting_opts.execution_overall_deadline,
+        Duration::from_millis(100),
+        remoting_opts.execution_rpc_concurrency,
+        capabilities_cell_opt,
+      )?);
+      let remote_execution_runner = Box::new(bounded::CommandRunner::new(
+        executor,
+        remote_execution_runner,
+        exec_strategy_opts.remote_parallelism,
+      ));
+      runner = Box::new(SwitchedCommandRunner::new(
+        remote_execution_runner,
+        runner,
+        |req| {
+          matches!(
+            req.execution_strategy,
+            ProcessExecutionStrategy::RemoteExecution
+          )
+        },
+      ));
+    }
+
+    Ok(Arc::new(runner))
   }
 
   ///

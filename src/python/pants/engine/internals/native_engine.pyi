@@ -177,6 +177,7 @@ class ProcessConfigFromEnvironment:
         *,
         platform: str,
         docker_image: str | None,
+        remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
     ) -> None: ...
     def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...

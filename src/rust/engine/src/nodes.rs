@@ -386,7 +386,7 @@ impl ExecuteProcess {
         .try_into()?
     };
 
-    Ok(process_execution::Process {
+    Ok(Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
       working_directory,
@@ -402,7 +402,7 @@ impl ExecuteProcess {
       execution_slot_variable,
       concurrency_available,
       cache_scope,
-      docker_image: process_config.docker_image,
+      execution_strategy: process_config.execution_strategy,
       platform_properties: process_config.remote_execution_extra_platform_properties,
     })
   }

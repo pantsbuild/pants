@@ -443,6 +443,13 @@ impl Default for InputDigests {
   }
 }
 
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub enum ProcessExecutionStrategy {
+  Local,
+  RemoteExecution,
+  Docker(String),
+}
+
 ///
 /// A process to be executed.
 ///
@@ -537,8 +544,7 @@ pub struct Process {
 
   pub cache_scope: ProcessCacheScope,
 
-  /// The docker image to run the process with.
-  pub docker_image: Option<String>,
+  pub execution_strategy: ProcessExecutionStrategy,
 
   /// Properties used for remote execution configuration. Regardless of remote execution, these
   /// should impact the cache key.
@@ -573,7 +579,7 @@ impl Process {
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
-      docker_image: None,
+      execution_strategy: ProcessExecutionStrategy::Local,
       platform_properties: vec![],
     }
   }
@@ -622,10 +628,10 @@ impl Process {
   }
 
   ///
-  /// Replaces the docker_image used for this process.
+  /// Set the execution strategy to Docker, with the specified image.
   ///
-  pub fn docker_image(mut self, docker_image: String) -> Process {
-    self.docker_image = Some(docker_image);
+  pub fn docker(mut self, image: String) -> Process {
+    self.execution_strategy = ProcessExecutionStrategy::Docker(image);
     self
   }
 
