@@ -546,9 +546,7 @@ pub struct Process {
 
   pub execution_strategy: ProcessExecutionStrategy,
 
-  /// Properties used for remote execution configuration. Regardless of remote execution, these
-  /// should impact the cache key.
-  pub platform_properties: Vec<(String, String)>,
+  pub remote_execution_platform_properties: Vec<(String, String)>,
 }
 
 impl Process {
@@ -580,7 +578,7 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       execution_strategy: ProcessExecutionStrategy::Local,
-      platform_properties: vec![],
+      remote_execution_platform_properties: vec![],
     }
   }
 
@@ -636,10 +634,13 @@ impl Process {
   }
 
   ///
-  /// Replaces the platform_properties used for this process.
+  /// Replaces the remote_execution_platform_properties used for this process.
   ///
-  pub fn platform_properties(mut self, properties: Vec<(String, String)>) -> Process {
-    self.platform_properties = properties;
+  pub fn remote_execution_platform_properties(
+    mut self,
+    properties: Vec<(String, String)>,
+  ) -> Process {
+    self.remote_execution_platform_properties = properties;
     self
   }
 }

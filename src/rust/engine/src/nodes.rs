@@ -403,7 +403,8 @@ impl ExecuteProcess {
       concurrency_available,
       cache_scope,
       execution_strategy: process_config.execution_strategy,
-      platform_properties: process_config.remote_execution_extra_platform_properties,
+      remote_execution_platform_properties: process_config
+        .remote_execution_extra_platform_properties,
     })
   }
 

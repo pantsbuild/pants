@@ -868,7 +868,7 @@ pub fn make_execute_request(
       });
   }
 
-  let mut platform_properties = req.platform_properties.clone();
+  let mut platform_properties = req.remote_execution_platform_properties.clone();
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
   //       interaction with how servers match platform properties.

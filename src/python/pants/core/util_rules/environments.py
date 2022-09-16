@@ -187,11 +187,24 @@ class RemotePlatformField(StringField):
     help = "The platform used by the remote execution environment."
 
 
+class RemoteExtraPlatformPropertiesField(StringSequenceField):
+    alias = "extra_platform_properties"
+    default = None  # If None, we will use the global option.
+    help = softwrap(
+        """
+        Overrides the default value from the option
+        `[GLOBAL].remote_execution_extra_platform_properties` when this environment target is
+        active.
+        """
+    )
+
+
 class RemoteEnvironmentTarget(Target):
     alias = "_remote_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RemotePlatformField,
+        RemoteExtraPlatformPropertiesField,
     )
     help = softwrap(
         """
@@ -436,11 +449,23 @@ def extract_process_config_from_environment(
     if tgt.val is None:
         docker_image = None
         remote_execution = global_options.remote_execution
+        raw_remote_execution_extra_platform_properties = (
+            global_options.remote_execution_extra_platform_properties if remote_execution else ()
+        )
     else:
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
         remote_execution = tgt.val.has_field(RemotePlatformField)
+        if remote_execution:
+            field_val = tgt.val[RemoteExtraPlatformPropertiesField].value
+            raw_remote_execution_extra_platform_properties = (
+                field_val
+                if field_val is not None
+                else global_options.remote_execution_extra_platform_properties
+            )
+        else:
+            raw_remote_execution_extra_platform_properties = ()
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
@@ -448,7 +473,7 @@ def extract_process_config_from_environment(
         remote_execution=remote_execution,
         remote_execution_extra_platform_properties=[
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
-            for pair in global_options.remote_execution_extra_platform_properties
+            for pair in raw_remote_execution_extra_platform_properties
         ],
     )
 

@@ -1698,8 +1698,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         help=softwrap(
             """
             Platform properties to set on remote execution requests.
+
             Format: property=value. Multiple values should be specified as multiple
-            occurrences of this flag. Pants itself may add additional platform properties.
+            occurrences of this flag.
+
+            Pants itself may add additional platform properties.
             """
         ),
         default=[],

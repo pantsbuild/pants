@@ -24,6 +24,7 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
     RemoteEnvironmentTarget,
+    RemoteExtraPlatformPropertiesField,
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
 )
@@ -55,11 +56,12 @@ def test_extract_process_config_from_environment() -> None:
         enable_remote_execution: bool,
         expected_remote_execution: bool,
         expected_docker_image: str | None,
+        expected_remote_execution_extra_platform_properties: list[tuple[str, str]] | None = None,
     ) -> None:
         global_options = create_subsystem(
             GlobalOptions,
             remote_execution=enable_remote_execution,
-            remote_execution_extra_platform_properties=["k=v"],
+            remote_execution_extra_platform_properties=["global_k=v"],
         )
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
@@ -68,7 +70,9 @@ def test_extract_process_config_from_environment() -> None:
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
         assert result.docker_image == expected_docker_image
-        assert result.remote_execution_extra_platform_properties == [("k", "v")]
+        assert result.remote_execution_extra_platform_properties == (
+            expected_remote_execution_extra_platform_properties or []
+        )
 
     assert_config(
         env_tgt=None,
@@ -81,6 +85,7 @@ def test_extract_process_config_from_environment() -> None:
         enable_remote_execution=True,
         expected_remote_execution=True,
         expected_docker_image=None,
+        expected_remote_execution_extra_platform_properties=[("global_k", "v")],
     )
 
     for re in (False, True):
@@ -110,7 +115,18 @@ def test_extract_process_config_from_environment() -> None:
             enable_remote_execution=re,
             expected_remote_execution=True,
             expected_docker_image=None,
+            expected_remote_execution_extra_platform_properties=[("global_k", "v")],
         )
+    # `extra_platforms_field` should override the global default.
+    assert_config(
+        env_tgt=RemoteEnvironmentTarget(
+            {RemoteExtraPlatformPropertiesField.alias: ["field_k=v"]}, Address("dir")
+        ),
+        enable_remote_execution=re,
+        expected_remote_execution=True,
+        expected_docker_image=None,
+        expected_remote_execution_extra_platform_properties=[("field_k", "v")],
+    )
 
 
 def test_all_environments(rule_runner: RuleRunner) -> None:
