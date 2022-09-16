@@ -523,7 +523,7 @@ class RuleRunner:
             ProcessConfigFromEnvironment(
                 platform=Platform.create_for_localhost().value,
                 docker_image=None,
-                remote_execution_extra_platform_properties={},
+                remote_execution_extra_platform_properties=[],
             ),
         )
 

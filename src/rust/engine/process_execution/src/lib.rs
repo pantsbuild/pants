@@ -542,7 +542,7 @@ pub struct Process {
 
   /// Properties used for remote execution configuration. Regardless of remote execution, these
   /// should impact the cache key.
-  pub platform_properties: BTreeMap<String, String>,
+  pub platform_properties: Vec<(String, String)>,
 }
 
 impl Process {
@@ -574,7 +574,7 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       docker_image: None,
-      platform_properties: BTreeMap::new(),
+      platform_properties: vec![],
     }
   }
 
@@ -632,7 +632,7 @@ impl Process {
   ///
   /// Replaces the platform_properties used for this process.
   ///
-  pub fn platform_properties(mut self, properties: BTreeMap<String, String>) -> Process {
+  pub fn platform_properties(mut self, properties: Vec<(String, String)>) -> Process {
     self.platform_properties = properties;
     self
   }
