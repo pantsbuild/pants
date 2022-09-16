@@ -374,7 +374,6 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None,
         remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        auth_plugin_result: AuthPluginResult | None = None
         if not remote_auth_plugin_func_from_entry_point:
             remote_auth_plugin_func = cls._get_auth_plugin_from_option(
                 bootstrap_options.remote_auth_plugin
@@ -509,7 +508,6 @@ class ExecutionOptions:
     remote_cache_read_timeout_millis: int
 
     remote_execution_address: str | None
-    remote_execution_extra_platform_properties: list[str]
     remote_execution_headers: dict[str, str]
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
@@ -553,7 +551,6 @@ class ExecutionOptions:
             remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
@@ -639,7 +636,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_extra_platform_properties=[],
     remote_execution_headers={
         "user-agent": f"pants/{VERSION}",
     },
@@ -1510,17 +1506,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_execution_extra_platform_properties = StrListOption(
-        advanced=True,
-        help=softwrap(
-            """
-            Platform properties to set on remote execution requests.
-            Format: property=value. Multiple values should be specified as multiple
-            occurrences of this flag. Pants itself may add additional platform properties.
-            """
-        ),
-        default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
-    )
     remote_execution_headers = DictOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
@@ -1706,6 +1691,18 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+    )
+
+    remote_execution_extra_platform_properties = StrListOption(
+        advanced=True,
+        help=softwrap(
+            """
+            Platform properties to set on remote execution requests.
+            Format: property=value. Multiple values should be specified as multiple
+            occurrences of this flag. Pants itself may add additional platform properties.
+            """
+        ),
+        default=[],
     )
 
     @classmethod

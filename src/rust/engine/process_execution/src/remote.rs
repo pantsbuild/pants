@@ -43,7 +43,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -97,7 +97,8 @@ pub enum ExecutionError {
 /// optimizations to shave off a round-trip in the future.
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   platform: Platform,
   store: Store,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -116,7 +117,8 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     execution_address: &str,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
@@ -151,7 +153,8 @@ impl CommandRunner {
     let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
-      metadata,
+      instance_name,
+      process_cache_namespace,
       execution_client,
       store,
       platform,
@@ -171,7 +174,7 @@ impl CommandRunner {
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
     let capabilities_fut = async {
       let mut request = remexec::GetCapabilitiesRequest::default();
-      if let Some(s) = self.metadata.instance_name.as_ref() {
+      if let Some(s) = self.instance_name.as_ref() {
         request.instance_name = s.clone();
       }
 
@@ -743,7 +746,11 @@ impl crate::CommandRunner for CommandRunner {
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
+    let (action, command, execute_request) = make_execute_request(
+      &request,
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
+    )?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
@@ -841,7 +848,8 @@ fn maybe_add_workunit(
 
 pub fn make_execute_request(
   req: &Process,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
@@ -866,11 +874,7 @@ pub fn make_execute_request(
       });
   }
 
-  let ProcessMetadata {
-    instance_name,
-    cache_key_gen_version,
-    mut platform_properties,
-  } = metadata;
+  let mut platform_properties = req.platform_properties.clone();
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
   //       interaction with how servers match platform properties.

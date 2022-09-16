@@ -28,7 +28,7 @@ use parking_lot::Mutex;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
+  ImmutableInputs, NamedCaches, Platform, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -97,7 +97,6 @@ pub struct RemotingOptions {
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
   pub cache_read_timeout: Duration,
-  pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
@@ -185,7 +184,8 @@ impl Core {
     local_execution_root_dir: &Path,
     immutable_inputs: &ImmutableInputs,
     named_caches: &NamedCaches,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
@@ -196,7 +196,8 @@ impl Core {
         Box::new(remote::CommandRunner::new(
           // We unwrap because global_options.py will have already validated these are defined.
           remoting_opts.execution_address.as_ref().unwrap(),
-          process_execution_metadata.clone(),
+          instance_name,
+          process_cache_namespace,
           root_ca_certs.clone(),
           remoting_opts.execution_headers.clone(),
           full_store.clone(),
@@ -290,7 +291,8 @@ impl Core {
     full_store: &Store,
     executor: &Executor,
     local_cache: &PersistentCache,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     remoting_opts: &RemotingOptions,
     remote_cache_read: bool,
@@ -308,7 +310,8 @@ impl Core {
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
-        process_execution_metadata.clone(),
+        instance_name,
+        process_cache_namespace.clone(),
         executor.clone(),
         full_store.clone(),
         remoting_opts.store_address.as_ref().unwrap(),
@@ -331,7 +334,7 @@ impl Core {
         full_store.clone(),
         local_cache_read,
         cache_content_behavior,
-        process_execution_metadata.clone(),
+        process_cache_namespace,
       ));
     }
 
@@ -349,7 +352,8 @@ impl Core {
     local_execution_root_dir: &Path,
     immutable_inputs: &ImmutableInputs,
     named_caches: &NamedCaches,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
@@ -362,7 +366,8 @@ impl Core {
       local_execution_root_dir,
       immutable_inputs,
       named_caches,
-      process_execution_metadata,
+      instance_name.clone(),
+      process_cache_namespace.clone(),
       root_ca_certs,
       exec_strategy_opts,
       remoting_opts,
@@ -382,7 +387,8 @@ impl Core {
         full_store,
         executor,
         local_cache,
-        process_execution_metadata,
+        instance_name.clone(),
+        process_cache_namespace.clone(),
         root_ca_certs,
         remoting_opts,
         remote_cache_read && should_cache_read,
@@ -517,12 +523,6 @@ impl Core {
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
     let named_caches = NamedCaches::new(named_caches_dir);
-    let process_execution_metadata = ProcessMetadata {
-      instance_name: remoting_opts.instance_name.clone(),
-      cache_key_gen_version: remoting_opts.execution_process_cache_namespace.clone(),
-      platform_properties: remoting_opts.execution_extra_platform_properties.clone(),
-    };
-
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,
@@ -531,7 +531,8 @@ impl Core {
       &local_execution_root_dir,
       &immutable_inputs,
       &named_caches,
-      &process_execution_metadata,
+      remoting_opts.instance_name.clone(),
+      remoting_opts.execution_process_cache_namespace.clone(),
       &root_ca_certs,
       &exec_strategy_opts,
       &remoting_opts,

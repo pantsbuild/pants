@@ -24,7 +24,7 @@ use workunit_store::{
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
+  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
@@ -47,7 +47,8 @@ pub enum RemoteCacheWarningsBehavior {
 #[derive(Clone)]
 pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -64,7 +65,8 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     inner: Arc<dyn crate::CommandRunner>,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     executor: task_executor::Executor,
     store: Store,
     action_cache_address: &str,
@@ -99,7 +101,8 @@ impl CommandRunner {
 
     Ok(CommandRunner {
       inner,
-      metadata,
+      instance_name,
+      process_cache_namespace,
       executor,
       store,
       action_cache_client,
@@ -259,7 +262,7 @@ impl CommandRunner {
       let response = check_action_cache(
         action_digest,
         &request.description,
-        &self.metadata,
+        self.instance_name.clone(),
         self.platform,
         &context,
         self.action_cache_client.clone(),
@@ -333,7 +336,7 @@ impl CommandRunner {
   async fn update_action_cache(
     &self,
     result: &FallibleProcessResultWithPlatform,
-    metadata: &ProcessMetadata,
+    instance_name: Option<String>,
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
@@ -359,11 +362,7 @@ impl CommandRunner {
       client,
       move |mut client| {
         let update_action_cache_request = remexec::UpdateActionResultRequest {
-          instance_name: metadata
-            .instance_name
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| "".to_owned()),
+          instance_name: instance_name.clone().unwrap_or_else(|| "".to_owned()),
           action_digest: Some(action_digest.into()),
           action_result: Some(action_result.clone()),
           ..remexec::UpdateActionResultRequest::default()
@@ -437,8 +436,11 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, _execute_request) =
-      make_execute_request(&request, self.metadata.clone())?;
+    let (action, command, _execute_request) = make_execute_request(
+      &request,
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
+    )?;
     let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
@@ -473,7 +475,7 @@ impl crate::CommandRunner for CommandRunner {
           let write_result = command_runner
             .update_action_cache(
               &result,
-              &command_runner.metadata,
+              command_runner.instance_name.clone(),
               &command,
               action_digest,
               command_digest,
@@ -506,7 +508,7 @@ impl crate::CommandRunner for CommandRunner {
 async fn check_action_cache(
   action_digest: Digest,
   command_description: &str,
-  metadata: &ProcessMetadata,
+  instance_name: Option<String>,
   platform: Platform,
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -528,7 +530,7 @@ async fn check_action_cache(
         move |mut client| {
           let request = remexec::GetActionResultRequest {
             action_digest: Some(action_digest.into()),
-            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
+            instance_name: instance_name.clone().unwrap_or_default(),
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);

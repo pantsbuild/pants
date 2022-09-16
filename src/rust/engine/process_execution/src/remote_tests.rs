@@ -24,7 +24,7 @@ use workunit_store::{RunId, WorkunitStore};
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessError, ProcessMetadata,
+  Platform, Process, ProcessCacheScope, ProcessError,
 };
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
@@ -90,6 +90,7 @@ async fn make_execute_request() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -140,7 +141,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -168,6 +169,7 @@ async fn make_execute_request_with_instance_name() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
   };
 
   let want_command = remexec::Command {
@@ -224,14 +226,7 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: Some("dark-tower".to_owned()),
-        cache_key_gen_version: None,
-        platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
-      }
-    ),
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None,),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -259,6 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let mut want_command = remexec::Command {
@@ -316,14 +312,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: None,
-        cache_key_gen_version: Some("meep".to_owned()),
-        platform_properties: vec![],
-      }
-    ),
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()),),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -381,7 +370,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -389,7 +378,12 @@ async fn make_execute_request_with_jdk() {
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
-  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"])).platform_properties(vec![
+    ("FIRST".to_owned(), "foo".to_owned()),
+    ("Multi".to_owned(), "uno".to_owned()),
+    ("last".to_owned(), "bar".to_owned()),
+    ("Multi".to_owned(), "dos".to_owned()),
+  ]);
   req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
@@ -457,19 +451,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(
-      &req,
-      ProcessMetadata {
-        instance_name: None,
-        cache_key_gen_version: None,
-        platform_properties: vec![
-          ("FIRST".to_owned(), "foo".to_owned()),
-          ("Multi".to_owned(), "uno".to_owned()),
-          ("last".to_owned(), "bar".to_owned()),
-          ("Multi".to_owned(), "dos".to_owned()),
-        ]
-      },
-    ),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -497,6 +479,7 @@ async fn make_execute_request_with_timeout() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -548,7 +531,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -603,6 +586,7 @@ async fn make_execute_request_using_immutable_inputs() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: vec![],
   };
 
   let want_command = remexec::Command {
@@ -653,7 +637,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    crate::remote::make_execute_request(&req, None, None),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -665,11 +649,9 @@ async fn successful_with_only_call_to_execute() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -706,11 +688,9 @@ async fn successful_after_reconnect_with_wait_execution() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -751,11 +731,9 @@ async fn successful_after_reconnect_from_retryable_error() {
   let op_name_2 = "gimme-bar".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     let execute_request_2 = execute_request.clone();
 
@@ -806,7 +784,8 @@ async fn server_rejecting_execute_request_gives_error() {
     mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
       execute_request: crate::remote::make_execute_request(
         &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-        ProcessMetadata::default(),
+        None,
+        None,
       )
       .unwrap()
       .2,
@@ -829,11 +808,9 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -858,11 +835,9 @@ async fn sends_headers() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -901,7 +876,8 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     btreemap! {
       String::from("cat") => String::from("roland"),
@@ -1050,11 +1026,9 @@ async fn ensure_inline_stdio_is_stored() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &echo_roland_request().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&echo_roland_request().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1095,7 +1069,8 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),
@@ -1148,7 +1123,8 @@ async fn bad_result_bytes() {
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
         execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
-          ProcessMetadata::default(),
+          None,
+          None,
         )
         .unwrap()
         .2,
@@ -1185,11 +1161,9 @@ async fn initial_response_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1227,11 +1201,9 @@ async fn initial_response_missing_response_and_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1264,11 +1236,9 @@ async fn fails_after_retry_limit_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1318,11 +1288,9 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
 
   let mock_server = {
     let op_name = "foo-bar".to_owned();
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1375,11 +1343,9 @@ async fn execute_missing_file_uploads_if_known() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
-    let (_, _, execute_request) = crate::remote::make_execute_request(
-      &cat_roland_request().try_into().unwrap(),
-      ProcessMetadata::default(),
-    )
-    .unwrap();
+    let (_, _, execute_request) =
+      crate::remote::make_execute_request(&cat_roland_request().try_into().unwrap(), None, None)
+        .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1395,7 +1361,8 @@ async fn execute_missing_file_uploads_if_known() {
         ExpectedAPICall::Execute {
           execute_request: crate::remote::make_execute_request(
             &cat_roland_request().try_into().unwrap(),
-            ProcessMetadata::default(),
+            None,
+            None,
           )
           .unwrap()
           .2,
@@ -1443,7 +1410,8 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),
@@ -1503,7 +1471,8 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store,
@@ -2175,7 +2144,8 @@ fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &execution_address,
-    ProcessMetadata::default(),
+    None,
+    None,
     None,
     BTreeMap::new(),
     store.clone(),

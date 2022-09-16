@@ -403,6 +403,7 @@ impl ExecuteProcess {
       concurrency_available,
       cache_scope,
       docker_image: process_config.docker_image,
+      platform_properties: process_config.remote_execution_extra_platform_properties,
     })
   }
 

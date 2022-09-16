@@ -28,6 +28,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
@@ -401,12 +402,19 @@ async def get_target_for_environment_name(
 
 @rule
 def extract_process_config_from_environment(
-    tgt: EnvironmentTarget, platform: Platform
+    tgt: EnvironmentTarget, platform: Platform, global_options: GlobalOptions
 ) -> ProcessConfigFromEnvironment:
     docker_image = (
         tgt.val[DockerImageField].value if tgt.val and tgt.val.has_field(DockerImageField) else None
     )
-    return ProcessConfigFromEnvironment(platform=platform.value, docker_image=docker_image)
+    return ProcessConfigFromEnvironment(
+        platform=platform.value,
+        docker_image=docker_image,
+        remote_execution_extra_platform_properties=[
+            tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
+            for pair in global_options.remote_execution_extra_platform_properties
+        ],
+    )
 
 
 class EnvironmentSensitiveOptionFieldMixin:

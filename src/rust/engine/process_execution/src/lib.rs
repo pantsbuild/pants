@@ -539,6 +539,10 @@ pub struct Process {
 
   /// The docker image to run the process with.
   pub docker_image: Option<String>,
+
+  /// Properties used for remote execution configuration. Regardless of remote execution, these
+  /// should impact the cache key.
+  pub platform_properties: Vec<(String, String)>,
 }
 
 impl Process {
@@ -570,6 +574,7 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       docker_image: None,
+      platform_properties: vec![],
     }
   }
 
@@ -623,18 +628,14 @@ impl Process {
     self.docker_image = Some(docker_image);
     self
   }
-}
 
-///
-/// Metadata surrounding an Process which factors into its cache key when cached
-/// externally from the engine graph (e.g. when using remote execution or an external process
-/// cache).
-///
-#[derive(Clone, Debug, Default)]
-pub struct ProcessMetadata {
-  pub instance_name: Option<String>,
-  pub cache_key_gen_version: Option<String>,
-  pub platform_properties: Vec<(String, String)>,
+  ///
+  /// Replaces the platform_properties used for this process.
+  ///
+  pub fn platform_properties(mut self, properties: Vec<(String, String)>) -> Process {
+    self.platform_properties = properties;
+    self
+  }
 }
 
 ///
@@ -888,9 +889,13 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+pub fn digest(
+  process: &Process,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
+) -> Digest {
   let (_, _, execute_request) =
-    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

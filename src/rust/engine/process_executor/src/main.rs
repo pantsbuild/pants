@@ -37,7 +37,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
-  Platform, ProcessCacheScope, ProcessMetadata,
+  Platform, ProcessCacheScope,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -46,6 +46,12 @@ use protos::require_digest;
 use store::Store;
 use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
+
+#[derive(Clone, Debug, Default)]
+struct ProcessMetadata {
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+}
 
 #[derive(StructOpt)]
 struct CommandSpec {
@@ -293,7 +299,8 @@ async fn main() {
 
       let remote_runner = process_execution::remote::CommandRunner::new(
         &address,
-        process_metadata.clone(),
+        process_metadata.instance_name.clone(),
+        process_metadata.cache_key_gen_version.clone(),
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
@@ -309,7 +316,8 @@ async fn main() {
         Box::new(
           process_execution::remote_cache::CommandRunner::new(
             Arc::new(remote_runner),
-            process_metadata,
+            process_metadata.instance_name.clone(),
+            process_metadata.cache_key_gen_version.clone(),
             executor,
             store.clone(),
             &address,
@@ -456,12 +464,12 @@ async fn make_request_from_flat_args(
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
+    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
 
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
     cache_key_gen_version: args.command.cache_key_gen_version.clone(),
-    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
   Ok((process, metadata))
 }
@@ -550,11 +558,6 @@ async fn extract_request_from_action_digest(
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-  };
-
-  let metadata = ProcessMetadata {
-    instance_name,
-    cache_key_gen_version: None,
     platform_properties: command
       .platform
       .iter()
@@ -565,6 +568,11 @@ async fn extract_request_from_action_digest(
           .map(|property| (property.name.clone(), property.value.clone()))
       })
       .collect(),
+  };
+
+  let metadata = ProcessMetadata {
+    instance_name,
+    cache_key_gen_version: None,
   };
 
   Ok((process, metadata))

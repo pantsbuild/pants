@@ -21,8 +21,8 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessError, ProcessMetadata,
-  ProcessResultMetadata, ProcessResultSource, RemoteCacheWarningsBehavior,
+  FallibleProcessResultWithPlatform, Platform, Process, ProcessError, ProcessResultMetadata,
+  ProcessResultSource, RemoteCacheWarningsBehavior,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -132,7 +132,8 @@ fn create_cached_runner(
   Box::new(
     crate::remote_cache::CommandRunner::new(
       local.into(),
-      ProcessMetadata::default(),
+      None,
+      None,
       store_setup.executor.clone(),
       store_setup.store.clone(),
       &store_setup.cas.address(),
@@ -156,8 +157,7 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   let process = Process::new(vec![
     "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
-  let (action, command, _exec_request) =
-    make_execute_request(&process, ProcessMetadata::default()).unwrap();
+  let (action, command, _exec_request) = make_execute_request(&process, None, None).unwrap();
   let (_command_digest, action_digest) =
     ensure_action_stored_locally(&store_setup.store, &command, &action)
       .await
@@ -608,7 +608,8 @@ async fn make_action_result_basic() {
   let cas = StubCAS::builder().build();
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
-    ProcessMetadata::default(),
+    None,
+    None,
     executor.clone(),
     store.clone(),
     &cas.address(),
