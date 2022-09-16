@@ -2301,6 +2301,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
 pub(crate) fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
+  process.platform = Platform::Linux_x86_64;
   process.input_digests =
     InputDigests::with_input_files(TestDirectory::containing_roland().directory_digest());
   process.timeout = one_second();
@@ -2310,6 +2311,7 @@ pub(crate) fn cat_roland_request() -> Process {
 
 pub(crate) fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
+  req.platform = Platform::Linux_x86_64;
   req.timeout = one_second();
   req.description = "unleash a roaring meow".to_string();
   req
