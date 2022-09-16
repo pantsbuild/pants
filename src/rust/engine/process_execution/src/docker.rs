@@ -385,9 +385,7 @@ impl super::CommandRunner for CommandRunner {
             workdir.path().to_owned(),
             sandbox_path_in_container,
             exclusive_spawn,
-            req
-              .platform_constraint
-              .unwrap_or_else(|| Platform::current().unwrap()),
+            req.platform,
           )
           .map_err(|msg| {
             // Processes that experience no infrastructure issues should result in an "Ok" return,
@@ -455,13 +453,9 @@ impl CapturedWorkdir for CommandRunner {
       .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
 
     // Obtain ID of the base container in which to run the execution for this process.
-    let platform = match req.platform_constraint {
-      Some(platform) => platform,
-      None => Platform::current()?,
-    };
     let container_id = self
       .container_cache
-      .container_id_for_image(&image, &platform, &context.build_id)
+      .container_id_for_image(&image, &req.platform, &context.build_id)
       .await?;
 
     let config = bollard::exec::CreateExecOptions {

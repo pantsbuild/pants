@@ -398,7 +398,7 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform_constraint: Some(process_config.platform),
+      platform: process_config.platform,
       execution_slot_variable,
       concurrency_available,
       cache_scope,

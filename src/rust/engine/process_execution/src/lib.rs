@@ -533,7 +533,7 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform_constraint: Option<Platform>,
+  pub platform: Platform,
 
   pub cache_scope: ProcessCacheScope,
 
@@ -569,7 +569,7 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform_constraint: None,
+      platform: Platform::current().unwrap(),
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,

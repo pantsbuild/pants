@@ -725,10 +725,7 @@ async fn run_command_via_docker_in_dir(
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
-  if req.platform_constraint.is_none() {
-    req.platform_constraint =
-      Some(platform_for_tests().map_err(|err| ProcessError::Unclassified(err))?);
-  }
+  req.platform = platform_for_tests().map_err(|err| ProcessError::Unclassified(err))?;
 
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());

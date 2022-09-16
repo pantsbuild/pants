@@ -913,10 +913,7 @@ pub fn make_execute_request(
       .environment_variables
       .push(remexec::command::EnvironmentVariable {
         name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
-        value: match req.platform_constraint {
-          Some(plat) => plat.into(),
-          None => "none".to_string(),
-        },
+        value: req.platform.into(),
       });
   }
 
