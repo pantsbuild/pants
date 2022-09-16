@@ -958,7 +958,7 @@ pub fn make_execute_request(
     // some kind of consensus across tools as to how this should work; RBE appears to work by
     // allowing you to specify a jdk-version platform property, and it will put a JDK at a
     // well-known path in the docker container you specify in which to run.
-    platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
+    platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
   }
 
   // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.

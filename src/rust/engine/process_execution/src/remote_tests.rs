@@ -90,7 +90,7 @@ async fn make_execute_request() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
+    platform_properties: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -169,7 +169,7 @@ async fn make_execute_request_with_instance_name() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
+    platform_properties: BTreeMap::from([("target_platform".to_owned(), "apple-2e".to_owned())]),
   };
 
   let want_command = remexec::Command {
@@ -254,7 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
+    platform_properties: BTreeMap::new(),
   };
 
   let mut want_command = remexec::Command {
@@ -378,12 +378,13 @@ async fn make_execute_request_with_jdk() {
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
-  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"])).platform_properties(vec![
-    ("FIRST".to_owned(), "foo".to_owned()),
-    ("Multi".to_owned(), "uno".to_owned()),
-    ("last".to_owned(), "bar".to_owned()),
-    ("Multi".to_owned(), "dos".to_owned()),
-  ]);
+  let mut req =
+    Process::new(owned_string_vec(&["/bin/echo", "yo"])).platform_properties(BTreeMap::from([
+      ("FIRST".to_owned(), "foo".to_owned()),
+      ("Multi".to_owned(), "uno".to_owned()),
+      ("last".to_owned(), "bar".to_owned()),
+      ("Multi".to_owned(), "dos".to_owned()),
+    ]));
   req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
@@ -479,7 +480,7 @@ async fn make_execute_request_with_timeout() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
+    platform_properties: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {
@@ -586,7 +587,7 @@ async fn make_execute_request_using_immutable_inputs() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     docker_image: None,
-    platform_properties: vec![],
+    platform_properties: BTreeMap::new(),
   };
 
   let want_command = remexec::Command {

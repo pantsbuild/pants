@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 
 use pyo3::basic::CompareOp;
@@ -21,7 +22,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 pub struct PyProcessConfigFromEnvironment {
   pub platform: Platform,
   pub docker_image: Option<String>,
-  pub remote_execution_extra_platform_properties: Vec<(String, String)>,
+  pub remote_execution_extra_platform_properties: BTreeMap<String, String>,
 }
 
 #[pymethods]
@@ -30,7 +31,7 @@ impl PyProcessConfigFromEnvironment {
   fn __new__(
     platform: String,
     docker_image: Option<String>,
-    remote_execution_extra_platform_properties: Vec<(String, String)>,
+    remote_execution_extra_platform_properties: BTreeMap<String, String>,
   ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
     Ok(Self {

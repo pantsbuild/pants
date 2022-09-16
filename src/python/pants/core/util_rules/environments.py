@@ -410,10 +410,10 @@ def extract_process_config_from_environment(
     return ProcessConfigFromEnvironment(
         platform=platform.value,
         docker_image=docker_image,
-        remote_execution_extra_platform_properties=[
+        remote_execution_extra_platform_properties=dict(
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
             for pair in global_options.remote_execution_extra_platform_properties
-        ],
+        ),
     )
 
 
