@@ -28,7 +28,7 @@ use parking_lot::Mutex;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, Platform, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  ImmutableInputs, NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -266,9 +266,6 @@ impl Core {
         root_ca_certs.clone(),
         remoting_opts.execution_headers.clone(),
         full_store.clone(),
-        // TODO if we ever want to configure the remote platform to be something else we
-        // need to take an option all the way down here and into the remote::CommandRunner struct.
-        Platform::Linux_x86_64,
         remoting_opts.execution_overall_deadline,
         Duration::from_millis(100),
         remoting_opts.execution_rpc_concurrency,
@@ -331,7 +328,6 @@ impl Core {
         remoting_opts.store_address.as_ref().unwrap(),
         root_ca_certs.clone(),
         remoting_opts.store_headers.clone(),
-        Platform::current()?,
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,

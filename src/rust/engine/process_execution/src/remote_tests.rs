@@ -886,7 +886,6 @@ async fn sends_headers() {
       String::from("authorization") => String::from("Bearer catnip-will-get-you-anywhere"),
     },
     store,
-    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1076,7 +1075,6 @@ async fn ensure_inline_stdio_is_stored() {
     None,
     BTreeMap::new(),
     store.clone(),
-    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1417,7 +1415,6 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     BTreeMap::new(),
     store.clone(),
-    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1478,7 +1475,6 @@ async fn execute_missing_file_errors_if_unknown() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux_x86_64,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1689,10 +1685,14 @@ async fn remote_workunits_are_stored() {
     .build();
   // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
   // address rather than an Execution address.
-  let (command_runner, _store) = create_command_runner(cas.address(), &cas, Platform::Linux_x86_64);
+  let (command_runner, _store) = create_command_runner(cas.address(), &cas);
 
   command_runner
-    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
+    .extract_execute_response(
+      RunId(0),
+      Platform::Linux_x86_64,
+      OperationOrStatus::Operation(operation),
+    )
     .await
     .unwrap();
 
@@ -2136,11 +2136,7 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   })
 }
 
-fn create_command_runner(
-  execution_address: String,
-  cas: &mock::StubCAS,
-  platform: Platform,
-) -> (CommandRunner, Store) {
+fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (CommandRunner, Store) {
   let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
@@ -2151,7 +2147,6 @@ fn create_command_runner(
     None,
     BTreeMap::new(),
     store.clone(),
-    platform,
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -2171,8 +2166,7 @@ async fn run_command_remote(
     .directory(&TestDirectory::containing_roland())
     .tree(&TestTree::roland_at_root())
     .build();
-  let (command_runner, store) =
-    create_command_runner(execution_address, &cas, Platform::Linux_x86_64);
+  let (command_runner, store) = create_command_runner(execution_address, &cas);
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
@@ -2222,10 +2216,14 @@ async fn extract_execute_response(
     .build();
   // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
   // address rather than an Execution address.
-  let (command_runner, store) = create_command_runner(cas.address(), &cas, remote_platform);
+  let (command_runner, store) = create_command_runner(cas.address(), &cas);
 
   let original = command_runner
-    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
+    .extract_execute_response(
+      RunId(0),
+      remote_platform,
+      OperationOrStatus::Operation(operation),
+    )
     .await?;
 
   let stdout_bytes: Vec<u8> = store
