@@ -8,7 +8,7 @@
 #   "generated_with_requirements": [
 #     "com.fasterxml.jackson.core:jackson-databind:2.12.4,url=not_provided,jar=not_provided",
 #     "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4,url=not_provided,jar=not_provided",
-#     "com.github.javaparser:javaparser-symbol-solver-core:3.23.0,url=not_provided,jar=not_provided"
+#     "com.github.javaparser:javaparser-symbol-solver-core:3.24.4,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -118,40 +118,40 @@ serialized_bytes_length = 34438
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "com.github.javaparser_javaparser-core_3.23.0.jar"
+file_name = "com.github.javaparser_javaparser-core_3.24.4.jar"
 
 [entries.coord]
 group = "com.github.javaparser"
 artifact = "javaparser-core"
-version = "3.23.0"
+version = "3.24.4"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "1d732f1b057b9e2ea69935180b5a6abf2c776f5e311a96651c3c03b0616032cc"
-serialized_bytes_length = 1308975
+fingerprint = "7970d915fd1b29ae2b0af53befd79680183166bb383569d969a5001fb074761b"
+serialized_bytes_length = 1312941
 [[entries]]
-file_name = "com.github.javaparser_javaparser-symbol-solver-core_3.23.0.jar"
+file_name = "com.github.javaparser_javaparser-symbol-solver-core_3.24.4.jar"
 [[entries.directDependencies]]
 group = "com.github.javaparser"
 artifact = "javaparser-core"
-version = "3.23.0"
+version = "3.24.4"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "com.google.guava"
 artifact = "guava"
-version = "30.1.1-jre"
+version = "31.1-jre"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.javassist"
 artifact = "javassist"
-version = "3.28.0-GA"
+version = "3.29.0-GA"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.github.javaparser"
 artifact = "javaparser-core"
-version = "3.23.0"
+version = "3.24.4"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -163,7 +163,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.google.errorprone"
 artifact = "error_prone_annotations"
-version = "2.5.1"
+version = "2.11.0"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -175,7 +175,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.google.guava"
 artifact = "guava"
-version = "30.1.1-jre"
+version = "31.1-jre"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -193,24 +193,24 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.checkerframework"
 artifact = "checker-qual"
-version = "3.8.0"
+version = "3.12.0"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.javassist"
 artifact = "javassist"
-version = "3.28.0-GA"
+version = "3.29.0-GA"
 packaging = "jar"
 
 
 [entries.coord]
 group = "com.github.javaparser"
 artifact = "javaparser-symbol-solver-core"
-version = "3.23.0"
+version = "3.24.4"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "a27067d886e72b35b4af31c8534f13ac54e924995f8f05ab2c3c4ab412ed3fb4"
-serialized_bytes_length = 480392
+fingerprint = "7d96f11964a16fcb61cda90fec70137c3d75b22af5a9ad38d18809b5b61954ac"
+serialized_bytes_length = 495881
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -227,16 +227,16 @@ serialized_bytes_length = 19936
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "com.google.errorprone_error_prone_annotations_2.5.1.jar"
+file_name = "com.google.errorprone_error_prone_annotations_2.11.0.jar"
 
 [entries.coord]
 group = "com.google.errorprone"
 artifact = "error_prone_annotations"
-version = "2.5.1"
+version = "2.11.0"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "ff80626baaf12a09342befd4e84cba9d50662f5fcd7f7a9b3490a6b7cf87e66c"
-serialized_bytes_length = 13854
+fingerprint = "721cb91842b46fa056847d104d5225c8b8e1e8b62263b993051e1e5a0137b7ec"
+serialized_bytes_length = 15979
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -251,7 +251,7 @@ packaging = "jar"
 fingerprint = "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26"
 serialized_bytes_length = 4617
 [[entries]]
-file_name = "com.google.guava_guava_30.1.1-jre.jar"
+file_name = "com.google.guava_guava_31.1-jre.jar"
 [[entries.directDependencies]]
 group = "com.google.code.findbugs"
 artifact = "jsr305"
@@ -261,7 +261,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "com.google.errorprone"
 artifact = "error_prone_annotations"
-version = "2.5.1"
+version = "2.11.0"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -285,7 +285,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.checkerframework"
 artifact = "checker-qual"
-version = "3.8.0"
+version = "3.12.0"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -297,7 +297,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.google.errorprone"
 artifact = "error_prone_annotations"
-version = "2.5.1"
+version = "2.11.0"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -321,18 +321,18 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.checkerframework"
 artifact = "checker-qual"
-version = "3.8.0"
+version = "3.12.0"
 packaging = "jar"
 
 
 [entries.coord]
 group = "com.google.guava"
 artifact = "guava"
-version = "30.1.1-jre"
+version = "31.1-jre"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "44ce229ce26d880bf3afc362bbfcec34d7e6903d195bbb1db9f3b6e0d9834f06"
-serialized_bytes_length = 2874025
+fingerprint = "a42edc9cab792e39fe39bb94f3fca655ed157ff87a8af78e1d6ba5b07c4a00ab"
+serialized_bytes_length = 2959479
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -362,26 +362,26 @@ serialized_bytes_length = 8781
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.checkerframework_checker-qual_3.8.0.jar"
+file_name = "org.checkerframework_checker-qual_3.12.0.jar"
 
 [entries.coord]
 group = "org.checkerframework"
 artifact = "checker-qual"
-version = "3.8.0"
+version = "3.12.0"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "c88c2e6a5fdaeb9f26fcf879264042de8a9ee9d376e2477838feaabcfa44dda6"
-serialized_bytes_length = 230905
+fingerprint = "ff10785ac2a357ec5de9c293cb982a2cbb605c0309ea4cc1cb9b9bc6dbe7f3cb"
+serialized_bytes_length = 208835
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.javassist_javassist_3.28.0-GA.jar"
+file_name = "org.javassist_javassist_3.29.0-GA.jar"
 
 [entries.coord]
 group = "org.javassist"
 artifact = "javassist"
-version = "3.28.0-GA"
+version = "3.29.0-GA"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "57d0a9e9286f82f4eaa851125186997f811befce0e2060ff0a15a77f5a9dd9a7"
-serialized_bytes_length = 851531
+fingerprint = "62d4065362e8969ce654f2b5541de1efb5b5bca6c146dbd38a595ea4df64cd31"
+serialized_bytes_length = 794034
