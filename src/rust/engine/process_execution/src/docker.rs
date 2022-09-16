@@ -622,14 +622,14 @@ impl ContainerCache {
       host_config: Some(bollard::service::HostConfig {
         binds: Some(vec![
           format!("{}:{}", work_dir_base, SANDBOX_BASE_PATH_IN_CONTAINER),
+          format!(
+            "{}:{}",
+            named_caches_base_dir, NAMED_CACHES_BASE_PATH_IN_CONTAINER,
+          ),
           // DOCKER-TODO: Consider making this bind mount read-only.
           format!(
             "{}:{}",
-            named_caches_base_dir, IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER
-          ),
-          format!(
-            "{}:{}",
-            immutable_inputs_base_dir, NAMED_CACHES_BASE_PATH_IN_CONTAINER
+            immutable_inputs_base_dir, IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER
           ),
         ]),
         // The init process ensures that child processes are properly reaped.
