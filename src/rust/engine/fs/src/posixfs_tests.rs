@@ -7,7 +7,7 @@ use testutil::make_file;
 use crate::{
   DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching,
-  SymlinkBehavior, Vfs,
+  SymlinkBehavior, TypedPath, Vfs,
 };
 
 #[tokio::test]
@@ -326,24 +326,18 @@ async fn memfs_expand_basic() {
   let p2 = PathBuf::from("some/other");
   let p3 = p2.join("file");
 
-  let fs = DigestTrie::from_path_stats(
+  let fs = DigestTrie::from_unique_paths(
     vec![
-      PathStat::file(
-        p1.clone(),
-        File {
-          path: p1.clone(),
-          is_executable: false,
-        },
-      ),
-      PathStat::file(
-        p3.clone(),
-        File {
-          path: p3.clone(),
-          is_executable: false,
-        },
-      ),
+      TypedPath::File {
+        path: &p1,
+        is_executable: false,
+      },
+      TypedPath::File {
+        path: &p3,
+        is_executable: false,
+      },
     ],
-    &vec![(p1.clone(), EMPTY_DIGEST), (p3, EMPTY_DIGEST)]
+    &vec![(p1.clone(), EMPTY_DIGEST), (p3.clone(), EMPTY_DIGEST)]
       .into_iter()
       .collect(),
   )

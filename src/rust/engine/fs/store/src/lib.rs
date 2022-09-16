@@ -560,7 +560,8 @@ impl Store {
       Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter)).unzip();
     let file_digests = maybe_digests.into_iter().flatten().collect();
 
-    let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+    let tree =
+      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
     let computed_digest = tree.compute_root_digest();
     if digest.as_digest() != computed_digest {
       return Err(
