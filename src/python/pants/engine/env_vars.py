@@ -7,8 +7,6 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
 
-from pants.engine.internals.session import SessionValues
-from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -93,26 +91,3 @@ class EnvironmentVars(FrozenDict[str, str]):
     `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment, rather
     than the entire unfiltered environment.
     """
-
-
-@rule
-def complete_environment_vars(session_values: SessionValues) -> CompleteEnvironmentVars:
-    return session_values[CompleteEnvironmentVars]
-
-
-@rule
-def environment_vars_subset(
-    session_values: SessionValues, request: EnvironmentVarsRequest
-) -> EnvironmentVars:
-    return EnvironmentVars(
-        session_values[CompleteEnvironmentVars]
-        .get_subset(
-            requested=tuple(request.requested),
-            allowed=(None if request.allowed is None else tuple(request.allowed)),
-        )
-        .items()
-    )
-
-
-def rules():
-    return collect_rules()
