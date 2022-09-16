@@ -16,16 +16,22 @@ from pants.core.util_rules.environments import (
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentName,
     DockerEnvironmentTarget,
+    DockerImageField,
     EnvironmentField,
     EnvironmentName,
     EnvironmentNameRequest,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
+    RemoteEnvironmentTarget,
     UnrecognizedEnvironmentError,
+    extract_process_config_from_environment,
 )
+from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.option.global_options import GlobalOptions
+from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -39,6 +45,77 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
         singleton_environment=None,
+    )
+
+
+def test_extract_process_config_from_environment() -> None:
+    def assert_config(
+        *,
+        env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
+        enable_remote_execution: bool,
+        expected_remote_execution: bool,
+        expected_docker_image: str | None,
+    ) -> None:
+        global_options = create_subsystem(
+            GlobalOptions,
+            remote_execution=enable_remote_execution,
+            remote_execution_extra_platform_properties=["k=v"],
+        )
+        result = run_rule_with_mocks(
+            extract_process_config_from_environment,
+            rule_args=[EnvironmentTarget(env_tgt), Platform.linux_arm64, global_options],
+        )
+        assert result.platform == Platform.linux_arm64.value
+        assert result.remote_execution is expected_remote_execution
+        assert result.docker_image == expected_docker_image
+        assert result.remote_execution_extra_platform_properties == [("k", "v")]
+
+    assert_config(
+        env_tgt=None,
+        enable_remote_execution=False,
+        expected_remote_execution=False,
+        expected_docker_image=None,
+    )
+    assert_config(
+        env_tgt=None,
+        enable_remote_execution=True,
+        expected_remote_execution=True,
+        expected_docker_image=None,
+    )
+
+    for re in (False, True):
+        assert_config(
+            env_tgt=LocalEnvironmentTarget({}, Address("dir")),
+            enable_remote_execution=re,
+            expected_remote_execution=False,
+            expected_docker_image=None,
+        )
+
+    for re in (False, True):
+        assert_config(
+            env_tgt=DockerEnvironmentTarget(
+                {
+                    DockerImageField.alias: "my_img",
+                },
+                Address("dir"),
+            ),
+            enable_remote_execution=re,
+            expected_remote_execution=False,
+            expected_docker_image="my_img",
+        )
+
+    re_tgt = RemoteEnvironmentTarget({}, Address("dir"))
+    assert_config(
+        env_tgt=re_tgt,
+        enable_remote_execution=True,
+        expected_remote_execution=True,
+        expected_docker_image=None,
+    )
+    assert_config(
+        env_tgt=re_tgt,
+        enable_remote_execution=False,
+        expected_remote_execution=False,
+        expected_docker_image=None,
     )
 
 

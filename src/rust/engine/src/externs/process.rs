@@ -78,4 +78,30 @@ impl PyProcessConfigFromEnvironment {
       _ => py.NotImplemented(),
     }
   }
+
+  #[getter]
+  fn platform(&self) -> String {
+    self.platform.into()
+  }
+
+  #[getter]
+  fn remote_execution(&self) -> bool {
+    matches!(
+      self.execution_strategy,
+      ProcessExecutionStrategy::RemoteExecution
+    )
+  }
+
+  #[getter]
+  fn docker_image(&self) -> Option<String> {
+    match self.execution_strategy.clone() {
+      ProcessExecutionStrategy::Docker(image) => Some(image),
+      _ => None,
+    }
+  }
+
+  #[getter]
+  fn remote_execution_extra_platform_properties(&self) -> Vec<(String, String)> {
+    self.remote_execution_extra_platform_properties.clone()
+  }
 }
