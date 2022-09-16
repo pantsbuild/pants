@@ -25,7 +25,7 @@ use crate::local::{
 };
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError,
+  ProcessError, ProcessExecutionStrategy,
 };
 
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
@@ -437,9 +437,10 @@ impl CapturedWorkdir for CommandRunner {
         )
       })?;
 
-    let image = req
-      .docker_image
-      .ok_or("docker_image not set on the Process, but the Docker CommandRunner was used.")?;
+    let image = match req.execution_strategy {
+      ProcessExecutionStrategy::Docker(image) => Ok(image),
+      _ => Err("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used.")
+    }?;
 
     // Obtain ID of the base container in which to run the execution for this process.
     let platform = match req.platform_constraint {

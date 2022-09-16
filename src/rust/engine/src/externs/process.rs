@@ -5,10 +5,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 
-use process_execution::Platform;
+use process_execution::{Platform, ProcessExecutionStrategy};
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyProcessConfigFromEnvironment>()?;
@@ -20,7 +20,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyProcessConfigFromEnvironment {
   pub platform: Platform,
-  pub docker_image: Option<String>,
+  pub execution_strategy: ProcessExecutionStrategy,
   pub remote_execution_extra_platform_properties: Vec<(String, String)>,
 }
 
@@ -30,12 +30,21 @@ impl PyProcessConfigFromEnvironment {
   fn __new__(
     platform: String,
     docker_image: Option<String>,
+    remote_execution: bool,
     remote_execution_extra_platform_properties: Vec<(String, String)>,
   ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
+    let execution_strategy = match (docker_image, remote_execution) {
+      (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution),
+      (None, false) => Ok(ProcessExecutionStrategy::Local),
+      (Some(image), false) => Ok(ProcessExecutionStrategy::Docker(image)),
+      (Some(_), true) => Err(PyAssertionError::new_err(
+        "docker_image cannot be set at the same time as remote_execution",
+      )),
+    }?;
     Ok(Self {
       platform,
-      docker_image,
+      execution_strategy,
       remote_execution_extra_platform_properties,
     })
   }
@@ -43,17 +52,17 @@ impl PyProcessConfigFromEnvironment {
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
     self.platform.hash(&mut s);
-    self.docker_image.hash(&mut s);
+    self.execution_strategy.hash(&mut s);
     self.remote_execution_extra_platform_properties.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
     format!(
-      "ProcessConfigFromEnvironment(platform={}, docker_image={}, remote_execution_extra_platform_properties={:?})",
+      "ProcessConfigFromEnvironment(platform={}, execution_strategy={:?}, remote_execution_extra_platform_properties={:?})",
       String::from(self.platform),
-      self.docker_image.as_ref().unwrap_or(&"None".to_owned()),
-      self.remote_execution_extra_platform_properties
+      self.execution_strategy,
+      self.remote_execution_extra_platform_properties,
     )
   }
 

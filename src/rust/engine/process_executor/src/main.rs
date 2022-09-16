@@ -37,7 +37,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
-  Platform, ProcessCacheScope,
+  Platform, ProcessCacheScope, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -463,7 +463,7 @@ async fn make_request_from_flat_args(
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::Local,
     platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
 
@@ -557,7 +557,7 @@ async fn extract_request_from_action_digest(
     jdk_home: None,
     platform_constraint: None,
     cache_scope: ProcessCacheScope::Always,
-    docker_image: None,
+    execution_strategy: ProcessExecutionStrategy::Local,
     platform_properties: command
       .platform
       .iter()
