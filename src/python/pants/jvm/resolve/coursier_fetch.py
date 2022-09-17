@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tupl
 import toml
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
+from pants.core.goals.generate_lockfiles import GenerateLockfilesSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -36,6 +36,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import ProcessResult
+from pants.engine.resolves import DEFAULT_TOOL_LOCKFILE
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule

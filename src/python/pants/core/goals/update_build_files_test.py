@@ -18,7 +18,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
     FormatWithYapfRequest,
@@ -40,6 +39,7 @@ from pants.core.goals.update_build_files import (
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.resolves import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule

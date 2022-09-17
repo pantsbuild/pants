@@ -7,7 +7,6 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
@@ -15,6 +14,17 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.resolves import (
+    DEFAULT_TOOL_LOCKFILE,
+    NO_TOOL_LOCKFILE,
+    AmbiguousResolveNamesError,
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
+    RequestedUserResolveNames,
+    UnrecognizedResolveNamesError,
+    _ResolveProvider,
+    _ResolveProviderType,
+)
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
@@ -82,133 +92,6 @@ class UserGenerateLockfiles(Collection[GenerateLockfile]):
     in the returned `UserGenerateLockfiles` should be a subclass of `GenerateLockfile`, like
     `GeneratePythonLockfile`.
     """
-
-
-@union
-class KnownUserResolveNamesRequest:
-    """A hook for a language ecosystem to declare which resolves it has defined.
-
-    Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
-    rule that goes from the subclass -> KnownUserResolveNames, usually by simply reading the
-    `resolves` option from the relevant subsystem.
-    """
-
-
-@dataclass(frozen=True)
-class KnownUserResolveNames:
-    """All defined user resolves for a particular language ecosystem.
-
-    See KnownUserResolveNamesRequest for how to use this type. `option_name` should be formatted
-    like `[options-scope].resolves`
-    """
-
-    names: tuple[str, ...]
-    option_name: str
-    requested_resolve_names_cls: type[RequestedUserResolveNames]
-
-
-@union(in_scope_types=[EnvironmentName])
-class RequestedUserResolveNames(Collection[str]):
-    """The user resolves requested for a particular language ecosystem.
-
-    Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
-    rule that goes from the subclass -> UserGenerateLockfiles.
-    """
-
-
-DEFAULT_TOOL_LOCKFILE = "<default>"
-NO_TOOL_LOCKFILE = "<none>"
-
-
-class UnrecognizedResolveNamesError(Exception):
-    def __init__(
-        self,
-        unrecognized_resolve_names: list[str],
-        all_valid_names: Iterable[str],
-        *,
-        description_of_origin: str,
-    ) -> None:
-        # TODO(#12314): maybe implement "Did you mean?"
-        if len(unrecognized_resolve_names) == 1:
-            unrecognized_str = unrecognized_resolve_names[0]
-            name_description = "name"
-        else:
-            unrecognized_str = str(sorted(unrecognized_resolve_names))
-            name_description = "names"
-        super().__init__(
-            softwrap(
-                f"""
-            Unrecognized resolve {name_description} from {description_of_origin}:
-            {unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}
-            """
-            )
-        )
-
-
-class _ResolveProviderType(Enum):
-    TOOL = 1
-    USER = 2
-
-
-@dataclass(frozen=True, order=True)
-class _ResolveProvider:
-    option_name: str
-    type_: _ResolveProviderType
-
-
-class AmbiguousResolveNamesError(Exception):
-    def __init__(self, ambiguous_name: str, providers: set[_ResolveProvider]) -> None:
-        tool_providers = []
-        user_providers = []
-        for provider in sorted(providers):
-            if provider.type_ == _ResolveProviderType.TOOL:
-                tool_providers.append(provider.option_name)
-            else:
-                user_providers.append(provider.option_name)
-
-        if tool_providers:
-            if not user_providers:
-                raise AssertionError(
-                    softwrap(
-                        f"""
-                        {len(tool_providers)} tools have the same options_scope: {ambiguous_name}.
-                        If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so
-                        that there is no ambiguity. Otherwise, please open a bug at
-                        https://github.com/pantsbuild/pants/issues/new.
-                        """
-                    )
-                )
-            if len(user_providers) == 1:
-                msg = softwrap(
-                    f"""
-                    A resolve name from the option `{user_providers[0]}` collides with the
-                    name of a tool resolve: {ambiguous_name}
-
-                    To fix, please update `{user_providers[0]}` to use a different resolve name.
-                    """
-                )
-            else:
-                msg = softwrap(
-                    f"""
-                    Multiple options define the resolve name `{ambiguous_name}`, but it is
-                    already claimed by a tool: {user_providers}
-
-                    To fix, please update these options so that none of them use
-                    `{ambiguous_name}`.
-                    """
-                )
-        else:
-            assert len(user_providers) > 1
-            msg = softwrap(
-                f"""
-                The same resolve name `{ambiguous_name}` is used by multiple options, which
-                causes ambiguity: {user_providers}
-
-                To fix, please update these options so that `{ambiguous_name}` is not used more
-                than once.
-                """
-            )
-        super().__init__(msg)
 
 
 def _check_ambiguous_resolve_names(

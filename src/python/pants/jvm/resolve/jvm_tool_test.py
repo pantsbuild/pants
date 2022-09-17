@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import textwrap
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
+from pants.engine.resolves import DEFAULT_TOOL_LOCKFILE
 from pants.engine.rules import SubsystemRule, rule
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.goals.lockfile import rules as lockfile_rules

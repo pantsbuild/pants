@@ -11,11 +11,12 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.resolves import DEFAULT_TOOL_LOCKFILE
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess

@@ -27,15 +27,17 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
-    KnownUserResolveNames,
-    KnownUserResolveNamesRequest,
-    RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
 from pants.engine.process import ProcessCacheScope, ProcessResult
+from pants.engine.resolves import (
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
+    RequestedUserResolveNames,
+)
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule

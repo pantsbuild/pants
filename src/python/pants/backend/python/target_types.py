@@ -27,7 +27,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import (
@@ -37,6 +36,7 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
+from pants.engine.resolves import UnrecognizedResolveNamesError
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,

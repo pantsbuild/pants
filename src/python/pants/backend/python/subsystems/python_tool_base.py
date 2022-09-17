@@ -17,10 +17,10 @@ from pants.backend.python.util_rules.pex_requirements import (
     ToolCustomLockfile,
     ToolDefaultLockfile,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import Digest, FileContent
 from pants.engine.internals.selectors import Get
+from pants.engine.resolves import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.engine.rules import rule_helper
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption

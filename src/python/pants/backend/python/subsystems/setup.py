@@ -9,7 +9,7 @@ import os
 from typing import Iterable, List, Optional, TypeVar, cast
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.engine.resolves import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
     DictOption,

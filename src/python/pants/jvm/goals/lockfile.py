@@ -10,15 +10,17 @@ from typing import Mapping
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
-    KnownUserResolveNames,
-    KnownUserResolveNamesRequest,
-    RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.resolves import (
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
+    RequestedUserResolveNames,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule, union
