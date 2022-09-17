@@ -1,0 +1,248 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+import shlex
+import string
+from dataclasses import dataclass
+from typing import Mapping
+
+from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules import first_party_pkg, goroot, sdk
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgAnalysis,
+    FallibleFirstPartyPkgDigest,
+    FirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
+    FirstPartyPkgDigestRequest,
+)
+from pants.backend.go.util_rules.goroot import GoRoot
+from pants.build_graph.address import Address
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.fs import DigestContents, Workspace
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
+from pants.engine.target import Targets
+
+logger = logging.getLogger(__name__)
+
+_GENERATE_DIRECTIVE_RE = re.compile(rb"^//go:generate[ \t](.*)$")
+
+
+class GoGenerateGoalSubsystem(GoalSubsystem):
+    name = "go-generate"
+    help = "Run commands described by go:generate directives."
+
+
+class GoGenerateGoal(Goal):
+    subsystem_cls = GoGenerateGoalSubsystem
+
+
+@dataclass(frozen=True)
+class RunPackageGeneratorsRequest:
+    address: Address
+    regex: str | None = None
+
+
+@dataclass(frozen=True)
+class RunPackageGeneratorsResult:
+    digest: Digest
+
+
+_SHELL_SPECIAL_VAR = frozenset(
+    ["*", "#", "$", "@", "!", "?", "-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+)
+_ALPHANUMERIC = frozenset([*string.ascii_letters, *string.digits, "_"])
+
+
+def _get_shell_name(s: str) -> tuple[str, int]:
+    if s[0] == "{":
+        if len(s) > 2 and s[1] in _SHELL_SPECIAL_VAR and s[2] == "}":
+            return s[1:2], 3
+        for i in range(1, len(s)):
+            if s[i] == "}":
+                if i == 1:
+                    return "", 2  # Bad syntax; eat "${}"
+                return s[1:i], i + 1
+        return "", 1  # Bad syntax; eat "${"
+    elif s[0] in _SHELL_SPECIAL_VAR:
+        return s[0:1], 1
+
+    i = 0
+    while i < len(s) and s[i] in _ALPHANUMERIC:
+        i += 1
+
+    return s[:i], i
+
+
+def _expand_env(s: str, m: Mapping[str, str]) -> str:
+    i = 0
+    buf: str | None = None
+    j = 0
+    while j < len(s):
+        if s[j] == "$" and j + 1 < len(s):
+            if buf is None:
+                buf = ""
+            buf += s[i:j]
+            name, w = _get_shell_name(s[j + 1 :])
+            if name == "" and w > 0:
+                # Encountered invalid syntax; eat the characters.
+                pass
+            elif name == "":
+                # Valid syntax, but $ was not followed by a name. Leave the dollar character untouched.
+                buf += s[j]
+            else:
+                buf += m.get(name, "")
+            j += w
+            i = j + 1
+        j += 1
+
+    if buf is None:
+        return s
+    return buf + s[i:]
+
+
+@rule_helper
+async def _run_generators(
+    analysis: FirstPartyPkgAnalysis,
+    digest: Digest,
+    dir_path: str,
+    go_file: str,
+    goroot: GoRoot,
+    env: Mapping[str, str],
+) -> Digest:
+    digest_contents = await Get(DigestContents, Digest, digest)
+    content: bytes | None = None
+    for entry in digest_contents:
+        if entry.path == os.path.join(dir_path, go_file):
+            content = entry.content
+            break
+
+    if content is None:
+        raise ValueError("Illegal state: Unable to extract Go file from digest.")
+
+    cmd_shorthand: dict[str, tuple[str, ...]] = {}
+
+    for line_num, line in enumerate(content.splitlines(), start=1):
+        m = _GENERATE_DIRECTIVE_RE.fullmatch(line)
+        if not m:
+            continue
+
+        # Extract the command to run.
+        # Note: Go only processes double-quoted strings. Thus, using shlex.split is actually more liberal than
+        # Go because it also allows single-quoted strings.
+        args = shlex.split(m.group(1).decode())
+
+        # Store any command shorthands for later use.
+        if args[0] == "-command":
+            if len(args) <= 1:
+                raise ValueError(
+                    f"{go_file}:{line_num}: -command syntax used but no command name specified"
+                )
+            cmd_shorthand[args[1]] = tuple(args[2:])
+            continue
+
+        # Replace any shorthand command with the previously-stored arguments.
+        if args[0] in cmd_shorthand:
+            args = [*cmd_shorthand[args[0]], *args[1:]]
+
+        # TODO: Substitute environment variables.
+
+        # If the program calls for `go`, then use the full path to the `go` binary in the GOROOT.
+        if args[0] == "go":
+            args[0] = os.path.join(goroot.path, "bin", "go")
+
+        generate_env = {
+            "GOOS": goroot.goos,
+            "GOARCH": goroot.goarch,
+            "GOFILE": go_file,
+            "GOLINE": str(line_num),
+            "GOPACKAGE": analysis.name,
+            "GOROOT": goroot.path,
+            "DOLLAR": "$",
+        }
+
+        for i, arg in enumerate(args):
+            args[i] = _expand_env(arg, generate_env)
+
+        # Invoke the subprocess and store its output for use as input root of next command (if any).
+        result = await Get(
+            ProcessResult,
+            Process(
+                argv=args,
+                input_digest=digest,
+                working_directory=dir_path,
+                output_directories=["."],
+                env={
+                    **generate_env,
+                    **env,
+                },
+                description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
+            ),
+        )
+        digest = await Get(Digest, AddPrefix(result.output_digest, dir_path))
+
+    return digest
+
+
+@rule
+async def run_go_package_generators(
+    request: RunPackageGeneratorsRequest, goroot: GoRoot
+) -> RunPackageGeneratorsResult:
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    fallible_analysis = await Get(
+        FallibleFirstPartyPkgAnalysis,
+        FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
+    )
+    if not fallible_analysis.analysis:
+        raise ValueError(f"Analysis failure for {request.address}: {fallible_analysis.stderr}")
+    analysis = fallible_analysis.analysis
+    dir_path = analysis.dir_path if analysis.dir_path else "."
+
+    fallible_pkg_digest = await Get(
+        FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(request.address)
+    )
+    if fallible_pkg_digest.pkg_digest is None:
+        raise ValueError(
+            f"Unable to obtain digest for {request.address}: {fallible_pkg_digest.stderr}"
+        )
+    pkg_digest = fallible_pkg_digest.pkg_digest
+
+    # Scan each Go file in the package for generate directives. Process them sequentially so that an error in
+    # an earlier-processed file prevents later files from being processed.
+    output_digest = EMPTY_DIGEST
+    for go_file in analysis.go_files:
+        output_digest_for_go_file = await _run_generators(
+            analysis, pkg_digest.digest, dir_path, go_file, goroot, env
+        )
+        output_digest = await Get(Digest, MergeDigests([output_digest, output_digest_for_go_file]))
+
+    return RunPackageGeneratorsResult(output_digest)
+
+
+@goal_rule
+async def go_generate(targets: Targets, workspace: Workspace) -> GoGenerateGoal:
+    go_package_targets = [tgt for tgt in targets if tgt.has_field(GoPackageSourcesField)]
+    results = await MultiGet(
+        Get(RunPackageGeneratorsResult, RunPackageGeneratorsRequest(tgt.address))
+        for tgt in go_package_targets
+    )
+    output_digest = await Get(Digest, MergeDigests([r.digest for r in results]))
+    workspace.write_digest(output_digest)
+    return GoGenerateGoal(exit_code=0)
+
+
+def rules():
+    return (
+        *collect_rules(),
+        *first_party_pkg.rules(),
+        *goroot.rules(),
+        *sdk.rules(),
+    )
