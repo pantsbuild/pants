@@ -89,8 +89,7 @@ async fn make_execute_request() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    remote_execution_platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {
@@ -168,11 +167,10 @@ async fn make_execute_request_with_instance_name() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    remote_execution_platform_properties: vec![(
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![(
       "target_platform".to_owned(),
       "apple-2e".to_owned(),
-    )],
+    )]),
   };
 
   let want_command = remexec::Command {
@@ -256,8 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    remote_execution_platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let mut want_command = remexec::Command {
@@ -484,8 +481,7 @@ async fn make_execute_request_with_timeout() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    remote_execution_platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {
@@ -591,8 +587,7 @@ async fn make_execute_request_using_immutable_inputs() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    remote_execution_platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {

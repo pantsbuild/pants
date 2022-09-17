@@ -517,7 +517,7 @@ fn interactive_process(
       (py_interactive_process.extract().unwrap(), py_process, process_config)
     });
     match process_config.execution_strategy {
-      ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution => panic!("InteractiveProcess should not set docker_image or remote_execution"),
+      ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => panic!("InteractiveProcess should not set docker_image or remote_execution"),
       _ => ()
     };
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config).await?.process;

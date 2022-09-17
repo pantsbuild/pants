@@ -66,10 +66,6 @@ struct CommandSpec {
   #[structopt(long)]
   input_digest_length: Option<usize>,
 
-  /// Extra platform properties to set on the execution request.
-  #[structopt(long)]
-  extra_platform_property: Vec<String>,
-
   /// Environment variables with which the process should be run.
   #[structopt(long)]
   env: Vec<String>,
@@ -462,9 +458,6 @@ async fn make_request_from_flat_args(
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::Local,
-    remote_execution_platform_properties: collection_from_keyvalues(
-      args.command.extra_platform_property.iter(),
-    ),
   };
 
   let metadata = ProcessMetadata {
@@ -558,16 +551,6 @@ async fn extract_request_from_action_digest(
     platform: Platform::current().unwrap(),
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::Local,
-    remote_execution_platform_properties: command
-      .platform
-      .iter()
-      .flat_map(|platform| {
-        platform
-          .properties
-          .iter()
-          .map(|property| (property.name.clone(), property.value.clone()))
-      })
-      .collect(),
   };
 
   let metadata = ProcessMetadata {

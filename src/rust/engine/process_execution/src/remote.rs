@@ -43,7 +43,7 @@ use workunit_store::{
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessResultMetadata, ProcessResultSource,
+  ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -868,7 +868,10 @@ pub fn make_execute_request(
       });
   }
 
-  let mut platform_properties = req.remote_execution_platform_properties.clone();
+  let mut platform_properties = match req.execution_strategy.clone() {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+    _ => vec![],
+  };
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
   //       interaction with how servers match platform properties.
