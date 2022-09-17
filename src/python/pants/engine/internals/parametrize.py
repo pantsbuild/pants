@@ -115,7 +115,7 @@ class Parametrize:
     def __repr__(self) -> str:
         strs = [str(s) for s in self.args]
         strs.extend(f"{alias}={value}" for alias, value in self.kwargs.items())
-        return f"parametrize({', '.join(strs)}"
+        return f"parametrize({', '.join(strs)})"
 
 
 @dataclass(frozen=True)
