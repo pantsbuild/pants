@@ -33,6 +33,17 @@ from pants.engine.target import Targets
 
 logger = logging.getLogger(__name__)
 
+
+# Adapted from Go toolchain.
+# See https://github.com/golang/go/blob/master/src/cmd/go/internal/generate/generate.go and
+# https://github.com/golang/go/blob/cc1b20e8adf83865a1dbffa259c7a04ef0699b43/src/os/env.go#L16-L96
+#
+# Original copyright:
+#   // Copyright 2011 The Go Authors. All rights reserved.
+#   // Use of this source code is governed by a BSD-style
+#   // license that can be found in the LICENSE file.
+
+
 _GENERATE_DIRECTIVE_RE = re.compile(rb"^//go:generate[ \t](.*)$")
 
 

@@ -54,6 +54,14 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+# Adapted from Go toolchain.
+# See https://github.com/golang/go/blob/cc1b20e8adf83865a1dbffa259c7a04ef0699b43/src/os/env_test.go#L14-L67
+#
+# Original copyright:
+#   // Copyright 2010 The Go Authors. All rights reserved.
+#   // Use of this source code is governed by a BSD-style
+#   // license that can be found in the LICENSE file.
+
 _EXPAND_TEST_CASES = [
     ("", ""),
     ("$*", "all the args"),
