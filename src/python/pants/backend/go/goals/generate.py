@@ -30,6 +30,8 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import Targets
+from pants.option.option_types import StrListOption
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,29 @@ _GENERATE_DIRECTIVE_RE = re.compile(rb"^//go:generate[ \t](.*)$")
 
 class GoGenerateGoalSubsystem(GoalSubsystem):
     name = "go-generate"
-    help = "Run commands described by go:generate directives."
+    help = softwrap(
+        """
+        Run each command in a package described by a `//go:generate` directive. This is equivalent to running
+        `go generate` on a Go package.
+
+        Note: Just like with `go generate`, the `go-generate` goal is never run as part of the build and
+        must be run manually to invoke the commands described by the //go:generate directives.
+
+        See https://go.dev/blog/generate for details.
+        """
+    )
+
+    env_vars = StrListOption(
+        default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+        help=softwrap(
+            """
+            Environment variables to set when invoking generator programs.
+            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+            or just `ENV_VAR` to copy the value from Pants's own environment.
+            """
+        ),
+        advanced=True,
+    )
 
 
 class GoGenerateGoal(Goal):
@@ -205,12 +229,14 @@ async def _run_generators(
 
 @rule
 async def run_go_package_generators(
-    request: RunPackageGeneratorsRequest, goroot: GoRoot
+    request: RunPackageGeneratorsRequest, goroot: GoRoot, subsystem: GoGenerateGoalSubsystem
 ) -> RunPackageGeneratorsResult:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    fallible_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis,
-        FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
+    fallible_analysis, env = await MultiGet(
+        Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
+        ),
+        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
     )
     if not fallible_analysis.analysis:
         raise ValueError(f"Analysis failure for {request.address}: {fallible_analysis.stderr}")
