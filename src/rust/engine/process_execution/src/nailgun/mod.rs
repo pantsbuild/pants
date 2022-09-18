@@ -255,7 +255,7 @@ impl CapturedWorkdir for CommandRunner {
             stdin_read
           })
         })
-        .map_err(|e| format!("Error communicating with server: {}", e))
+        .map_err(|e| format!("Error communicating with nailgun server: {}", e))
         .await?
     };
 
@@ -270,7 +270,7 @@ impl CapturedWorkdir for CommandRunner {
     let exit_code = child
       .wait()
       .map_ok(ChildOutput::Exit)
-      .map_err(|e| format!("Error communicating with server: {}", e));
+      .map_err(|e| format!("Error communicating with nailgun server: {}", e));
 
     Ok(futures::stream::select(output_stream, exit_code.into_stream()).boxed())
   }
