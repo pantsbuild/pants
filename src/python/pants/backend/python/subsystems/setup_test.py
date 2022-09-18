@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.engine.resolves import UnrecognizedResolveNamesError
 from pants.testutil.option_util import create_subsystem
 
 
