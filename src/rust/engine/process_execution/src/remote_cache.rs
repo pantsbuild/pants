@@ -291,42 +291,63 @@ impl CommandRunner {
       Level::Trace,
       |workunit| async move {
         tokio::select! {
-          cache_result = cache_read_future => {
-            if let Some(cached_response) = cache_result {
-              let lookup_elapsed = cache_lookup_start.elapsed();
-              workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-              if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
-                let time_saved = time_saved.as_millis() as u64;
-                workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-                workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-              }
-              // When we successfully use the cache, we change the description and increase the level
-              // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| {
-                initial.map(|(initial, _)|
-                (WorkunitMetadata {
-                  desc: initial
-                    .desc
-                    .as_ref()
-                    .map(|desc| format!("Hit: {}", desc)),
-                  ..initial
-                }, Level::Debug))
-              });
-              Ok((cached_response, true))
-            } else {
-              // Note that we don't increment a counter here, as there is nothing of note in this
-              // scenario: the remote cache did not save unnecessary local work, nor was the remote
-              // trip unusually slow such that local execution was faster.
-              local_execution_future.await.map(|res| (res, false))
-            }
+          cache_result = &cache_read_future => {
+            self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
           }
-          local_result = &mut local_execution_future => {
-            workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
-            local_result.map(|res| (res, false))
+          s = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
+            tokio::select! {
+              cache_result = cache_read_future => {
+                self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
+              }
+              local_result = &mut local_execution_future => {
+                workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+                local_result.map(|res| (res, false))
+              }
+            }
           }
         }
       }
     ).await
+  }
+
+  async fn handle_cache_read_completed(
+    &self,
+    workunit: &mut RunningWorkunit,
+    cache_lookup_start: Instant,
+    cache_result: Option<FallibleProcessResultWithPlatform>,
+    local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, ProcessError>>,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
+    if let Some(cached_response) = cache_result {
+      let lookup_elapsed = cache_lookup_start.elapsed();
+      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+      if let Some(time_saved) = cached_response
+        .metadata
+        .time_saved_from_cache(lookup_elapsed)
+      {
+        let time_saved = time_saved.as_millis() as u64;
+        workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+        workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+      }
+      // When we successfully use the cache, we change the description and increase the level
+      // (but not so much that it will be logged by default).
+      workunit.update_metadata(|initial| {
+        initial.map(|(initial, _)| {
+          (
+            WorkunitMetadata {
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              ..initial
+            },
+            Level::Debug,
+          )
+        })
+      });
+      Ok((cached_response, true))
+    } else {
+      // Note that we don't increment a counter here, as there is nothing of note in this
+      // scenario: the remote cache did not save unnecessary local work, nor was the remote
+      // trip unusually slow such that local execution was faster.
+      local_execution_future.await.map(|res| (res, false))
+    }
   }
 
   /// Stores an execution result into the remote Action Cache.
@@ -443,6 +464,8 @@ impl crate::CommandRunner for CommandRunner {
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
+
+    let use_nailgun = !request.input_digests.use_nailgun.is_empty();
 
     let (result, hit_cache) = if self.cache_read {
       self
