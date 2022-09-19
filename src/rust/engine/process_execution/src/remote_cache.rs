@@ -255,7 +255,7 @@ impl CommandRunner {
     >,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
-    let cache_read_future = async {
+    let mut cache_read_future = async {
       let response = check_action_cache(
         action_digest,
         &request.description,
@@ -291,10 +291,10 @@ impl CommandRunner {
       Level::Trace,
       |workunit| async move {
         tokio::select! {
-          cache_result = &cache_read_future => {
+          cache_result = &mut cache_read_future => {
             self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
           }
-          s = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
+          _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
             tokio::select! {
               cache_result = cache_read_future => {
                 self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
