@@ -453,7 +453,12 @@ async def package_python_dist(
     source_roots_result = await Get(
         SourceRootsResult,
         SourceRootsRequest(
-            files=[], dirs={PurePath(tgt.address.spec_path) for tgt in transitive_targets.closure}
+            files=[],
+            dirs={
+                PurePath(tgt.address.spec_path)
+                for tgt in transitive_targets.closure
+                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+            },
         ),
     )
     source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
