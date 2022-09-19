@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, cast
 
@@ -189,12 +190,16 @@ class RemotePlatformField(StringField):
 
 class RemoteExtraPlatformPropertiesField(StringSequenceField):
     alias = "extra_platform_properties"
-    default = None  # If None, we will use the global option.
+    default = ()
+    value: tuple[str, ...]
     help = softwrap(
         """
-        Overrides the default value from the option
-        `[GLOBAL].remote_execution_extra_platform_properties` when this environment target is
-        active.
+        Platform properties to set on remote execution requests.
+
+        Format: property=value. Multiple values should be specified as multiple
+        occurrences of this flag.
+
+        Pants itself may add additional platform properties.
         """
     )
 
@@ -458,12 +463,21 @@ def extract_process_config_from_environment(
         )
         remote_execution = tgt.val.has_field(RemotePlatformField)
         if remote_execution:
-            field_val = tgt.val[RemoteExtraPlatformPropertiesField].value
-            raw_remote_execution_extra_platform_properties = (
-                field_val
-                if field_val is not None
-                else global_options.remote_execution_extra_platform_properties
-            )
+            raw_remote_execution_extra_platform_properties = tgt.val[
+                RemoteExtraPlatformPropertiesField
+            ].value
+            if global_options.remote_execution_extra_platform_properties:
+                logging.warning(
+                    softwrap(
+                        f"""\
+                        The option `[GLOBAL].remote_execution_extra_platform_properties` is set, but
+                        it is ignored because you are using the environments target mechanism.
+                        Instead, delete that option and set the field
+                        `{RemoteExtraPlatformPropertiesField}.alias` on
+                        `{RemoteEnvironmentTarget.alias}` targets.
+                        """
+                    )
+                )
         else:
             raw_remote_execution_extra_platform_properties = ()
 

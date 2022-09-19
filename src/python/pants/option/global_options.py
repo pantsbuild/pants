@@ -1703,6 +1703,9 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             occurrences of this flag.
 
             Pants itself may add additional platform properties.
+
+            If you are using the remote_environment target mechanism, set this value as a field
+            on the target instead. This option will be ignored.
             """
         ),
         default=[],

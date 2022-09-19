@@ -115,9 +115,9 @@ def test_extract_process_config_from_environment() -> None:
             enable_remote_execution=re,
             expected_remote_execution=True,
             expected_docker_image=None,
-            expected_remote_execution_extra_platform_properties=[("global_k", "v")],
+            # The global option is ignored.
+            expected_remote_execution_extra_platform_properties=[],
         )
-    # `extra_platforms_field` should override the global default.
     assert_config(
         env_tgt=RemoteEnvironmentTarget(
             {RemoteExtraPlatformPropertiesField.alias: ["field_k=v"]}, Address("dir")
