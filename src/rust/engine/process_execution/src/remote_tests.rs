@@ -89,8 +89,7 @@ async fn make_execute_request() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {
@@ -168,8 +167,10 @@ async fn make_execute_request_with_instance_name() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![(
+      "target_platform".to_owned(),
+      "apple-2e".to_owned(),
+    )]),
   };
 
   let want_command = remexec::Command {
@@ -253,8 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let mut want_command = remexec::Command {
@@ -379,12 +379,13 @@ async fn make_execute_request_with_jdk() {
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
-  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"])).platform_properties(vec![
-    ("FIRST".to_owned(), "foo".to_owned()),
-    ("Multi".to_owned(), "uno".to_owned()),
-    ("last".to_owned(), "bar".to_owned()),
-    ("Multi".to_owned(), "dos".to_owned()),
-  ]);
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]))
+    .remote_execution_platform_properties(vec![
+      ("FIRST".to_owned(), "foo".to_owned()),
+      ("Multi".to_owned(), "uno".to_owned()),
+      ("last".to_owned(), "bar".to_owned()),
+      ("Multi".to_owned(), "dos".to_owned()),
+    ]);
   req.platform = Platform::Linux_x86_64;
   req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
@@ -480,8 +481,7 @@ async fn make_execute_request_with_timeout() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {
@@ -587,8 +587,7 @@ async fn make_execute_request_using_immutable_inputs() {
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution,
-    platform_properties: vec![],
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
   };
 
   let want_command = remexec::Command {

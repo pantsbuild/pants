@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, cast
 
@@ -187,11 +188,28 @@ class RemotePlatformField(StringField):
     help = "The platform used by the remote execution environment."
 
 
+class RemoteExtraPlatformPropertiesField(StringSequenceField):
+    alias = "extra_platform_properties"
+    default = ()
+    value: tuple[str, ...]
+    help = softwrap(
+        """
+        Platform properties to set on remote execution requests.
+
+        Format: property=value. Multiple values should be specified as multiple
+        occurrences of this flag.
+
+        Pants itself may add additional platform properties.
+        """
+    )
+
+
 class RemoteEnvironmentTarget(Target):
     alias = "_remote_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RemotePlatformField,
+        RemoteExtraPlatformPropertiesField,
     )
     help = softwrap(
         """
@@ -436,11 +454,32 @@ def extract_process_config_from_environment(
     if tgt.val is None:
         docker_image = None
         remote_execution = global_options.remote_execution
+        raw_remote_execution_extra_platform_properties = (
+            global_options.remote_execution_extra_platform_properties if remote_execution else ()
+        )
     else:
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
         remote_execution = tgt.val.has_field(RemotePlatformField)
+        if remote_execution:
+            raw_remote_execution_extra_platform_properties = tgt.val[
+                RemoteExtraPlatformPropertiesField
+            ].value
+            if global_options.remote_execution_extra_platform_properties:
+                logging.warning(
+                    softwrap(
+                        f"""\
+                        The option `[GLOBAL].remote_execution_extra_platform_properties` is set, but
+                        it is ignored because you are using the environments target mechanism.
+                        Instead, delete that option and set the field
+                        `{RemoteExtraPlatformPropertiesField}.alias` on
+                        `{RemoteEnvironmentTarget.alias}` targets.
+                        """
+                    )
+                )
+        else:
+            raw_remote_execution_extra_platform_properties = ()
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
@@ -448,7 +487,7 @@ def extract_process_config_from_environment(
         remote_execution=remote_execution,
         remote_execution_extra_platform_properties=[
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]
-            for pair in global_options.remote_execution_extra_platform_properties
+            for pair in raw_remote_execution_extra_platform_properties
         ],
     )
 
