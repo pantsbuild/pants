@@ -1013,6 +1013,22 @@ def test_duplicated_rules() -> None:
             return B()
 
 
+def test_param_type_overrides() -> None:
+    type1 = int  # use a runtime type
+
+    @rule(param_type_overrides={"param1": type1, "param2": dict})
+    async def dont_injure_humans(param1: str, param2, param3: list) -> A:
+        return A()
+
+    assert dont_injure_humans.rule.input_selectors == (int, dict, list)
+
+    with pytest.raises(ValueError, match="paramX"):
+
+        @rule(param_type_overrides={"paramX": int})
+        async def obey_human_orders() -> A:
+            return A()
+
+
 def test_invalid_rule_helper_name() -> None:
     with pytest.raises(ValueError, match="must be private"):
 

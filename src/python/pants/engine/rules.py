@@ -155,7 +155,7 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level", "param_type_overrides"}
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
@@ -183,6 +183,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
+    param_type_overrides: dict[str, type] = kwargs.get("param_type_overrides", {})
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
@@ -191,13 +192,21 @@ def rule_decorator(func, **kwargs) -> Callable:
         name=f"{func_id} return",
         raise_type=MissingReturnTypeAnnotation,
     )
+
+    func_params = inspect.signature(func).parameters
+    for parameter in param_type_overrides:
+        if parameter not in func_params:
+            raise ValueError(f"Unknown parameter name in `param_type_overrides`: {parameter}")
+
     parameter_types = tuple(
-        _ensure_type_annotation(
+        param_type_overrides[parameter]
+        if parameter in param_type_overrides
+        else _ensure_type_annotation(
             type_annotation=type_hints.get(parameter),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )
-        for parameter in inspect.signature(func).parameters
+        for parameter in func_params
     )
     is_goal_cls = issubclass(return_type, Goal)
 
