@@ -696,8 +696,7 @@ class VenvScriptWriter:
 
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
-            if [ ! -e "${{target_venv_executable}}" ]; then
-                rm -rf "${{venv_dir}}" || true
+            if [ ! -e "${{venv_dir}}" ]; then
                 PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
             fi
 
