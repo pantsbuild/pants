@@ -196,7 +196,10 @@ def rule_decorator(func, **kwargs) -> Callable:
     func_params = inspect.signature(func).parameters
     for parameter in param_type_overrides:
         if parameter not in func_params:
-            raise ValueError(f"Unknown parameter name in `param_type_overrides`: {parameter}")
+            raise ValueError(
+                f"Unknown parameter name in `param_type_overrides`: {parameter}."
+                + f" Parameter names: '{', '.join(func_params)}'"
+            )
 
     parameter_types = tuple(
         param_type_overrides[parameter]
