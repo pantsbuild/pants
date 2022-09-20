@@ -327,6 +327,7 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     } == set(constrained_pex_info["distributions"].keys())
 
 
+@pytest.mark.skip(reason="Suspected flaky: see #16927.")
 def test_lockfiles(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--python-invalid-lockfile-behavior=ignore"])
     rule_runner.write_files(
