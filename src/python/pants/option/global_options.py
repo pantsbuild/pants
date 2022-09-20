@@ -487,6 +487,7 @@ class ExecutionOptions:
     local_cache: bool
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
+    nailgun_remote_cache_speculation_delay: int
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
     process_execution_graceful_shutdown_timeout: int
@@ -534,6 +535,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            nailgun_remote_cache_speculation_delay=bootstrap_options.nailgun_remote_cache_speculation_delay,
             cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
@@ -619,6 +621,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
+    nailgun_remote_cache_speculation_delay=0,
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
@@ -1286,6 +1289,15 @@ class BootstrapOptions:
     process_execution_local_enable_nailgun = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
         help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
+        advanced=True,
+    )
+    nailgun_remote_cache_speculation_delay = IntOption(
+        default=DEFAULT_EXECUTION_OPTIONS.nailgun_remote_cache_speculation_delay,
+        help=softwrap(
+            """
+            The time in milliseconds to delay remote cache read speculation of nailgun processes.
+            """
+        ),
         advanced=True,
     )
     process_execution_graceful_shutdown_timeout = IntOption(

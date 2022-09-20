@@ -294,7 +294,7 @@ impl CommandRunner {
           cache_result = &mut cache_read_future => {
             self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
           }
-          _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
+          _ = tokio::time::sleep(request.remote_cache_speculation_delay) => {
             tokio::select! {
               cache_result = cache_read_future => {
                 self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
@@ -464,8 +464,6 @@ impl crate::CommandRunner for CommandRunner {
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
-
-    let use_nailgun = !request.input_digests.use_nailgun.is_empty();
 
     let (result, hit_cache) = if self.cache_read {
       self

@@ -463,6 +463,7 @@ async fn make_request_from_flat_args(
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::Local,
     platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
   let metadata = ProcessMetadata {
@@ -566,6 +567,7 @@ async fn extract_request_from_action_digest(
           .map(|property| (property.name.clone(), property.value.clone()))
       })
       .collect(),
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
   let metadata = ProcessMetadata {

@@ -549,6 +549,8 @@ pub struct Process {
   /// Properties used for remote execution configuration. Regardless of remote execution, these
   /// should impact the cache key.
   pub platform_properties: Vec<(String, String)>,
+
+  pub remote_cache_speculation_delay: std::time::Duration,
 }
 
 impl Process {
