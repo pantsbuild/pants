@@ -66,6 +66,10 @@ struct CommandSpec {
   #[structopt(long)]
   input_digest_length: Option<usize>,
 
+  /// Extra platform properties to set on the execution request during remote execution.
+  #[structopt(long)]
+  extra_platform_property: Vec<String>,
+
   /// Environment variables with which the process should be run.
   #[structopt(long)]
   env: Vec<String>,
@@ -377,6 +381,18 @@ async fn make_request(
   store: &Store,
   args: &Opt,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let (execution_strategy, platform) = if args.server.is_some() {
+    let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
+      args.command.extra_platform_property.iter(),
+    ));
+    (strategy, Platform::Linux_x86_64)
+  } else {
+    (
+      ProcessExecutionStrategy::Local,
+      Platform::current().unwrap(),
+    )
+  };
+
   match (
     args.command.input_digest,
     args.command.input_digest_length,
@@ -385,14 +401,20 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length)).await
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
 
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
-      extract_request_from_action_digest(store, Digest::new(action_fingerprint, action_digest_length), args.remote_instance_name.clone()).await
+      extract_request_from_action_digest(
+        store,
+        Digest::new(action_fingerprint, action_digest_length),
+        execution_strategy,
+        platform,
+        args.remote_instance_name.clone(),
+      ).await
     }
     (None, None, None, None, Some(buildbarn_url)) => {
-      extract_request_from_buildbarn_url(store, buildbarn_url).await
+      extract_request_from_buildbarn_url(store, buildbarn_url, execution_strategy, platform).await
     }
     (None, None, None, None, None) => {
       Err("Must specify either action input digest or action digest or buildbarn URL".to_owned())
@@ -407,6 +429,8 @@ async fn make_request_from_flat_args(
   store: &Store,
   args: &Opt,
   input_files: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -453,13 +477,12 @@ async fn make_request_from_flat_args(
     level: Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
-    platform: Platform::current().unwrap(),
+    platform,
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::Local,
+    execution_strategy,
   };
-
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
     cache_key_gen_version: args.command.cache_key_gen_version.clone(),
@@ -471,6 +494,8 @@ async fn make_request_from_flat_args(
 async fn extract_request_from_action_digest(
   store: &Store,
   action_digest: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
   instance_name: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let action = store
@@ -548,9 +573,9 @@ async fn extract_request_from_action_digest(
     level: Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::current().unwrap(),
+    platform,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::Local,
+    execution_strategy,
   };
 
   let metadata = ProcessMetadata {
@@ -564,6 +589,8 @@ async fn extract_request_from_action_digest(
 async fn extract_request_from_buildbarn_url(
   store: &Store,
   buildbarn_url: &str,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
   if url_parts.len() < 4 {
@@ -610,7 +637,14 @@ async fn extract_request_from_buildbarn_url(
     }
   };
 
-  extract_request_from_action_digest(store, action_digest, Some(instance.to_owned())).await
+  extract_request_from_action_digest(
+    store,
+    action_digest,
+    execution_strategy,
+    platform,
+    Some(instance.to_owned()),
+  )
+  .await
 }
 
 fn collection_from_keyvalues<Str, It, Col>(keyvalues: It) -> Col
