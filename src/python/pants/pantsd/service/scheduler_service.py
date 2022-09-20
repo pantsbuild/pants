@@ -157,3 +157,4 @@ class SchedulerService(PantsService):
                 self._logger.critical(f"The scheduler was invalidated: {e!r}")
                 self.terminate()
         self._scheduler_session.cancel()
+        self._scheduler.shutdown()

@@ -31,6 +31,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
@@ -880,6 +881,11 @@ pub trait CommandRunner: Send + Sync + Debug {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
+
+  /// Shutdown this CommandRunner cleanly. This
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 #[async_trait]
@@ -891,6 +897,26 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     (**self).run(context, workunit, req).await
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    (**self).shutdown().await
+  }
+}
+
+#[async_trait]
+impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    (**self).run(context, workunit, req).await
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    (**self).shutdown().await
   }
 }
 

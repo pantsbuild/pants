@@ -493,6 +493,10 @@ impl crate::CommandRunner for CommandRunner {
 
     Ok(result)
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.inner.shutdown().await
+  }
 }
 
 /// Check the remote Action Cache for a cached result of running the given `command` and the Action

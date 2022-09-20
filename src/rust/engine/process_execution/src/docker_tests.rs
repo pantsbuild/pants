@@ -748,6 +748,7 @@ async fn run_command_via_docker_in_dir(
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await?;
+  runner.shutdown().await?;
   Ok(LocalTestResult {
     original,
     stdout_bytes,
