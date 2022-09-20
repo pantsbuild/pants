@@ -3,7 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Iterator
+import itertools
+from typing import Any, Iterable, Iterator, MutableMapping
+
+import toml
+from packaging.utils import NormalizedName
+from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.common_fields import (
     ModuleMappingField,
@@ -29,6 +34,40 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
+
+
+def parse_pyproject_toml(
+    pyproject_toml: str,
+    *,
+    rel_path: str,
+    overrides: MutableMapping[NormalizedName, dict[str, Any]],
+) -> Iterator[PipRequirement]:
+    parsed = toml.loads(pyproject_toml)
+    deps_vals: list[str] = parsed.get("project", {}).get("dependencies", [])
+    optional_dependencies = parsed.get("project", {}).get("optional-dependencies", {})
+    if not deps_vals and not optional_dependencies:
+        raise KeyError(
+            softwrap(
+                "No section `project.dependencies` or `project.optional-dependencies` "
+                f"found in {rel_path}"
+            )
+        )
+    for dep in deps_vals:
+        dep, _, _ = dep.partition("--")
+        dep = dep.strip().rstrip("\\")
+        if not dep or dep.startswith(("#", "-")):
+            continue
+        yield PipRequirement.parse(dep, description_of_origin=rel_path)
+    for tag, opt_dep in optional_dependencies.items():
+        for dep in opt_dep:
+            req = PipRequirement.parse(dep, description_of_origin=rel_path)
+            canonical_project_name = canonicalize_project_name(req.project_name)
+            override = overrides.get(canonical_project_name, {})
+            tags: list[str] = override.get("tags", [])
+            tags.append(tag)
+            override["tags"] = tags
+            overrides[canonical_project_name] = override
+            yield req
 
 
 class PythonRequirementsSourceField(SingleSourceField):
@@ -68,7 +107,13 @@ class GenerateFromPythonRequirementsRequest(GenerateTargetsRequest):
     generate_from = PythonRequirementsTargetGenerator
 
 
-@rule(desc="Generate `python_requirement` targets from requirements.txt", level=LogLevel.DEBUG)
+@rule(
+    desc=(
+        "Generate `python_requirement` targets from requirements.txt or PEP 621 compliant "
+        "pyproject.toml"
+    ),
+    level=LogLevel.DEBUG,
+)
 async def generate_from_python_requirement(
     request: GenerateFromPythonRequirementsRequest,
     union_membership: UnionMembership,
@@ -85,6 +130,9 @@ async def generate_from_python_requirement(
 
 def parse_requirements_callback(file_contents: bytes, file_path: str) -> Iterator[PipRequirement]:
     return parse_requirements_file(file_contents.decode(), rel_path=file_path)
+
+def parse_pyproject_callback(file_contents: bytes, file_path: str, overrides) -> Iterator[PipRequirement]:
+    return parse_pyproject_toml(file_contents.decode(), rel_path=file_path, overrides=overrides)
 
 
 def rules():
