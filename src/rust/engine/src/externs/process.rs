@@ -21,7 +21,6 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 pub struct PyProcessConfigFromEnvironment {
   pub platform: Platform,
   pub execution_strategy: ProcessExecutionStrategy,
-  pub remote_execution_extra_platform_properties: Vec<(String, String)>,
 }
 
 #[pymethods]
@@ -35,7 +34,9 @@ impl PyProcessConfigFromEnvironment {
   ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
     let execution_strategy = match (docker_image, remote_execution) {
-      (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution),
+      (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution(
+        remote_execution_extra_platform_properties,
+      )),
       (None, false) => Ok(ProcessExecutionStrategy::Local),
       (Some(image), false) => Ok(ProcessExecutionStrategy::Docker(image)),
       (Some(_), true) => Err(PyAssertionError::new_err(
@@ -45,7 +46,6 @@ impl PyProcessConfigFromEnvironment {
     Ok(Self {
       platform,
       execution_strategy,
-      remote_execution_extra_platform_properties,
     })
   }
 
@@ -53,16 +53,14 @@ impl PyProcessConfigFromEnvironment {
     let mut s = DefaultHasher::new();
     self.platform.hash(&mut s);
     self.execution_strategy.hash(&mut s);
-    self.remote_execution_extra_platform_properties.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
     format!(
-      "ProcessConfigFromEnvironment(platform={}, execution_strategy={:?}, remote_execution_extra_platform_properties={:?})",
+      "ProcessConfigFromEnvironment(platform={}, execution_strategy={:?})",
       String::from(self.platform),
       self.execution_strategy,
-      self.remote_execution_extra_platform_properties,
     )
   }
 
@@ -88,7 +86,7 @@ impl PyProcessConfigFromEnvironment {
   fn remote_execution(&self) -> bool {
     matches!(
       self.execution_strategy,
-      ProcessExecutionStrategy::RemoteExecution
+      ProcessExecutionStrategy::RemoteExecution(_)
     )
   }
 
@@ -102,6 +100,9 @@ impl PyProcessConfigFromEnvironment {
 
   #[getter]
   fn remote_execution_extra_platform_properties(&self) -> Vec<(String, String)> {
-    self.remote_execution_extra_platform_properties.clone()
+    match self.execution_strategy.clone() {
+      ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+      _ => vec![],
+    }
   }
 }

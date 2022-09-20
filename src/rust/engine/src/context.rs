@@ -282,7 +282,7 @@ impl Core {
         |req| {
           matches!(
             req.execution_strategy,
-            ProcessExecutionStrategy::RemoteExecution
+            ProcessExecutionStrategy::RemoteExecution(_)
           )
         },
       ));

@@ -220,7 +220,7 @@ impl NailgunPool {
     let status = process
       .handle
       .try_wait()
-      .map_err(|e| format!("Error getting the process status! {}", e))?;
+      .map_err(|e| format!("Error getting the process status from nailgun: {}", e))?;
     match status {
       None => {
         // Process hasn't exited yet.
@@ -297,7 +297,7 @@ fn spawn_and_read_port(
     .spawn()
     .map_err(|e| {
       format!(
-        "Failed to create child handle with cmd: {} options {:#?}: {}",
+        "Failed to create child handle for nailgun with cmd: {} options {:#?}: {}",
         &cmd, &process, e
       )
     })?;
@@ -314,7 +314,7 @@ fn spawn_and_read_port(
         .next()
         .ok_or_else(|| "There is no line ready in the child's output".to_string())
     })
-    .and_then(|res| res.map_err(|e| format!("Failed to read from stdout: {}", e)));
+    .and_then(|res| res.map_err(|e| format!("Failed to read stdout from nailgun: {}", e)));
 
   // If we failed to read a port line and the child has exited, report that.
   if port_line.is_err() {
@@ -340,7 +340,7 @@ fn spawn_and_read_port(
     .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{:?}", port_line))?[1];
   let port = port_str
     .parse::<Port>()
-    .map_err(|e| format!("Error parsing port {}! {}", port_str, e))?;
+    .map_err(|e| format!("Error parsing nailgun port {}: {}", port_str, e))?;
 
   Ok((child, port))
 }
@@ -497,7 +497,10 @@ impl Drop for BorrowedNailgunProcess {
         "Killing nailgun process {:?} due to cancellation.",
         process.as_ref().unwrap().name
       );
-      let _ = process.as_mut().unwrap().handle.kill();
+      if process.as_mut().unwrap().handle.kill().is_ok() {
+        // NB: This is blocking, but should be a short wait in general.
+        let _ = process.as_mut().unwrap().handle.wait();
+      }
     }
   }
 }
