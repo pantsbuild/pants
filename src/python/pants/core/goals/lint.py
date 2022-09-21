@@ -405,12 +405,6 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
     return 0
 
 
-# TODO(16868): Rule parser requires arguments to be values in module scope
-_LintTargetsPartitionRequest = LintTargetsRequest.PartitionRequest
-_LintFilesPartitionRequest = LintFilesRequest.PartitionRequest
-_LintSubPartition = LintRequest.SubPartition
-
-
 @goal_rule
 async def lint(
     console: Console,
@@ -512,7 +506,7 @@ async def lint(
             lint_targets_request_type = cast("type[LintTargetsRequest]", request_type)
             return Get(
                 Partitions,
-                _LintTargetsPartitionRequest,
+                LintTargetsRequest.PartitionRequest,
                 lint_targets_request_type.PartitionRequest(
                     tuple(
                         lint_targets_request_type.field_set_type.create(target)
@@ -525,7 +519,7 @@ async def lint(
             assert partition_request_type in file_partitioners
             return Get(
                 Partitions,
-                _LintFilesPartitionRequest,
+                LintFilesRequest.PartitionRequest,
                 cast("type[LintFilesRequest]", request_type).PartitionRequest(specs_paths.files),
             )
 
@@ -589,7 +583,7 @@ async def lint(
         )
 
     all_requests = [
-        *(Get(LintResult, _LintSubPartition, request) for request in lint_batches),
+        *(Get(LintResult, LintRequest.SubPartition, request) for request in lint_batches),
         *(Get(LintResult, FmtTargetsRequest, request) for request in fmt_target_requests),
         *(Get(LintResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
     ]
