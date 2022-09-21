@@ -56,6 +56,10 @@ impl DockerOnceCell {
     }
   }
 
+  pub fn initialized(&self) -> bool {
+    self.cell.initialized()
+  }
+
   pub async fn get(&self) -> Result<&Docker, String> {
     self
       .cell
@@ -726,6 +730,11 @@ impl ContainerCache {
   }
 
   pub async fn shutdown(&self) -> Result<(), String> {
+    // Skip shutting down if Docker was never initialized in the first place.
+    if !self.docker.initialized() {
+      return Ok(());
+    }
+
     let docker = match self.docker.get().await {
       Ok(d) => d,
       Err(err) => {
