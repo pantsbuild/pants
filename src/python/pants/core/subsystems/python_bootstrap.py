@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import ClassVar, Iterable, Sequence
 
 from pex.variables import Variables
 
@@ -248,10 +248,21 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
         return os.path.join(home_from_env, ".pyenv")
     return None
 
+class Outer:
+    
+    @dataclass
+    class Inner:
+        beep: int
+
+
+@rule
+async def beeeep2() -> Outer.Inner:
+    logger.warning(f"{dir(Outer.Inner)=}")
+    return Outer.Inner(7)
 
 @rule
 async def python_bootstrap(
-    python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget
+    python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget, oin: Outer.Inner,
 ) -> PythonBootstrap:
 
     # TODO: use subsystems directly again once we do overrides at subsystem contruct time.
@@ -273,6 +284,8 @@ async def python_bootstrap(
         ),
     )
 
+    #await Get(Outer, OuterInner, OuterInner(1))
+
     return PythonBootstrap(
         interpreter_names=interpreter_names,
         raw_interpreter_search_paths=interpreter_search_paths,
@@ -280,7 +293,7 @@ async def python_bootstrap(
         asdf_standard_tool_paths=result.standard_tool_paths,
         asdf_local_tool_paths=result.local_tool_paths,
     )
-
+  
 
 def rules():
     return (

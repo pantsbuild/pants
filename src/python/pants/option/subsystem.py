@@ -14,6 +14,7 @@ from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 
 
@@ -104,7 +105,7 @@ class Subsystem(metaclass=ABCMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
-    def register_options_on_scope(cls, options):
+    def register_options_on_scope(cls, options: Options):
         """Trigger registration of this Subsystem's options.
 
         Subclasses should not generally need to override this method.
@@ -115,7 +116,7 @@ class Subsystem(metaclass=ABCMeta):
 
         # NB: If the class defined `register_options` we should call it
         if "register_options" in cls.__dict__:
-            cls.register_options(register)
+            cls.register_options(register)  # type: ignore[attr-defined]
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
