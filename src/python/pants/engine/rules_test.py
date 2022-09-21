@@ -1020,7 +1020,7 @@ def test_invalid_rule_helper_name() -> None:
         async def foo() -> A:
             pass
 
-    @rule_helper(public=True)
+    @rule_helper(_public=True)
     async def bar() -> A:
         pass
 
