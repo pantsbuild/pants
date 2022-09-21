@@ -444,7 +444,10 @@ impl crate::CommandRunner for CommandRunner {
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
-    let (result, hit_cache) = if self.cache_read {
+    let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
+      || request.cache_scope == ProcessCacheScope::Successful;
+
+    let (result, hit_cache) = if self.cache_read && use_remote_cache {
       self
         .speculate_read_action_cache(
           context.clone(),
@@ -461,7 +464,11 @@ impl crate::CommandRunner for CommandRunner {
       )
     };
 
-    if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
+    if !hit_cache
+      && (result.exit_code == 0 || write_failures_to_cache)
+      && self.cache_write
+      && use_remote_cache
+    {
       let command_runner = self.clone();
       let result = result.clone();
       let _write_join = self.executor.spawn(in_workunit!(
