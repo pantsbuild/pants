@@ -505,7 +505,7 @@ impl crate::CommandRunner for CommandRunner {
     {
       let command_runner = self.clone();
       let result = result.clone();
-      let _write_join = self.executor.spawn(in_workunit!(
+      let write_fut = self.executor.spawn(in_workunit!(
         "remote_cache_write",
         Level::Trace,
         |workunit| async move {
@@ -530,6 +530,8 @@ impl crate::CommandRunner for CommandRunner {
         // NB: We must box the future to avoid a stack overflow.
         .boxed()
       ));
+      let mut tail_tasks = context.tail_tasks.lock();
+      tail_tasks.push(write_fut.boxed());
     }
 
     Ok(result)
