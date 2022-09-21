@@ -112,14 +112,20 @@ def test_rule_helpers_class_methods() -> None:
     assert_awaitables(rule1, [])
 
     async def rule2():
-        container_instance._static_helper(1)
+        HelperContainer._static_helper(1)
 
+    # Rule helpers must be called via module-scoped attributes
     assert_awaitables(rule2, [(int, str), (str, int)])
 
     async def rule3():
+        container_instance._static_helper(1)
+
+    assert_awaitables(rule3, [(int, str), (str, int)])
+
+    async def rule4():
         container_instance._method_helper(1)
 
-    assert_awaitables(rule3, [(int, str)])
+    assert_awaitables(rule4, [(int, str)])
 
 
 def test_valid_get_unresolvable_product_type() -> None:
