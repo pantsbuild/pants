@@ -227,15 +227,23 @@ async def resolve_target_parametrizations(
                 if field_value is not None:
                     template_fields[field_type.alias] = field_value
 
+        field_type_aliases = target_type._get_field_aliases_to_field_types(
+            target_type.class_field_types(union_membership)
+        ).keys()
         generator_fields_parametrized = {
-            name for name, field in generator_fields.items() if isinstance(field, Parametrize)
+            name
+            for name, field in generator_fields.items()
+            if isinstance(field, Parametrize) and name in field_type_aliases
         }
         if generator_fields_parametrized:
             noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+            generator_fields_parametrized_text = ", ".join(
+                repr(f) for f in generator_fields_parametrized
+            )
             raise InvalidFieldException(
                 f"Only fields which will be moved to generated targets may be parametrized, "
                 f"so target generator {address} (with type {target_type.alias}) cannot "
-                f"parametrize the {generator_fields_parametrized} {noun}."
+                f"parametrize the {generator_fields_parametrized_text} {noun}."
             )
 
         base_generator = target_type(
