@@ -386,6 +386,10 @@ impl ExecuteProcess {
         .try_into()?
     };
 
+    let remote_cache_speculation_delay = std::time::Duration::from_millis(
+      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis").unwrap() as u64,
+    );
+
     Ok(Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -403,6 +407,7 @@ impl ExecuteProcess {
       concurrency_available,
       cache_scope,
       execution_strategy: process_config.execution_strategy,
+      remote_cache_speculation_delay: remote_cache_speculation_delay,
     })
   }
 

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
+from pants.option.option_types import BoolOption, DictOption, IntOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -94,6 +94,25 @@ class JvmSubsystem(Subsystem):
 
             Because some compilers do not support this step as a native operation, it can have a
             performance cost, and is not enabled by default.
+            """
+        ),
+        advanced=True,
+    )
+    # See https://github.com/pantsbuild/pants/issues/14937 for discussion of one way to improve
+    # our behavior around cancellation with nailgun.
+    nailgun_remote_cache_speculation_delay = IntOption(
+        default=1000,
+        help=softwrap(
+            """
+            The time in milliseconds to delay speculation of nailgun processes while reading
+            from the remote cache.
+
+            When speculating, a remote cache hit will cancel the local copy of a process. But
+            because nailgun does not natively support cancellation, that requires killing a
+            nailgun server, which will mean that future processes take longer to warm up.
+
+            This setting allows for trading off waiting for potentially slow cache entries
+            against potentially having to warm up a new nailgun server.
             """
         ),
         advanced=True,

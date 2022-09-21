@@ -90,6 +90,7 @@ async fn make_execute_request() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
   let want_command = remexec::Command {
@@ -171,6 +172,7 @@ async fn make_execute_request_with_instance_name() {
       "target_platform".to_owned(),
       "apple-2e".to_owned(),
     )]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
   let want_command = remexec::Command {
@@ -255,6 +257,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
   let mut want_command = remexec::Command {
@@ -482,6 +485,7 @@ async fn make_execute_request_with_timeout() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
   let want_command = remexec::Command {
@@ -588,6 +592,7 @@ async fn make_execute_request_using_immutable_inputs() {
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
     execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
   let want_command = remexec::Command {

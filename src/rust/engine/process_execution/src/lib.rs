@@ -548,6 +548,8 @@ pub struct Process {
   pub cache_scope: ProcessCacheScope,
 
   pub execution_strategy: ProcessExecutionStrategy,
+
+  pub remote_cache_speculation_delay: std::time::Duration,
 }
 
 impl Process {
@@ -579,6 +581,7 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       execution_strategy: ProcessExecutionStrategy::Local,
+      remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
 
@@ -641,6 +644,11 @@ impl Process {
     properties: Vec<(String, String)>,
   ) -> Process {
     self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
+    self
+  }
+
+  pub fn remote_cache_speculation_delay(mut self, delay: std::time::Duration) -> Process {
+    self.remote_cache_speculation_delay = delay;
     self
   }
 }
