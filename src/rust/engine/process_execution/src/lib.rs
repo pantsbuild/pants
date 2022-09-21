@@ -883,9 +883,7 @@ pub trait CommandRunner: Send + Sync + Debug {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
 
   /// Shutdown this CommandRunner cleanly.
-  async fn shutdown(&self) -> Result<(), String> {
-    Ok(())
-  }
+  async fn shutdown(&self) -> Result<(), String>;
 }
 
 #[async_trait]

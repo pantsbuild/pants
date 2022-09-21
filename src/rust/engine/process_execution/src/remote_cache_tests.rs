@@ -68,6 +68,10 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 // NB: We bundle these into a struct to ensure they share the same lifetime.
@@ -575,6 +579,10 @@ async fn make_action_result_basic() {
       _req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       unimplemented!()
+    }
+
+    async fn shutdown(&self) -> Result<(), String> {
+      Ok(())
     }
   }
 

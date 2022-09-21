@@ -85,6 +85,10 @@ mod tests {
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       self.0.clone()
     }
+
+    async fn shutdown(&self) -> Result<(), String> {
+      Ok(())
+    }
   }
 
   #[tokio::test]
