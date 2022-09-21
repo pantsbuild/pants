@@ -373,7 +373,7 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 
 @rule
 async def jvm_process(
-    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+    bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
 
     jdk = request.jdk
@@ -421,9 +421,7 @@ async def jvm_process(
     if request.remote_cache_speculation_delay is not None:
         remote_cache_speculation_delay_millis = request.remote_cache_speculation_delay
     elif request.use_nailgun:
-        remote_cache_speculation_delay_millis = (
-            global_options.nailgun_remote_cache_speculation_delay
-        )
+        remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
 
     return Process(
         [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
