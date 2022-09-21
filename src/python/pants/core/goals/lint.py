@@ -35,7 +35,6 @@ from pants.core.goals.style_request import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
@@ -50,6 +49,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import runtime_ignore_subscripts
@@ -59,8 +59,8 @@ logger = logging.getLogger(__name__)
 
 _SR = TypeVar("_SR", bound=StyleRequest)
 _T = TypeVar("_T")
-_ElementT = TypeVar("_ElementT")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
+_PartitionElementT = TypeVar("_PartitionElementT")
 
 
 class AmbiguousRequestNamesError(Exception):
@@ -145,6 +145,36 @@ class LintResult(EngineAwareReturnType):
         return False
 
 
+@runtime_ignore_subscripts
+class Partitions(FrozenDict[Any, "tuple[_PartitionElementT, ...]"]):
+    """A mapping from <partition key> to <partition>.
+
+    When implementing a linter, one of your rules will return this type, taking in a
+    `PartitionRequest` specific to your linter.
+
+    The return likely will fit into one of:
+        - Returning an empty partition: E.g. if your tool is being skipped.
+        - Returning one partition. The partition may contain all of the inputs
+            (as will likely be the case for target linters) or a subset (which will likely be the
+            case for targetless linters).
+        - Returning >1 partition. This might be the case if you can't run
+            the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
+            and files ABC with Py2.
+
+    The partition key can be of any type able to cross a rule-boundary, and will be provided to the
+    rule which "runs" your tool.
+
+    NOTE: The partition may be divided further into multiple sub-partitions.
+    """
+
+    @classmethod
+    def single_partition(
+        cls, elements: Iterable[_PartitionElementT], key: Any = None
+    ) -> Partitions[_PartitionElementT]:
+        """Helper constructor for implementations that have only one partition."""
+        return Partitions([(key, tuple(elements))])
+
+
 @union
 class LintRequest:
     """Base class for plugin types wanting to be run as part of `lint`.
@@ -170,7 +200,7 @@ class LintRequest:
                         return Partitions()
 
                     # One possible implementation
-                    return Partitions([request.field_sets])
+                    return Partitions.single_partition(request.field_sets)
 
         2. A rule which takes an instance of your request type's `SubPartition` class property, and
             returns a `LintResult instance.
@@ -198,18 +228,20 @@ class LintRequest:
     def debug_hint(self) -> str:
         return self.name
 
-    if TYPE_CHECKING:
+    @dataclass(frozen=True)
+    @runtime_ignore_subscripts
+    class SubPartition(Generic[_PartitionElementT]):
+        elements: Tuple[_PartitionElementT, ...]
+        key: Any
 
-        class SubPartition(Collection[_ElementT]):
-            pass
+    _SubPartitionBase = SubPartition
 
-    else:
+    if not TYPE_CHECKING:
 
         @memoized_classproperty
-        def SubPartition(cls) -> type:
+        def SubPartition(cls):
             @union(in_scope_types=[EnvironmentName])
-            @runtime_ignore_subscripts
-            class SubPartition(Collection):
+            class SubPartition(cls._SubPartitionBase):
                 pass
 
             return SubPartition
@@ -225,55 +257,30 @@ class LintRequest:
         yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
 
 
-@runtime_ignore_subscripts
-class Partitions(Collection[Tuple[_ElementT, ...]]):
-    """A collection of partitions.
-
-    When implementing a linter, one of your rules will return this type, taking in a
-    `PartitionRequest` specific to your linter.
-
-    The return likely will fit into one of:
-        - Returning an empty partition: E.g. if your tool is being skipped.
-        - Returning one partition. The return value may contain all of the inputs
-            (as will likely be the case for target linters) or a subset (which will likely be the
-            case for targetless linters).
-        - Returning >1 partition. This might be the case if you can't run
-            the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
-            and files ABC with Py2.
-
-    The elements in each partition can be of any type, and `lint.py` only uses it to batch and pass
-    into your "runner" implementation.
-
-    NOTE: The partition may be divided further into multiple sub-partitions.
-    """
-
-
-@union
 class LintTargetsRequest(LintRequest, StyleRequest):
     """The entry point for linters that operate on targets."""
 
-    if TYPE_CHECKING:
+    @dataclass(frozen=True)
+    @runtime_ignore_subscripts
+    class PartitionRequest(Generic[_FieldSetT]):
+        """Returns a unique `PartitionRequest` type per calling type.
 
-        @dataclass(frozen=True)
-        class PartitionRequest(Generic[_FieldSetT]):
-            field_sets: tuple[_FieldSetT, ...]
+        This serves us 2 purposes:
+            1. `LintTargetsRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
+        """
 
-    else:
+        field_sets: tuple[_FieldSetT, ...]
+
+    _PartitionRequestBase = PartitionRequest
+
+    if not TYPE_CHECKING:
 
         @memoized_classproperty
         def PartitionRequest(cls):
-            """Returns a unique `PartitionRequest` type per calling type.
-
-            This serves us 2 purposes:
-                1. `LintTargetsRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-                2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-            """
-
             @union(in_scope_types=[EnvironmentName])
-            @dataclass(frozen=True)
-            @runtime_ignore_subscripts
-            class PartitionRequest:
-                field_sets: tuple
+            class PartitionRequest(cls._PartitionRequestBase):
+                pass
 
             return PartitionRequest
 
@@ -287,27 +294,26 @@ class LintTargetsRequest(LintRequest, StyleRequest):
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
-    if TYPE_CHECKING:
+    @dataclass(frozen=True)
+    class PartitionRequest:
+        """Returns a unique `PartitionRequest` type per calling type.
 
-        @dataclass(frozen=True)
-        class PartitionRequest:
-            file_paths: tuple[str, ...]
+        This serves us 2 purposes:
+            1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
+        """
 
-    else:
+        file_paths: tuple[str, ...]
+
+    _PartitionRequestBase = PartitionRequest
+
+    if not TYPE_CHECKING:
 
         @memoized_classproperty
         def PartitionRequest(cls):
-            """Returns a unique `PartitionRequest` type per calling type.
-
-            This serves us 2 purposes:
-                1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-                2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-            """
-
             @union(in_scope_types=[EnvironmentName])
-            @dataclass(frozen=True)
-            class PartitionRequest:
-                file_paths: tuple
+            class PartitionRequest(cls._PartitionRequestBase):
+                pass
 
             return PartitionRequest
 
@@ -538,18 +544,18 @@ async def lint(
 
     lint_batches_by_request_type = {
         rt: [
-            subpartition
+            (subpartition, key)
             for partitions in lint_partitions
-            for partition in partitions
+            for key, partition in partitions.items()
             for subpartition in batch(partition)
         ]
         for rt, lint_partitions in lint_partitions_by_request_type.items()
     }
 
     lint_batches = [
-        rt.SubPartition(elements)
+        rt.SubPartition(elements, key)
         for rt, batch in lint_batches_by_request_type.items()
-        for elements in batch
+        for elements, key in batch
     ]
 
     fmt_target_requests: Iterable[FmtTargetsRequest] = ()
