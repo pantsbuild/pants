@@ -319,8 +319,8 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def _rule_helper_decorator(func: Callable[P, R], public: bool = False) -> Callable[P, R]:
-    if not public and not func.__name__.startswith("_"):
+def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Callable[P, R]:
+    if not _public and not func.__name__.startswith("_"):
         raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
 
     if hasattr(func, "rule"):
@@ -353,7 +353,7 @@ def rule_helper(
     awaitables.
 
     There are a few restrictions:
-        1. Rule helpers must be "private". I.e. start with an underscore (unless marked "public").
+        1. Rule helpers must be "private". I.e. start with an underscore.
         2. Rule hlpers must be `async`
         3. Rule helpers can't be rules
         4. Rule helpers must be accessed by attributes chained from a module variable (see below)
