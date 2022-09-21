@@ -555,6 +555,36 @@ def test_source_override(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-enable-resolves"])
+    file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
+    lock_addr = Address("", target_name="reqs", generated_name="3rdparty/python/default.lock")
+    assert_poetry_requirements(
+        rule_runner,
+        "poetry_requirements(name='reqs')",
+        dedent(
+            """\
+            [tool.poetry.dependencies]
+            ansicolors = ">=1.18.0"
+            [tool.poetry.dev-dependencies]
+            """
+        ),
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec, lock_addr.spec],
+                    "requirements": ["ansicolors>=1.18.0"],
+                },
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": file_addr.filename}, file_addr),
+            TargetGeneratorSourcesHelperTarget(
+                {"source": "3rdparty/python/default.lock"}, lock_addr
+            ),
+        },
+    )
+
+
 def test_non_pep440_error(rule_runner: RuleRunner) -> None:
     with engine_error(contains='Failed to parse requirement foo = "~r62b" in pyproject.toml'):
         assert_poetry_requirements(

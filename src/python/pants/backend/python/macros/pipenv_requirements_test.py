@@ -48,8 +48,8 @@ def assert_pipenv_requirements(
 
 
 def test_pipfile_lock(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each entry in a
-    Pipfile.lock file.
+    """This tests that we correctly create a new python_requirement for each entry in a Pipfile.lock
+    file.
 
     Edge cases:
 
@@ -87,5 +87,48 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                 Address("", target_name="reqs", generated_name="cachetools"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "Pipfile.lock"}, file_addr),
+        },
+    )
+
+
+def test_pipfile_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    """This tests that we adds a dependency on the lockfile for the resolve for each generated
+    python_requirement."""
+    rule_runner.set_options(["--python-enable-resolves"])
+    file_addr = Address("", target_name="reqs", relative_file_path="Pipfile.lock")
+    lock_addr = Address("", target_name="reqs", generated_name="3rdparty/python/default.lock")
+    assert_pipenv_requirements(
+        rule_runner,
+        "pipenv_requirements(name='reqs', module_mapping={'ansicolors': ['colors']})",
+        {
+            "default": {"ansicolors": {"version": ">=1.18.0"}},
+            "develop": {
+                "cachetools": {
+                    "markers": "python_version ~= '3.5'",
+                    "version": "==4.1.1",
+                    "extras": ["ring", "mongo"],
+                }
+            },
+        },
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "requirements": ["ansicolors>=1.18.0"],
+                    "modules": ["colors"],
+                    "dependencies": [file_addr.spec, lock_addr.spec],
+                },
+                Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "requirements": ["cachetools[ring, mongo]==4.1.1;python_version ~= '3.5'"],
+                    "dependencies": [file_addr.spec, lock_addr.spec],
+                },
+                Address("", target_name="reqs", generated_name="cachetools"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": file_addr.filename}, file_addr),
+            TargetGeneratorSourcesHelperTarget(
+                {"source": "3rdparty/python/default.lock"}, lock_addr
+            ),
         },
     )
