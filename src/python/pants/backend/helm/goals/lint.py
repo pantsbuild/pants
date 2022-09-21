@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
@@ -17,7 +18,7 @@ from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -38,16 +39,20 @@ class HelmLintRequest(LintTargetsRequest):
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
 ) -> Partitions[HelmLintFieldSet]:
-    return Partitions((fs,) for fs in request.field_sets if not fs.skip_lint.value)
+    field_sets = tuple(
+        field_set for field_set in request.field_sets if not field_set.skip_lint.value
+    )
+    charts = await MultiGet(Get(HelmChart, HelmChartRequest(field_set)) for field_set in field_sets)
+    return Partitions((chart, (field_set,)) for chart, field_set in zip(charts, field_sets))
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
     request: HelmLintRequest.SubPartition[HelmLintFieldSet], helm_subsystem: HelmSubsystem
 ) -> LintResult:
-    assert len(request) == 1
-    field_set = request[0]
-    chart = await Get(HelmChart, HelmChartRequest(field_set))
+    assert len(request.elements) == 1
+    field_set = request.elements[0]
+    chart = cast(HelmChart, request.key)
 
     argv = ["lint", chart.name]
 

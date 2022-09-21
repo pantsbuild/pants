@@ -40,7 +40,7 @@ class ShellcheckRequest(LintTargetsRequest):
 async def partition_shellcheck(
     request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
 ) -> Partitions[ShellcheckFieldSet]:
-    return Partitions() if shellcheck.skip else Partitions([request.field_sets])
+    return Partitions() if shellcheck.skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
@@ -52,12 +52,12 @@ async def run_shellcheck(
     # Shellcheck looks at direct dependencies to make sure that every symbol is defined, so we must
     # include those in the run.
     all_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies)) for field_set in request
+        Get(Targets, DependenciesRequest(field_set.dependencies)) for field_set in request.elements
     )
     direct_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(
-            (field_set.sources for field_set in request),
+            (field_set.sources for field_set in request.elements),
             for_sources_types=(ShellSourceField,),
             enable_codegen=True,
         ),
@@ -100,7 +100,7 @@ async def run_shellcheck(
         Process(
             argv=[downloaded_shellcheck.exe, *shellcheck.args, *direct_sources.snapshot.files],
             input_digest=input_digest,
-            description=f"Run Shellcheck on {pluralize(len(request), 'file')}.",
+            description=f"Run Shellcheck on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
