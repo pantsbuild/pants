@@ -7,7 +7,8 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar
+from itertools import chain
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
 from pants.engine.internals.selectors import AwaitableConstraints, Get
@@ -20,7 +21,9 @@ from pants.util.memo import memoized_classmethod
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
-    from pants.engine.rules import TaskRule
+    from pants.engine.rules import Rule
+
+_SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -46,12 +49,16 @@ class Subsystem(metaclass=ABCMeta):
 
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
+    class EnvironmentAware(metaclass=ABCMeta):
+        options_scope: str
+        options: OptionValueContainer
+
     @classmethod
-    def rule(cls) -> TaskRule:
-        """Returns a `TaskRule` that will construct the target Subsystem.
-        """
+    def rule(cls) -> Rule:
+        """Returns a `TaskRule` that will construct the target Subsystem."""
         from pants.engine.rules import TaskRule
-        partial_construct_subsystem = functools.partial(_construct_subsytem, cls)
+
+        partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
 
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
@@ -81,9 +88,54 @@ class Subsystem(metaclass=ABCMeta):
             canonical_name=name,
         )
 
+    @classmethod
+    def rule_env_aware(cls) -> Rule:
+        """Returns kwargs to construct a `TaskRule` that will construct the target Subsystem.
+
+        TODO: This indirection avoids a cycle between this module and the `rules` module.
+        """
+        from pants.engine.rules import TaskRule
+
+        partial_construct_subsystem: Any = functools.partial(_construct_env_aware, cls)
+
+        # NB: We must populate several dunder methods on the partial function because partial
+        # functions do not have these defined by default and the engine uses these values to
+        # visualize functions in error messages and the rule graph.
+        snake_scope = normalize_scope(cls.options_scope)
+        name = f"construct_scope_{snake_scope}"
+        partial_construct_subsystem.__name__ = name
+        partial_construct_subsystem.__module__ = cls.__module__
+        partial_construct_subsystem.__doc__ = cls.help
+
+        # `inspect.getsourcelines` does not work under oxidation
+        if not ox.is_oxidized:
+            _, class_definition_lineno = inspect.getsourcelines(cls)
+        else:
+            class_definition_lineno = 0  # `inspect.getsourcelines` returns 0 when undefined.
+        partial_construct_subsystem.__line_number__ = class_definition_lineno
+
+        return TaskRule(
+            output_type=cls.EnvironmentAware,
+            input_selectors=(),
+            func=partial_construct_subsystem,
+            input_gets=(
+                AwaitableConstraints(
+                    output_type=ScopedOptions, input_types=(Scope,), is_effect=False
+                ),
+            ),
+            canonical_name=name,
+        )
+
     @memoized_classmethod
-    def rules(cls) -> Iterable[TaskRule]:
-        return [cls.rule()]
+    def rules(cls: Any) -> Iterable[Rule]:
+        from pants.core.util_rules.environments import add_option_fields_for
+        from pants.engine.rules import Rule
+
+        return [
+            cls.rule(),
+            cls.rule_env_aware(),
+            *(cast(Rule, i) for i in add_option_fields_for(cls)),
+        ]
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
@@ -119,7 +171,9 @@ class Subsystem(metaclass=ABCMeta):
         Subclasses should not generally need to override this method.
         """
         register = options.registration_function_for_subsystem(cls)
-        for options_info in collect_options_info(cls):
+        for options_info in chain(
+            collect_options_info(cls), collect_options_info(cls.EnvironmentAware)
+        ):
             register(*options_info.flag_names, **options_info.flag_options)
 
         # NB: If the class defined `register_options` we should call it
@@ -136,9 +190,16 @@ class Subsystem(metaclass=ABCMeta):
         return bool(self.options == other.options)
 
 
-_SubsystemT = TypeVar("_SubsystemT", bound=Subsystem)
-
-
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
+
+
+async def _construct_env_aware(
+    subsystem_typ: type[_SubsystemT],
+) -> Subsystem.EnvironmentAware:
+    scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
+    t: Subsystem.EnvironmentAware = subsystem_typ.EnvironmentAware()  # (scoped_options.options)
+    t.options = scoped_options.options
+    t.options_scope = subsystem_typ.options_scope
+    return t

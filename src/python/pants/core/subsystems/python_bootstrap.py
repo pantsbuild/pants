@@ -7,19 +7,14 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Iterable, Sequence
+from typing import Iterable, Sequence
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.environments import (
-    EnvironmentsSubsystem,
-    EnvironmentTarget,
-    add_option_fields_for,
-    get_option,
-)
+from pants.core.util_rules.environments import EnvironmentsSubsystem, EnvironmentTarget, get_option
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -42,50 +37,51 @@ class PythonBootstrapSubsystem(Subsystem):
         """
     )
 
-    search_path = StrListOption(
-        default=["<PYENV>", "<PATH>"],
-        help=softwrap(
-            """
-            A list of paths to search for Python interpreters.
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        search_path = StrListOption(
+            default=["<PYENV>", "<PATH>"],
+            help=softwrap(
+                """
+                A list of paths to search for Python interpreters.
 
-            Which interpeters are actually used from these paths is context-specific:
-            the Python backend selects interpreters using options on the `python` subsystem,
-            in particular, the `[python].interpreter_constraints` option.
+                Which interpeters are actually used from these paths is context-specific:
+                the Python backend selects interpreters using options on the `python` subsystem,
+                in particular, the `[python].interpreter_constraints` option.
 
-            You can specify absolute paths to interpreter binaries
-            and/or to directories containing interpreter binaries. The order of entries does
-            not matter.
+                You can specify absolute paths to interpreter binaries
+                and/or to directories containing interpreter binaries. The order of entries does
+                not matter.
 
-            The following special strings are supported:
+                The following special strings are supported:
 
-              * `<PATH>`, the contents of the PATH env var
-              * `<ASDF>`, all Python versions currently configured by ASDF \
-                  `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-              * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
-              * `<PYENV>`, all Python versions under $(pyenv root)/versions
-              * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
-              * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-        environment_sensitive=True,
-    )
-    names = StrListOption(
-        default=["python", "python3"],
-        help=softwrap(
-            """
-            The names of Python binaries to search for. See the `--search-path` option to
-            influence where interpreters are searched for.
+                * `<PATH>`, the contents of the PATH env var
+                * `<ASDF>`, all Python versions currently configured by ASDF \
+                    `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
+                * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+                * `<PYENV>`, all Python versions under $(pyenv root)/versions
+                * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
+                * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+            environment_sensitive=True,
+        )
+        names = StrListOption(
+            default=["python", "python3"],
+            help=softwrap(
+                """
+                The names of Python binaries to search for. See the `--search-path` option to
+                influence where interpreters are searched for.
 
-            This does not impact which Python interpreter is used to run your code, only what
-            is used to run internal tools.
-            """
-        ),
-        advanced=True,
-        metavar="<python-binary-names>",
-        environment_sensitive=True,
-    )
+                This does not impact which Python interpreter is used to run your code, only what
+                is used to run internal tools.
+                """
+            ),
+            advanced=True,
+            metavar="<python-binary-names>",
+            environment_sensitive=True,
+        )
 
     # TODO(#7735): Move to `Subsystem`?
     def error_if_environment_mechanism_ambiguity(self, option: str) -> None:
@@ -248,21 +244,12 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
         return os.path.join(home_from_env, ".pyenv")
     return None
 
-class Outer:
-    
-    @dataclass
-    class Inner:
-        beep: int
-
-
-@rule
-async def beeeep2() -> Outer.Inner:
-    logger.warning(f"{dir(Outer.Inner)=}")
-    return Outer.Inner(7)
 
 @rule
 async def python_bootstrap(
-    python_bootstrap_subsystem: PythonBootstrapSubsystem, env_tgt: EnvironmentTarget, oin: Outer.Inner,
+    a: PythonBootstrapSubsystem,
+    python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
+    env_tgt: EnvironmentTarget,
 ) -> PythonBootstrap:
 
     # TODO: use subsystems directly again once we do overrides at subsystem contruct time.
@@ -284,8 +271,6 @@ async def python_bootstrap(
         ),
     )
 
-    #await Get(Outer, OuterInner, OuterInner(1))
-
     return PythonBootstrap(
         interpreter_names=interpreter_names,
         raw_interpreter_search_paths=interpreter_search_paths,
@@ -293,11 +278,10 @@ async def python_bootstrap(
         asdf_standard_tool_paths=result.standard_tool_paths,
         asdf_local_tool_paths=result.local_tool_paths,
     )
-  
+
 
 def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
-        *add_option_fields_for(PythonBootstrapSubsystem),
     )

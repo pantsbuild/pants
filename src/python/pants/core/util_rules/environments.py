@@ -493,7 +493,7 @@ def extract_process_config_from_environment(
 
 
 class EnvironmentSensitiveOptionFieldMixin:
-    subsystem: ClassVar[type[Subsystem]]
+    subsystem: ClassVar[type[Subsystem.EnvironmentAware]]
     option_name: ClassVar[str]
 
 
@@ -518,15 +518,22 @@ def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
     """
     field_rules: set[UnionRule] = set()
 
-    for option_attrname, option in _collect_options_info_extended(subsystem):
+    for option_attrname, option in _collect_options_info_extended(subsystem.EnvironmentAware):
         if option.flag_options["environment_sensitive"]:
-            field_rules.update(_add_option_field_for(subsystem, option, option_attrname))
+            field_rules.update(
+                _add_option_field_for(
+                    subsystem, subsystem.EnvironmentAware, option, option_attrname
+                )
+            )
 
     return field_rules
 
 
 def _add_option_field_for(
-    subsystem_t: type[Subsystem], option: OptionsInfo, attrname: str
+    subsystem_t: type[Subsystem],
+    env_aware_t: type[Subsystem.EnvironmentAware],
+    option: OptionsInfo,
+    attrname: str,
 ) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
     scope = subsystem_t.options_scope
@@ -567,7 +574,7 @@ def _add_option_field_for(
             f"Overrides the default value from the option `[{scope}].{attrname}` when this "
             "environment target is active."
         )
-        subsystem = subsystem_t
+        subsystem = env_aware_t
         option_name = attrname
 
     return [
@@ -577,7 +584,7 @@ def _add_option_field_for(
     ]
 
 
-def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
+def get_option(name: str, subsystem: Subsystem.EnvironmentAware, env_tgt: EnvironmentTarget):
     """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
 
     This is slated for quick deprecation once we can construct `Subsystems` per environment.
@@ -596,10 +603,12 @@ def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
 
 
 @memoized
-def _options(env_tgt: EnvironmentTarget) -> dict[tuple[type[Subsystem], str], Field]:
+def _options(
+    env_tgt: EnvironmentTarget,
+) -> dict[tuple[type[Subsystem.EnvironmentAware], str], Field]:
     """Index the environment-specific `fields` on an environment target by subsystem and name."""
 
-    options: dict[tuple[type[Subsystem], str], Field] = {}
+    options: dict[tuple[type[Subsystem.EnvironmentAware], str], Field] = {}
 
     if env_tgt.val is None:
         return options

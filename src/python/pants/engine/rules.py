@@ -19,6 +19,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
     get_type_hints,
     overload,
 )
@@ -58,7 +59,7 @@ def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
         entity=f"using `SubsystemRule({subsystem.__name__})`",
         hint=f"Use `*{subsystem.__name__}.rules()` instead.",
     )
-    return next(iter(subsystem.rules()))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
+    return cast(TaskRule, next(iter(subsystem.rules())))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
 
 
 class RuleType(Enum):
