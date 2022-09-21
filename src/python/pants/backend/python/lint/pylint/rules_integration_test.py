@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import PartitionElement, PylintRequest
+from pants.backend.python.lint.pylint.rules import PartitionKey, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -71,14 +71,14 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[PartitionElement],
+        Partitions[PylintFieldSet],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [PylintRequest.SubPartition(subpartition)],
+            [PylintRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)
@@ -522,29 +522,29 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = rule_runner.request(Partitions[PartitionElement], [request])
-    assert len(partitions) == 3
+    partition_keys = list(rule_runner.request(Partitions[PylintFieldSet], [request]))
+    assert len(partition_keys) == 3
 
     def assert_partition(
-        elements: tuple[PartitionElement, ...],
+        key: PartitionKey,
         roots: list[Target],
         deps: list[Target],
         interpreter: str,
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {t.address for element in elements for t in element.coarsened_target.closure()} == {
+        assert {t.address for t in key.coarsened_targets.closure()} == {
             *root_addresses,
             *(t.address for t in deps),
         }
         ics = [f"CPython=={interpreter}.*"]
-        assert elements[0].interpreter_constraints == InterpreterConstraints(ics)
-        assert elements[0].description() == f"{resolve}, {ics}"
+        assert key.interpreter_constraints == InterpreterConstraints(ics)
+        assert key.description() == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
+    assert_partition(partition_keys[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(partition_keys[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        partitions[2],
+        partition_keys[2],
         [resolve_b_root1, resolve_b_root2],
         [resolve_b_dep1, resolve_b_dep2],
         "3.9",

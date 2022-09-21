@@ -54,10 +54,10 @@ def run_shellcheck(
         ],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [ShellcheckRequest.SubPartition(subpartition)],
+            [ShellcheckRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)

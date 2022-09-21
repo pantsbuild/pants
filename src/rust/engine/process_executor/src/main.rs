@@ -482,6 +482,7 @@ async fn make_request_from_flat_args(
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
     execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
@@ -576,6 +577,7 @@ async fn extract_request_from_action_digest(
     platform,
     cache_scope: ProcessCacheScope::Always,
     execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
   let metadata = ProcessMetadata {

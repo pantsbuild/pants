@@ -127,7 +127,7 @@ def mock_target_partitioner(
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
-    return Partitions([request.field_sets])
+    return Partitions.single_partition(request.field_sets)
 
 
 class MockFilesRequest(LintFilesRequest):
@@ -135,7 +135,7 @@ class MockFilesRequest(LintFilesRequest):
 
 
 def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
-    return Partitions([request.file_paths])
+    return Partitions.single_partition(request.file_paths)
 
 
 def mock_lint_partition(request: Any) -> LintResult:
@@ -145,7 +145,7 @@ def mock_lint_partition(request: Any) -> LintResult:
     request_type = {cls.SubPartition: cls for cls in MockLintRequest.__subclasses__()}[
         type(request)
     ]
-    return request_type(request).lint_result  # type: ignore[abstract]
+    return request_type(request.elements).lint_result  # type: ignore[abstract]
 
 
 class MockFmtRequest(FmtTargetsRequest):

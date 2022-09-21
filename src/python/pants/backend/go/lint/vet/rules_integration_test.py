@@ -101,10 +101,10 @@ def run_go_vet(
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.SubPartition(subpartition)],
+            [GoVetRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)
