@@ -446,7 +446,9 @@ impl Default for InputDigests {
 #[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
 pub enum ProcessExecutionStrategy {
   Local,
-  RemoteExecution,
+  /// Stores the platform_properties.
+  RemoteExecution(Vec<(String, String)>),
+  /// Stores the image name.
   Docker(String),
 }
 
@@ -546,10 +548,6 @@ pub struct Process {
 
   pub execution_strategy: ProcessExecutionStrategy,
 
-  /// Properties used for remote execution configuration. Regardless of remote execution, these
-  /// should impact the cache key.
-  pub platform_properties: Vec<(String, String)>,
-
   pub remote_cache_speculation_delay: std::time::Duration,
 }
 
@@ -582,7 +580,6 @@ impl Process {
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       execution_strategy: ProcessExecutionStrategy::Local,
-      platform_properties: vec![],
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
@@ -639,10 +636,13 @@ impl Process {
   }
 
   ///
-  /// Replaces the platform_properties used for this process.
+  /// Set the execution strategy to remote execution with the provided platform properties.
   ///
-  pub fn platform_properties(mut self, properties: Vec<(String, String)>) -> Process {
-    self.platform_properties = properties;
+  pub fn remote_execution_platform_properties(
+    mut self,
+    properties: Vec<(String, String)>,
+  ) -> Process {
+    self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
     self
   }
 
