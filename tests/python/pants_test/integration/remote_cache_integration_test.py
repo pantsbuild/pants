@@ -44,9 +44,10 @@ def test_warns_on_remote_cache_errors() -> None:
             [
                 "--backend-packages=['pants.backend.python']",
                 "--no-dynamic-ui",
+                "--no-local-cache",
                 *remote_cache_args(cas.address, behavior),
                 "package",
-                "testprojects/src/python/hello/main:main",
+                "testprojects/src/python/hello/main::",
             ],
             use_pantsd=False,
         )
