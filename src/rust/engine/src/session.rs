@@ -13,6 +13,7 @@ use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable, FutureExt};
+use futures_core::future::BoxFuture;
 use graph::LastObserved;
 use log::warn;
 use parking_lot::Mutex;
@@ -89,6 +90,8 @@ struct SessionState {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
+  /// Tasks to await at the "tail" of the session.
+  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
 }
 
 ///
@@ -183,6 +186,7 @@ impl Session {
         workunit_store,
         session_values: Mutex::new(session_values),
         run_id: AtomicU32::new(run_id.0),
+        tail_tasks: Arc::default(),
       }),
     })
   }
@@ -365,6 +369,13 @@ impl Session {
         }
       }
     }
+  }
+
+  /// Returns a Vec of futures representing an asynchronous "tail" task that should not block
+  /// individual nodes in the build graph but should block (up to a configurable timeout)
+  /// ending this `Session`.
+  pub fn tail_tasks(&self) -> Arc<Mutex<Vec<BoxFuture<'static, ()>>>> {
+    self.state.tail_tasks.clone()
   }
 }
 

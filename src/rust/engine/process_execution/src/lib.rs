@@ -37,10 +37,11 @@ use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use deepsize::DeepSizeOf;
 use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
-use futures::future::try_join_all;
+use futures::future::{try_join_all, BoxFuture};
 use futures::try_join;
 use hashing::Digest;
 use itertools::Itertools;
+use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
@@ -855,6 +856,7 @@ pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
   run_id: RunId,
+  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
 }
 
 impl Default for Context {
@@ -863,16 +865,23 @@ impl Default for Context {
       workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
+      tail_tasks: Arc::default(),
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: RunId) -> Context {
+  pub fn new(
+    workunit_store: WorkunitStore,
+    build_id: String,
+    run_id: RunId,
+    tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
+  ) -> Context {
     Context {
       workunit_store,
       build_id,
       run_id,
+      tail_tasks,
     }
   }
 }
