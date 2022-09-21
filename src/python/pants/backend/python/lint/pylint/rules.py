@@ -62,7 +62,7 @@ def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> Tup
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
-    args.extend(field_set.source.value for field_set in field_sets)
+    args.extend(field_set.source.file_path for field_set in field_sets)
     return tuple(args)
 
 
