@@ -47,18 +47,20 @@ class GoVetRequest(LintTargetsRequest):
 async def partition_go_vet(
     request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
 ) -> Partitions[GoVetFieldSet]:
-    return Partitions() if go_vet_subsystem.skip else Partitions([request.field_sets])
+    return (
+        Partitions() if go_vet_subsystem.skip else Partitions.single_partition(request.field_sets)
+    )
 
 
 @rule(level=LogLevel.DEBUG)
 async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintResult:
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request),
+        SourceFilesRequest(field_set.sources for field_set in request.elements),
     )
 
     owning_go_mods = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request
+        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.elements
     )
 
     owning_go_mod_addresses = {x.address for x in owning_go_mods}

@@ -52,10 +52,10 @@ def run_hadolint(
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [HadolintRequest.SubPartition(subpartition)],
+            [HadolintRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)

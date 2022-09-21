@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.flake8.rules import Flake8Request, PartitionElement
+from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
@@ -55,14 +55,14 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[PartitionElement],
+        Partitions[Flake8FieldSet],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.SubPartition(subpartition)],
+            [Flake8Request.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)
