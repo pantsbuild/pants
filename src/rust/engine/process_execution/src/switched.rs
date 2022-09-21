@@ -54,6 +54,13 @@ where
       self.false_runner.run(context, workunit, req).await
     }
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    let true_runner_shutdown_fut = self.true_runner.shutdown();
+    let false_runner_shutdown_fut = self.false_runner.shutdown();
+    futures::try_join!(true_runner_shutdown_fut, false_runner_shutdown_fut)?;
+    Ok(())
+  }
 }
 
 #[cfg(test)]
@@ -77,6 +84,10 @@ mod tests {
       _req: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       self.0.clone()
+    }
+
+    async fn shutdown(&self) -> Result<(), String> {
+      Ok(())
     }
   }
 

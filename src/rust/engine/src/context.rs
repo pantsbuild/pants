@@ -21,6 +21,7 @@ use crate::types::Types;
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
@@ -632,6 +633,19 @@ impl Core {
     }
     // Then clear the Graph to ensure that drop handlers run (particularly for running processes).
     self.graph.clear();
+
+    // Allow command runners to cleanly shutdown in an async context to avoid issues with
+    // waiting for async code to run in a non-async drop context.
+    let shutdown_futures = self
+      .command_runners
+      .iter()
+      .map(|runner| runner.shutdown().boxed());
+    let shutdown_results = futures::future::join_all(shutdown_futures).await;
+    for shutfdown_result in shutdown_results {
+      if let Err(err) = shutfdown_result {
+        log::warn!("Command runner failed to shutdown cleanly: {err}");
+      }
+    }
   }
 }
 

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple, Tuple
+from typing import Tuple, cast
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -25,12 +25,6 @@ class BanditRequest(LintTargetsRequest):
     name = Bandit.options_scope
 
 
-class PartitionElement(NamedTuple):
-    field_set: BanditFieldSet
-    # NB: The interpreter_constraints are the same for every element in a partition
-    interpreter_constraints: InterpreterConstraints
-
-
 def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
@@ -45,35 +39,26 @@ async def partition_bandit(
     request: BanditRequest.PartitionRequest[BanditFieldSet],
     bandit: Bandit,
     python_setup: PythonSetup,
-) -> Partitions[PartitionElement]:
+) -> Partitions[BanditFieldSet]:
     if bandit.skip:
         return Partitions()
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
-    # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
-    # batch targets by their constraints to ensure, for example, that all Python 2 targets run
+    # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit).
+    # We batch targets by their constraints to ensure, for example, that all Python 2 targets run
     # together and all Python 3 targets run together.
     constraints_to_field_sets = InterpreterConstraints.group_field_sets_by_constraints(
         request.field_sets, python_setup
     )
 
-    return Partitions(
-        tuple(
-            PartitionElement(
-                field_set,
-                interpreter_constraints,
-            )
-            for field_set in field_sets
-        )
-        for interpreter_constraints, field_sets in constraints_to_field_sets.items()
-    )
+    return Partitions(constraints_to_field_sets)
 
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
-    request: BanditRequest.SubPartition[PartitionElement], bandit: Bandit
+    request: BanditRequest.SubPartition[BanditFieldSet], bandit: Bandit
 ) -> LintResult:
-    interpreter_constraints = request[0].interpreter_constraints
+    interpreter_constraints = cast(InterpreterConstraints, request.key)
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,
@@ -82,7 +67,7 @@ async def bandit_lint(
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
     source_files_get = Get(
-        SourceFiles, SourceFilesRequest(element.field_set.source for element in request)
+        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -104,7 +89,7 @@ async def bandit_lint(
             bandit_pex,
             argv=generate_argv(source_files, bandit),
             input_digest=input_digest,
-            description=f"Run Bandit on {pluralize(len(request), 'file')}.",
+            description=f"Run Bandit on {pluralize(len(request.elements), 'file')}.",
             output_directories=(REPORT_DIR,),
             level=LogLevel.DEBUG,
         ),

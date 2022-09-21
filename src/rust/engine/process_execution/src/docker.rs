@@ -285,7 +285,6 @@ impl CommandRunner {
       &named_caches,
       &immutable_inputs,
       image_pull_policy,
-      executor.clone(),
     )?;
 
     Ok(CommandRunner {
@@ -412,6 +411,10 @@ impl super::CommandRunner for CommandRunner {
       }
     )
     .await
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.container_cache.shutdown().await
   }
 }
 
@@ -540,7 +543,6 @@ struct ContainerCache {
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
   image_pull_cache: ImagePullCache,
-  executor: Executor,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
@@ -555,7 +557,6 @@ impl ContainerCache {
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     image_pull_policy: ImagePullPolicy,
-    executor: Executor,
   ) -> Result<Self, String> {
     let work_dir_base = work_dir_base
       .to_path_buf()
@@ -599,7 +600,6 @@ impl ContainerCache {
       immutable_inputs_base_dir,
       image_pull_cache: ImagePullCache::new(image_pull_policy),
       containers: Mutex::default(),
-      executor,
     })
   }
 
@@ -724,37 +724,39 @@ impl ContainerCache {
 
     Ok(container_id.to_owned())
   }
-}
 
-impl Drop for ContainerCache {
-  fn drop(&mut self) {
-    let executor = self.executor.clone();
-    let container_ids = self.containers.lock().keys().cloned().collect::<Vec<_>>();
-    let docker = self.docker.clone();
-    executor.enter(move || {
-      let join_fut = tokio::spawn(async move {
-        let docker = match docker.get().await {
-          Ok(d) => d,
-          Err(err) => {
-            log::warn!("Failed to get Docker connection during container removal: {err}");
-            return;
-          }
-        };
+  pub async fn shutdown(&self) -> Result<(), String> {
+    let docker = match self.docker.get().await {
+      Ok(d) => d,
+      Err(err) => {
+        return Err(format!(
+          "Failed to get Docker connection during container removal: {err}"
+        ))
+      }
+    };
 
-        let removal_futures = container_ids.into_iter().map(|(id, _platform)| async move {
-          let remove_options = RemoveContainerOptions {
-            force: true,
-            ..RemoveContainerOptions::default()
-          };
-          let remove_result = docker.remove_container(&id, Some(remove_options)).await;
-          if let Err(err) = remove_result {
-            log::warn!("Failed to remove Docker container `{id}`: {err:?}");
-          }
-        });
+    #[allow(clippy::needless_collect)]
+    // allow is necessary otherwise will get "temporary value dropped while borrowed" error
+    let container_ids = self
+      .containers
+      .lock()
+      .values()
+      .flat_map(|v| v.get())
+      .cloned()
+      .collect::<Vec<_>>();
 
-        let _ = futures::future::join_all(removal_futures).await;
-      });
-      let _ = tokio::task::block_in_place(|| futures::executor::block_on(join_fut));
+    let removal_futures = container_ids.into_iter().map(|id| async move {
+      let remove_options = RemoveContainerOptions {
+        force: true,
+        ..RemoveContainerOptions::default()
+      };
+      docker
+        .remove_container(&id, Some(remove_options))
+        .await
+        .map_err(|err| format!("Failed to remove Docker container `{id}`: {err:?}"))
     });
+
+    futures::future::try_join_all(removal_futures).await?;
+    Ok(())
   }
 }

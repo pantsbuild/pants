@@ -42,7 +42,7 @@ class BufLintRequest(LintTargetsRequest):
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
 ) -> Partitions[BufFieldSet]:
-    return Partitions() if buf.lint_skip else Partitions([request.field_sets])
+    return Partitions() if buf.lint_skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
@@ -51,7 +51,7 @@ async def run_buf(
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest((field_set.address for field_set in request)),
+        TransitiveTargetsRequest((field_set.address for field_set in request.elements)),
     )
 
     all_stripped_sources_request = Get(
@@ -65,7 +65,7 @@ async def run_buf(
     target_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (field_set.sources for field_set in request),
+            (field_set.sources for field_set in request.elements),
             for_sources_types=(ProtobufSourceField,),
             enable_codegen=True,
         ),
@@ -99,7 +99,7 @@ async def run_buf(
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
-            description=f"Run buf lint on {pluralize(len(request), 'file')}.",
+            description=f"Run buf lint on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

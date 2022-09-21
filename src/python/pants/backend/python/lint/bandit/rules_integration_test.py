@@ -9,7 +9,7 @@ from typing import Sequence
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.lint.bandit.rules import BanditRequest, PartitionElement
+from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
@@ -59,14 +59,14 @@ def run_bandit(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[PartitionElement],
+        Partitions[BanditFieldSet],
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.SubPartition(subpartition)],
+            [BanditRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)
