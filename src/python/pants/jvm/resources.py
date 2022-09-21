@@ -10,7 +10,7 @@ from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSe
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.core.util_rules.system_binaries import ZipBinary
+from pants.core.util_rules.system_binaries import BashBinary, TouchBinary, ZipBinary
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessResult
@@ -44,6 +44,8 @@ class JvmResourcesRequest(ClasspathEntryRequest):
 @rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
+    bash: BashBinary,
+    touch: TouchBinary,
     jvm: JvmSubsystem,
     request: JvmResourcesRequest,
 ) -> FallibleClasspathEntry:
@@ -89,9 +91,21 @@ async def assemble_resources_jar(
         ProcessResult,
         Process(
             argv=[
-                zip.path,
-                output_filename,
-                *sorted(input_files),
+                bash.path,
+                "-c",
+                " ".join(
+                    [
+                        touch.path,
+                        "-d 1980-01-01T00:00:00Z",
+                        *sorted(input_files),
+                        ";",
+                        "TZ=UTC",
+                        zip.path,
+                        "-oX",
+                        output_filename,
+                        *sorted(input_files),
+                    ]
+                ),
             ],
             description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
