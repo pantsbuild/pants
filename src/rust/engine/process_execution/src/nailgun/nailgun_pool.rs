@@ -495,7 +495,10 @@ impl Drop for BorrowedNailgunProcess {
         "Killing nailgun process {:?} due to cancellation.",
         process.as_ref().unwrap().name
       );
-      let _ = process.as_mut().unwrap().handle.kill();
+      if process.as_mut().unwrap().handle.kill().is_ok() {
+        // NB: This is blocking, but should be a short wait in general.
+        let _ = process.as_mut().unwrap().handle.wait();
+      }
     }
   }
 }
