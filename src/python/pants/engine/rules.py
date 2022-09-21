@@ -25,6 +25,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -52,7 +53,12 @@ PANTS_RULES_MODULE_KEY = "__pants_rules__"
 @memoized
 def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
-    return TaskRule(**subsystem.signature())
+    warn_or_error(
+        removal_version="2.17.0dev0",
+        entity=f"using `SubsystemRule({subsystem.__name__})`",
+        hint=f"Use `*{subsystem.__name__}.rules()` instead.",
+    )
+    return next(iter(subsystem.rules()))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
 
 
 class RuleType(Enum):
@@ -428,9 +434,9 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                 if isinstance(rule, TaskRule):
                     for input in rule.input_selectors:
                         if issubclass(input, Subsystem):
-                            yield SubsystemRule(input)
+                            yield from input.rules()
                     if issubclass(rule.output_type, Goal):
-                        yield SubsystemRule(rule.output_type.subsystem_cls)
+                        yield from rule.output_type.subsystem_cls.rules()
                     yield rule
 
     return list(iter_rules())
