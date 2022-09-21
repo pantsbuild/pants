@@ -741,13 +741,18 @@ async fn run_command_via_docker_in_dir(
     cleanup,
     ImagePullPolicy::IfMissing,
   )?;
-  let original = runner.run(Context::default(), workunit, req.into()).await?;
-  let stdout_bytes = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?;
-  let stderr_bytes = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?;
+  let result: Result<_, ProcessError> = async {
+    let original = runner.run(Context::default(), workunit, req.into()).await?;
+    let stdout_bytes = store
+      .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+      .await?;
+    let stderr_bytes = store
+      .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+      .await?;
+    Ok((original, stdout_bytes, stderr_bytes))
+  }
+  .await;
+  let (original, stdout_bytes, stderr_bytes) = result?;
   runner.shutdown().await?;
   Ok(LocalTestResult {
     original,
