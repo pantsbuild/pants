@@ -314,6 +314,7 @@ async fn cache_read_speculation() {
   async fn run_process(
     local_delay_ms: u64,
     remote_delay_ms: u64,
+    remote_cache_speculation_delay_ms: u64,
     cache_hit: bool,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
@@ -327,6 +328,9 @@ async fn cache_read_speculation() {
       create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
 
     let (process, action_digest) = create_process(&store_setup).await;
+    let process = process.remote_cache_speculation_delay(std::time::Duration::from_millis(
+      remote_cache_speculation_delay_ms,
+    ));
     if cache_hit {
       store_setup
         .cas
@@ -345,17 +349,32 @@ async fn cache_read_speculation() {
   }
 
   // Case 1: remote is faster than local.
-  let (exit_code, local_call_count) = run_process(200, 0, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(200, 0, 0, true, &mut workunit).await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
   // Case 2: local is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 200, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(0, 200, 0, true, &mut workunit).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
   // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(200, 0, false, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(200, 0, 0, false, &mut workunit).await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 4: remote is faster than speculation read delay.
+  let (exit_code, local_call_count) = run_process(0, 100, 200, true, &mut workunit).await;
+  assert_eq!(exit_code, 0);
+  assert_eq!(local_call_count, 0);
+
+  // Case 5: remote is faster than speculation read delay, but there is no cache entry so we fallback to local execution.
+  let (exit_code, local_call_count) = run_process(0, 100, 200, false, &mut workunit).await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 6: local with speculation read delay is faster than remote.
+  let (exit_code, local_call_count) = run_process(0, 200, 100, true, &mut workunit).await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 }
