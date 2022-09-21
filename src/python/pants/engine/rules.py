@@ -202,10 +202,8 @@ def rule_decorator(func, **kwargs) -> Callable:
             )
 
     parameter_types = tuple(
-        param_type_overrides[parameter]
-        if parameter in param_type_overrides
-        else _ensure_type_annotation(
-            type_annotation=type_hints.get(parameter),
+        _ensure_type_annotation(
+            type_annotation=param_type_overrides.get(parameter, type_hints.get(parameter)),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )

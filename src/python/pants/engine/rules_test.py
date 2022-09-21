@@ -1028,6 +1028,12 @@ def test_param_type_overrides() -> None:
         async def obey_human_orders() -> A:
             return A()
 
+    with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
+
+        @rule(param_type_overrides={"param1": "A string"})
+        async def protect_existence(param1) -> A:
+            return A()
+
 
 def test_invalid_rule_helper_name() -> None:
     with pytest.raises(ValueError, match="must be private"):
