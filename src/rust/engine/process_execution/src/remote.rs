@@ -822,6 +822,10 @@ impl crate::CommandRunner for CommandRunner {
     )
     .await
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 fn maybe_add_workunit(
