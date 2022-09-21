@@ -271,7 +271,7 @@ async def partition_inputs(
         if content_pattern_names and encoding:
             applicable_file_paths.append(fp)
 
-    return Partitions([tuple(applicable_file_paths)])
+    return Partitions.single_partition(applicable_file_paths)
 
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)
@@ -281,7 +281,7 @@ async def lint_with_regex_patterns(
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     assert multi_matcher is not None
     file_to_content_pattern_names_and_encoding = {}
-    for fp in request:
+    for fp in request.elements:
         content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
         assert content_pattern_names and encoding
         file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)

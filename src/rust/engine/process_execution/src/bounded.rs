@@ -151,6 +151,10 @@ impl crate::CommandRunner for CommandRunner {
       }
     }
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.inner.shutdown().await
+  }
 }
 
 /// A wrapped Semaphore which adds concurrency metadata which supports overcommit.

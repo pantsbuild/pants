@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -34,15 +34,14 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, CoarsenedTargetsRequest
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PartitionElement:
-    source_path: str
-    coarsened_target: CoarsenedTarget
+class PartitionKey:
+    coarsened_targets: CoarsenedTargets
     # NB: These are the same across every element in a partition
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
@@ -57,13 +56,13 @@ class PylintRequest(LintTargetsRequest):
     name = Pylint.options_scope
 
 
-def generate_argv(source_paths: tuple[str, ...], pylint: Pylint) -> Tuple[str, ...]:
+def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.append("--jobs={pants_concurrency}")
     args.extend(pylint.args)
-    args.extend(source_paths)
+    args.extend(field_set.source.file_path for field_set in field_sets)
     return tuple(args)
 
 
@@ -73,7 +72,7 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> Partitions[PartitionElement]:
+) -> Partitions[PylintFieldSet]:
     if pylint.skip:
         return Partitions()
 
@@ -92,14 +91,15 @@ async def partition_pylint(
     coarsened_targets_by_address = coarsened_targets.by_address()
 
     return Partitions(
-        tuple(
-            PartitionElement(
-                field_set.source.file_path,
-                coarsened_targets_by_address[field_set.address],
+        (
+            PartitionKey(
+                CoarsenedTargets(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                ),
                 resolve if len(python_setup.resolves) > 1 else None,
                 InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
-            )
-            for field_set in field_sets
+            ),
+            tuple(field_sets),
         )
         for (
             resolve,
@@ -110,21 +110,19 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def run_pylint(
-    request: PylintRequest.SubPartition[PartitionElement],
+    request: PylintRequest.SubPartition[PylintFieldSet],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
-    sources_paths = tuple(element.source_path for element in request)
-    coarsened_targets = CoarsenedTargets(element.coarsened_target for element in request)
-    interpreter_constraints = request[0].interpreter_constraints
+    partition_key = cast(PartitionKey, request.key)
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in coarsened_targets.closure()),
+            (target.address for target in partition_key.coarsened_targets.closure()),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=interpreter_constraints,
+            hardcoded_interpreter_constraints=partition_key.interpreter_constraints,
         ),
     )
 
@@ -132,12 +130,14 @@ async def run_pylint(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=interpreter_constraints,
+            interpreter_constraints=partition_key.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
-    sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(coarsened_targets.closure()))
+    sources_get = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(partition_key.coarsened_targets.closure())
+    )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
 
@@ -154,7 +154,7 @@ async def run_pylint(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=interpreter_constraints,
+                    interpreter_constraints=partition_key.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
@@ -192,19 +192,19 @@ async def run_pylint(
         FallibleProcessResult,
         VenvPexProcess(
             pylint_runner_pex,
-            argv=generate_argv(sources_paths, pylint),
+            argv=generate_argv(request.elements, pylint),
             input_digest=input_digest,
             output_directories=(REPORT_DIR,),
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            concurrency_available=len(request),
-            description=f"Run Pylint on {pluralize(len(request), 'target')}.",
+            concurrency_available=len(request.elements),
+            description=f"Run Pylint on {pluralize(len(request.elements), 'target')}.",
             level=LogLevel.DEBUG,
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
         result,
-        partition_description=request[0].description(),
+        partition_description=partition_key.description(),
         linter_name=Pylint.options_scope,
         report=report,
     )

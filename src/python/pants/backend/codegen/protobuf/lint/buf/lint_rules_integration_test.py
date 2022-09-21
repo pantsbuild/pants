@@ -59,10 +59,10 @@ def run_buf(
         [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for subpartition in partition:
+    for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BufLintRequest.SubPartition(subpartition)],
+            [BufLintRequest.SubPartition(subpartition, key)],
         )
         results.append(result)
     return tuple(results)

@@ -323,6 +323,7 @@ class JvmProcess:
     extra_env: FrozenDict[str, str]
     cache_scope: ProcessCacheScope | None
     use_nailgun: bool
+    remote_cache_speculation_delay: int | None
 
     def __init__(
         self,
@@ -341,6 +342,7 @@ class JvmProcess:
         timeout_seconds: int | float | None = None,
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
+        remote_cache_speculation_delay: int | None = None,
     ):
         self.jdk = jdk
         self.argv = tuple(argv)
@@ -357,6 +359,7 @@ class JvmProcess:
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.extra_env = FrozenDict(extra_env or {})
         self.use_nailgun = use_nailgun
+        self.remote_cache_speculation_delay = remote_cache_speculation_delay
 
         if not use_nailgun and extra_nailgun_keys:
             raise AssertionError(
@@ -370,7 +373,7 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 
 @rule
 async def jvm_process(
-    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+    bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
 
     jdk = request.jdk
@@ -414,6 +417,12 @@ async def jvm_process(
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
+    remote_cache_speculation_delay_millis = 0
+    if request.remote_cache_speculation_delay is not None:
+        remote_cache_speculation_delay_millis = request.remote_cache_speculation_delay
+    elif request.use_nailgun:
+        remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
+
     return Process(
         [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,
@@ -427,6 +436,7 @@ async def jvm_process(
         append_only_caches=jdk.append_only_caches,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+        remote_cache_speculation_delay_millis=remote_cache_speculation_delay_millis,
     )
 
 
