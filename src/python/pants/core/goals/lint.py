@@ -382,7 +382,7 @@ async def _get_subpartitions(
     core_request_types: Iterable[type[LintRequest]],
     target_partitioners: Iterable[type[LintTargetsRequest.PartitionRequest]],
     file_partitioners: Iterable[type[LintFilesRequest.PartitionRequest]],
-    subsystem: type[_GoalSubsystemT],
+    subsystem: _GoalSubsystemT,
     specs: Specs,
     specified_names: Iterable[str],
     # NB: Because the rule parser code will collect `Get`s from caller's scope, these allows the
