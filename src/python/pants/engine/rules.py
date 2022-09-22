@@ -50,7 +50,7 @@ PANTS_RULES_MODULE_KEY = "__pants_rules__"
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
+def SubsystemRule(subsystem: Type[Subsystem]) -> Rule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     warn_or_error(
         removal_version="2.17.0dev0",

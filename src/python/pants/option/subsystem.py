@@ -19,7 +19,7 @@ from pants.util.memo import memoized_classmethod
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
-    from pants.engine.rules import TaskRule
+    from pants.engine.rules import Rule
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -46,11 +46,11 @@ class Subsystem(metaclass=ABCMeta):
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @classmethod
-    def rule(cls) -> TaskRule:
-        """Returns a `TaskRule` that will construct the target Subsystem.
-        """
+    def rule(cls) -> Rule:
+        """Returns a `TaskRule` that will construct the target Subsystem."""
         from pants.engine.rules import TaskRule
-        partial_construct_subsystem = functools.partial(_construct_subsytem, cls)
+
+        partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
 
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
@@ -81,7 +81,7 @@ class Subsystem(metaclass=ABCMeta):
         )
 
     @memoized_classmethod
-    def rules(cls) -> Iterable[TaskRule]:
+    def rules(cls) -> Iterable[Rule]:
         return [cls.rule()]
 
     @classmethod
