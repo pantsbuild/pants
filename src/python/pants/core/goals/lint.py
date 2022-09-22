@@ -311,7 +311,13 @@ class LintSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return LintRequest in union_membership
+        return bool(
+            {
+                LintRequest,
+                FmtTargetsRequest,
+                _FmtBuildFilesRequest,
+            }.intersection(union_membership.union_rules.keys())
+        )
 
     only = StrListOption(
         help=only_option_help("lint", "linter", "flake8", "shellcheck"),
@@ -637,7 +643,7 @@ async def lint(
     return Lint(_get_error_code(all_batch_results))
 
 
-@rule(level=LogLevel.DEBUG)
+@rule(level=LogLevel.TRACE)
 async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
     return LintResult(
         1 if fmt_result.did_change else 0,
