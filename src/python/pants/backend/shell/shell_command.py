@@ -104,7 +104,7 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
 
 @rule
 async def prepare_shell_command_process(
-    request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
+    request: ShellCommandProcessRequest, shell_setup: ShellSetup.EnvironmentAware, bash: BashBinary
 ) -> Process:
     shell_command = request.target
     interactive = shell_command.has_field(ShellCommandRunWorkdirField)

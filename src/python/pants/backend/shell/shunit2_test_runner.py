@@ -124,7 +124,8 @@ class Shunit2Runner:
 
 @rule(desc="Determine shunit2 shell")
 async def determine_shunit2_shell(
-    request: Shunit2RunnerRequest, shell_setup: ShellSetup
+    request: Shunit2RunnerRequest,
+    shell_setup: ShellSetup.EnvironmentAware,
 ) -> Shunit2Runner:
     if request.shell_field.value is not None:
         tgt_shell = Shunit2Shell(request.shell_field.value)
@@ -158,7 +159,7 @@ async def determine_shunit2_shell(
 @rule(desc="Setup shunit2", level=LogLevel.DEBUG)
 async def setup_shunit2_for_target(
     request: TestSetupRequest,
-    shell_setup: ShellSetup,
+    shell_setup: ShellSetup.EnvironmentAware,
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
