@@ -20,6 +20,8 @@ class OptionsInfo:
 
 
 def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+    """Yields the ordered options info from the MRO of the provided class."""
+
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
     # class attribute order, starting from the base class down.
     for class_ in reversed(inspect.getmro(cls)):
