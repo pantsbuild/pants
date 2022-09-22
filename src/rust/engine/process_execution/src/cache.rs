@@ -158,6 +158,10 @@ impl crate::CommandRunner for CommandRunner {
     }
     Ok(result)
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.inner.shutdown().await
+  }
 }
 
 impl CommandRunner {

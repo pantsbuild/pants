@@ -60,6 +60,7 @@ _SR = TypeVar("_SR", bound=StyleRequest)
 _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 _PartitionElementT = TypeVar("_PartitionElementT")
+_GoalSubsystemT = TypeVar("_GoalSubsystemT", bound=GoalSubsystem)
 
 
 @dataclass(frozen=True)
@@ -375,14 +376,6 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
     return 0
 
 
-# TODO(16868): Rule parser requires arguments to be values in module scope
-_LintTargetsPartitionRequest = LintTargetsRequest.PartitionRequest
-_LintFilesPartitionRequest = LintFilesRequest.PartitionRequest
-_LintSubPartition = LintRequest.SubPartition
-
-_GoalSubsystemT = TypeVar("_GoalSubsystemT", bound=GoalSubsystem)
-
-
 @rule_helper
 async def _get_subpartitions(
     core_request_types: Iterable[type[LintRequest]],
@@ -519,8 +512,8 @@ async def lint(
         lint_subsystem,
         specs,
         specified_names,
-        lambda request_type: Get(Partitions, _LintTargetsPartitionRequest, request_type),
-        lambda request_type: Get(Partitions, _LintFilesPartitionRequest, request_type),
+        lambda request_type: Get(Partitions, LintTargetsRequest.PartitionRequest, request_type),
+        lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
     )
 
     # NOTE: Fmt support has been prefactored to be isolated from core "lint" support as a follow-up
@@ -614,7 +607,7 @@ async def lint(
         )
 
     all_requests = [
-        *(Get(LintResult, _LintSubPartition, request) for request in lint_subpartitions),
+        *(Get(LintResult, LintRequest.SubPartition, request) for request in lint_subpartitions),
         *(Get(LintResult, FmtTargetsRequest, request) for request in fmt_target_requests),
         *(Get(LintResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
     ]

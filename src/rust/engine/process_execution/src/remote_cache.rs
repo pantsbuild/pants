@@ -255,7 +255,7 @@ impl CommandRunner {
     >,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
-    let cache_read_future = async {
+    let mut cache_read_future = async {
       let response = check_action_cache(
         action_digest,
         &request.description,
@@ -291,42 +291,63 @@ impl CommandRunner {
       Level::Trace,
       |workunit| async move {
         tokio::select! {
-          cache_result = cache_read_future => {
-            if let Some(cached_response) = cache_result {
-              let lookup_elapsed = cache_lookup_start.elapsed();
-              workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-              if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
-                let time_saved = time_saved.as_millis() as u64;
-                workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-                workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-              }
-              // When we successfully use the cache, we change the description and increase the level
-              // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| {
-                initial.map(|(initial, _)|
-                (WorkunitMetadata {
-                  desc: initial
-                    .desc
-                    .as_ref()
-                    .map(|desc| format!("Hit: {}", desc)),
-                  ..initial
-                }, Level::Debug))
-              });
-              Ok((cached_response, true))
-            } else {
-              // Note that we don't increment a counter here, as there is nothing of note in this
-              // scenario: the remote cache did not save unnecessary local work, nor was the remote
-              // trip unusually slow such that local execution was faster.
-              local_execution_future.await.map(|res| (res, false))
-            }
+          cache_result = &mut cache_read_future => {
+            self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
           }
-          local_result = &mut local_execution_future => {
-            workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
-            local_result.map(|res| (res, false))
+          _ = tokio::time::sleep(request.remote_cache_speculation_delay) => {
+            tokio::select! {
+              cache_result = cache_read_future => {
+                self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
+              }
+              local_result = &mut local_execution_future => {
+                workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+                local_result.map(|res| (res, false))
+              }
+            }
           }
         }
       }
     ).await
+  }
+
+  async fn handle_cache_read_completed(
+    &self,
+    workunit: &mut RunningWorkunit,
+    cache_lookup_start: Instant,
+    cache_result: Option<FallibleProcessResultWithPlatform>,
+    local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, ProcessError>>,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
+    if let Some(cached_response) = cache_result {
+      let lookup_elapsed = cache_lookup_start.elapsed();
+      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+      if let Some(time_saved) = cached_response
+        .metadata
+        .time_saved_from_cache(lookup_elapsed)
+      {
+        let time_saved = time_saved.as_millis() as u64;
+        workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+        workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+      }
+      // When we successfully use the cache, we change the description and increase the level
+      // (but not so much that it will be logged by default).
+      workunit.update_metadata(|initial| {
+        initial.map(|(initial, _)| {
+          (
+            WorkunitMetadata {
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              ..initial
+            },
+            Level::Debug,
+          )
+        })
+      });
+      Ok((cached_response, true))
+    } else {
+      // Note that we don't increment a counter here, as there is nothing of note in this
+      // scenario: the remote cache did not save unnecessary local work, nor was the remote
+      // trip unusually slow such that local execution was faster.
+      local_execution_future.await.map(|res| (res, false))
+    }
   }
 
   /// Stores an execution result into the remote Action Cache.
@@ -444,7 +465,10 @@ impl crate::CommandRunner for CommandRunner {
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
-    let (result, hit_cache) = if self.cache_read {
+    let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
+      || request.cache_scope == ProcessCacheScope::Successful;
+
+    let (result, hit_cache) = if self.cache_read && use_remote_cache {
       self
         .speculate_read_action_cache(
           context.clone(),
@@ -461,7 +485,11 @@ impl crate::CommandRunner for CommandRunner {
       )
     };
 
-    if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
+    if !hit_cache
+      && (result.exit_code == 0 || write_failures_to_cache)
+      && self.cache_write
+      && use_remote_cache
+    {
       let command_runner = self.clone();
       let result = result.clone();
       let _write_join = self.executor.spawn(in_workunit!(
@@ -492,6 +520,10 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     Ok(result)
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.inner.shutdown().await
   }
 }
 

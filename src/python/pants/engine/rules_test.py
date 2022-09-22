@@ -1020,6 +1020,10 @@ def test_invalid_rule_helper_name() -> None:
         async def foo() -> A:
             pass
 
+    @rule_helper(_public=True)
+    async def bar() -> A:
+        pass
+
 
 def test_cant_be_both_rule_and_rule_helper() -> None:
     with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):

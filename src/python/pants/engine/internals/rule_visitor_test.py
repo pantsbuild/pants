@@ -43,6 +43,15 @@ class HelperContainer:
 container_instance = HelperContainer()
 
 
+class InnerScope:
+    STR = str
+    INT = int
+    BOOL = bool
+
+    HelperContainer = HelperContainer
+    container_instance = container_instance
+
+
 def assert_awaitables(func, awaitable_types: Iterable[tuple[type | list[type], type]]):
     gets = collect_awaitables(func)
     actual_types = tuple((list(get.input_types), get.output_type) for get in gets)
@@ -90,6 +99,14 @@ def test_multiget_heterogeneous() -> None:
     assert_awaitables(rule, [(int, str), (str, int)])
 
 
+def test_attribute_lookup() -> None:
+    async def rule1():
+        await Get(InnerScope.STR, InnerScope.INT, 42)
+        await Get(InnerScope.STR, InnerScope.INT(42))
+
+    assert_awaitables(rule1, [(int, str), (int, str)])
+
+
 def test_get_no_index_call_no_subject_call_allowed() -> None:
     async def rule():
         get_type: type = Get  # noqa: F841
@@ -108,18 +125,36 @@ def test_rule_helpers_class_methods() -> None:
     async def rule1():
         HelperContainer()._static_helper(1)
 
-    # Rule helpers must be called via module-scoped attributes
-    assert_awaitables(rule1, [])
+    async def rule1_inner():
+        InnerScope.HelperContainer()._static_helper(1)
 
     async def rule2():
-        container_instance._static_helper(1)
+        HelperContainer._static_helper(1)
 
-    assert_awaitables(rule2, [(int, str), (str, int)])
+    async def rule2_inner():
+        InnerScope.HelperContainer._static_helper(1)
 
     async def rule3():
+        container_instance._static_helper(1)
+
+    async def rule3_inner():
+        InnerScope.container_instance._static_helper(1)
+
+    async def rule4():
         container_instance._method_helper(1)
 
-    assert_awaitables(rule3, [(int, str)])
+    async def rule4_inner():
+        InnerScope.container_instance._method_helper(1)
+
+    # Rule helpers must be called via module-scoped attribute lookup
+    assert_awaitables(rule1, [])
+    assert_awaitables(rule1_inner, [])
+    assert_awaitables(rule2, [(int, str), (str, int)])
+    assert_awaitables(rule2_inner, [(int, str), (str, int)])
+    assert_awaitables(rule3, [(int, str), (str, int)])
+    assert_awaitables(rule3_inner, [(int, str), (str, int)])
+    assert_awaitables(rule4, [(int, str)])
+    assert_awaitables(rule4_inner, [(int, str)])
 
 
 def test_valid_get_unresolvable_product_type() -> None:
@@ -160,7 +195,7 @@ def test_invalid_get_invalid_subject_arg_no_constructor_call() -> None:
     async def rule():
         Get(STR, "bob")
 
-    with pytest.raises(GetParseError):
+    with pytest.raises(ValueError):
         collect_awaitables(rule)
 
 
@@ -168,7 +203,7 @@ def test_invalid_get_invalid_product_type_not_a_type_name() -> None:
     async def rule():
         Get(call(), STR("bob"))  # noqa: F821
 
-    with pytest.raises(GetParseError):
+    with pytest.raises(ValueError):
         collect_awaitables(rule)
 
 
@@ -176,5 +211,5 @@ def test_invalid_get_dict_value_not_type() -> None:
     async def rule():
         Get(int, {"str": "not a type"})
 
-    with pytest.raises(GetParseError):
+    with pytest.raises(ValueError):
         collect_awaitables(rule)

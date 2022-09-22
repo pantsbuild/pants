@@ -214,6 +214,10 @@ impl super::CommandRunner for CommandRunner {
     )
     .await
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 #[async_trait]
