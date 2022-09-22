@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import os
 from typing import Any, Iterable, Iterator, MutableMapping
 
 import toml
@@ -119,11 +120,17 @@ async def generate_from_python_requirement(
     union_membership: UnionMembership,
     python_setup: PythonSetup,
 ) -> GeneratedTargets:
+    generator = request.generator
+    requirements_rel_path = generator[PythonRequirementsSourceField].value
+    if os.path.basename(requirements_rel_path) == "pyproject.toml":
+        callback = parse_pyproject_callback
+    else:
+        callback = parse_requirements_callback
     result = await _generate_requirements(
         request,
         union_membership,
         python_setup,
-        parse_requirements_callback=parse_requirements_callback,
+        parse_requirements_callback=callback,
     )
     return GeneratedTargets(request.generator, result)
 
