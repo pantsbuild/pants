@@ -209,8 +209,7 @@ _NO_FALLBACK_ENVIRONMENT = "<none>"
 
 class RemoteFallbackEnvironmentField(StringField):
     alias = "fallback_environment"
-    default = LOCAL_ENVIRONMENT_MATCHER
-    value: str
+    default = None
     help = softwrap(
         f"""
         The environment to fallback to when remote execution is disabled via the global option
@@ -218,7 +217,7 @@ class RemoteFallbackEnvironmentField(StringField):
 
         Must be an environment name from the option `[environments-preview].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
-        string `{_NO_FALLBACK_ENVIRONMENT}` to error when remote execution is disabled.
+        Python value `None` to error when remote execution is disabled.
 
         Tip: if you are using a Docker image with your remote execution environment (usually
         enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
@@ -439,7 +438,7 @@ async def resolve_environment_name(
         RemoteFallbackEnvironmentField
     ):
         fallback_field = env_tgt.val[RemoteFallbackEnvironmentField]
-        if fallback_field.value == _NO_FALLBACK_ENVIRONMENT:
+        if fallback_field.value is None:
             raise RemoteExecutionDisabledError(
                 softwrap(
                     f"""
@@ -447,8 +446,7 @@ async def resolve_environment_name(
                     environment `{request.raw_value}` is used in {request.description_of_origin}.
 
                     Either enable the option `--remote-execution`, or set the field
-                    `{fallback_field.alias}` for the target {env_tgt.val.address},
-                    e.g. to the default `{LOCAL_ENVIRONMENT_MATCHER}`.
+                    `{fallback_field.alias}` for the target {env_tgt.val.address}.
                     """
                 )
             )

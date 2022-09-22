@@ -11,7 +11,6 @@ import pytest
 from pants.build_graph.address import Address, ResolveError
 from pants.core.util_rules import environments
 from pants.core.util_rules.environments import (
-    _NO_FALLBACK_ENVIRONMENT,
     LOCAL_ENVIRONMENT_MATCHER,
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
@@ -194,14 +193,12 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                f"""\
+                """\
                 _local_environment(name='local')
                 # Intentionally set this to no platforms so that it cannot be autodiscovered.
                 _local_environment(name='hardcoded', compatible_platforms=[])
                 _docker_environment(name='docker', image="centos6:latest")
-                _remote_environment(
-                    name='remote-no-fallback', fallback_environment="{_NO_FALLBACK_ENVIRONMENT}"
-                )
+                _remote_environment(name='remote-no-fallback', fallback_environment=None)
                 _remote_environment(name='remote-fallback', fallback_environment="docker")
                 _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
                 """
