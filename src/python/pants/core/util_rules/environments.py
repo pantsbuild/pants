@@ -599,7 +599,7 @@ def get_option(name: str, subsystem: Subsystem.EnvironmentAware):
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return getattr(subsystem, name)
+        return subsystem.options[name]
     else:
         return maybe.value
 

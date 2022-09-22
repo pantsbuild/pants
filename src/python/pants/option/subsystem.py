@@ -55,6 +55,21 @@ class Subsystem(metaclass=ABCMeta):
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
 
+        def __getattribute__(self, __name: str) -> Any:
+            from pants.core.util_rules.environments import get_option
+
+            val = super().__getattribute__(__name)
+            if __name == "options":
+                return val
+
+            try:
+                if __name in self.options:
+                    return get_option(__name, self)
+            except AttributeError:
+                pass
+
+            return val
+
     @classmethod
     def rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem."""
