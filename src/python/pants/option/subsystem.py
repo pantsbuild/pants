@@ -21,6 +21,7 @@ from pants.util.memo import memoized_classmethod
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
+    from pants.core.util_rules.environments import EnvironmentTarget
     from pants.engine.rules import Rule
 
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
@@ -52,10 +53,13 @@ class Subsystem(metaclass=ABCMeta):
     class EnvironmentAware(metaclass=ABCMeta):
         options_scope: str
         options: OptionValueContainer
+        env_tgt: EnvironmentTarget
 
     @classmethod
     def rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem."""
+
+        # Global-level imports are conditional, we need to re-import here for runtime use
         from pants.engine.rules import TaskRule
 
         partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
@@ -90,34 +94,18 @@ class Subsystem(metaclass=ABCMeta):
 
     @classmethod
     def rule_env_aware(cls) -> Rule:
-        """Returns kwargs to construct a `TaskRule` that will construct the target Subsystem.
-
-        TODO: This indirection avoids a cycle between this module and the `rules` module.
-        """
+        """Returns kwargs to construct a `TaskRule` that will construct the target Subsystem."""
+        # Global-level imports are conditional, we need to re-import here for runtime use
+        from pants.core.util_rules.environments import EnvironmentTarget
         from pants.engine.rules import TaskRule
 
-        partial_construct_subsystem: Any = functools.partial(_construct_env_aware, cls)
-
-        # NB: We must populate several dunder methods on the partial function because partial
-        # functions do not have these defined by default and the engine uses these values to
-        # visualize functions in error messages and the rule graph.
         snake_scope = normalize_scope(cls.options_scope)
-        name = f"construct_scope_{snake_scope}"
-        partial_construct_subsystem.__name__ = name
-        partial_construct_subsystem.__module__ = cls.__module__
-        partial_construct_subsystem.__doc__ = cls.help
-
-        # `inspect.getsourcelines` does not work under oxidation
-        if not ox.is_oxidized:
-            _, class_definition_lineno = inspect.getsourcelines(cls)
-        else:
-            class_definition_lineno = 0  # `inspect.getsourcelines` returns 0 when undefined.
-        partial_construct_subsystem.__line_number__ = class_definition_lineno
+        name = f"construct_env_aware_scope_{snake_scope}"
 
         return TaskRule(
             output_type=cls.EnvironmentAware,
-            input_selectors=(),
-            func=partial_construct_subsystem,
+            input_selectors=(cls, EnvironmentTarget),
+            func=_construct_env_aware,
             input_gets=(
                 AwaitableConstraints(
                     output_type=ScopedOptions, input_types=(Scope,), is_effect=False
@@ -196,10 +184,16 @@ async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
 
 
 async def _construct_env_aware(
-    subsystem_typ: type[_SubsystemT],
+    subsystem_instance: _SubsystemT,
+    env_tgt: EnvironmentTarget,
 ) -> Subsystem.EnvironmentAware:
-    scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
-    t: Subsystem.EnvironmentAware = subsystem_typ.EnvironmentAware()  # (scoped_options.options)
+    scoped_options = await Get(ScopedOptions, Scope(str(subsystem_instance.options_scope)))
+    t: Subsystem.EnvironmentAware = type(subsystem_instance).EnvironmentAware()
+    # Runtime error which should alert subsystem authors and end users shouldn't see.
+    # Inner type must explicitly declare a subclass, but mypy doesn't catch this.
+    assert isinstance(t, Subsystem.EnvironmentAware)
     t.options = scoped_options.options
-    t.options_scope = subsystem_typ.options_scope
+    t.options_scope = subsystem_instance.options_scope
+    t.env_tgt = env_tgt
+
     return t

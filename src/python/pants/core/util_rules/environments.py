@@ -546,7 +546,7 @@ def _add_option_field_for(
             field_type = _SIMPLE_OPTIONS[option_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a value type that does "
+                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a value type that does "
                 "not yet have a mapping in `environments.py`. To fix, map the value type in "
                 "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
             )
@@ -556,7 +556,7 @@ def _add_option_field_for(
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a member value type that "
+                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a member value type that "
                 "does yet have a mapping in `environments.py`. To fix, map the member value type "
                 "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
                 "member value type."
@@ -584,11 +584,13 @@ def _add_option_field_for(
     ]
 
 
-def get_option(name: str, subsystem: Subsystem.EnvironmentAware, env_tgt: EnvironmentTarget):
+def get_option(name: str, subsystem: Subsystem.EnvironmentAware):
     """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
 
     This is slated for quick deprecation once we can construct `Subsystems` per environment.
     """
+
+    env_tgt = subsystem.env_tgt
 
     if env_tgt.val is None:
         return getattr(subsystem, name)

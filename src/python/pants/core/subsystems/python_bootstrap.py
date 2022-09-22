@@ -14,7 +14,7 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentsSubsystem, EnvironmentTarget, get_option
+from pants.core.util_rules.environments import EnvironmentsSubsystem, get_option
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -249,12 +249,11 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
 async def python_bootstrap(
     a: PythonBootstrapSubsystem,
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
-    env_tgt: EnvironmentTarget,
 ) -> PythonBootstrap:
 
     # TODO: use subsystems directly again once we do overrides at subsystem contruct time.
-    interpreter_search_paths = get_option("search_path", python_bootstrap_subsystem, env_tgt)
-    interpreter_names = get_option("names", python_bootstrap_subsystem, env_tgt)
+    interpreter_search_paths = get_option("search_path", python_bootstrap_subsystem)
+    interpreter_names = get_option("names", python_bootstrap_subsystem)
 
     has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
         interpreter_search_paths
