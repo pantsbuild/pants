@@ -6,22 +6,15 @@ import os.path
 import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any, cast
 
 from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
-from pants.engine.fs import (
-    Digest,
-    DigestSubset,
-    GlobExpansionConjunction,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -59,20 +52,24 @@ class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 
 @dataclass(frozen=True)
-class Partition:
-    process: JvmProcess
-    description: str
+class ScalafmtPartitionRequest:
+    field_sets: tuple[ScalafmtFieldSet, ...]
+
+
+class ScalafmtPartitions(FrozenDict[Any, "tuple[str, ...]"]):
+    pass
 
 
 @dataclass(frozen=True)
-class Setup:
-    partitions: tuple[Partition, ...]
-    original_snapshot: Snapshot
+class ScalafmtSubPartitionRequest:
+    files: tuple[str, ...]
+    key: Any
+    snapshot: Snapshot
 
 
 @dataclass(frozen=True)
 class GatherScalafmtConfigFilesRequest:
-    snapshot: Snapshot
+    filepaths: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -82,12 +79,11 @@ class ScalafmtConfigFiles:
 
 
 @dataclass(frozen=True)
-class SetupScalafmtPartition:
+class PartitionInfo:
     classpath_entries: tuple[str, ...]
-    merged_sources_digest: Digest
+    config_snapshot: Snapshot
     extra_immutable_input_digests: FrozenDict[str, Digest]
-    config_file: str
-    files: tuple[str, ...]
+    description: str
 
 
 def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
@@ -107,7 +103,7 @@ async def gather_scalafmt_config_files(
 ) -> ScalafmtConfigFiles:
     """Gather scalafmt config files and identify which config files to use for each source
     directory."""
-    source_dirs = frozenset(os.path.dirname(path) for path in request.snapshot.files)
+    source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
 
     source_dirs_with_ancestors = {"", *source_dirs}
     for source_dir in source_dirs:
@@ -139,60 +135,20 @@ async def gather_scalafmt_config_files(
 
 
 @rule
-async def setup_scalafmt_partition(
-    request: SetupScalafmtPartition, jdk: InternalJdk, tool: ScalafmtSubsystem
-) -> Partition:
-    sources_digest = await Get(
-        Digest,
-        DigestSubset(
-            request.merged_sources_digest,
-            PathGlobs(
-                [request.config_file, *request.files],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin=f"the files in scalafmt partition for config file {request.config_file}",
-            ),
-        ),
-    )
+async def partition_scalafmt(
+    request: ScalafmtPartitionRequest, tool: ScalafmtSubsystem
+) -> ScalafmtPartitions:
 
-    args = [
-        "org.scalafmt.cli.Cli",
-        f"--config={request.config_file}",
-        "--non-interactive",
-    ]
-    args.extend(request.files)
-
-    process = JvmProcess(
-        jdk=jdk,
-        argv=args,
-        classpath_entries=request.classpath_entries,
-        input_digest=sources_digest,
-        output_files=request.files,
-        extra_jvm_options=tool.jvm_options,
-        extra_immutable_input_digests=request.extra_immutable_input_digests,
-        # extra_nailgun_keys=request.extra_immutable_input_digests,
-        use_nailgun=False,
-        description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
-        level=LogLevel.DEBUG,
-    )
-
-    return Partition(process, f"{pluralize(len(request.files), 'file')} ({request.config_file})")
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_scalafmt(
-    request: ScalafmtRequest,
-) -> Setup:
     toolcp_relpath = "__toolcp"
 
+    filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafmtToolLockfileSentinel())
     tool_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(ScalafmtConfigFiles, GatherScalafmtConfigFilesRequest(request.snapshot)),
-    )
-
-    merged_sources_digest = await Get(
-        Digest, MergeDigests([request.snapshot.digest, config_files.snapshot.digest])
+        Get(
+            ScalafmtConfigFiles,
+            GatherScalafmtConfigFilesRequest(filepaths),
+        ),
     )
 
     extra_immutable_input_digests = {
@@ -201,36 +157,79 @@ async def setup_scalafmt(
 
     # Partition the work by which source files share the same config file (regardless of directory).
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
-    for source_dir, files_in_source_dir in group_by_dir(request.snapshot.files).items():
+    for source_dir, files_in_source_dir in group_by_dir(filepaths).items():
         config_file = config_files.source_dir_to_config_file[source_dir]
         source_files_by_config_file[config_file].update(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
-    partitions = await MultiGet(
-        Get(
-            Partition,
-            SetupScalafmtPartition(
-                classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
-                merged_sources_digest=merged_sources_digest,
-                extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
-                config_file=config_file,
-                files=tuple(sorted(files)),
-            ),
-        )
-        for config_file, files in source_files_by_config_file.items()
+    config_file_snapshots = await MultiGet(
+        Get(Snapshot, DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
+        for config_file in source_files_by_config_file
     )
 
-    return Setup(tuple(partitions), original_snapshot=request.snapshot)
+    return ScalafmtPartitions(
+        (
+            PartitionInfo(
+                classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
+                config_snapshot=config_snapshot,
+                extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
+                description=f"{pluralize(len(files), 'file')} ({config_file})",
+            ),
+            tuple(files),
+        )
+        for (config_file, files), config_snapshot in zip(
+            source_files_by_config_file.items(), config_file_snapshots
+        )
+    )
+
+
+@rule
+async def run_scalafmt(
+    request: ScalafmtSubPartitionRequest, jdk: InternalJdk, tool: ScalafmtSubsystem
+) -> ProcessResult:
+    partition_info = cast(PartitionInfo, request.key)
+    original_snapshot = request.snapshot
+
+    merged_digest = await Get(
+        Digest,
+        MergeDigests([partition_info.config_snapshot.digest, original_snapshot.digest]),
+    )
+
+    result = await Get(
+        ProcessResult,
+        JvmProcess(
+            jdk=jdk,
+            argv=[
+                "org.scalafmt.cli.Cli",
+                f"--config={partition_info.config_snapshot.files[0]}",
+                "--non-interactive",
+                *request.files,
+            ],
+            classpath_entries=partition_info.classpath_entries,
+            input_digest=merged_digest,
+            output_files=request.files,
+            extra_jvm_options=tool.jvm_options,
+            extra_immutable_input_digests=partition_info.extra_immutable_input_digests,
+            # extra_nailgun_keys=request.extra_immutable_input_digests,
+            use_nailgun=False,
+            description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    return result
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
 async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
     if tool.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, ScalafmtRequest, request)
+
+    partitions = await Get(ScalafmtPartitions, ScalafmtPartitionRequest(request.field_sets))
     results = await MultiGet(
-        Get(ProcessResult, JvmProcess, partition.process) for partition in setup.partitions
+        Get(ProcessResult, ScalafmtSubPartitionRequest(files, key, request.snapshot))
+        for key, files in partitions.items()
     )
 
     def format(description: str, output) -> str:
@@ -247,7 +246,7 @@ async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Fmt
 
     stdout_content = ""
     stderr_content = ""
-    for partition, result in zip(setup.partitions, results):
+    for partition, result in zip(partitions, results):
         stdout_content += format(partition.description, result.stdout)
         stderr_content += format(partition.description, result.stderr)
 
@@ -256,7 +255,7 @@ async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Fmt
     output_snapshot = await Get(Snapshot, Digest, output_digest)
 
     fmt_result = FmtResult(
-        input=setup.original_snapshot,
+        input=request.snapshot,
         output=output_snapshot,
         stdout=stdout_content,
         stderr=stderr_content,
