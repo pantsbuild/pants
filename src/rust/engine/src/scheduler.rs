@@ -324,7 +324,7 @@ impl Scheduler {
           res = &mut execution_task => {
             // Wait for tail tasks to complete.
             let tail_tasks = session.tail_tasks().lock().drain(..).collect();
-            Self::wait_for_tail_tasks(tail_tasks).await;
+            Self::wait_for_tail_tasks(tail_tasks, self.core.session_end_tasks_timeout).await;
 
             // Completed successfully.
             break Ok(Self::execute_record_results(&request.roots, session, res));
@@ -336,12 +336,12 @@ impl Scheduler {
     })
   }
 
-  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>) {
+  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>, timeout: Duration) {
     if !tasks.is_empty() {
       log::trace!("waiting for {} tail tasks to complete", tasks.len());
 
       let joined_tail_tasks_fut = futures::future::join_all(tasks);
-      let timeout_fut = time::timeout(Duration::from_secs(5), joined_tail_tasks_fut);
+      let timeout_fut = time::timeout(timeout, joined_tail_tasks_fut);
       match timeout_fut.await {
         Ok(_) => {
           log::trace!("tail tasks completed successfully");

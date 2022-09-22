@@ -491,6 +491,7 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
     process_execution_graceful_shutdown_timeout: int
+    session_end_tasks_timeout: int
     cache_content_behavior: CacheContentBehavior
 
     process_total_child_memory_usage: int | None
@@ -538,6 +539,7 @@ class ExecutionOptions:
             cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
+            session_end_tasks_timeout=bootstrap_options.session_end_tasks_timeout,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
@@ -621,6 +623,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
     process_execution_graceful_shutdown_timeout=3,
+    session_end_tasks_timeout=5 * 1000,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -1305,6 +1308,16 @@ class BootstrapOptions:
             """
         ),
         advanced=True,
+    )
+    session_end_tasks_timeout = IntOption(
+        default=DEFAULT_EXECUTION_OPTIONS.session_end_tasks_timeout,
+        help=softwrap(
+            """
+            The time in milliseconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
     )
     remote_execution = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
