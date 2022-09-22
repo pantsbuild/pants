@@ -592,7 +592,7 @@ def get_option(name: str, subsystem: Subsystem.EnvironmentAware):
     env_tgt = subsystem.env_tgt
 
     if env_tgt.val is None:
-        return getattr(subsystem, name)
+        return subsystem.options[name]
 
     options = _options(env_tgt)
 
