@@ -19,7 +19,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
     get_type_hints,
     overload,
 )
@@ -52,14 +51,14 @@ PANTS_RULES_MODULE_KEY = "__pants_rules__"
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
+def SubsystemRule(subsystem: Type[Subsystem]) -> Rule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     warn_or_error(
         removal_version="2.17.0dev0",
         entity=f"using `SubsystemRule({subsystem.__name__})`",
         hint=f"Use `*{subsystem.__name__}.rules()` instead.",
     )
-    return cast(TaskRule, next(iter(subsystem.rules())))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
+    return next(iter(subsystem.rules()))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
 
 
 class RuleType(Enum):
