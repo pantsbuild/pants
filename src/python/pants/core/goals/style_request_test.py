@@ -28,15 +28,14 @@ def test_determine_specified_tool_names() -> None:
         determine_specified_tool_names(
             "fake-goal",
             only_option=["bad"],
-            all_style_requests=[StyleReq],
-            extra_valid_names=["extra-tool"],
+            all_requests=[StyleReq],
         )
     assert (
         softwrap(
             """
             Unrecognized name with the option `--fake-goal-only`: 'bad'
 
-            All valid names: ['extra-tool', 'my-tool']
+            All valid names: ['my-tool']
             """
         )
         in str(exc.value)
