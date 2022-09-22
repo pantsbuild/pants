@@ -59,9 +59,6 @@ class TffmtSubPartitionRequest:
 
 @rule
 async def partition_tffmt(request: TffmtPartitionRequest, tffmt: TfFmtSubsystem) -> TffmtPartitions:
-    if tffmt.skip:
-        return TffmtPartitions()
-
     source_files = await Get(
         SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
     )
@@ -92,6 +89,9 @@ async def run_tffmt(request: TffmtSubPartitionRequest) -> ProcessResult:
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
+    if tffmt.skip:
+        return FmtResult.skip(formatter_name=request.name)
+
     partitions = await Get(TffmtPartitions, TffmtPartitionRequest(request.field_sets))
     results = await MultiGet(
         Get(ProcessResult, TffmtSubPartitionRequest(files, key, request.snapshot))
