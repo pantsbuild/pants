@@ -34,6 +34,18 @@ class _SubsystemMeta(ABCMeta):
         super().__init__(name, bases, namespace, **k)
         if name != "Subsystem" and self.EnvironmentAware is not Subsystem.EnvironmentAware:
             # Only `EnvironmentAware` subclasses should be linked to their enclosing scope
+            if Subsystem.EnvironmentAware not in self.EnvironmentAware.__bases__:
+                # Allow for `self.EnvironmentAware` to not need to explicitly derive from
+                # `Subsystem.EnvironmentAware` (saving needless repetitive typing)
+                self.EnvironmentAware = type(
+                    "EnvironmentAware",
+                    (
+                        self.EnvironmentAware,
+                        Subsystem.EnvironmentAware,
+                        *self.EnvironmentAware.__bases__,
+                    ),
+                    {},
+                )
             self.EnvironmentAware.subsystem = self
 
 
@@ -215,8 +227,8 @@ async def _construct_env_aware(
     env_tgt: EnvironmentTarget,
 ) -> Subsystem.EnvironmentAware:
     t: Subsystem.EnvironmentAware = type(subsystem_instance).EnvironmentAware()
-    # Runtime error which should alert subsystem authors and end users shouldn't see.
-    # Inner type must explicitly declare a subclass, but mypy doesn't catch this.
+    # `_SubSystemMeta` metaclass should ensure that `EnvironmentAware` actually subclasses
+    # `EnvironmentAware`, but
     assert isinstance(t, Subsystem.EnvironmentAware)
 
     t.options = subsystem_instance.options

@@ -36,7 +36,7 @@ class PythonBootstrapSubsystem(Subsystem):
         """
     )
 
-    class EnvironmentAware(Subsystem.EnvironmentAware):
+    class EnvironmentAware:
         search_path = StrListOption(
             default=["<PYENV>", "<PATH>"],
             help=softwrap(
