@@ -582,22 +582,21 @@ def _add_option_field_for(
 
 
 def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.EnvironmentAware):
-    """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
+    """Return the value from the environment field corresponding to the scope and name provided.
 
-    This is slated for quick deprecation once we can construct `Subsystems` per environment.
+    If not defined, return `None`.
     """
 
     env_tgt = subsystem.env_tgt
-    container_name = name.lstrip("-").replace("-", "_")
 
     if env_tgt.val is None:
-        return subsystem.options[container_name]
+        return None
 
     options = _options(env_tgt)
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return subsystem.options[container_name]
+        return None
     else:
         return maybe.value
 
