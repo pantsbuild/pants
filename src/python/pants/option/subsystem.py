@@ -7,7 +7,7 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar
 
 from pants import ox
 from pants.engine.internals.selectors import AwaitableConstraints, Get
@@ -15,6 +15,11 @@ from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.memo import memoized_classmethod
+
+if TYPE_CHECKING:
+    # Needed to avoid an import cycle.
+    from pants.engine.rules import Rule
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -41,12 +46,11 @@ class Subsystem(metaclass=ABCMeta):
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     @classmethod
-    def signature(cls):
-        """Returns kwargs to construct a `TaskRule` that will construct the target Subsystem.
+    def rule(cls) -> Rule:
+        """Returns a `TaskRule` that will construct the target Subsystem."""
+        from pants.engine.rules import TaskRule
 
-        TODO: This indirection avoids a cycle between this module and the `rules` module.
-        """
-        partial_construct_subsystem = functools.partial(_construct_subsytem, cls)
+        partial_construct_subsystem: Any = functools.partial(_construct_subsytem, cls)
 
         # NB: We must populate several dunder methods on the partial function because partial
         # functions do not have these defined by default and the engine uses these values to
@@ -64,7 +68,7 @@ class Subsystem(metaclass=ABCMeta):
             class_definition_lineno = 0  # `inspect.getsourcelines` returns 0 when undefined.
         partial_construct_subsystem.__line_number__ = class_definition_lineno
 
-        return dict(
+        return TaskRule(
             output_type=cls,
             input_selectors=(),
             func=partial_construct_subsystem,
@@ -75,6 +79,10 @@ class Subsystem(metaclass=ABCMeta):
             ),
             canonical_name=name,
         )
+
+    @memoized_classmethod
+    def rules(cls) -> Iterable[Rule]:
+        return [cls.rule()]
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
