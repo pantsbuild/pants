@@ -511,7 +511,7 @@ _LIST_OPTIONS: dict[type, type[Field]] = {
 
 @memoized
 def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
-    """Register environment fields for the `environment_sensitive` options of `subsystem`
+    """Register environment fields for the options of `subsystem.EnvironmentAware`
 
     This should be called in the `rules()` method in the file where `subsystem` is defined. It will
     register the relevant fields under the `local_environment` and `docker_environment` targets.
@@ -519,12 +519,9 @@ def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
     field_rules: set[UnionRule] = set()
 
     for option_attrname, option in _collect_options_info_extended(subsystem.EnvironmentAware):
-        if option.flag_options["environment_sensitive"]:
-            field_rules.update(
-                _add_option_field_for(
-                    subsystem, subsystem.EnvironmentAware, option, option_attrname
-                )
-            )
+        field_rules.update(
+            _add_option_field_for(subsystem, subsystem.EnvironmentAware, option, option_attrname)
+        )
 
     return field_rules
 
@@ -566,7 +563,6 @@ def _add_option_field_for(
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
     # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
     class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        # TODO: use envvar-like normalization logic here
         alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
         required = False
         value: Any

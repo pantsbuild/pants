@@ -51,7 +51,7 @@ class Subsystem(metaclass=ABCMeta):
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     class EnvironmentAware(metaclass=ABCMeta):
-        options_scope: str
+        subsystem: Subsystem
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
 
@@ -202,13 +202,13 @@ async def _construct_env_aware(
     subsystem_instance: _SubsystemT,
     env_tgt: EnvironmentTarget,
 ) -> Subsystem.EnvironmentAware:
-    scoped_options = await Get(ScopedOptions, Scope(str(subsystem_instance.options_scope)))
     t: Subsystem.EnvironmentAware = type(subsystem_instance).EnvironmentAware()
     # Runtime error which should alert subsystem authors and end users shouldn't see.
     # Inner type must explicitly declare a subclass, but mypy doesn't catch this.
     assert isinstance(t, Subsystem.EnvironmentAware)
-    t.options = scoped_options.options
-    t.options_scope = subsystem_instance.options_scope
+
+    t.options = subsystem_instance.options
+    t.subsystem = subsystem_instance
     t.env_tgt = env_tgt
 
     return t

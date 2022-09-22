@@ -65,7 +65,6 @@ class PythonBootstrapSubsystem(Subsystem):
             ),
             advanced=True,
             metavar="<binary-paths>",
-            environment_sensitive=True,
         )
         names = StrListOption(
             default=["python", "python3"],
@@ -80,7 +79,6 @@ class PythonBootstrapSubsystem(Subsystem):
             ),
             advanced=True,
             metavar="<python-binary-names>",
-            environment_sensitive=True,
         )
 
     # TODO(#7735): Move to `Subsystem`?
