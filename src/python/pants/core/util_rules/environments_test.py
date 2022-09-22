@@ -24,6 +24,7 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
     RemoteEnvironmentTarget,
+    RemoteExecutionDisabledError,
     RemoteExtraPlatformPropertiesField,
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
@@ -44,7 +45,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
         ],
-        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
+        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
         singleton_environment=None,
     )
 
@@ -197,6 +198,9 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
                 # Intentionally set this to no platforms so that it cannot be autodiscovered.
                 _local_environment(name='hardcoded', compatible_platforms=[])
                 _docker_environment(name='docker', image="centos6:latest")
+                _remote_environment(name='remote-no-fallback', fallback_environment=None)
+                _remote_environment(name='remote-fallback', fallback_environment="docker")
+                _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
                 """
             )
         }
@@ -213,16 +217,28 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
     with engine_error(UnrecognizedEnvironmentError):
         get_name("hardcoded")
 
-    rule_runner.set_options(
-        [
-            "--environments-preview-names={'local': '//:local', 'hardcoded': '//:hardcoded', 'docker': '//:docker'}"
-        ]
+    env_names_arg = (
+        "--environments-preview-names={"
+        + "'local': '//:local', "
+        + "'hardcoded': '//:hardcoded', "
+        + "'docker': '//:docker', "
+        + "'remote-no-fallback': '//:remote-no-fallback', "
+        + "'remote-fallback': '//:remote-fallback',"
+        "'remote-bad-fallback': '//:remote-bad-fallback'}"
     )
+    rule_runner.set_options([env_names_arg, "--remote-execution"])
     assert get_name(LOCAL_ENVIRONMENT_MATCHER).val == "local"
-    assert get_name("hardcoded").val == "hardcoded"
-    assert get_name("docker").val == "docker"
+    for name in ("hardcoded", "docker", "remote-no-fallback", "remote-fallback"):
+        assert get_name(name).val == name
     with engine_error(UnrecognizedEnvironmentError):
         get_name("fake")
+
+    rule_runner.set_options([env_names_arg, "--no-remote-execution"])
+    assert get_name("remote-fallback").val == "docker"
+    with engine_error(RemoteExecutionDisabledError):
+        get_name("remote-no-fallback")
+    with engine_error(UnrecognizedEnvironmentError):
+        get_name("remote-bad-fallback")
 
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:

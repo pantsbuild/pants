@@ -204,12 +204,33 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     )
 
 
+class RemoteFallbackEnvironmentField(StringField):
+    alias = "fallback_environment"
+    default = None
+    help = softwrap(
+        f"""
+        The environment to fallback to when remote execution is disabled via the global option
+        `--remote-execution`.
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when remote execution is disabled.
+
+        Tip: if you are using a Docker image with your remote execution environment (usually
+        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        useful to fallback to an equivalent `docker_image` target so that you have a consistent
+        execution environment.
+        """
+    )
+
+
 class RemoteEnvironmentTarget(Target):
     alias = "_remote_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RemotePlatformField,
         RemoteExtraPlatformPropertiesField,
+        RemoteFallbackEnvironmentField,
     )
     help = softwrap(
         """
@@ -249,6 +270,10 @@ class AmbiguousEnvironmentError(Exception):
 
 
 class UnrecognizedEnvironmentError(Exception):
+    pass
+
+
+class RemoteExecutionDisabledError(Exception):
     pass
 
 
@@ -382,7 +407,9 @@ async def determine_local_environment(
 
 @rule
 async def resolve_environment_name(
-    request: EnvironmentNameRequest, environments_subsystem: EnvironmentsSubsystem
+    request: EnvironmentNameRequest,
+    environments_subsystem: EnvironmentsSubsystem,
+    global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
@@ -399,6 +426,37 @@ async def resolve_environment_name(
                 """
             )
         )
+    env_tgt = await Get(EnvironmentTarget, EnvironmentName(request.raw_value))
+    if env_tgt.val is None:
+        raise AssertionError(f"EnvironmentTarget.val is None for the name `{request.raw_value}`")
+
+    # If remote execution is disabled and it's a remote environment, try falling back.
+    if not global_options.remote_execution and env_tgt.val.has_field(
+        RemoteFallbackEnvironmentField
+    ):
+        fallback_field = env_tgt.val[RemoteFallbackEnvironmentField]
+        if fallback_field.value is None:
+            raise RemoteExecutionDisabledError(
+                softwrap(
+                    f"""
+                    The global option `--remote-execution` is set to false, but the remote
+                    environment `{request.raw_value}` is used in {request.description_of_origin}.
+
+                    Either enable the option `--remote-execution`, or set the field
+                    `{fallback_field.alias}` for the target {env_tgt.val.address}.
+                    """
+                )
+            )
+        return await Get(
+            EnvironmentName,
+            EnvironmentNameRequest(
+                fallback_field.value,
+                description_of_origin=(
+                    f"the `{fallback_field.alias}` field of the target {env_tgt.val.address}"
+                ),
+            ),
+        )
+
     return EnvironmentName(request.raw_value)
 
 
@@ -433,12 +491,16 @@ async def get_target_for_environment_name(
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
     tgt = wrapped_target.val
-    if not tgt.has_field(CompatiblePlatformsField) and not tgt.has_field(DockerImageField):
+    if (
+        not tgt.has_field(CompatiblePlatformsField)
+        and not tgt.has_field(DockerImageField)
+        and not tgt.has_field(RemotePlatformField)
+    ):
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `_local_environment` or `_docker_environment`
-                target in the option `[environments-preview].names`, but the name
+                Expected to use the address to a `_local_environment`, `_docker_environment`, or
+                `_remote_environment` target in the option `[environments-preview].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """
