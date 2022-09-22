@@ -581,7 +581,7 @@ def _add_option_field_for(
     ]
 
 
-def get_option(name: str, subsystem: Subsystem.EnvironmentAware):
+def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.EnvironmentAware):
     """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
 
     This is slated for quick deprecation once we can construct `Subsystems` per environment.

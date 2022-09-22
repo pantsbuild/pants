@@ -81,16 +81,27 @@ class Subsystem(metaclass=_SubsystemMeta):
         env_tgt: EnvironmentTarget
 
         def __getattribute__(self, __name: str) -> Any:
-            from pants.core.util_rules.environments import get_option
+            from pants.core.util_rules.environments import resolve_environment_sensitive_option
 
-            default = object.__getattribute__(self, __name)
+            # Will raise an `AttributeError` if the attribute is not defined.
+            # MyPy should stop that from ever happening.
+            default = super().__getattribute__(__name)
+
+            # Check to see whether there's a definition of this attribute at the class level.
+            # If it returns `default` then the attribute on the instance is the same object
+            # as defined at the class, or the attribute does not exist on the class,
+            # and we don't really need to go any further.
             v = getattr(type(self), __name, default)
             if v is default:
                 return default
 
+            # Resolving an attribute on the class object will return the underlying descriptor.
+            # If the descriptor is an `OptionsInfo`, we can resolve it against the environment
+            # target.
             if isinstance(v, OptionsInfo):
-                return get_option(v.flag_names[0], self)
+                return resolve_environment_sensitive_option(v.flag_names[0], self)
 
+            # We should just return the default at this point.
             return default
 
     @classmethod
@@ -153,9 +164,9 @@ class Subsystem(metaclass=_SubsystemMeta):
         from pants.core.util_rules.environments import add_option_fields_for
         from pants.engine.rules import Rule
 
-        # nb. this needs to be memoized so that repeated calls to add these rules return
-        # exactly the same rule objects. As such, returning this generator directly
-        # won't work, because the iterator needs to be replayable.
+        # nb. `rules` needs to be memoized so that repeated calls to add these rules
+        # return exactly the same rule objects. As such, returning this generator
+        # directly won't work, because the iterator needs to be replayable.
         def inner() -> Iterable[Rule]:
             yield cls.construct_subsystem_rule()
             if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
