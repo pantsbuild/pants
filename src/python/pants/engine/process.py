@@ -64,6 +64,7 @@ class Process:
     concurrency_available: int
     cache_scope: ProcessCacheScope
     platform: str | None
+    remote_cache_speculation_delay_millis: int
 
     def __init__(
         self,
@@ -85,6 +86,7 @@ class Process:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         platform: Platform | None = None,
+        remote_cache_speculation_delay_millis: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -132,6 +134,7 @@ class Process:
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.platform = platform.value if platform is not None else None
+        self.remote_cache_speculation_delay_millis = remote_cache_speculation_delay_millis
 
 
 @dataclass(frozen=True)

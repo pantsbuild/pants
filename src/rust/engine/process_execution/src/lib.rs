@@ -530,6 +530,8 @@ pub struct Process {
   pub platform_constraint: Option<Platform>,
 
   pub cache_scope: ProcessCacheScope,
+
+  pub remote_cache_speculation_delay: std::time::Duration,
 }
 
 impl Process {
@@ -560,6 +562,7 @@ impl Process {
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
+      remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
 
@@ -603,6 +606,11 @@ impl Process {
     append_only_caches: BTreeMap<CacheName, RelativePath>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
+    self
+  }
+
+  pub fn remote_cache_speculation_delay(mut self, delay: std::time::Duration) -> Process {
+    self.remote_cache_speculation_delay = delay;
     self
   }
 }
