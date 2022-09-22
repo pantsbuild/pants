@@ -228,7 +228,8 @@ async def _construct_env_aware(
 ) -> Subsystem.EnvironmentAware:
     t: Subsystem.EnvironmentAware = type(subsystem_instance).EnvironmentAware()
     # `_SubSystemMeta` metaclass should ensure that `EnvironmentAware` actually subclasses
-    # `EnvironmentAware`, but
+    # `EnvironmentAware`, but if an implementer does something egregious, it's best we
+    # catch it.
     assert isinstance(t, Subsystem.EnvironmentAware)
 
     t.options = subsystem_instance.options
