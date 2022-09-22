@@ -520,20 +520,21 @@ def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
 
     for option_attrname, option in _collect_options_info_extended(subsystem.EnvironmentAware):
         field_rules.update(
-            _add_option_field_for(subsystem, subsystem.EnvironmentAware, option, option_attrname)
+            _add_option_field_for(subsystem.EnvironmentAware, option, option_attrname)
         )
 
     return field_rules
 
 
 def _add_option_field_for(
-    subsystem_t: type[Subsystem],
     env_aware_t: type[Subsystem.EnvironmentAware],
     option: OptionsInfo,
     attrname: str,
 ) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
-    scope = subsystem_t.options_scope
+    scope = env_aware_t.subsystem.options_scope
+
+    subsystem_t = env_aware_t.subsystem
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -543,9 +544,10 @@ def _add_option_field_for(
             field_type = _SIMPLE_OPTIONS[option_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a value type that does "
-                "not yet have a mapping in `environments.py`. To fix, map the value type in "
-                "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
+                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a value "
+                "type that does not yet have a mapping in `environments.py`. To fix, map the "
+                "value type in `_SIMPLE_OPTIONS` to a `Field` subtype that supports your "
+                "option's value type."
             )
     else:
         member_type = option.flag_options["member_type"]
@@ -553,10 +555,10 @@ def _add_option_field_for(
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a member value type that "
-                "does yet have a mapping in `environments.py`. To fix, map the member value type "
-                "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
-                "member value type."
+                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a member "
+                "value type that  does yet have a mapping in `environments.py`. To fix, map "
+                "the member value type in `_LIST_OPTIONS` to a `SequenceField` subtype that "
+                "supports your option's member value type."
             )
 
     # The below class will never be used for static type checking outside of this function.

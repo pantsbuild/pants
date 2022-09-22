@@ -245,7 +245,6 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
 
 @rule
 async def python_bootstrap(
-    a: PythonBootstrapSubsystem,
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
 

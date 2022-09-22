@@ -435,6 +435,8 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                     for input in rule.input_selectors:
                         if issubclass(input, Subsystem):
                             yield from input.rules()
+                        if issubclass(input, Subsystem.EnvironmentAware):
+                            yield from input.subsystem.rules()
                     if issubclass(rule.output_type, Goal):
                         yield from rule.output_type.subsystem_cls.rules()
                     yield rule

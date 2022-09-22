@@ -27,7 +27,17 @@ if TYPE_CHECKING:
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
 
 
-class Subsystem(metaclass=ABCMeta):
+class _SubsystemMeta(ABCMeta):
+    """Metaclass to link inner `EnvironmentAware` class with the enclosing subsystem."""
+
+    def __init__(self, name, bases, namespace, **k):
+        super().__init__(name, bases, namespace, **k)
+        if name != "Subsystem" and self.EnvironmentAware is not Subsystem.EnvironmentAware:
+            # Only `EnvironmentAware` subclasses should be linked to their enclosing scope
+            self.EnvironmentAware.subsystem = self
+
+
+class Subsystem(metaclass=_SubsystemMeta):
     """A separable piece of functionality that may be reused across multiple tasks or other code.
 
     Subsystems encapsulate the configuration and initialization of things like JVMs,
@@ -51,7 +61,7 @@ class Subsystem(metaclass=ABCMeta):
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     class EnvironmentAware(metaclass=ABCMeta):
-        subsystem: Subsystem
+        subsystem: ClassVar[type[Subsystem]]
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
 
@@ -208,7 +218,6 @@ async def _construct_env_aware(
     assert isinstance(t, Subsystem.EnvironmentAware)
 
     t.options = subsystem_instance.options
-    t.subsystem = subsystem_instance
     t.env_tgt = env_tgt
 
     return t
