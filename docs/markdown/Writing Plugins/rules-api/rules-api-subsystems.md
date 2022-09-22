@@ -39,7 +39,7 @@ class ShellcheckSubsystem(Subsystem):
 
 
 def rules():
-    return [SubsystemRule(ShellcheckSubsystem)]
+    return [*ShellcheckSubsystem.rules()]
 ```
 ```python pants-plugins/example/register.py
 from example import shellcheck
