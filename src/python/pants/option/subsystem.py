@@ -81,7 +81,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             return val
 
     @classmethod
-    def rule(cls) -> Rule:
+    def construct_subsystem_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem."""
 
         # Global-level imports are conditional, we need to re-import here for runtime use
@@ -118,8 +118,8 @@ class Subsystem(metaclass=_SubsystemMeta):
         )
 
     @classmethod
-    def rule_env_aware(cls) -> Rule:
-        """Returns kwargs to construct a `TaskRule` that will construct the target Subsystem."""
+    def construct_env_aware_rule(cls) -> Rule:
+        """Returns a `TaskRule` that will construct the target Subsystem.EnvironmentAware."""
         # Global-level imports are conditional, we need to re-import here for runtime use
         from pants.core.util_rules.environments import EnvironmentTarget
         from pants.engine.rules import TaskRule
@@ -131,11 +131,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
             func=_construct_env_aware,
-            input_gets=(
-                AwaitableConstraints(
-                    output_type=ScopedOptions, input_types=(Scope,), is_effect=False
-                ),
-            ),
+            input_gets=(),
             canonical_name=name,
         )
 
@@ -144,11 +140,16 @@ class Subsystem(metaclass=_SubsystemMeta):
         from pants.core.util_rules.environments import add_option_fields_for
         from pants.engine.rules import Rule
 
-        return [
-            cls.rule(),
-            cls.rule_env_aware(),
-            *(cast(Rule, i) for i in add_option_fields_for(cls)),
-        ]
+        # nb. this needs to be memoized so that repeated calls to add these rules return
+        # exactly the same rule objects. As such, returning this generator directly
+        # won't work, because the iterator needs to be replayable.
+        def inner() -> Iterable[Rule]:
+            yield cls.construct_subsystem_rule()
+            if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
+                yield cls.construct_env_aware_rule()
+                yield from (cast(Rule, i) for i in add_option_fields_for(cls))
+
+        return list(inner())
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
