@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 from pants import ox
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import collect_options_info
+from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -81,20 +81,17 @@ class Subsystem(metaclass=_SubsystemMeta):
         env_tgt: EnvironmentTarget
 
         def __getattribute__(self, __name: str) -> Any:
-            """Fetch the option from the runtime environment, or defer to the global default."""
             from pants.core.util_rules.environments import get_option
 
-            val = super().__getattribute__(__name)
-            if __name == "options":
-                return val
+            default = object.__getattribute__(self, __name)
+            v = getattr(type(self), __name, default)
+            if v is default:
+                return default
 
-            try:
-                if __name in self.options:
-                    return get_option(__name, self)
-            except AttributeError:
-                pass
+            if isinstance(v, OptionsInfo):
+                return get_option(v.flag_names[0], self)
 
-            return val
+            return default
 
     @classmethod
     def construct_subsystem_rule(cls) -> Rule:

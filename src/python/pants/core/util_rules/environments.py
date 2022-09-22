@@ -30,7 +30,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
+from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
@@ -521,8 +521,8 @@ def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterab
 
     field_rules: set[UnionRule] = set()
 
-    for option_attrname, option in _collect_options_info_extended(env_aware):
-        field_rules.update(_add_option_field_for(env_aware, option, option_attrname))
+    for option in collect_options_info(env_aware):
+        field_rules.update(_add_option_field_for(env_aware, option))
 
     return field_rules
 
@@ -530,12 +530,11 @@ def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterab
 def _add_option_field_for(
     env_aware_t: type[Subsystem.EnvironmentAware],
     option: OptionsInfo,
-    attrname: str,
 ) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
     scope = env_aware_t.subsystem.options_scope
 
-    subsystem_t = env_aware_t.subsystem
+    snake_name = option.flag_names[0][2:].replace("-", "_")
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -545,10 +544,9 @@ def _add_option_field_for(
             field_type = _SIMPLE_OPTIONS[option_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a value "
-                "type that does not yet have a mapping in `environments.py`. To fix, map the "
-                "value type in `_SIMPLE_OPTIONS` to a `Field` subtype that supports your "
-                "option's value type."
+                f"The option `[{scope}].{snake_name}` has a value type that does not yet have a "
+                "mapping in `environments.py`. To fix, map the value type in `_SIMPLE_OPTIONS` "
+                "to a `Field` subtype that supports your option's value type."
             )
     else:
         member_type = option.flag_options["member_type"]
@@ -556,25 +554,25 @@ def _add_option_field_for(
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.EnvironmentAware.{attrname}` has a member "
-                "value type that  does yet have a mapping in `environments.py`. To fix, map "
-                "the member value type in `_LIST_OPTIONS` to a `SequenceField` subtype that "
-                "supports your option's member value type."
+                f"The option `[{scope}].{snake_name}` has a member value type that does yet have "
+                "a mapping in `environments.py`. To fix, map the member value type in "
+                "`_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's member "
+                "value type."
             )
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
     # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
     class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
+        alias = f"{scope}_{snake_name}".replace("-", "_")
         required = False
         value: Any
         help = (
-            f"Overrides the default value from the option `[{scope}].{attrname}` when this "
+            f"Overrides the default value from the option `[{scope}].{snake_name}` when this "
             "environment target is active."
         )
         subsystem = env_aware_t
-        option_name = attrname
+        option_name = option.flag_names[0]
 
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
@@ -590,15 +588,16 @@ def get_option(name: str, subsystem: Subsystem.EnvironmentAware):
     """
 
     env_tgt = subsystem.env_tgt
+    container_name = name.lstrip("-").replace("-", "_")
 
     if env_tgt.val is None:
-        return subsystem.options[name]
+        return subsystem.options[container_name]
 
     options = _options(env_tgt)
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return subsystem.options[name]
+        return subsystem.options[container_name]
     else:
         return maybe.value
 
