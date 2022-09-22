@@ -204,7 +204,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     )
 
 
-_NO_FALLBACK_ENVIRONMENT = "__none__"
+_NO_FALLBACK_ENVIRONMENT = "<none>"
 
 
 class RemoteFallbackEnvironmentField(StringField):
