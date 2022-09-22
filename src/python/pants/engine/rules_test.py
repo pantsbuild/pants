@@ -1016,7 +1016,7 @@ def test_duplicated_rules() -> None:
 def test_param_type_overrides() -> None:
     type1 = int  # use a runtime type
 
-    @rule(param_type_overrides={"param1": type1, "param2": dict})
+    @rule(_param_type_overrides={"param1": type1, "param2": dict})
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
@@ -1024,13 +1024,13 @@ def test_param_type_overrides() -> None:
 
     with pytest.raises(ValueError, match="paramX"):
 
-        @rule(param_type_overrides={"paramX": int})
+        @rule(_param_type_overrides={"paramX": int})
         async def obey_human_orders() -> A:
             return A()
 
     with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
 
-        @rule(param_type_overrides={"param1": "A string"})
+        @rule(_param_type_overrides={"param1": "A string"})
         async def protect_existence(param1) -> A:
             return A()
 

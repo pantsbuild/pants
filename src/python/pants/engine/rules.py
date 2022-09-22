@@ -155,7 +155,17 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level", "param_type_overrides"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
+# We aren't sure if these'll stick around or be removed at some point, so they are "private"
+# and should only be used in Pants' codebase.
+PRIVATE_RULE_DECORATOR_ARGUMENTS = {
+    # Allows callers to override the type Pants will use for the params listed.
+    #
+    # It is assumed (but not enforced) that the provided type is a subclass of the annotated type.
+    # (We assume but not enforce since this is likely to be used with unions, which has the same
+    # assumption between the union base and its members).
+    "_param_type_overrides",
+}
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
@@ -173,6 +183,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         len(
             set(kwargs)
             - PUBLIC_RULE_DECORATOR_ARGUMENTS
+            - PRIVATE_RULE_DECORATOR_ARGUMENTS
             - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS
         )
         != 0
@@ -183,7 +194,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
-    param_type_overrides: dict[str, type] = kwargs.get("param_type_overrides", {})
+    param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
