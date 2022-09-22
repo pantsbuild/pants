@@ -16,7 +16,7 @@ from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Field,
@@ -85,6 +85,11 @@ class EnvironmentField(StringField):
     )
 
 
+class FallbackEnvironmentField(StringField):
+    alias = "fallback_environment"
+    default = None
+
+
 class CompatiblePlatformsField(StringSequenceField):
     alias = "compatible_platforms"
     default = tuple(plat.value for plat in Platform)
@@ -101,9 +106,28 @@ class CompatiblePlatformsField(StringSequenceField):
     )
 
 
+class LocalFallbackEnvironmentField(FallbackEnvironmentField):
+    help = softwrap(
+        f"""
+        The environment to fallback to when this local environment cannot be used because the
+        field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when this specific local environment cannot be used.
+
+        Tip: when targeting Linux, it can be particularly helpful to fallback to a
+        `docker_environment` or `remote_environment` target. That allows you to prefer using the
+        local host when possible, which often has less overhead (particularly compared to Docker).
+        If the local host is not compatible, then Pants will use Docker or remote execution to
+        still run in a similar environment.
+        """
+    )
+
+
 class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField)
+    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
@@ -168,9 +192,28 @@ def docker_platform_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value)
 
 
+class DockerFallbackEnvironmentField(FallbackEnvironmentField):
+    help = softwrap(
+        f"""
+        The environment to fallback to when this Docker environment cannot be used because the
+        field `{DockerPlatformField.alias}` is not compatible with the local host's CPU
+        architecture. (This is only an issue when the local host is Linux; macOS is fine.)
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when this specific Docker environment cannot be used.
+        """
+    )
+
+
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField, DockerPlatformField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        DockerImageField,
+        DockerPlatformField,
+        DockerFallbackEnvironmentField,
+    )
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment
@@ -204,9 +247,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     )
 
 
-class RemoteFallbackEnvironmentField(StringField):
-    alias = "fallback_environment"
-    default = None
+class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
     help = softwrap(
         f"""
         The environment to fallback to when remote execution is disabled via the global option
@@ -273,7 +314,7 @@ class UnrecognizedEnvironmentError(Exception):
     pass
 
 
-class RemoteExecutionDisabledError(Exception):
+class NoFallbackEnvironmentError(Exception):
     pass
 
 
@@ -405,6 +446,22 @@ async def determine_local_environment(
     return ChosenLocalEnvironmentName(result_name)
 
 
+@rule_helper
+async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
+    fallback_field = env_tgt[FallbackEnvironmentField]
+    if fallback_field.value is None:
+        raise NoFallbackEnvironmentError(error_msg)
+    return await Get(
+        EnvironmentName,
+        EnvironmentNameRequest(
+            fallback_field.value,
+            description_of_origin=(
+                f"the `{fallback_field.alias}` field of the target {env_tgt.address}"
+            ),
+        ),
+    )
+
+
 @rule
 async def resolve_environment_name(
     request: EnvironmentNameRequest,
@@ -426,34 +483,74 @@ async def resolve_environment_name(
                 """
             )
         )
+
+    # Get the target so that we can apply the environment_fallback field, if relevant.
     env_tgt = await Get(EnvironmentTarget, EnvironmentName(request.raw_value))
     if env_tgt.val is None:
         raise AssertionError(f"EnvironmentTarget.val is None for the name `{request.raw_value}`")
 
-    # If remote execution is disabled and it's a remote environment, try falling back.
-    if not global_options.remote_execution and env_tgt.val.has_field(
-        RemoteFallbackEnvironmentField
+    if (
+        env_tgt.val.has_field(RemoteFallbackEnvironmentField)
+        and not global_options.remote_execution
     ):
-        fallback_field = env_tgt.val[RemoteFallbackEnvironmentField]
-        if fallback_field.value is None:
-            raise RemoteExecutionDisabledError(
-                softwrap(
-                    f"""
-                    The global option `--remote-execution` is set to false, but the remote
-                    environment `{request.raw_value}` is used in {request.description_of_origin}.
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The global option `--remote-execution` is set to false, but the remote
+                environment `{request.raw_value}` is used in {request.description_of_origin}.
 
-                    Either enable the option `--remote-execution`, or set the field
-                    `{fallback_field.alias}` for the target {env_tgt.val.address}.
-                    """
-                )
-            )
-        return await Get(
-            EnvironmentName,
-            EnvironmentNameRequest(
-                fallback_field.value,
-                description_of_origin=(
-                    f"the `{fallback_field.alias}` field of the target {env_tgt.val.address}"
-                ),
+                Either enable the option `--remote-execution`, or set the field
+                `{FallbackEnvironmentField.alias}` for the target {env_tgt.val.address}.
+                """
+            ),
+        )
+
+    localhost_platform = Platform.create_for_localhost().value
+
+    if (
+        env_tgt.val.has_field(DockerFallbackEnvironmentField)
+        and localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
+        and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
+    ):
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The docker environment `{request.raw_value}` is specified in
+                {request.description_of_origin}, but it cannot be used because the local host has
+                the platform `{localhost_platform}` and the Docker environment has the platform
+                {env_tgt.val[DockerPlatformField].normalized_value}.
+
+                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
+                {env_tgt.val.address}, such as to a `docker_environment` target that sets
+                `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
+                not explicitly setting the field `{DockerPlatformField.alias}` for the target
+                {env_tgt.val.address} because the default behavior is to use the CPU architecture
+                of the current host for the platform (although this requires the docker image
+                supports that CPU architecture).
+                """
+            ),
+        )
+
+    if (
+        env_tgt.val.has_field(LocalFallbackEnvironmentField)
+        and localhost_platform not in env_tgt.val[CompatiblePlatformsField].value
+    ):
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The local environment `{request.raw_value}` was specified in
+                {request.description_of_origin}, but it is not compatible with the current
+                machine's platform: {localhost_platform}. The environment only works with the
+                platforms: {env_tgt.val[CompatiblePlatformsField].value}
+
+                Consider setting the the field `{FallbackEnvironmentField.alias}` for the target
+                {env_tgt.val.address}, such as to a `docker_environment` or `remote_environment`
+                target. You can also set that field to another `local_environment` target, such as
+                one that is compatible with the current platform {localhost_platform}.
+                """
             ),
         )
 
