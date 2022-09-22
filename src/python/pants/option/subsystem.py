@@ -151,10 +151,17 @@ class Subsystem(metaclass=_SubsystemMeta):
         snake_scope = normalize_scope(cls.options_scope)
         name = f"construct_env_aware_scope_{snake_scope}"
 
+        # placate the rule graph visualizer.
+        @functools.wraps(_construct_env_aware)
+        async def inner(*a, **k):
+            return await _construct_env_aware(*a, **k)
+
+        inner.__line_number__ = 0  # type: ignore[attr-defined]
+
         return TaskRule(
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
-            func=_construct_env_aware,
+            func=inner,
             input_gets=(),
             canonical_name=name,
         )
