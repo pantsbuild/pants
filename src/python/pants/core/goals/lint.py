@@ -638,7 +638,7 @@ async def lint(
     return Lint(_get_error_code(all_batch_results))
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
     return LintResult(
         1 if fmt_result.did_change else 0,
