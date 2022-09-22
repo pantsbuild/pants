@@ -14,7 +14,6 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -79,20 +78,6 @@ class PythonBootstrapSubsystem(Subsystem):
             ),
             advanced=True,
             metavar="<python-binary-names>",
-        )
-
-    # TODO(#7735): Move to `Subsystem`?
-    def error_if_environment_mechanism_ambiguity(self, option: str) -> None:
-        if self.options.is_default(option):
-            return
-        raise ValueError(
-            softwrap(
-                f"""
-                The option `[{self.options_scope}].{option}` is explicitly set at the same time as
-                the option `[{EnvironmentsSubsystem.options_scope}].platforms_to_local_environment`,
-                which makes it ambiguous which values to use. To fix, only set one of these options.
-                """
-            )
         )
 
 

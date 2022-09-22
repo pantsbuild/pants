@@ -492,7 +492,7 @@ def extract_process_config_from_environment(
     )
 
 
-class EnvironmentSensitiveOptionFieldMixin:
+class _EnvironmentSensitiveOptionFieldMixin:
     subsystem: ClassVar[type[Subsystem.EnvironmentAware]]
     option_name: ClassVar[str]
 
@@ -510,18 +510,19 @@ _LIST_OPTIONS: dict[type, type[Field]] = {
 
 
 @memoized
-def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
-    """Register environment fields for the options of `subsystem.EnvironmentAware`
+def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterable[UnionRule]:
+    """Register environment fields for the options declared in `env_aware`
 
-    This should be called in the `rules()` method in the file where `subsystem` is defined. It will
-    register the relevant fields under the `local_environment` and `docker_environment` targets.
+    This is called by `env_aware.subsystem.rules()`, which is called whenever a rule depends on
+    `env_aware`. It will register the relevant fields under the `local_environment` and
+    `docker_environment` targets. Note that it must be `memoized`, such that repeated calls result
+    in exactly the same rules being registered.
     """
+
     field_rules: set[UnionRule] = set()
 
-    for option_attrname, option in _collect_options_info_extended(subsystem.EnvironmentAware):
-        field_rules.update(
-            _add_option_field_for(subsystem.EnvironmentAware, option, option_attrname)
-        )
+    for option_attrname, option in _collect_options_info_extended(env_aware):
+        field_rules.update(_add_option_field_for(env_aware, option, option_attrname))
 
     return field_rules
 
@@ -564,7 +565,7 @@ def _add_option_field_for(
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
     # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
-    class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
+    class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
         alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
         required = False
         value: Any
@@ -614,7 +615,7 @@ def _options(
         return options
 
     for _, field in env_tgt.val.field_values.items():
-        if isinstance(field, EnvironmentSensitiveOptionFieldMixin):
+        if isinstance(field, _EnvironmentSensitiveOptionFieldMixin):
             options[(field.subsystem, field.option_name)] = field
 
     return options

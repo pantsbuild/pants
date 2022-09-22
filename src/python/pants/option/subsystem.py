@@ -66,6 +66,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         env_tgt: EnvironmentTarget
 
         def __getattribute__(self, __name: str) -> Any:
+            """Fetch the option from the runtime environment, or defer to the global default."""
             from pants.core.util_rules.environments import get_option
 
             val = super().__getattribute__(__name)
@@ -147,7 +148,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             yield cls.construct_subsystem_rule()
             if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
                 yield cls.construct_env_aware_rule()
-                yield from (cast(Rule, i) for i in add_option_fields_for(cls))
+                yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
 
         return list(inner())
 
