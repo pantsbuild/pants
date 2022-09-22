@@ -465,12 +465,11 @@ async def _get_subpartitions(
     lint_batches_by_request_type = {
         request_type: [
             (subpartition, key)
-            # @TODO: rename partionss
-            for partitions in partitionss
+            for partitions in partitions_list
             for key, partition in partitions.items()
             for subpartition in batch(partition)
         ]
-        for request_type, partitionss in partitions_by_request_type.items()
+        for request_type, partitions_list in partitions_by_request_type.items()
     }
 
     subparitions = [
