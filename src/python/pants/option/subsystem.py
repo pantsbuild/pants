@@ -32,7 +32,10 @@ class _SubsystemMeta(ABCMeta):
 
     def __init__(self, name, bases, namespace, **k):
         super().__init__(name, bases, namespace, **k)
-        if name != "Subsystem" and self.EnvironmentAware is not Subsystem.EnvironmentAware:
+        if (
+            not (name == "Subsystem" and bases == ())
+            and self.EnvironmentAware is not Subsystem.EnvironmentAware
+        ):
             # Only `EnvironmentAware` subclasses should be linked to their enclosing scope
             if Subsystem.EnvironmentAware not in self.EnvironmentAware.__bases__:
                 # Allow for `self.EnvironmentAware` to not need to explicitly derive from
