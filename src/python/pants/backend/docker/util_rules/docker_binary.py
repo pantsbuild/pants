@@ -126,10 +126,12 @@ class DockerBinaryRequest:
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
 async def find_docker(
-    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+    docker_request: DockerBinaryRequest,
+    docker_options: DockerOptions,
+    docker_options_env_aware: DockerOptions.EnvironmentAware,
 ) -> DockerBinary:
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    search_path = docker_options.executable_search_path(env)
+    search_path = docker_options_env_aware.executable_search_path(env)
     request = BinaryPathRequest(
         binary_name="docker",
         search_path=search_path,

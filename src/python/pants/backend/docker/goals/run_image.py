@@ -16,10 +16,13 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 @rule
 async def docker_image_run_request(
-    field_set: DockerFieldSet, docker: DockerBinary, options: DockerOptions
+    field_set: DockerFieldSet,
+    docker: DockerBinary,
+    options: DockerOptions,
+    options_env_aware: DockerOptions.EnvironmentAware,
 ) -> RunRequest:
     env, image = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(options.env_vars)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars)),
         Get(BuiltPackage, PackageFieldSet, field_set),
     )
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
