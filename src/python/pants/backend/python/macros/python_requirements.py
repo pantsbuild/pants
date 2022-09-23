@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import itertools
+import logging
+import os.path
 from typing import Iterable
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -42,6 +44,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class PythonRequirementsSourceField(SingleSourceField):
@@ -112,13 +116,25 @@ async def generate_from_python_requirement(
     )
     lockfile = python_setup.resolves.get(resolve) if python_setup.enable_resolves else None
     if lockfile:
-        helper_tgts.append(
-            TargetGeneratorSourcesHelperTarget(
-                {TargetGeneratorSourcesHelperSourcesField.alias: lockfile},
-                generator.address.create_generated(lockfile),
-                union_membership,
+        relative_file_path = os.path.relpath(lockfile, generator.address.spec_path)
+        if ".." in relative_file_path:
+            logger.info(
+                softwrap(
+                    f"""
+                    The lockfile {lockfile} will only be inferred as a dependency of the
+                    {generator.alias} target `{generator.address}` when in the subtree of
+                    {generator.address.spec_path}
+                    """
+                )
             )
-        )
+        else:
+            helper_tgts.append(
+                TargetGeneratorSourcesHelperTarget(
+                    {TargetGeneratorSourcesHelperSourcesField.alias: relative_file_path},
+                    generator.address.create_generated(relative_file_path),
+                    union_membership,
+                )
+            )
 
     digest_contents = await Get(
         DigestContents,
