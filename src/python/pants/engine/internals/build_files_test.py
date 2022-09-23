@@ -20,6 +20,8 @@ from pants.engine.internals.build_files import (
     evaluate_preludes,
     parse_address_family,
 )
+from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
@@ -202,7 +204,9 @@ def test_resolve_address() -> None:
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))], target_types=[MockTgt]
+        rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
+        target_types=[MockTgt],
+        objects={"parametrize": Parametrize},
     )
 
 
@@ -315,6 +319,28 @@ def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
 
     # The defaults originates from a parent BUILD file, and as such has been frozen.
     assert target_adaptor.kwargs["tags"] == ("root",)
+
+
+def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                __defaults__(
+                  all=dict(
+                    tags=parametrize(a=["a", "root"], b=["non-root", "b"])
+                  )
+                )
+                """
+            ),
+            "helloworld/dir/BUILD": "mock_tgt()",
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
