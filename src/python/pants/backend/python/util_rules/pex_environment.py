@@ -29,21 +29,36 @@ class PexSubsystem(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
-    # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
-    #  per-process override.
-    _executable_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used by the PEX subprocess and any subprocesses it
-            spawns.
+    class EnvironmentAware:
+        # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
+        #  per-process override.
+        _executable_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                The PATH value that will be used by the PEX subprocess and any subprocesses it
+                spawns.
 
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-    )
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @memoized_method
+        def path(self, env: EnvironmentVars) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_paths:
+                    if entry == "<PATH>":
+                        path = env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))
+
     _verbosity = IntOption(
         default=0,
         help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
@@ -63,19 +78,6 @@ class PexSubsystem(Subsystem):
         ),
         advanced=True,
     )
-
-    @memoized_method
-    def path(self, env: EnvironmentVars) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
-
-        return tuple(OrderedSet(iter_path_entries()))
 
     @property
     def verbosity(self) -> int:
@@ -161,11 +163,12 @@ async def find_pex_python(
     python_bootstrap: PythonBootstrap,
     python_binary: PythonBinary,
     pex_subsystem: PexSubsystem,
+    pex_environment_aware: PexSubsystem.EnvironmentAware,
     subprocess_env_vars: SubprocessEnvironmentVars,
     named_caches_dir: NamedCachesDirOption,
 ) -> PexEnvironment:
     return PexEnvironment(
-        path=pex_subsystem.path(python_bootstrap.environment),
+        path=pex_environment_aware.path(python_bootstrap.environment),
         interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
