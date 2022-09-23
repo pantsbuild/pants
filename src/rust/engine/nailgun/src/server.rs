@@ -14,14 +14,13 @@ use bytes::Bytes;
 use futures::channel::oneshot;
 use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use log::{debug, info};
-use nails::execution::{
-  self, child_channel, sink_for, stream_for, ChildInput, ChildOutput, ExitCode,
-};
+use nails::execution::{self, child_channel, sink_for, ChildInput, ChildOutput, ExitCode};
 use nails::Nail;
 use task_executor::Executor;
 use tokio::fs::File;
 use tokio::net::TcpListener;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::{mpsc, Notify, RwLock};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub struct Server {
   exit_sender: oneshot::Sender<()>,
@@ -284,10 +283,10 @@ impl RawFdNail {
     if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().read(true)) {
       Ok((Box::new(tty), None))
     } else {
-      let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
+      let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
       let write_handle =
-        File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_writer.into_raw_fd()) });
-      Ok((Box::new(stdin_reader), Some(sink_for(write_handle))))
+        File::from_std(unsafe { std::fs::File::from_raw_fd(pipe_writer.into_raw_fd()) });
+      Ok((Box::new(pipe_reader), Some(sink_for(write_handle))))
     }
   }
 
@@ -316,10 +315,12 @@ impl RawFdNail {
     ) {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
-      let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
-      let read_handle =
-        File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_reader.into_raw_fd()) });
-      Ok((stream_for(read_handle).boxed(), Box::new(stdin_writer)))
+      let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
+      let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
+      Ok((
+        blocking_stream_for(read_handle).boxed(),
+        Box::new(pipe_writer),
+      ))
     }
   }
 
@@ -348,4 +349,30 @@ impl RawFdNail {
       .get(&format!("NAILGUN_TTY_PATH_{}", fd_number))
       .map(PathBuf::from)
   }
+}
+
+// TODO: See https://github.com/pantsbuild/pants/issues/16969.
+pub fn blocking_stream_for<R: io::Read + Send + Sized + 'static>(
+  mut r: R,
+) -> impl futures::Stream<Item = Result<Bytes, io::Error>> {
+  let (sender, receiver) = mpsc::unbounded_channel();
+  std::thread::spawn(move || {
+    let mut buf = [0; 4096];
+    loop {
+      match r.read(&mut buf) {
+        Ok(0) => break,
+        Ok(n) => {
+          if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+            break;
+          }
+        }
+        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+        Err(e) => {
+          let _ = sender.send(Err(e));
+          break;
+        }
+      }
+    }
+  });
+  UnboundedReceiverStream::new(receiver)
 }

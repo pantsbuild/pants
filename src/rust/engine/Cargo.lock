@@ -1682,6 +1682,7 @@ dependencies = [
  "os_pipe",
  "task_executor",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
