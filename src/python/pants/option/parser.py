@@ -362,7 +362,6 @@ class Parser:
         "removal_version",
         "removal_hint",
         "deprecation_start_version",
-        "environment_sensitive",
         "fromfile",
         "mutually_exclusive_group",
         "daemon",

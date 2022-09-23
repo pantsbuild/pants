@@ -20,10 +20,12 @@ from typing import (
     TypeVar,
     Union,
     get_type_hints,
+    overload,
 )
 
 from typing_extensions import ParamSpec
 
+from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -49,9 +51,14 @@ PANTS_RULES_MODULE_KEY = "__pants_rules__"
 # We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
 # decorator.
 @memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
+def SubsystemRule(subsystem: Type[Subsystem]) -> Rule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
-    return TaskRule(**subsystem.signature())
+    warn_or_error(
+        removal_version="2.17.0dev0",
+        entity=f"using `SubsystemRule({subsystem.__name__})`",
+        hint=f"Use `*{subsystem.__name__}.rules()` instead.",
+    )
+    return next(iter(subsystem.rules()))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
 
 
 class RuleType(Enum):
@@ -156,6 +163,16 @@ def _ensure_type_annotation(
 
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
+# We aren't sure if these'll stick around or be removed at some point, so they are "private"
+# and should only be used in Pants' codebase.
+PRIVATE_RULE_DECORATOR_ARGUMENTS = {
+    # Allows callers to override the type Pants will use for the params listed.
+    #
+    # It is assumed (but not enforced) that the provided type is a subclass of the annotated type.
+    # (We assume but not enforce since this is likely to be used with unions, which has the same
+    # assumption between the union base and its members).
+    "_param_type_overrides",
+}
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
@@ -173,6 +190,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         len(
             set(kwargs)
             - PUBLIC_RULE_DECORATOR_ARGUMENTS
+            - PRIVATE_RULE_DECORATOR_ARGUMENTS
             - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS
         )
         != 0
@@ -183,6 +201,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
+    param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
@@ -191,13 +210,22 @@ def rule_decorator(func, **kwargs) -> Callable:
         name=f"{func_id} return",
         raise_type=MissingReturnTypeAnnotation,
     )
+
+    func_params = inspect.signature(func).parameters
+    for parameter in param_type_overrides:
+        if parameter not in func_params:
+            raise ValueError(
+                f"Unknown parameter name in `param_type_overrides`: {parameter}."
+                + f" Parameter names: '{', '.join(func_params)}'"
+            )
+
     parameter_types = tuple(
         _ensure_type_annotation(
-            type_annotation=type_hints.get(parameter),
+            type_annotation=param_type_overrides.get(parameter, type_hints.get(parameter)),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )
-        for parameter in inspect.signature(func).parameters
+        for parameter in func_params
     )
     is_goal_cls = issubclass(return_type, Goal)
 
@@ -318,7 +346,33 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
+def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Callable[P, R]:
+    if not _public and not func.__name__.startswith("_"):
+        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
+
+    if hasattr(func, "rule"):
+        raise ValueError("Cannot use both @rule and @rule_helper.")
+
+    if not inspect.iscoroutinefunction(func):
+        raise ValueError("@rule_helpers must be async.")
+
+    setattr(func, "rule_helper", func)
+    return func
+
+
+@overload
 def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
+    ...
+
+
+@overload
+def rule_helper(func: None = None, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    ...
+
+
+def rule_helper(
+    func: Callable[P, R] | None = None, **kwargs: Any
+) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator which marks a function as a "rule helper".
 
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers
@@ -326,7 +380,7 @@ def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
     awaitables.
 
     There are a few restrictions:
-        1. Rule helpers must be "private". I.e. start with an underscore
+        1. Rule helpers must be "private". I.e. start with an underscore.
         2. Rule hlpers must be `async`
         3. Rule helpers can't be rules
         4. Rule helpers must be accessed by attributes chained from a module variable (see below)
@@ -353,17 +407,14 @@ def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
             await arg.helper()  # Not OK, won't collect awaitables from `helper`
     ```
     """
-    if not func.__name__.startswith("_"):
-        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
+    if func is None:
 
-    if hasattr(func, "rule"):
-        raise ValueError("Cannot use both @rule and @rule_helper.")
+        def wrapper(func: Callable[P, R]) -> Callable[P, R]:
+            return _rule_helper_decorator(func, **kwargs)
 
-    if not inspect.iscoroutinefunction(func):
-        raise ValueError("@rule_helpers must be async.")
+        return wrapper
 
-    setattr(func, "rule_helper", func)
-    return func
+    return _rule_helper_decorator(func, **kwargs)
 
 
 class Rule(ABC):
@@ -404,9 +455,11 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                 if isinstance(rule, TaskRule):
                     for input in rule.input_selectors:
                         if issubclass(input, Subsystem):
-                            yield SubsystemRule(input)
+                            yield from input.rules()
+                        if issubclass(input, Subsystem.EnvironmentAware):
+                            yield from input.subsystem.rules()
                     if issubclass(rule.output_type, Goal):
-                        yield SubsystemRule(rule.output_type.subsystem_cls)
+                        yield from rule.output_type.subsystem_cls.rules()
                     yield rule
 
     return list(iter_rules())

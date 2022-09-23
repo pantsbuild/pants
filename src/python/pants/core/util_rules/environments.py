@@ -16,7 +16,7 @@ from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Field,
@@ -30,7 +30,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
+from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
@@ -85,6 +85,11 @@ class EnvironmentField(StringField):
     )
 
 
+class FallbackEnvironmentField(StringField):
+    alias = "fallback_environment"
+    default = None
+
+
 class CompatiblePlatformsField(StringSequenceField):
     alias = "compatible_platforms"
     default = tuple(plat.value for plat in Platform)
@@ -101,9 +106,28 @@ class CompatiblePlatformsField(StringSequenceField):
     )
 
 
+class LocalFallbackEnvironmentField(FallbackEnvironmentField):
+    help = softwrap(
+        f"""
+        The environment to fallback to when this local environment cannot be used because the
+        field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when this specific local environment cannot be used.
+
+        Tip: when targeting Linux, it can be particularly helpful to fallback to a
+        `docker_environment` or `remote_environment` target. That allows you to prefer using the
+        local host when possible, which often has less overhead (particularly compared to Docker).
+        If the local host is not compatible, then Pants will use Docker or remote execution to
+        still run in a similar environment.
+        """
+    )
+
+
 class LocalEnvironmentTarget(Target):
     alias = "_local_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField)
+    core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
@@ -168,9 +192,28 @@ def docker_platform_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value)
 
 
+class DockerFallbackEnvironmentField(FallbackEnvironmentField):
+    help = softwrap(
+        f"""
+        The environment to fallback to when this Docker environment cannot be used because the
+        field `{DockerPlatformField.alias}` is not compatible with the local host's CPU
+        architecture. (This is only an issue when the local host is Linux; macOS is fine.)
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when this specific Docker environment cannot be used.
+        """
+    )
+
+
 class DockerEnvironmentTarget(Target):
     alias = "_docker_environment"
-    core_fields = (*COMMON_TARGET_FIELDS, DockerImageField, DockerPlatformField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        DockerImageField,
+        DockerPlatformField,
+        DockerFallbackEnvironmentField,
+    )
     help = softwrap(
         """
         Configuration of a Docker image used for building your code, including the environment
@@ -204,12 +247,31 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     )
 
 
+class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
+    help = softwrap(
+        f"""
+        The environment to fallback to when remote execution is disabled via the global option
+        `--remote-execution`.
+
+        Must be an environment name from the option `[environments-preview].names`, the
+        special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
+        Python value `None` to error when remote execution is disabled.
+
+        Tip: if you are using a Docker image with your remote execution environment (usually
+        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        useful to fallback to an equivalent `docker_image` target so that you have a consistent
+        execution environment.
+        """
+    )
+
+
 class RemoteEnvironmentTarget(Target):
     alias = "_remote_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RemotePlatformField,
         RemoteExtraPlatformPropertiesField,
+        RemoteFallbackEnvironmentField,
     )
     help = softwrap(
         """
@@ -249,6 +311,10 @@ class AmbiguousEnvironmentError(Exception):
 
 
 class UnrecognizedEnvironmentError(Exception):
+    pass
+
+
+class NoFallbackEnvironmentError(Exception):
     pass
 
 
@@ -380,9 +446,27 @@ async def determine_local_environment(
     return ChosenLocalEnvironmentName(result_name)
 
 
+@rule_helper
+async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
+    fallback_field = env_tgt[FallbackEnvironmentField]
+    if fallback_field.value is None:
+        raise NoFallbackEnvironmentError(error_msg)
+    return await Get(
+        EnvironmentName,
+        EnvironmentNameRequest(
+            fallback_field.value,
+            description_of_origin=(
+                f"the `{fallback_field.alias}` field of the target {env_tgt.address}"
+            ),
+        ),
+    )
+
+
 @rule
 async def resolve_environment_name(
-    request: EnvironmentNameRequest, environments_subsystem: EnvironmentsSubsystem
+    request: EnvironmentNameRequest,
+    environments_subsystem: EnvironmentsSubsystem,
+    global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
@@ -399,6 +483,77 @@ async def resolve_environment_name(
                 """
             )
         )
+
+    # Get the target so that we can apply the environment_fallback field, if relevant.
+    env_tgt = await Get(EnvironmentTarget, EnvironmentName(request.raw_value))
+    if env_tgt.val is None:
+        raise AssertionError(f"EnvironmentTarget.val is None for the name `{request.raw_value}`")
+
+    if (
+        env_tgt.val.has_field(RemoteFallbackEnvironmentField)
+        and not global_options.remote_execution
+    ):
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The global option `--remote-execution` is set to false, but the remote
+                environment `{request.raw_value}` is used in {request.description_of_origin}.
+
+                Either enable the option `--remote-execution`, or set the field
+                `{FallbackEnvironmentField.alias}` for the target {env_tgt.val.address}.
+                """
+            ),
+        )
+
+    localhost_platform = Platform.create_for_localhost().value
+
+    if (
+        env_tgt.val.has_field(DockerFallbackEnvironmentField)
+        and localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
+        and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
+    ):
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The docker environment `{request.raw_value}` is specified in
+                {request.description_of_origin}, but it cannot be used because the local host has
+                the platform `{localhost_platform}` and the Docker environment has the platform
+                {env_tgt.val[DockerPlatformField].normalized_value}.
+
+                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
+                {env_tgt.val.address}, such as to a `docker_environment` target that sets
+                `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
+                not explicitly setting the field `{DockerPlatformField.alias}` for the target
+                {env_tgt.val.address} because the default behavior is to use the CPU architecture
+                of the current host for the platform (although this requires the docker image
+                supports that CPU architecture).
+                """
+            ),
+        )
+
+    if (
+        env_tgt.val.has_field(LocalFallbackEnvironmentField)
+        and localhost_platform not in env_tgt.val[CompatiblePlatformsField].value
+    ):
+        return await _apply_fallback_environment(
+            env_tgt.val,
+            error_msg=softwrap(
+                f"""
+                The local environment `{request.raw_value}` was specified in
+                {request.description_of_origin}, but it is not compatible with the current
+                machine's platform: {localhost_platform}. The environment only works with the
+                platforms: {env_tgt.val[CompatiblePlatformsField].value}
+
+                Consider setting the the field `{FallbackEnvironmentField.alias}` for the target
+                {env_tgt.val.address}, such as to a `docker_environment` or `remote_environment`
+                target. You can also set that field to another `local_environment` target, such as
+                one that is compatible with the current platform {localhost_platform}.
+                """
+            ),
+        )
+
     return EnvironmentName(request.raw_value)
 
 
@@ -433,12 +588,16 @@ async def get_target_for_environment_name(
         WrappedTargetRequest(address, description_of_origin=_description_of_origin),
     )
     tgt = wrapped_target.val
-    if not tgt.has_field(CompatiblePlatformsField) and not tgt.has_field(DockerImageField):
+    if (
+        not tgt.has_field(CompatiblePlatformsField)
+        and not tgt.has_field(DockerImageField)
+        and not tgt.has_field(RemotePlatformField)
+    ):
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `_local_environment` or `_docker_environment`
-                target in the option `[environments-preview].names`, but the name
+                Expected to use the address to a `_local_environment`, `_docker_environment`, or
+                `_remote_environment` target in the option `[environments-preview].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """
@@ -492,8 +651,8 @@ def extract_process_config_from_environment(
     )
 
 
-class EnvironmentSensitiveOptionFieldMixin:
-    subsystem: ClassVar[type[Subsystem]]
+class _EnvironmentSensitiveOptionFieldMixin:
+    subsystem: ClassVar[type[Subsystem.EnvironmentAware]]
     option_name: ClassVar[str]
 
 
@@ -510,26 +669,31 @@ _LIST_OPTIONS: dict[type, type[Field]] = {
 
 
 @memoized
-def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
-    """Register environment fields for the `environment_sensitive` options of `subsystem`
+def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterable[UnionRule]:
+    """Register environment fields for the options declared in `env_aware`
 
-    This should be called in the `rules()` method in the file where `subsystem` is defined. It will
-    register the relevant fields under the `local_environment` and `docker_environment` targets.
+    This is called by `env_aware.subsystem.rules()`, which is called whenever a rule depends on
+    `env_aware`. It will register the relevant fields under the `local_environment` and
+    `docker_environment` targets. Note that it must be `memoized`, such that repeated calls result
+    in exactly the same rules being registered.
     """
+
     field_rules: set[UnionRule] = set()
 
-    for option_attrname, option in _collect_options_info_extended(subsystem):
-        if option.flag_options["environment_sensitive"]:
-            field_rules.update(_add_option_field_for(subsystem, option, option_attrname))
+    for option in collect_options_info(env_aware):
+        field_rules.update(_add_option_field_for(env_aware, option))
 
     return field_rules
 
 
 def _add_option_field_for(
-    subsystem_t: type[Subsystem], option: OptionsInfo, attrname: str
+    env_aware_t: type[Subsystem.EnvironmentAware],
+    option: OptionsInfo,
 ) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
-    scope = subsystem_t.options_scope
+    scope = env_aware_t.subsystem.options_scope
+
+    snake_name = option.flag_names[0][2:].replace("-", "_")
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -539,9 +703,9 @@ def _add_option_field_for(
             field_type = _SIMPLE_OPTIONS[option_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a value type that does "
-                "not yet have a mapping in `environments.py`. To fix, map the value type in "
-                "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
+                f"The option `[{scope}].{snake_name}` has a value type that does not yet have a "
+                "mapping in `environments.py`. To fix, map the value type in `_SIMPLE_OPTIONS` "
+                "to a `Field` subtype that supports your option's value type."
             )
     else:
         member_type = option.flag_options["member_type"]
@@ -549,26 +713,25 @@ def _add_option_field_for(
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a member value type that "
-                "does yet have a mapping in `environments.py`. To fix, map the member value type "
-                "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
-                "member value type."
+                f"The option `[{scope}].{snake_name}` has a member value type that does yet have "
+                "a mapping in `environments.py`. To fix, map the member value type in "
+                "`_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's member "
+                "value type."
             )
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
     # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
-    class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        # TODO: use envvar-like normalization logic here
-        alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
+    class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
+        alias = f"{scope}_{snake_name}".replace("-", "_")
         required = False
         value: Any
         help = (
-            f"Overrides the default value from the option `[{scope}].{attrname}` when this "
+            f"Overrides the default value from the option `[{scope}].{snake_name}` when this "
             "environment target is active."
         )
-        subsystem = subsystem_t
-        option_name = attrname
+        subsystem = env_aware_t
+        option_name = option.flag_names[0]
 
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
@@ -577,35 +740,39 @@ def _add_option_field_for(
     ]
 
 
-def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
-    """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
+def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.EnvironmentAware):
+    """Return the value from the environment field corresponding to the scope and name provided.
 
-    This is slated for quick deprecation once we can construct `Subsystems` per environment.
+    If not defined, return `None`.
     """
 
+    env_tgt = subsystem.env_tgt
+
     if env_tgt.val is None:
-        return getattr(subsystem, name)
+        return None
 
     options = _options(env_tgt)
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return getattr(subsystem, name)
+        return None
     else:
         return maybe.value
 
 
 @memoized
-def _options(env_tgt: EnvironmentTarget) -> dict[tuple[type[Subsystem], str], Field]:
+def _options(
+    env_tgt: EnvironmentTarget,
+) -> dict[tuple[type[Subsystem.EnvironmentAware], str], Field]:
     """Index the environment-specific `fields` on an environment target by subsystem and name."""
 
-    options: dict[tuple[type[Subsystem], str], Field] = {}
+    options: dict[tuple[type[Subsystem.EnvironmentAware], str], Field] = {}
 
     if env_tgt.val is None:
         return options
 
     for _, field in env_tgt.val.field_values.items():
-        if isinstance(field, EnvironmentSensitiveOptionFieldMixin):
+        if isinstance(field, _EnvironmentSensitiveOptionFieldMixin):
             options[(field.subsystem, field.option_name)] = field
 
     return options

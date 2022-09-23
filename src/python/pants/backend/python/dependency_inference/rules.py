@@ -42,7 +42,7 @@ from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllA
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, SubsystemRule, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, rule, rule_helper
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -537,8 +537,8 @@ def import_rules():
         *module_mapper.rules(),
         *stripped_source_files.rules(),
         *target_types.rules(),
-        SubsystemRule(PythonInferSubsystem),
-        SubsystemRule(PythonSetup),
+        *PythonInferSubsystem.rules(),
+        *PythonSetup.rules(),
         UnionRule(InferDependenciesRequest, InferPythonImportDependencies),
     ]
 
