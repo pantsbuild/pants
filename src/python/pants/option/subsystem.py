@@ -76,6 +76,16 @@ class Subsystem(metaclass=_SubsystemMeta):
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     class EnvironmentAware(metaclass=ABCMeta):
+        """A separate container for options that may be redefined by the runtime environment.
+
+        To define environment-sensitive options, create an inner class in the `Subsystem` called
+        `EnvironmentAware`. Option fields share their scope with their enclosing `Subsystem`,
+        and the values of fields will default to the values set through Pants' configuration.
+
+        To consume environment-sensitive options, inject the `EnvironmentAware` inner class into
+        your rule.
+        """
+
         subsystem: ClassVar[type[Subsystem]]
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
@@ -106,8 +116,24 @@ class Subsystem(metaclass=_SubsystemMeta):
             # We should just return the default at this point.
             return default
 
+    @memoized_classmethod
+    def rules(cls: Any) -> Iterable[Rule]:
+        from pants.core.util_rules.environments import add_option_fields_for
+        from pants.engine.rules import Rule
+
+        # nb. `rules` needs to be memoized so that repeated calls to add these rules
+        # return exactly the same rule objects. As such, returning this generator
+        # directly won't work, because the iterator needs to be replayable.
+        def inner() -> Iterable[Rule]:
+            yield cls._construct_subsystem_rule()
+            if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
+                yield cls._construct_env_aware_rule()
+                yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
+
+        return list(inner())
+
     @classmethod
-    def construct_subsystem_rule(cls) -> Rule:
+    def _construct_subsystem_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem."""
 
         # Global-level imports are conditional, we need to re-import here for runtime use
@@ -144,7 +170,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         )
 
     @classmethod
-    def construct_env_aware_rule(cls) -> Rule:
+    def _construct_env_aware_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem.EnvironmentAware."""
         # Global-level imports are conditional, we need to re-import here for runtime use
         from pants.core.util_rules.environments import EnvironmentTarget
@@ -167,22 +193,6 @@ class Subsystem(metaclass=_SubsystemMeta):
             input_gets=(),
             canonical_name=name,
         )
-
-    @memoized_classmethod
-    def rules(cls: Any) -> Iterable[Rule]:
-        from pants.core.util_rules.environments import add_option_fields_for
-        from pants.engine.rules import Rule
-
-        # nb. `rules` needs to be memoized so that repeated calls to add these rules
-        # return exactly the same rule objects. As such, returning this generator
-        # directly won't work, because the iterator needs to be replayable.
-        def inner() -> Iterable[Rule]:
-            yield cls.construct_subsystem_rule()
-            if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
-                yield cls.construct_env_aware_rule()
-                yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
-
-        return list(inner())
 
     @classmethod
     def is_valid_scope_name(cls, s: str) -> bool:
