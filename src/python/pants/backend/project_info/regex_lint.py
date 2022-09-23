@@ -266,7 +266,7 @@ async def partition_inputs(
         return Partitions()
 
     applicable_file_paths = []
-    for fp in request.file_paths:
+    for fp in request.files:
         content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
         if content_pattern_names and encoding:
             applicable_file_paths.append(fp)
