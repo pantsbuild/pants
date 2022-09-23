@@ -111,7 +111,8 @@ class Subsystem(metaclass=_SubsystemMeta):
             if isinstance(v, OptionsInfo):
                 # If the the value is not defined in the `EnvironmentTarget`, return the value
                 # from the options system.
-                return resolve_environment_sensitive_option(v.flag_names[0], self) or default
+                override = resolve_environment_sensitive_option(v.flag_names[0], self)
+                return override if override is not None else default
 
             # We should just return the default at this point.
             return default
