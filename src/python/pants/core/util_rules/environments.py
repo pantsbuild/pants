@@ -96,12 +96,15 @@ class CompatiblePlatformsField(StringSequenceField):
     valid_choices = Platform
     value: tuple[str, ...]
     help = softwrap(
-        """
+        f"""
         Which platforms this environment can be used with.
 
         This is used for Pants to automatically determine which environment target to use for
-        the user's machine. Currently, there must be exactly one environment target for the
-        platform.
+        the user's machine when the environment is set to the special value
+        `{LOCAL_ENVIRONMENT_MATCHER}`. Currently, there cannot be more than one environment target
+        registered in `[environments-preview].names` for a particular platform. If there is no
+        environment target for a certain platform, Pants will use the options system instead to
+        determine environment variables and executable search paths.
         """
     )
 
@@ -302,10 +305,6 @@ def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentNam
     return EnvironmentName(local_env.val)
 
 
-class NoCompatibleEnvironmentError(Exception):
-    pass
-
-
 class AmbiguousEnvironmentError(Exception):
     pass
 
@@ -400,8 +399,6 @@ async def determine_local_environment(
     all_environment_targets: AllEnvironmentTargets,
 ) -> ChosenLocalEnvironmentName:
     platform = Platform.create_for_localhost()
-    if not all_environment_targets:
-        return ChosenLocalEnvironmentName(None)
     compatible_name_and_targets = [
         (name, tgt)
         for name, tgt in all_environment_targets.items()
@@ -409,41 +406,28 @@ async def determine_local_environment(
         and platform.value in tgt[CompatiblePlatformsField].value
     ]
     if not compatible_name_and_targets:
-        raise NoCompatibleEnvironmentError(
-            softwrap(
-                f"""
-                No `_local_environment` targets from `[environments-preview].names` are
-                compatible with the current platform: {platform.value}
+        # That is, use the values from the options system instead, rather than from fields.
+        return ChosenLocalEnvironmentName(None)
 
-                To fix, either adjust the `{CompatiblePlatformsField.alias}` field from the targets
-                in `[environments-preview].names` to include `{platform.value}`, or define a new
-                `_local_environment` target with `{platform.value}` included in the
-                `{CompatiblePlatformsField.alias}` field. (Current targets from
-                `[environments-preview].names`:
-                {sorted(tgt.address.spec for tgt in all_environment_targets.values())})
-                """
-            )
-        )
-    elif len(compatible_name_and_targets) > 1:
-        # TODO(#7735): Consider if we still want to error when no target is found, given that we
-        #  are now falling back to subsystem values.
-        # TODO(#7735): Allow the user to disambiguate what __local__ means via an option.
-        raise AmbiguousEnvironmentError(
-            softwrap(
-                f"""
-                Multiple `_local_environment` targets from `[environments-preview].names`
-                are compatible with the current platform `{platform.value}`, so it is ambiguous
-                which to use:
-                {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
+    if len(compatible_name_and_targets) == 1:
+        result_name, _tgt = compatible_name_and_targets[0]
+        return ChosenLocalEnvironmentName(result_name)
 
-                To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
-                targets so that only one includes the value `{platform.value}`, or change
-                `[environments-preview].names` so that it does not define some of those targets.
-                """
-            )
+    # TODO(#7735): Maybe allow the user to disambiguate what __local__ means via an option?
+    raise AmbiguousEnvironmentError(
+        softwrap(
+            f"""
+            Multiple `_local_environment` targets from `[environments-preview].names`
+            are compatible with the current platform `{platform.value}`, so it is ambiguous
+            which to use:
+            {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
+
+            To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
+            targets so that only one includes the value `{platform.value}`, or change
+            `[environments-preview].names` so that it does not define some of those targets.
+            """
         )
-    result_name, _tgt = compatible_name_and_targets[0]
-    return ChosenLocalEnvironmentName(result_name)
+    )
 
 
 @rule_helper
