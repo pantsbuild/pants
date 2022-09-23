@@ -7,7 +7,7 @@ from typing import Sequence
 
 import pytest
 
-from pants.backend.terraform import style, tool
+from pants.backend.terraform import tool
 from pants.backend.terraform.goals import check
 from pants.backend.terraform.goals.check import TerraformCheckRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
@@ -28,7 +28,6 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *check.rules(),
             *tool.rules(),
-            *style.rules(),
             *source_files.rules(),
             QueryRule(CheckResults, (TerraformCheckRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),

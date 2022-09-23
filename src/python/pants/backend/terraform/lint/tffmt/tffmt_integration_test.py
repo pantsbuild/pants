@@ -5,7 +5,7 @@ from typing import List, NewType
 
 import pytest
 
-from pants.backend.terraform import style, tool
+from pants.backend.terraform import tool
 from pants.backend.terraform.lint.tffmt import tffmt
 from pants.backend.terraform.lint.tffmt.tffmt import TffmtRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
@@ -52,7 +52,6 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *tffmt.rules(),
             *tool.rules(),
-            *style.rules(),
             *source_files.rules(),
             QueryRule(FmtResult, (TffmtRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
