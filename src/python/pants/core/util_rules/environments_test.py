@@ -15,25 +15,36 @@ from pants.core.util_rules.environments import (
     AllEnvironmentTargets,
     AmbiguousEnvironmentError,
     ChosenLocalEnvironmentName,
+    CompatiblePlatformsField,
     DockerEnvironmentTarget,
     DockerImageField,
+    DockerPlatformField,
     EnvironmentField,
     EnvironmentName,
     EnvironmentNameRequest,
+    EnvironmentsSubsystem,
     EnvironmentTarget,
+    FallbackEnvironmentField,
     LocalEnvironmentTarget,
     NoCompatibleEnvironmentError,
+    NoFallbackEnvironmentError,
     RemoteEnvironmentTarget,
-    RemoteExecutionDisabledError,
     RemoteExtraPlatformPropertiesField,
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
+    resolve_environment_name,
 )
 from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 
 
 @pytest.fixture
@@ -195,10 +206,11 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 _local_environment(name='local')
-                # Intentionally set this to no platforms so that it cannot be autodiscovered.
-                _local_environment(name='hardcoded', compatible_platforms=[])
+                _local_environment(
+                    name='local-fallback', compatible_platforms=[], fallback_environment='local'
+                )
                 _docker_environment(name='docker', image="centos6:latest")
-                _remote_environment(name='remote-no-fallback', fallback_environment=None)
+                _remote_environment(name='remote-no-fallback')
                 _remote_environment(name='remote-fallback', fallback_environment="docker")
                 _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
                 """
@@ -215,12 +227,12 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
     assert get_name(LOCAL_ENVIRONMENT_MATCHER).val is None
     # Else, error for unrecognized names.
     with engine_error(UnrecognizedEnvironmentError):
-        get_name("hardcoded")
+        get_name("local")
 
     env_names_arg = (
         "--environments-preview-names={"
         + "'local': '//:local', "
-        + "'hardcoded': '//:hardcoded', "
+        + "'local-fallback': '//:local-fallback', "
         + "'docker': '//:docker', "
         + "'remote-no-fallback': '//:remote-no-fallback', "
         + "'remote-fallback': '//:remote-fallback',"
@@ -228,17 +240,118 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options([env_names_arg, "--remote-execution"])
     assert get_name(LOCAL_ENVIRONMENT_MATCHER).val == "local"
-    for name in ("hardcoded", "docker", "remote-no-fallback", "remote-fallback"):
+    for name in ("local", "docker", "remote-no-fallback", "remote-fallback"):
         assert get_name(name).val == name
     with engine_error(UnrecognizedEnvironmentError):
         get_name("fake")
 
+    assert get_name("local-fallback").val == "local"
+
     rule_runner.set_options([env_names_arg, "--no-remote-execution"])
     assert get_name("remote-fallback").val == "docker"
-    with engine_error(RemoteExecutionDisabledError):
+    with engine_error(NoFallbackEnvironmentError):
         get_name("remote-no-fallback")
     with engine_error(UnrecognizedEnvironmentError):
         get_name("remote-bad-fallback")
+
+
+def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> None:
+    # We can't monkeypatch the Platform with RuleRunner, so instead use run_run_with_mocks.
+    def get_env_name(env_tgt: Target, platform: Platform) -> str | None:
+        monkeypatch.setattr(Platform, "create_for_localhost", lambda: platform)
+        result = run_rule_with_mocks(
+            resolve_environment_name,
+            rule_args=[
+                EnvironmentNameRequest("env", description_of_origin="foo"),
+                create_subsystem(EnvironmentsSubsystem, names={"env": "", "fallback": ""}),
+                create_subsystem(GlobalOptions, remote_execution=False),
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=ChosenLocalEnvironmentName,
+                    input_types=(),
+                    mock=lambda: ChosenLocalEnvironmentName(None),
+                ),
+                MockGet(
+                    output_type=EnvironmentTarget,
+                    input_types=(EnvironmentName,),
+                    mock=lambda _: EnvironmentTarget(env_tgt),
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda req: EnvironmentName(req.raw_value),
+                ),
+            ],
+        ).val
+        return result  # type: ignore[no-any-return]
+
+    def create_local_tgt(
+        *, compatible_platforms: list[Platform] | None = None, fallback: bool = False
+    ) -> LocalEnvironmentTarget:
+        return LocalEnvironmentTarget(
+            {
+                CompatiblePlatformsField.alias: [plat.value for plat in compatible_platforms]
+                if compatible_platforms
+                else None,
+                FallbackEnvironmentField.alias: "fallback" if fallback else None,
+            },
+            Address("envs"),
+        )
+
+    assert get_env_name(create_local_tgt(), Platform.linux_arm64) == "env"
+    assert (
+        get_env_name(
+            create_local_tgt(compatible_platforms=[Platform.linux_x86_64], fallback=True),
+            Platform.linux_arm64,
+        )
+        == "fallback"
+    )
+    with pytest.raises(NoFallbackEnvironmentError):
+        get_env_name(
+            create_local_tgt(compatible_platforms=[Platform.linux_x86_64]),
+            Platform.linux_arm64,
+        )
+
+    def create_docker_tgt(
+        *, platform: Platform | None = None, fallback: bool = False
+    ) -> DockerEnvironmentTarget:
+        return DockerEnvironmentTarget(
+            {
+                DockerImageField.alias: "image",
+                DockerPlatformField.alias: platform.value if platform else None,
+                FallbackEnvironmentField.alias: "fallback" if fallback else None,
+            },
+            Address("envs"),
+        )
+
+    # If the Docker platform is not set, we default to the CPU arch. So regardless of localhost,
+    # the Docker environment should be used.
+    assert get_env_name(create_docker_tgt(), Platform.linux_arm64) == "env"
+
+    # The Docker env can be used if we're on macOS, or on Linux and the CPU arch matches.
+    for plat in (Platform.macos_arm64, Platform.macos_x86_64, Platform.linux_x86_64):
+        assert get_env_name(create_docker_tgt(platform=Platform.linux_x86_64), plat) == "env"
+    for plat in (Platform.macos_arm64, Platform.macos_x86_64, Platform.linux_arm64):
+        assert get_env_name(create_docker_tgt(platform=Platform.linux_arm64), plat) == "env"
+
+    # But if on Linux and a different CPU arch is used, fallback.
+    assert (
+        get_env_name(
+            create_docker_tgt(platform=Platform.linux_x86_64, fallback=True), Platform.linux_arm64
+        )
+        == "fallback"
+    )
+    assert (
+        get_env_name(
+            create_docker_tgt(platform=Platform.linux_arm64, fallback=True), Platform.linux_x86_64
+        )
+        == "fallback"
+    )
+    with pytest.raises(NoFallbackEnvironmentError):
+        get_env_name(create_docker_tgt(platform=Platform.linux_x86_64), Platform.linux_arm64)
+    with pytest.raises(NoFallbackEnvironmentError):
+        get_env_name(create_docker_tgt(platform=Platform.linux_arm64), Platform.linux_x86_64)
 
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
