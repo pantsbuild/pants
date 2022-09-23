@@ -50,8 +50,7 @@ Running a `pex_binary` is equivalent to `package`-ing the target followed by exe
 
 Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your code in an ephemeral sandbox (temporary directory) with your firstparty code and Pants-generated files (such as a `relocated_files` or `archive`) copied inside. If you are using generated files like this, you may need to set the `run_goal_use_sandbox` to `True` for file loading to work properly.
 
-Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to running the source directly (a la `python ...`) with the set of third-party dependencies exposed to the interpreter. This is comparable to using a virtual environment or Poetry to run your script
-(E.g. `venv/bin/python ...` or `poetry run python ...`). When scripts write in-repo files—such as Django's `manage.py makemigrations` - it is often necessary to set `run_goal_use_sandbox` to `False` so that the file is written into the expected location.
+Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to running the source directly (a la `python ...`) with the set of third-party dependencies exposed to the interpreter. This is comparable to using a virtual environment or Poetry to run your script (E.g. `venv/bin/python ...` or `poetry run python ...`). When scripts write in-repo files—such as Django's `manage.py makemigrations` - it is often necessary to set `run_goal_use_sandbox` to `False` so that the file is written into the expected location.
 
 
 Watching the filesystem
