@@ -377,7 +377,7 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
 
 
 @rule_helper
-async def _get_subpartitions(
+async def _get_partitions_by_request_type(
     core_request_types: Iterable[type[LintRequest]],
     target_partitioners: Iterable[type[LintTargetsRequest.PartitionRequest]],
     file_partitioners: Iterable[type[LintFilesRequest.PartitionRequest]],
@@ -392,12 +392,12 @@ async def _get_subpartitions(
     make_files_partition_request_get: Callable[
         [LintFilesRequest.PartitionRequest], Get[Partitions]
     ],
-) -> list[LintRequest.SubPartition]:
+) -> dict[type[LintRequest], list[Partitions]]:
     filtered_core_request_types = [
         request_type for request_type in core_request_types if request_type.name in specified_names
     ]
     if not filtered_core_request_types:
-        return []
+        return {}
 
     core_partition_request_types = {
         getattr(request_type, "PartitionRequest") for request_type in filtered_core_request_types
@@ -449,35 +449,7 @@ async def _get_subpartitions(
     for request_type, partition in zip(filtered_core_request_types, all_partitions):
         partitions_by_request_type[request_type].append(partition)
 
-    def batch(
-        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
-    ) -> Iterator[tuple[_T, ...]]:
-        batches = partition_sequentially(
-            iterable,
-            key=key,
-            size_target=subsystem.batch_size,  # type: ignore[attr-defined]
-            size_max=4 * subsystem.batch_size,  # type: ignore[attr-defined]
-        )
-        for batch in batches:
-            yield tuple(batch)
-
-    lint_batches_by_request_type = {
-        request_type: [
-            (subpartition, key)
-            for partitions in partitions_list
-            for key, partition in partitions.items()
-            for subpartition in batch(partition)
-        ]
-        for request_type, partitions_list in partitions_by_request_type.items()
-    }
-
-    subparitions = [
-        request_type.SubPartition(elements, key)
-        for request_type, batch in lint_batches_by_request_type.items()
-        for elements, key in batch
-    ]
-
-    return subparitions
+    return partitions_by_request_type
 
 
 @goal_rule
@@ -505,7 +477,7 @@ async def lint(
         [*lint_request_types, *fmt_target_request_types, *fmt_build_request_types],
     )
 
-    lint_subpartitions = await _get_subpartitions(
+    partitions_by_request_type = await _get_partitions_by_request_type(
         lint_request_types,
         target_partitioners,
         file_partitioners,
@@ -515,6 +487,34 @@ async def lint(
         lambda request_type: Get(Partitions, LintTargetsRequest.PartitionRequest, request_type),
         lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
     )
+
+    def batch(
+        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
+    ) -> Iterator[tuple[_T, ...]]:
+        batches = partition_sequentially(
+            iterable,
+            key=key,
+            size_target=lint_subsystem.batch_size,
+            size_max=4 * lint_subsystem.batch_size,
+        )
+        for batch in batches:
+            yield tuple(batch)
+
+    lint_batches_by_request_type = {
+        request_type: [
+            (subpartition, key)
+            for partitions in partitions_list
+            for key, partition in partitions.items()
+            for subpartition in batch(partition)
+        ]
+        for request_type, partitions_list in partitions_by_request_type.items()
+    }
+
+    lint_subpartitions = [
+        request_type.SubPartition(elements, key)
+        for request_type, batch in lint_batches_by_request_type.items()
+        for elements, key in batch
+    ]
 
     # NOTE: Fmt support has been prefactored to be isolated from core "lint" support as a follow-up
     # change will remove this in entirety. Therefore, this has some duplication/suboptimal code.
