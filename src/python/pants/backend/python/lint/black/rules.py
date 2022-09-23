@@ -80,8 +80,6 @@ async def partition_black(
     # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
     # the machine.
     tool_interpreter_constraints = black.interpreter_constraints
-    print(tool_interpreter_constraints)
-    print(black.options.is_default("interpreter_constraints"))
     if black.options.is_default("interpreter_constraints"):
         try:
             # Don't compute this unless we have to, since it might fail.

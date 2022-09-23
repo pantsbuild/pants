@@ -202,9 +202,6 @@ async def scalafmt_fmt(
     )
 
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-
-    print(original_snapshot)
-    print(output_snapshot)
     return FmtResult.create(
         result,
         original_snapshot,

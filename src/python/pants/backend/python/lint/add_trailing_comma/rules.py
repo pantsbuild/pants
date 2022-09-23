@@ -35,7 +35,7 @@ class AddTrailingCommaRequest(FmtTargetsRequest):
 
 
 @rule
-async def partition_clangformat(
+async def partition(
     request: AddTrailingCommaRequest.PartitionRequest, add_trailing_comma: AddTrailingComma
 ) -> Partitions:
     return (

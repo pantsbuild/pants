@@ -35,9 +35,7 @@ class AutoflakeRequest(FmtTargetsRequest):
 
 
 @rule
-async def partition_clangformat(
-    request: AutoflakeRequest.PartitionRequest, autoflake: Autoflake
-) -> Partitions:
+async def partition(request: AutoflakeRequest.PartitionRequest, autoflake: Autoflake) -> Partitions:
     return (
         Partitions()
         if autoflake.skip
