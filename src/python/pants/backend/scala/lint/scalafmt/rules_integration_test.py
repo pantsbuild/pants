@@ -243,7 +243,9 @@ def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
     )
 
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot)])
+    request = rule_runner.request(
+        ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot.files)]
+    )
     assert sorted(request.source_dir_to_config_file.items()) == [
         ("foo/bar", "foo/bar/.scalafmt.conf"),
         ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),
