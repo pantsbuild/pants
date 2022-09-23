@@ -21,10 +21,7 @@ class OptionsInfo:
 
 def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
     """Yields the ordered options info from the MRO of the provided class."""
-    yield from (info[1] for info in _collect_options_info_extended(cls))
 
-
-def _collect_options_info_extended(cls: type) -> Iterator[tuple[str, OptionsInfo]]:
     # NB: Since registration ordering matters (it impacts `help` output), we register these in
     # class attribute order, starting from the base class down.
     for class_ in reversed(inspect.getmro(cls)):
@@ -32,7 +29,7 @@ def _collect_options_info_extended(cls: type) -> Iterator[tuple[str, OptionsInfo
             # NB: We use attrname and getattr to trigger descriptors
             attr = getattr(cls, attrname)
             if isinstance(attr, OptionsInfo):
-                yield (attrname, attr)
+                yield attr
 
 
 # The type of the option.
@@ -97,7 +94,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -136,8 +132,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         :param deprecation_start_version: If the option is deprecated, sets the version at which the
             deprecation will begin. Must be less than the `removal_version`.
-        :param environment_sensitive: If the option is environment-sensitive, it may be overridden
-            in a runtime environment definition.
         """
         self = super().__new__(cls)
         self._flag_names = (flag_name,) if flag_name else None
@@ -157,7 +151,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
                 "removal_hint": removal_hint,
                 "removal_version": removal_version,
                 "deprecation_start_version": deprecation_start_version,
-                "environment_sensitive": environment_sensitive,
             }.items()
             if v is not None
         }
@@ -240,7 +233,6 @@ class _ListOptionBase(
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -262,7 +254,6 @@ class _ListOptionBase(
             removal_hint=removal_hint,
             removal_version=removal_version,
             deprecation_start_version=deprecation_start_version,
-            environment_sensitive=environment_sensitive,
         )
         return instance
 
@@ -459,7 +450,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -485,7 +475,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -511,7 +500,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -535,7 +523,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         removal_version=None,
         removal_hint=None,
         deprecation_start_version=None,
-        environment_sensitive=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -556,7 +543,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             deprecation_start_version=deprecation_start_version,
             daemon=daemon,
             fingerprint=fingerprint,
-            environment_sensitive=environment_sensitive,
         )
         instance._enum_type = enum_type
         return instance
@@ -607,7 +593,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -633,7 +618,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -658,7 +642,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -682,7 +665,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         removal_version=None,
         removal_hint=None,
         deprecation_start_version=None,
-        environment_sensitive=None,
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
@@ -703,7 +685,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
             deprecation_start_version=deprecation_start_version,
             daemon=daemon,
             fingerprint=fingerprint,
-            environment_sensitive=environment_sensitive,
         )
         instance._enum_type = enum_type
         return instance
@@ -767,7 +748,6 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         removal_version: str | None = None,
         removal_hint: str | None = None,
         deprecation_start_version: str | None = None,
-        environment_sensitive: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -788,7 +768,6 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
             removal_hint=removal_hint,
             removal_version=removal_version,
             deprecation_start_version=deprecation_start_version,
-            environment_sensitive=environment_sensitive,
         )
 
     def _convert_(self, val: Any) -> dict[str, _ValueT]:

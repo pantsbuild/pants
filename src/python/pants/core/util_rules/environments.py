@@ -30,7 +30,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import DictOption, OptionsInfo, _collect_options_info_extended
+from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
 from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
@@ -651,8 +651,8 @@ def extract_process_config_from_environment(
     )
 
 
-class EnvironmentSensitiveOptionFieldMixin:
-    subsystem: ClassVar[type[Subsystem]]
+class _EnvironmentSensitiveOptionFieldMixin:
+    subsystem: ClassVar[type[Subsystem.EnvironmentAware]]
     option_name: ClassVar[str]
 
 
@@ -669,26 +669,31 @@ _LIST_OPTIONS: dict[type, type[Field]] = {
 
 
 @memoized
-def add_option_fields_for(subsystem: type[Subsystem]) -> Iterable[UnionRule]:
-    """Register environment fields for the `environment_sensitive` options of `subsystem`
+def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterable[UnionRule]:
+    """Register environment fields for the options declared in `env_aware`
 
-    This should be called in the `rules()` method in the file where `subsystem` is defined. It will
-    register the relevant fields under the `local_environment` and `docker_environment` targets.
+    This is called by `env_aware.subsystem.rules()`, which is called whenever a rule depends on
+    `env_aware`. It will register the relevant fields under the `local_environment` and
+    `docker_environment` targets. Note that it must be `memoized`, such that repeated calls result
+    in exactly the same rules being registered.
     """
+
     field_rules: set[UnionRule] = set()
 
-    for option_attrname, option in _collect_options_info_extended(subsystem):
-        if option.flag_options["environment_sensitive"]:
-            field_rules.update(_add_option_field_for(subsystem, option, option_attrname))
+    for option in collect_options_info(env_aware):
+        field_rules.update(_add_option_field_for(env_aware, option))
 
     return field_rules
 
 
 def _add_option_field_for(
-    subsystem_t: type[Subsystem], option: OptionsInfo, attrname: str
+    env_aware_t: type[Subsystem.EnvironmentAware],
+    option: OptionsInfo,
 ) -> Iterable[UnionRule]:
     option_type: type = option.flag_options["type"]
-    scope = subsystem_t.options_scope
+    scope = env_aware_t.subsystem.options_scope
+
+    snake_name = option.flag_names[0][2:].replace("-", "_")
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...
@@ -698,9 +703,9 @@ def _add_option_field_for(
             field_type = _SIMPLE_OPTIONS[option_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a value type that does "
-                "not yet have a mapping in `environments.py`. To fix, map the value type in "
-                "`_SIMPLE_OPTIONS` to a `Field` subtype that supports your option's value type."
+                f"The option `[{scope}].{snake_name}` has a value type that does not yet have a "
+                "mapping in `environments.py`. To fix, map the value type in `_SIMPLE_OPTIONS` "
+                "to a `Field` subtype that supports your option's value type."
             )
     else:
         member_type = option.flag_options["member_type"]
@@ -708,26 +713,25 @@ def _add_option_field_for(
             field_type = _LIST_OPTIONS[member_type]
         except KeyError:
             raise AssertionError(
-                f"The option `{subsystem_t.__name__}.{attrname}` has a member value type that "
-                "does yet have a mapping in `environments.py`. To fix, map the member value type "
-                "in `_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's "
-                "member value type."
+                f"The option `[{scope}].{snake_name}` has a member value type that does yet have "
+                "a mapping in `environments.py`. To fix, map the member value type in "
+                "`_LIST_OPTIONS` to a `SequenceField` subtype that supports your option's member "
+                "value type."
             )
 
     # The below class will never be used for static type checking outside of this function.
     # so it's reasonably safe to use `ignore[name-defined]`. Ensure that all this remains valid
     # if `_SIMPLE_OPTIONS` or `_LIST_OPTIONS` are ever modified.
-    class OptionField(field_type, EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
-        # TODO: use envvar-like normalization logic here
-        alias = f"{scope}_{option.flag_names[0][2:]}".replace("-", "_")
+    class OptionField(field_type, _EnvironmentSensitiveOptionFieldMixin):  # type: ignore[valid-type, misc]
+        alias = f"{scope}_{snake_name}".replace("-", "_")
         required = False
         value: Any
         help = (
-            f"Overrides the default value from the option `[{scope}].{attrname}` when this "
+            f"Overrides the default value from the option `[{scope}].{snake_name}` when this "
             "environment target is active."
         )
-        subsystem = subsystem_t
-        option_name = attrname
+        subsystem = env_aware_t
+        option_name = option.flag_names[0]
 
     return [
         LocalEnvironmentTarget.register_plugin_field(OptionField),
@@ -736,35 +740,39 @@ def _add_option_field_for(
     ]
 
 
-def get_option(name: str, subsystem: Subsystem, env_tgt: EnvironmentTarget):
-    """Get the option from the `EnvionmentTarget`, if specified there, else from the `Subsystem`.
+def resolve_environment_sensitive_option(name: str, subsystem: Subsystem.EnvironmentAware):
+    """Return the value from the environment field corresponding to the scope and name provided.
 
-    This is slated for quick deprecation once we can construct `Subsystems` per environment.
+    If not defined, return `None`.
     """
 
+    env_tgt = subsystem.env_tgt
+
     if env_tgt.val is None:
-        return getattr(subsystem, name)
+        return None
 
     options = _options(env_tgt)
 
     maybe = options.get((type(subsystem), name))
     if maybe is None or maybe.value is None:
-        return getattr(subsystem, name)
+        return None
     else:
         return maybe.value
 
 
 @memoized
-def _options(env_tgt: EnvironmentTarget) -> dict[tuple[type[Subsystem], str], Field]:
+def _options(
+    env_tgt: EnvironmentTarget,
+) -> dict[tuple[type[Subsystem.EnvironmentAware], str], Field]:
     """Index the environment-specific `fields` on an environment target by subsystem and name."""
 
-    options: dict[tuple[type[Subsystem], str], Field] = {}
+    options: dict[tuple[type[Subsystem.EnvironmentAware], str], Field] = {}
 
     if env_tgt.val is None:
         return options
 
     for _, field in env_tgt.val.field_values.items():
-        if isinstance(field, EnvironmentSensitiveOptionFieldMixin):
+        if isinstance(field, _EnvironmentSensitiveOptionFieldMixin):
             options[(field.subsystem, field.option_name)] = field
 
     return options
