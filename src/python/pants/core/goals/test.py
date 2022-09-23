@@ -313,6 +313,17 @@ class TestSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return TestFieldSet in union_membership
 
+    class EnvironmentAware:
+        extra_env_vars = StrListOption(
+            help=softwrap(
+                """
+                Additional environment variables to include in test processes.
+                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+                """
+            ),
+        )
+
     debug = BoolOption(
         default=False,
         help=softwrap(
@@ -364,15 +375,6 @@ class TestSubsystem(GoalSubsystem):
         default=default_report_path,
         advanced=True,
         help="Path to write test reports to. Must be relative to the build root.",
-    )
-    extra_env_vars = StrListOption(
-        help=softwrap(
-            """
-            Additional environment variables to include in test processes.
-            Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-            `ENV_VAR` to copy the value of a variable in Pants's own environment.
-            """
-        ),
     )
     shard = StrOption(
         default="",
@@ -678,9 +680,9 @@ class TestExtraEnv:
 
 
 @rule
-async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEnv:
+async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAware) -> TestExtraEnv:
     return TestExtraEnv(
-        await Get(EnvironmentVars, EnvironmentVarsRequest(test_subsystem.extra_env_vars))
+        await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
     )
 
 
