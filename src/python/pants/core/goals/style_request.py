@@ -42,12 +42,9 @@ def only_option_help(goal_name: str, tool_description: str, example1: str, examp
 def determine_specified_tool_names(
     goal_name: str,
     only_option: Iterable[str],
-    all_style_requests: Iterable[type[StyleRequest]],
-    *,
-    extra_valid_names: Iterable[str] = (),
+    all_requests: Iterable[type],
 ) -> set[str]:
-    target_request_names = {request.name for request in all_style_requests}
-    all_valid_names = {*target_request_names, *extra_valid_names}
+    all_valid_names = {request.name for request in all_requests}  # type: ignore[attr-defined]
     if not only_option:
         return all_valid_names
 

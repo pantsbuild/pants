@@ -14,7 +14,6 @@ import pytest
 from pants.base.specs import Specs
 from pants.core.goals.fmt import FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.lint import (
-    AmbiguousRequestNamesError,
     Lint,
     LintFilesRequest,
     LintRequest,
@@ -60,10 +59,10 @@ class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
     def exit_code(_: Iterable[Address]) -> int:
         pass
 
-    @property
-    def lint_result(self) -> LintResult:
-        addresses = [config.address for config in self.field_sets]
-        return LintResult(self.exit_code(addresses), "", "", self.name)
+    @classmethod
+    def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
+        addresses = [field_set.address for field_set in field_sets]
+        return LintResult(cls.exit_code(addresses), "", "", cls.name)
 
 
 class SuccessfulRequest(MockLintRequest):
@@ -145,7 +144,7 @@ def mock_lint_partition(request: Any) -> LintResult:
     request_type = {cls.SubPartition: cls for cls in MockLintRequest.__subclasses__()}[
         type(request)
     ]
-    return request_type(request.elements).lint_result  # type: ignore[abstract]
+    return request_type.get_lint_result(request.elements)
 
 
 class MockFmtRequest(FmtTargetsRequest):
@@ -448,40 +447,4 @@ def test_streaming_output_partitions() -> None:
         stderr
 
         """
-    )
-
-
-def test_duplicated_names(rule_runner: RuleRunner) -> None:
-    class AmbiguousLintTargetsRequest(LintTargetsRequest):
-        name = "FilesLinter"  # also used by MockFilesRequest
-
-    with pytest.raises(AmbiguousRequestNamesError):
-        run_lint_rule(
-            rule_runner,
-            lint_request_types=[AmbiguousLintTargetsRequest],
-            run_files_linter=True,  # needed for MockFilesRequest
-            targets=[],
-        )
-
-    class BuildAndLintTargetType(LintTargetsRequest):
-        name = BuildFileFormatter.name
-
-    with pytest.raises(AmbiguousRequestNamesError):
-        run_lint_rule(
-            rule_runner,
-            lint_request_types=[BuildAndLintTargetType],
-            targets=[],
-            run_build_formatter=True,
-        )
-
-    class BuildAndFmtTargetType(FmtTargetsRequest):
-        name = BuildFileFormatter.name
-
-    # Ambiguity between a target formatter and BUILD formatter are OK
-    run_lint_rule(
-        rule_runner,
-        lint_request_types=[],
-        fmt_request_types=[BuildAndFmtTargetType],
-        run_build_formatter=True,
-        targets=[],
     )

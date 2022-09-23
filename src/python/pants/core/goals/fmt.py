@@ -239,8 +239,7 @@ def _get_request_types(
     formatters_to_run = determine_specified_tool_names(
         "fmt",
         fmt_subsystem.only,
-        fmt_target_request_types,
-        extra_valid_names=(fbfrt.name for fbfrt in fmt_build_files_request_types),
+        [*fmt_target_request_types, *fmt_build_files_request_types],
     )
 
     filtered_fmt_target_request_types = tuple(
