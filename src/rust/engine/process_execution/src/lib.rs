@@ -856,7 +856,7 @@ pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
   run_id: RunId,
-  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
+  tail_tasks: TailTasks,
 }
 
 impl Default for Context {
@@ -865,7 +865,7 @@ impl Default for Context {
       workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
-      tail_tasks: Arc::default(),
+      tail_tasks: TailTasks::new(),
     }
   }
 }
@@ -875,7 +875,7 @@ impl Context {
     workunit_store: WorkunitStore,
     build_id: String,
     run_id: RunId,
-    tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
+    tail_tasks: TailTasks,
   ) -> Context {
     Context {
       workunit_store,

@@ -13,13 +13,14 @@ use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable, FutureExt};
-use futures_core::future::BoxFuture;
 use graph::LastObserved;
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::Executor;
+use tokio::runtime::Handle;
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::task::{Id, JoinSet};
 use ui::ConsoleUI;
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
@@ -91,7 +92,7 @@ struct SessionState {
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
   /// Tasks to await at the "tail" of the session.
-  tail_tasks: Arc<Mutex<Vec<BoxFuture<'static, ()>>>>,
+  tail_tasks: TailTasks,
 }
 
 ///
@@ -186,7 +187,7 @@ impl Session {
         workunit_store,
         session_values: Mutex::new(session_values),
         run_id: AtomicU32::new(run_id.0),
-        tail_tasks: Arc::default(),
+        tail_tasks: TailTasks::new(),
       }),
     })
   }
@@ -374,7 +375,7 @@ impl Session {
   /// Returns a Vec of futures representing an asynchronous "tail" task that should not block
   /// individual nodes in the build graph but should block (up to a configurable timeout)
   /// ending this `Session`.
-  pub fn tail_tasks(&self) -> Arc<Mutex<Vec<BoxFuture<'static, ()>>>> {
+  pub fn tail_tasks(&self) -> TailTasks {
     self.state.tail_tasks.clone()
   }
 }
@@ -496,5 +497,87 @@ impl Sessions {
 impl Drop for Sessions {
   fn drop(&mut self) {
     self.signal_task_abort_handle.abort();
+  }
+}
+
+/// Store "tail" tasks which are async tasks that can execute concurrently with regular
+/// build actions. Tail task block completion of a session until all of them have been
+/// completed (subject to a timeout).
+#[derive(Clone)]
+pub struct TailTasks {
+  inner: Arc<Mutex<TailTasksInner>>,
+}
+
+struct TailTasksInner {
+  id_to_name: HashMap<Id, String>,
+  task_set: JoinSet<()>,
+}
+
+impl TailTasks {
+  pub fn new() -> Self {
+    Self {
+      inner: Arc::new(Mutex::new(TailTasksInner {
+        id_to_name: HashMap::new(),
+        task_set: JoinSet::new(),
+      })),
+    }
+  }
+
+  /// Spawn a tail task with the given name.
+  pub fn spawn_on<F>(&self, name: &str, task: F, handle: &Handle)
+  where
+    F: Future<Output = ()>,
+    F: Send + 'static,
+  {
+    let mut inner = self.inner.lock();
+    let h = inner.task_set.spawn_on(task, handle);
+    inner.id_to_name.insert(h.id(), name.to_string());
+  }
+
+  /// Wait for all tail tasks to complete subject to the given timeout. If tasks
+  /// fail or do not complete, log that fact.
+  pub async fn wait(self, timeout: Duration) {
+    let mut inner = self.inner.lock();
+
+    if inner.task_set.is_empty() {
+      return;
+    }
+
+    log::debug!(
+      "waiting for {} session end task(s) to complete",
+      inner.task_set.len()
+    );
+
+    let mut timeout = tokio::time::sleep(timeout).boxed();
+
+    loop {
+      tokio::select! {
+        // Use biased mode to prefer an expired timeout over joining on remaining tasks.
+        biased;
+
+        // Exit monitoring loop if timeout expires.
+        _ = &mut timeout => break,
+
+        next_result = inner.task_set.join_next_with_id() => {
+          match next_result {
+            Some(Ok((id, _))) => (),
+            Some(Err(err)) => {
+              log::error!("a session end task failed: {err:?}");
+            }
+            None => break,
+          }
+        }
+      }
+    }
+
+    if inner.task_set.is_empty() {
+      log::debug!("all session end tasks completed successfully");
+    } else {
+      log::debug!(
+        "{} session end task(s) failed to complete within timeout",
+        inner.task_set.len()
+      );
+      inner.task_set.abort_all();
+    }
   }
 }

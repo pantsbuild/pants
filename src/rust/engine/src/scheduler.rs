@@ -336,22 +336,7 @@ impl Scheduler {
     })
   }
 
-  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>, timeout: Duration) {
-    if !tasks.is_empty() {
-      log::trace!("waiting for {} tail tasks to complete", tasks.len());
-
-      let joined_tail_tasks_fut = futures::future::join_all(tasks);
-      let timeout_fut = time::timeout(timeout, joined_tail_tasks_fut);
-      match timeout_fut.await {
-        Ok(_) => {
-          log::trace!("tail tasks completed successfully");
-        }
-        Err(_) => {
-          log::trace!("tail tasks failed to complete within timeout");
-        }
-      }
-    }
-  }
+  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>, timeout: Duration) {}
 
   fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
     deadline
