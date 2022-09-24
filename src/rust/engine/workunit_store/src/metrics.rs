@@ -51,6 +51,9 @@ pub enum Metric {
   RemoteStoreMissingDigest,
   /// Number of times that we backtracked due to missing digests.
   BacktrackAttempts,
+  DockerExecutionRequests,
+  DockerExecutionSuccess,
+  DockerExecutionErrors,
 }
 
 impl Metric {
