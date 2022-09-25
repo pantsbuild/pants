@@ -21,6 +21,14 @@ from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
+# Adapted from Go toolchain.
+# See https://github.com/golang/go/blob/a0441c7ae3dea57a0553c9ea77e184c34b7da40f/src/cmd/cover/html.go
+#
+# Original copyright:
+#  // Copyright 2013 The Go Authors. All rights reserved.
+#  // Use of this source code is governed by a BSD-style
+#  // license that can be found in the LICENSE file.
+
 
 @dataclass(frozen=True)
 class RenderGoCoverageProfileToHtmlRequest:
