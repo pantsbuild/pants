@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import builtins
+import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -22,6 +23,10 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, P
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticAddressMapsRequest,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
@@ -159,16 +164,20 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            globs=(
-                *(os.path.join(directory.path, p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
+    digest_contents, all_synthetic_address_maps = await MultiGet(
+        Get(
+            DigestContents,
+            PathGlobs(
+                globs=(
+                    *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                    *(f"!{p}" for p in build_file_options.ignores),
+                )
+            ),
         ),
+        Get(SyntheticAddressMaps, SyntheticAddressMapsRequest(directory.path)),
     )
-    if not digest_contents:
+    synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
+    if not digest_contents and not synthetic_address_maps:
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
@@ -192,10 +201,20 @@ async def parse_address_family(
         )
         for fc in digest_contents
     ]
+
+    # Freeze defaults.
+    frozen_defaults = defaults_parser_state.get_frozen_defaults()
+
+    # Process synthetic targets.
+    for address_map in address_maps:
+        for synthetic in synthetic_address_maps:
+            synthetic.process_declared_targets(address_map)
+            synthetic.apply_defaults(frozen_defaults)
+
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path, address_maps, defaults_parser_state.get_frozen_defaults()
+            directory.path, (*address_maps, *synthetic_address_maps), frozen_defaults
         ),
     )
 

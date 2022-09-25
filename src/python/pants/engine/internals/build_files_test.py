@@ -24,6 +24,10 @@ from pants.engine.internals.defaults import ParametrizeDefault
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticAddressMapsRequest,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import (
     Dependencies,
@@ -71,6 +75,11 @@ def test_parse_address_family_empty() -> None:
                 output_type=OptionalAddressFamily,
                 input_types=(AddressFamilyDir,),
                 mock=lambda _: OptionalAddressFamily("/dev"),
+            ),
+            MockGet(
+                output_type=SyntheticAddressMaps,
+                input_types=(SyntheticAddressMapsRequest,),
+                mock=lambda _: SyntheticAddressMaps(),
             ),
         ],
     )
