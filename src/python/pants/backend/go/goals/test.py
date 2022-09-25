@@ -33,6 +33,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
     FirstPartyPkgDigestRequest,
 )
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
@@ -164,6 +165,7 @@ async def run_go_tests(
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
     test_extra_env: TestExtraEnv,
+    goroot: GoRoot,
 ) -> TestResult:
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
@@ -371,6 +373,14 @@ async def run_go_tests(
         # `go_package`.
         **field_set_extra_env,
     }
+
+    # Add $GOROOT/bin to the PATH just as `go test` does.
+    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/test/test.go#L1384
+    goroot_bin_path = os.path.join(goroot.path, "bin")
+    if "PATH" in extra_env:
+        extra_env["PATH"] = f"{goroot_bin_path}:{extra_env['PATH']}"
+    else:
+        extra_env["PATH"] = goroot_bin_path
 
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
