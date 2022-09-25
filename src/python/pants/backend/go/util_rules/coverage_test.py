@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import textwrap
-from typing import cast
 
 import pytest
 
@@ -28,6 +27,7 @@ from pants.backend.go.util_rules.coverage import GoCoverageData
 from pants.backend.go.util_rules.coverage_output import GoCoverageDataCollection
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
+    CoverageReport,
     CoverageReports,
     FilesystemCoverageReport,
     TestResult,
@@ -110,8 +110,7 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
         CoverageReports, [GoCoverageDataCollection([coverage_data])]
     )
     assert len(coverage_reports.reports) == 2
-    reports = cast(list[FilesystemCoverageReport], list(coverage_reports.reports))
-    reports.sort(key=lambda x: x.report_type)
+    reports: list[CoverageReport] = list(coverage_reports.reports)
 
     go_report = reports[0]
     assert isinstance(go_report, FilesystemCoverageReport)
