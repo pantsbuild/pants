@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 import shlex
@@ -22,19 +21,30 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
+from pants.core.goals.tailor import group_by_dir
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, Workspace
+from pants.engine.fs import (
+    CreateDigest,
+    DigestContents,
+    DigestEntries,
+    FileEntry,
+    SnapshotDiff,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.native_engine import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.util.strutil import softwrap
-
-logger = logging.getLogger(__name__)
-
 
 # Adapted from Go toolchain.
 # See https://github.com/golang/go/blob/master/src/cmd/go/internal/generate/generate.go and
@@ -63,17 +73,18 @@ class GoGenerateGoalSubsystem(GoalSubsystem):
         """
     )
 
-    env_vars = StrListOption(
-        default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
-        help=softwrap(
-            """
-            Environment variables to set when invoking generator programs.
-            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
-            or just `ENV_VAR` to copy the value from Pants's own environment.
-            """
-        ),
-        advanced=True,
-    )
+    class EnvironmentAware:
+        env_vars = StrListOption(
+            default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+            help=softwrap(
+                """
+                Environment variables to set when invoking generator programs.
+                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+                or just `ENV_VAR` to copy the value from Pants's own environment.
+                """
+            ),
+            advanced=True,
+        )
 
 
 class GoGenerateGoal(Goal):
@@ -227,9 +238,49 @@ async def _run_generators(
     return digest
 
 
+@rule_helper
+async def _merge_digests_with_overwrite(orig_digest: Digest, new_digest: Digest) -> Digest:
+    orig_snapshot, new_snapshot, orig_digest_entries, new_digest_entries = await MultiGet(
+        Get(Snapshot, Digest, orig_digest),
+        Get(Snapshot, Digest, new_digest),
+        Get(DigestEntries, Digest, orig_digest),
+        Get(DigestEntries, Digest, new_digest),
+    )
+
+    orig_snapshot_grouped = group_by_dir(orig_snapshot.files)
+    new_snapshot_grouped = group_by_dir(new_snapshot.files)
+
+    diff = SnapshotDiff.from_snapshots(orig_snapshot, new_snapshot)
+
+    output_entries: list[FileEntry] = []
+
+    # Keep unchanged original files and directories in the output.
+    orig_files_to_keep = set(diff.our_unique_files)
+    for dir_path in diff.our_unique_dirs:
+        for filename in orig_snapshot_grouped[dir_path]:
+            orig_files_to_keep.add(os.path.join(dir_path, filename))
+    for entry in orig_digest_entries:
+        if isinstance(entry, FileEntry) and entry.path in orig_files_to_keep:
+            output_entries.append(entry)
+
+    # Add new files/directories and changed files to the output.
+    new_files_to_keep = {*diff.their_unique_files, *diff.changed_files}
+    for dir_path in diff.their_unique_dirs:
+        for filename in new_snapshot_grouped[dir_path]:
+            new_files_to_keep.add(os.path.join(dir_path, filename))
+    for entry in new_digest_entries:
+        if isinstance(entry, FileEntry) and entry.path in new_files_to_keep:
+            output_entries.append(entry)
+
+    digest = await Get(Digest, CreateDigest(output_entries))
+    return digest
+
+
 @rule
 async def run_go_package_generators(
-    request: RunPackageGeneratorsRequest, goroot: GoRoot, subsystem: GoGenerateGoalSubsystem
+    request: RunPackageGeneratorsRequest,
+    goroot: GoRoot,
+    subsystem: GoGenerateGoalSubsystem.EnvironmentAware,
 ) -> RunPackageGeneratorsResult:
     fallible_analysis, env = await MultiGet(
         Get(
@@ -259,7 +310,9 @@ async def run_go_package_generators(
         output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await Get(Digest, MergeDigests([output_digest, output_digest_for_go_file]))
+        output_digest = await _merge_digests_with_overwrite(
+            output_digest, output_digest_for_go_file
+        )
 
     return RunPackageGeneratorsResult(output_digest)
 
