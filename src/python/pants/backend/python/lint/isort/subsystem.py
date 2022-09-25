@@ -18,14 +18,16 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
-class Isort(PythonToolBase):
+class Isort(GoalToolMixin, PythonToolBase):
     options_scope = "isort"
     name = "isort"
+    example_goal_name = "fmt"
     help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
     default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
@@ -39,7 +41,6 @@ class Isort(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/isort/isort.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
     export = ExportToolOption()
     config = FileListOption(

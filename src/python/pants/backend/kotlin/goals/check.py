@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 
+from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import KotlinFieldSet
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
@@ -30,8 +31,12 @@ class KotlincCheckRequest(CheckRequest):
 @rule(desc="Check compilation for Kotlin", level=LogLevel.DEBUG)
 async def kotlinc_check(
     request: KotlincCheckRequest,
+    kotlinc: KotlincSubsystem,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:
+    if kotlinc.skip:
+        return CheckResults([], checker_name=request.name)
+
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )

@@ -9,13 +9,15 @@ from typing import Iterable
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.strutil import softwrap
 
 
-class Shellcheck(TemplatedExternalTool):
+class Shellcheck(GoalToolMixin, TemplatedExternalTool):
     options_scope = "shellcheck"
     name = "Shellcheck"
+    example_goal_name = "lint"
     help = "A linter for shell scripts."
 
     default_version = "v0.8.0"
@@ -37,7 +39,6 @@ class Shellcheck(TemplatedExternalTool):
         "linux_x86_64": "linux.x86_64",
     }
 
-    skip = SkipOption("lint")
     args = ArgsListOption(example="-e SC20529")
     config_discovery = BoolOption(
         default=True,

@@ -14,13 +14,15 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 
 
-class Autoflake(PythonToolBase):
+class Autoflake(GoalToolMixin, PythonToolBase):
     options_scope = "autoflake"
     name = "Autoflake"
+    example_goal_name = "fmt"
     help = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
 
     default_version = "autoflake==1.4"
@@ -34,7 +36,6 @@ class Autoflake(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/autoflake/autoflake.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
         example="--remove-all-unused-imports --target-version=py37 --quiet",
         # This argument was previously hardcoded. Moved it a default argument

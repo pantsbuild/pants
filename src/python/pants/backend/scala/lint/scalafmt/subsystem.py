@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import SkipOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 
 
-class ScalafmtSubsystem(JvmToolBase):
+class ScalafmtSubsystem(GoalToolMixin, JvmToolBase):
     options_scope = "scalafmt"
     name = "scalafmt"
+    example_goal_name = "fmt"
     help = "scalafmt (https://scalameta.org/scalafmt/)"
 
     default_version = "3.2.1"
@@ -21,5 +22,3 @@ class ScalafmtSubsystem(JvmToolBase):
         "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
     )
     default_lockfile_url = git_url(default_lockfile_path)
-
-    skip = SkipOption("fmt", "lint")

@@ -58,11 +58,11 @@ from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
     FileOption,
-    SkipOption,
     StrListOption,
     StrOption,
     TargetListOption,
 )
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -89,9 +89,10 @@ class MyPyFieldSet(FieldSet):
 # --------------------------------------------------------------------------------------
 
 
-class MyPy(PythonToolBase):
+class MyPy(GoalToolMixin, PythonToolBase):
     options_scope = "mypy"
     name = "MyPy"
+    example_goal_name = "check"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_version = "mypy==0.961"
@@ -107,7 +108,6 @@ class MyPy(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
-    skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
     export = ExportToolOption()
     config = FileOption(

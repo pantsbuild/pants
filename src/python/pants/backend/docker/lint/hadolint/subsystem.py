@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.strutil import softwrap
 
 
-class Hadolint(TemplatedExternalTool):
+class Hadolint(GoalToolMixin, TemplatedExternalTool):
     options_scope = "hadolint"
     name = "Hadolint"
+    example_goal_name = "lint"
     help = "A linter for Dockerfiles."
 
     default_version = "v2.10.0"
@@ -31,7 +33,6 @@ class Hadolint(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    skip = SkipOption("lint")
     args = ArgsListOption(example="--format json")
     config = FileOption(
         default=None,

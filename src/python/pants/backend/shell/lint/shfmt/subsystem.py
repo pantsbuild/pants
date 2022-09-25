@@ -9,13 +9,15 @@ from typing import Iterable
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.strutil import softwrap
 
 
-class Shfmt(TemplatedExternalTool):
+class Shfmt(GoalToolMixin, TemplatedExternalTool):
     options_scope = "shfmt"
     name = "shfmt"
+    example_goal_name = "fmt"
     help = "An autoformatter for shell scripts (https://github.com/mvdan/sh)."
 
     default_version = "v3.2.4"
@@ -36,7 +38,6 @@ class Shfmt(TemplatedExternalTool):
         "linux_x86_64": "linux_amd64",
     }
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="-i 2")
     config_discovery = BoolOption(
         default=True,

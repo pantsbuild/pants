@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 from pants.option.option_types import ArgsListOption, DictOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.strutil import softwrap
 
 
-class Scalac(Subsystem):
+class Scalac(GoalToolMixin, Subsystem):
     options_scope = "scalac"
     name = "scalac"
+    example_goal_name = "check"
     help = "The Scala compiler."
 
     default_plugins_lockfile_path = (

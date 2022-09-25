@@ -36,13 +36,8 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.option_types import (
-    ArgsListOption,
-    BoolOption,
-    FileOption,
-    SkipOption,
-    TargetListOption,
-)
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, TargetListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -67,9 +62,10 @@ class PylintFieldSet(FieldSet):
 # --------------------------------------------------------------------------------------
 
 
-class Pylint(PythonToolBase):
+class Pylint(GoalToolMixin, PythonToolBase):
     options_scope = "pylint"
     name = "Pylint"
+    example_goal_name = "lint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_version = "pylint>=2.13.0,<2.15"
@@ -81,7 +77,6 @@ class Pylint(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
-    skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
     export = ExportToolOption()
     config = FileOption(

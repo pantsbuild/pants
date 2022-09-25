@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from pants.option.option_types import ArgsListOption, DictOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.strutil import softwrap
 
 
-class KotlincSubsystem(Subsystem):
+class KotlincSubsystem(GoalToolMixin, Subsystem):
     options_scope = "kotlinc"
     name = "kotlinc"
+    example_goal_name = "check"
     help = "The Kotlin programming language (https://kotlinlang.org/)."
 
     args = ArgsListOption(

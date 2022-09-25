@@ -7,14 +7,15 @@ import os
 from typing import Iterable
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.option.option_types import ArgsListOption, SkipOption
-from pants.option.subsystem import Subsystem
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.strutil import softwrap
 
 
-class Prettier(Subsystem):
+class Prettier(GoalToolMixin, Subsystem):
     options_scope = "prettier"
     name = "Prettier"
+    example_goal_name = "fmt"
     help = softwrap(
         """
         The Prettier utility for formatting JS/TS (and others) code
@@ -24,7 +25,6 @@ class Prettier(Subsystem):
 
     default_version = "prettier@2.6.2"
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:

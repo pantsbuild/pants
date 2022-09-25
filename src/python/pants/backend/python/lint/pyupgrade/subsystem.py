@@ -14,13 +14,15 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 
 
-class PyUpgrade(PythonToolBase):
+class PyUpgrade(GoalToolMixin, PythonToolBase):
     options_scope = "pyupgrade"
     name = "pyupgrade"
+    example_goal_name = "fmt"
     help = (
         "Upgrade syntax for newer versions of the language (https://github.com/asottile/pyupgrade)."
     )
@@ -36,7 +38,6 @@ class PyUpgrade(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/pyupgrade/pyupgrade.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--py39-plus --keep-runtime-typing")
     export = ExportToolOption()
 

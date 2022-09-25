@@ -14,13 +14,15 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 
 
-class AddTrailingComma(PythonToolBase):
+class AddTrailingComma(GoalToolMixin, PythonToolBase):
     options_scope = "add-trailing-comma"
     name = "add-trailing-comma"
+    example_goal_name = "fmt"
     help = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
 
     default_version = "add-trailing-comma==2.2.3"
@@ -39,7 +41,6 @@ class AddTrailingComma(PythonToolBase):
     )
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--py36-plus")
     export = ExportToolOption()
 

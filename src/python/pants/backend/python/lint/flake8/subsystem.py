@@ -40,9 +40,9 @@ from pants.option.option_types import (
     BoolOption,
     FileListOption,
     FileOption,
-    SkipOption,
     TargetListOption,
 )
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -61,9 +61,10 @@ class Flake8FieldSet(FieldSet):
         return tgt.get(SkipFlake8Field).value
 
 
-class Flake8(PythonToolBase):
+class Flake8(GoalToolMixin, PythonToolBase):
     options_scope = "flake8"
     name = "Flake8"
+    example_goal_name = "lint"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
     default_version = "flake8>=3.9.2,<4.0"
@@ -74,7 +75,6 @@ class Flake8(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/flake8/flake8.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
     export = ExportToolOption()
     config = FileOption(

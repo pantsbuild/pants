@@ -31,8 +31,12 @@ class ScalacCheckRequest(CheckRequest):
 @rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
 async def scalac_check(
     request: ScalacCheckRequest,
+    scalac: Scalac,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:
+    if scalac.skip:
+        return CheckResults([], checker_name=request.name)
+
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )

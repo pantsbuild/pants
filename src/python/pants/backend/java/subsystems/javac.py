@@ -6,14 +6,15 @@ from __future__ import annotations
 import logging
 
 from pants.option.option_types import ArgsListOption, BoolOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 
 logger = logging.getLogger(__name__)
 
 
-class JavacSubsystem(Subsystem):
+class JavacSubsystem(GoalToolMixin, Subsystem):
     options_scope = "javac"
     name = "javac"
+    example_goal_name = "check"
     help = "The javac Java source compiler."
 
     args = ArgsListOption(example="-g -deprecation")

@@ -28,7 +28,8 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -46,9 +47,10 @@ class BlackFieldSet(FieldSet):
         return tgt.get(SkipBlackField).value
 
 
-class Black(PythonToolBase):
+class Black(GoalToolMixin, PythonToolBase):
     options_scope = "black"
     name = "Black"
+    example_goal_name = "fmt"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_version = "black==22.6.0"
@@ -63,7 +65,6 @@ class Black(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")
     export = ExportToolOption()
     config = FileOption(

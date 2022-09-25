@@ -14,7 +14,7 @@ from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import DictOption, EnumOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -70,8 +70,9 @@ class ValidationConfig:
         )
 
 
-class RegexLintSubsystem(Subsystem):
+class RegexLintSubsystem(GoalToolMixin, Subsystem):
     options_scope = "regex-lint"
+    example_goal_name = "lint"
     help = softwrap(
         """
         Lint your code using regex patterns, e.g. to check for copyright headers.

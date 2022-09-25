@@ -31,8 +31,12 @@ class JavacCheckRequest(CheckRequest):
 @rule(desc="Check javac compilation", level=LogLevel.DEBUG)
 async def javac_check(
     request: JavacCheckRequest,
+    javac: JavacSubsystem,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:
+    if javac.skip:
+        return CheckResults([], checker_name=request.name)
+
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )

@@ -2,13 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.strutil import softwrap
 
 
-class Buildifier(TemplatedExternalTool):
+class Buildifier(GoalToolMixin, TemplatedExternalTool):
     options_scope = "buildifier"
     name = "Buildifier"
+    example_goal_name = "fmt"
     help = softwrap(
         """
         Buildifier is a tool for formatting BUILD files with a standard convention.
@@ -40,7 +42,6 @@ class Buildifier(TemplatedExternalTool):
         "linux_x86_64": "linux-amd64",
     }
 
-    skip = SkipOption("fmt")
     args = ArgsListOption(example="-lint=fix")
 
     # NB: buildifier doesn't (yet) support config files https://github.com/bazelbuild/buildtools/issues/479

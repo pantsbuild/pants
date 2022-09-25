@@ -2,13 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.option.option_types import SkipOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 
 
-class GoVetSubsystem(Subsystem):
+class GoVetSubsystem(GoalToolMixin, Subsystem):
     options_scope = "go-vet"
     name = "`go vet`"
+    example_goal_name = "lint"
     help = "`go vet`-specific options."
-
-    skip = SkipOption("lint")

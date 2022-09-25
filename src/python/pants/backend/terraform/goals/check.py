@@ -11,17 +11,15 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import SkipOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.strutil import pluralize
 
 
-class TerraformValidateSubsystem(Subsystem):
+class TerraformValidateSubsystem(GoalToolMixin, Subsystem):
     options_scope = "terraform-validate"
     name = "`terraform validate`"
+    example_goal_name = "check"
     help = """Terraform validate options."""
-
-    skip = SkipOption("check")
 
 
 class TerraformCheckRequest(CheckRequest):

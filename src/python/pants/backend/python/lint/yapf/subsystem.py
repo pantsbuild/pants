@@ -18,14 +18,16 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
-class Yapf(PythonToolBase):
+class Yapf(GoalToolMixin, PythonToolBase):
     options_scope = "yapf"
     name = "yapf"
+    example_goal_name = "fmt"
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_version = "yapf==0.32.0"
@@ -40,7 +42,6 @@ class Yapf(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/yapf/yapf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
         example="--no-local-style",
         extra_help=softwrap(

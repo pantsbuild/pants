@@ -18,14 +18,16 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
-class ClangFormat(PythonToolBase):
+class ClangFormat(GoalToolMixin, PythonToolBase):
     options_scope = "clang-format"
     name = "ClangFormat"
+    example_goal_name = "fmt"
     help = softwrap(
         """
         The clang-format utility for formatting C/C++ (and others) code
@@ -40,7 +42,6 @@ class ClangFormat(PythonToolBase):
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
 
     register_lockfile = True

@@ -25,7 +25,8 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, FileOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -43,9 +44,10 @@ class BanditFieldSet(FieldSet):
         return tgt.get(SkipBanditField).value
 
 
-class Bandit(PythonToolBase):
+class Bandit(GoalToolMixin, PythonToolBase):
     options_scope = "bandit"
     name = "Bandit"
+    example_goal_name = "lint"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
@@ -65,7 +67,6 @@ class Bandit(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/bandit/bandit.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("lint")
     args = ArgsListOption(example="--skip B101,B308 --confidence")
     export = ExportToolOption()
     config = FileOption(

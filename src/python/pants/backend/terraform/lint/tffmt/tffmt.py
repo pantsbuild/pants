@@ -20,20 +20,18 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import SkipOption
-from pants.option.subsystem import Subsystem
+from pants.option.subsystem import GoalToolMixin, Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
 
-class TfFmtSubsystem(Subsystem):
+class TfFmtSubsystem(GoalToolMixin, Subsystem):
     options_scope = "terraform-fmt"
     name = "`terraform fmt`"
+    example_goal_name = "fmt"
     help = "Terraform fmt options."
-
-    skip = SkipOption("fmt", "lint")
 
 
 class TffmtRequest(FmtTargetsRequest):

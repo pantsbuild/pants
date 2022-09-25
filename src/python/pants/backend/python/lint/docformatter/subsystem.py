@@ -13,13 +13,15 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 
 
-class Docformatter(PythonToolBase):
+class Docformatter(GoalToolMixin, PythonToolBase):
     options_scope = "docformatter"
     name = "docformatter"
+    example_goal_name = "fmt"
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_version = "docformatter>=1.4,<1.5"
@@ -33,7 +35,6 @@ class Docformatter(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/docformatter.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--wrap-summaries=100 --pre-summary-newline")
     export = ExportToolOption()
 

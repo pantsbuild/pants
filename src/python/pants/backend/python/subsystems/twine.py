@@ -18,14 +18,16 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, StrOption
+from pants.option.subsystem import GoalToolMixin
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
-class TwineSubsystem(PythonToolBase):
+class TwineSubsystem(GoalToolMixin, PythonToolBase):
     options_scope = "twine"
     name = "Twine"
+    example_goal_name = "publish"
     help = "The utility for publishing Python distributions to PyPI and other Python repositories."
 
     default_version = "twine>=3.7.1,<3.8"
@@ -45,7 +47,6 @@ class TwineSubsystem(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/subsystems/twine.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("publish")
     args = ArgsListOption(example="--skip-existing")
     config = FileOption(
         default=None,
