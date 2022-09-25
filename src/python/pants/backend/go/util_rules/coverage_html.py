@@ -24,6 +24,14 @@ from pants.engine.rules import collect_rules, rule
 # Adapted from Go toolchain.
 # See https://github.com/golang/go/blob/a0441c7ae3dea57a0553c9ea77e184c34b7da40f/src/cmd/cover/html.go
 #
+# Note: `go tool cover` could not be used for the HTML support because it attempts to find the source files
+# on its own using go list.
+# See https://github.com/golang/go/blob/a0441c7ae3dea57a0553c9ea77e184c34b7da40f/src/cmd/cover/func.go#L200-L222.
+#
+# The Go rules have been engineered to avoid `go list` due to it needing, among other things, all transitive
+# third-party dependencies available to it when analyzing first-party sources. Thus, the use of `go list` by
+# `go tool cover` in this case means we cannot use `go tool cover` to generate the HTML.
+#
 # Original copyright:
 #  // Copyright 2013 The Go Authors. All rights reserved.
 #  // Use of this source code is governed by a BSD-style
