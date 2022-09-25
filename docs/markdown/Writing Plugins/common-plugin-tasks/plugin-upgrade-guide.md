@@ -9,6 +9,13 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### Subsystems used in `fmt`/`lint`/`check`/etc... should inherit from `GoalToolSubsystem`
+
+The new subsystem base is declared in `pants.options.subsystem`, and provides the `skip` option.
+
+If your subsystem participates in a goal like `fmt` or `check`, declare it as a base class, and remove
+your `skip` option.
+
 ### `platform` kwarg for `Process` deprecated
 
 Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
@@ -126,7 +133,7 @@ on `FieldSet`'s mechanisms for matching targets and getting field values.
 Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
 `GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
 distinguish what language a tool belongs to, which is used for options like
-`[python].resolves_to_constraints_file` to validate which resolve names are recognized. 
+`[python].resolves_to_constraints_file` to validate which resolve names are recognized.
 
 Things will still work if you do not make this change, other than the new options not recognizing
 your tool.

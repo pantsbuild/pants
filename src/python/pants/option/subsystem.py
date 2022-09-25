@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 from pants import ox
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import OptionsInfo, collect_options_info
+from pants.option.option_types import BoolOption, OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.docutil import bin_name
 from pants.util.memo import memoized_classmethod
+from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
@@ -246,6 +248,28 @@ class Subsystem(metaclass=_SubsystemMeta):
         if type(self) != type(other):
             return False
         return bool(self.options == other.options)
+
+
+class GoalToolMixin(Subsystem):
+    """Subsystem mixin for tools that invoked with other tools as part of a goal.
+
+    E.g. fmt/lint/check/etc...
+    """
+
+    example_goal_name: ClassVar[str]
+
+    @classproperty
+    def tool_name(cls) -> str:
+        """The tool name to use for goal options (e.g. `--fmt-only`)."""
+        return cls.options_scope
+
+    skip = BoolOption(
+        default=False,
+        help=lambda subsystem_cls: (
+            f"If true, don't use {subsystem_cls.options_scope} when running goals like "
+            + f" `{bin_name()} {subsystem_cls.example_goal_name}`"
+        ),
+    )
 
 
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
