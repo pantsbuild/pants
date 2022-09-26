@@ -25,14 +25,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::HashMap;
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
 use lazy_static::lazy_static;
+use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::task::{Id, JoinSet};
 
 lazy_static! {
     // Lazily initialized in Executor::global.
@@ -199,5 +203,92 @@ impl Executor {
     stdio::scope_task_destination(stdio_destination, async move {
       workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
     })
+  }
+
+  /// Return a reference to this executor's runtime handle.
+  pub fn handle(&self) -> &Handle {
+    &self.handle
+  }
+}
+
+/// Store "tail" tasks which are async tasks that can execute concurrently with regular
+/// build actions. Tail task block completion of a session until all of them have been
+/// completed (subject to a timeout).
+#[derive(Clone)]
+pub struct TailTasks {
+  inner: Arc<Mutex<TailTasksInner>>,
+}
+
+struct TailTasksInner {
+  id_to_name: HashMap<Id, String>,
+  task_set: JoinSet<()>,
+}
+
+impl TailTasks {
+  pub fn new() -> Self {
+    Self {
+      inner: Arc::new(Mutex::new(TailTasksInner {
+        id_to_name: HashMap::new(),
+        task_set: JoinSet::new(),
+      })),
+    }
+  }
+
+  /// Spawn a tail task with the given name.
+  pub fn spawn_on<F>(&self, name: &str, task: F, handle: &Handle)
+  where
+    F: Future<Output = ()>,
+    F: Send + 'static,
+  {
+    let mut inner = self.inner.lock();
+    let h = inner.task_set.spawn_on(task, handle);
+    inner.id_to_name.insert(h.id(), name.to_string());
+  }
+
+  /// Wait for all tail tasks to complete subject to the given timeout. If tasks
+  /// fail or do not complete, log that fact.
+  pub async fn wait(self, timeout: Duration) {
+    let mut inner = self.inner.lock();
+
+    if inner.task_set.is_empty() {
+      return;
+    }
+
+    log::debug!(
+      "waiting for {} session end task(s) to complete",
+      inner.task_set.len()
+    );
+
+    let mut timeout = tokio::time::sleep(timeout).boxed();
+
+    loop {
+      tokio::select! {
+        // Use biased mode to prefer an expired timeout over joining on remaining tasks.
+        biased;
+
+        // Exit monitoring loop if timeout expires.
+        _ = &mut timeout => break,
+
+        next_result = inner.task_set.join_next_with_id() => {
+          match next_result {
+            Some(Ok(_)) => (),
+            Some(Err(err)) => {
+              log::error!("a session end task failed: {err:?}");
+            }
+            None => break,
+          }
+        }
+      }
+    }
+
+    if inner.task_set.is_empty() {
+      log::debug!("all session end tasks completed successfully");
+    } else {
+      log::debug!(
+        "{} session end task(s) failed to complete within timeout",
+        inner.task_set.len()
+      );
+      inner.task_set.abort_all();
+    }
   }
 }

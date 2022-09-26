@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 
 use deepsize::DeepSizeOf;
 use futures::{future, FutureExt};
-use futures_core::future::BoxFuture;
 use log::debug;
 use tokio::time;
 
@@ -322,9 +321,8 @@ impl Scheduler {
             refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
           }
           res = &mut execution_task => {
-            // Wait for tail tasks to complete.
-            let tail_tasks = session.tail_tasks().lock().drain(..).collect();
-            Self::wait_for_tail_tasks(tail_tasks, self.core.session_end_tasks_timeout).await;
+            // Wait for session end ("tail") tasks to complete.
+            session.tail_tasks().wait(self.core.session_end_tasks_timeout).await;
 
             // Completed successfully.
             break Ok(Self::execute_record_results(&request.roots, session, res));
@@ -335,8 +333,6 @@ impl Scheduler {
       result
     })
   }
-
-  async fn wait_for_tail_tasks(tasks: Vec<BoxFuture<'static, ()>>, timeout: Duration) {}
 
   fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
     deadline

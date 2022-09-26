@@ -3258,6 +3258,8 @@ dependencies = [
  "arc-swap",
  "futures",
  "lazy_static",
+ "log",
+ "parking_lot 0.12.1",
  "stdio",
  "tokio",
  "workunit_store",
