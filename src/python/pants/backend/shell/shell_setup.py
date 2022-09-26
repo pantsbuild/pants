@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import os
 
-from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import BoolOption, StrListOption
-from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.option.subsystem import DependsOnEnvVars, Subsystem
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
@@ -32,7 +31,9 @@ class ShellSetup(Subsystem):
         advanced=True,
     )
 
-    class EnvironmentAware:
+    class EnvironmentAware(DependsOnEnvVars):
+        env_var_names = ("PATH",)
+
         _executable_search_path = StrListOption(
             default=["<PATH>"],
             help=softwrap(
@@ -47,12 +48,12 @@ class ShellSetup(Subsystem):
             metavar="<binary-paths>",
         )
 
-        @memoized_method
-        def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
+        @memoized_property
+        def executable_search_path(self) -> tuple[str, ...]:
             def iter_path_entries():
                 for entry in self._executable_search_path:
                     if entry == "<PATH>":
-                        path = env.get("PATH")
+                        path = self.env_vars.get("PATH")
                         if path:
                             yield from path.split(os.pathsep)
                     else:
