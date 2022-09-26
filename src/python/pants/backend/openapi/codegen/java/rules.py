@@ -25,7 +25,6 @@ from pants.backend.openapi.util_rules.generator_process import (
     OpenAPIGeneratorType,
 )
 from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, PomReport
-from pants.build_graph.address import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     AddPrefix,
@@ -83,9 +82,9 @@ class OpenApiDocumentJavaFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class CompileOpenApiIntoJavaRequest:
-    address: Address
     input_file: str
     input_digest: Digest
+    description: str
     api_package: str | None = None
     model_package: str | None = None
 
@@ -125,7 +124,7 @@ async def compile_openapi_into_java(
         ],
         input_digest=merged_digests,
         output_directories=(output_dir,),
-        description=f"Generating Java sources from OpenAPI definition {request.address}",
+        description=request.description,
         level=LogLevel.DEBUG,
     )
 
@@ -178,9 +177,9 @@ async def generate_java_from_openapi(request: GenerateJavaFromOpenAPIRequest) ->
         Get(
             CompiledJavaFromOpenApi,
             CompileOpenApiIntoJavaRequest(
-                field_set.address,
                 file,
                 input_digest=input_digest,
+                description=f"Generating Java sources from OpenAPI definition {field_set.address}",
                 api_package=field_set.api_package.value,
                 model_package=field_set.model_package.value,
             ),
@@ -240,9 +239,9 @@ async def infer_openapi_java_dependencies(
     compiled_sources = await Get(
         CompiledJavaFromOpenApi,
         CompileOpenApiIntoJavaRequest(
-            address=request.field_set.address,
             input_file=sample_spec_name,
             input_digest=sample_source_digest,
+            description=f"Inferring Java runtime dependencies for OpenAPI {request.field_set.address}",
         ),
     )
 
