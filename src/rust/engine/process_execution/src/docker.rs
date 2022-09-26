@@ -45,7 +45,7 @@ pub struct CommandRunner {
 }
 
 #[derive(Clone)]
-struct DockerOnceCell {
+pub struct DockerOnceCell {
   cell: Arc<OnceCell<Docker>>,
 }
 

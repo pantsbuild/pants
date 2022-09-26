@@ -23,6 +23,7 @@ use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
+use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
@@ -121,6 +122,13 @@ impl Intrinsics {
         ],
       },
       Box::new(interactive_process),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.docker_resolve_image_result,
+        inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
+      },
+      Box::new(docker_resolve_image),
     );
     Intrinsics { intrinsics }
   }
@@ -644,4 +652,47 @@ fn interactive_process(
     };
     Ok(result)
   }.boxed()
+}
+
+use process_execution::docker::DockerOnceCell;
+fn docker_resolve_image(
+  context: Context,
+  args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let types = &context.core.types;
+    let docker_resolve_image_result = types.docker_resolve_image_result;
+
+    let image_name = Python::with_gil(|py| {
+      let py_docker_request = (*args[0]).as_ref(py);
+      let image_name: String = externs::getattr(py_docker_request, "image_name").unwrap();
+      image_name
+    });
+
+    // TODO: Store this somewhere as a singleton?
+    let docker_cell = DockerOnceCell::new();
+    let docker = docker_cell.get().await?;
+
+    let image_metadata = docker.inspect_image(&image_name).await.map_err(|err| {
+      format!(
+        "Failed to resolve image ID for image `{}`: {:?}",
+        &image_name, err
+      )
+    })?;
+    let image_id = image_metadata
+      .id
+      .ok_or_else(|| format!("Image does not exist: `{}`", &image_name))?;
+
+    let result = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      externs::unsafe_call(
+        py,
+        docker_resolve_image_result,
+        &[Value::from(PyString::new(py, &image_id).to_object(py))],
+      )
+    };
+    Ok(result)
+  }
+  .boxed()
 }
