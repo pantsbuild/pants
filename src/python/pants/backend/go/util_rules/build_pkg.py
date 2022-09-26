@@ -53,6 +53,10 @@ class BuildGoPackageRequest(EngineAwareParameter):
         coverage_config: GoCoverageConfig | None = None,
         cgo_file_names: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
+        c_files: tuple[str, ...] = (),
+        cxx_files: tuple[str, ...] = (),
+        objc_files: tuple[str, ...] = (),
+        fortran_files: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -73,6 +77,10 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.coverage_config = coverage_config
         self.cgo_file_names = cgo_file_names
         self.cgo_flags = cgo_flags
+        self.c_files = c_files
+        self.cxx_files = cxx_files
+        self.objc_files = objc_files
+        self.fortran_files = fortran_files
         self._hashcode = hash(
             (
                 self.import_path,
@@ -88,6 +96,10 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.coverage_config,
                 self.cgo_file_names,
                 self.cgo_flags,
+                self.c_files,
+                self.cxx_files,
+                self.objc_files,
+                self.fortran_files,
             )
         )
 
@@ -108,7 +120,11 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"embed_config={self.embed_config}, "
             f"coverage_config={self.coverage_config}, "
             f"cgo_file_names={self.cgo_file_names}, "
-            f"cgo_flags={self.cgo_flags}"
+            f"cgo_flags={self.cgo_flags}, "
+            f"c_files={self.c_files}, "
+            f"cxx_files={self.cxx_files}, "
+            f"objc_files={self.objc_files}, "
+            f"fortran_files={self.fortran_files}"
             ")"
         )
 
@@ -132,6 +148,10 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.coverage_config == other.coverage_config
             and self.cgo_file_names == other.cgo_file_names
             and self.cgo_flags == other.cgo_flags
+            and self.c_files == other.c_files
+            and self.cxx_files == other.cxx_files
+            and self.objc_files == other.objc_files
+            and self.fortran_files == other.fortran_files
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -340,6 +360,10 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
+                c_files=request.c_files,
+                cxx_files=request.cxx_files,
+                objc_files=request.objc_files,
+                fortran_files=request.fortran_files,
             ),
         )
         assert cgo_compile_result is not None

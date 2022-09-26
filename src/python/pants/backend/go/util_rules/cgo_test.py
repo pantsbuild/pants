@@ -150,8 +150,6 @@ def test_cgo_compile(rule_runner: RuleRunner) -> None:
         pkg_name=analysis.name,
         digest=pkg_digest.digest,
         dir_path=analysis.dir_path,
-        m_files=(),
-        f_files=(),
         cgo_files=analysis.cgo_files,
         cgo_flags=analysis.cgo_flags,
     )
