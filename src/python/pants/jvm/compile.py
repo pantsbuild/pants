@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
-from pants.core.target_types import FilesGeneratingSourcesField, FileSourceField
+from pants.core.target_types import (
+    FilesGeneratingSourcesField,
+    FileSourceField,
+    RelocatedFilesOriginalTargetsField,
+)
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
@@ -290,8 +294,15 @@ class ClasspathEntry:
         """
         for cpe in entries:
             fingerprint_prefix = cpe.digest.fingerprint[:12]
+            has_class_files = False
             for filename in cpe.filenames:
-                yield os.path.join(prefix, fingerprint_prefix, filename)
+                if filename.endswith(".jar"):
+                    yield os.path.join(prefix, fingerprint_prefix, filename)
+                elif filename.endswith(".class"):
+                    has_class_files = True
+
+            if has_class_files:
+                yield os.path.join(prefix, fingerprint_prefix)
 
     @classmethod
     def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
@@ -425,7 +436,9 @@ def classpath_dependency_requests(
         return sum(
             1
             for t in coarsened_dep.members
-            if t.has_field(FileSourceField) or t.has_field(FilesGeneratingSourcesField)
+            if t.has_field(FileSourceField)
+            or t.has_field(FilesGeneratingSourcesField)
+            or t.has_field(RelocatedFilesOriginalTargetsField)
         ) == len(coarsened_dep.members)
 
     return ClasspathEntryRequests(

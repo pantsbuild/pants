@@ -354,8 +354,14 @@ def test_allow_files_dependency(
         {
             "BUILD": dedent(
                 """\
-                scala_sources(name='main', dependencies=[":files"])
+                scala_sources(name='main', dependencies=[":files", ":relocated"])
                 files(name="files", sources=["File.txt"])
+                relocated_files(
+                    name="relocated",
+                    files_targets=[":files"],
+                    src="",
+                    dest="files",
+                )
                 """
             ),
             "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
