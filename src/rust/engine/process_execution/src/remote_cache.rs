@@ -505,31 +505,27 @@ impl crate::CommandRunner for CommandRunner {
     {
       let command_runner = self.clone();
       let result = result.clone();
-      let write_fut = self.executor.spawn(in_workunit!(
-        "remote_cache_write",
-        Level::Trace,
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
-          let write_result = command_runner
-            .update_action_cache(
-              &result,
-              command_runner.instance_name.clone(),
-              &command,
-              action_digest,
-              command_digest,
-            )
-            .await;
-          match write_result {
-            Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
-            Err(err) => {
-              command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
-              workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
-            }
-          };
-        }
-        // NB: We must box the future to avoid a stack overflow.
-        .boxed()
-      ));
+      let write_fut = in_workunit!("remote_cache_write", Level::Trace, |workunit| async move {
+        workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
+        let write_result = command_runner
+          .update_action_cache(
+            &result,
+            command_runner.instance_name.clone(),
+            &command,
+            action_digest,
+            command_digest,
+          )
+          .await;
+        match write_result {
+          Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+          Err(err) => {
+            command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
+            workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          }
+        };
+      }
+      // NB: We must box the future to avoid a stack overflow.
+      .boxed());
       let task_name = format!("remote cache write {:?}", action_digest);
       context
         .tail_tasks
