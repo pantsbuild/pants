@@ -213,7 +213,7 @@ impl Executor {
 }
 
 /// Store "tail" tasks which are async tasks that can execute concurrently with regular
-/// build actions. Tail task block completion of a session until all of them have been
+/// build actions. Tail tasks block completion of a session until all of them have been
 /// completed (subject to a timeout).
 #[derive(Clone)]
 pub struct TailTasks {
