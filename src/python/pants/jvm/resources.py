@@ -89,7 +89,7 @@ async def assemble_resources_jar(
 
     resources_jar_input_digest = source_files.snapshot.digest
 
-    input_filenames = shlex.join(sorted(input_files))
+    input_filenames = " ".join(shlex.quote(file) for file in sorted(input_files))
 
     resources_jar_result = await Get(
         ProcessResult,
