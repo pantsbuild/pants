@@ -11,6 +11,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import OptionsInfo, collect_options_info
@@ -191,7 +192,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
             func=inner,
-            input_gets=(),
+            input_gets=(
+                AwaitableConstraints(
+                    output_type=EnvironmentVars,
+                    input_types=(EnvironmentVarsRequest,),
+                    is_effect=False,
+                ),
+            ),
             canonical_name=name,
         )
 
@@ -248,6 +255,14 @@ class Subsystem(metaclass=_SubsystemMeta):
         return bool(self.options == other.options)
 
 
+class DependsOnEnvVars:
+    """Indicates that an `EnvironmentAware` subclass depends environment variables, and makes them
+    available to instances at construction time."""
+
+    env_var_names: ClassVar[tuple[str, ...]]
+    env_vars: EnvironmentVars
+
+
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
@@ -265,5 +280,8 @@ async def _construct_env_aware(
 
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
+
+    if isinstance(t, DependsOnEnvVars):
+        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.env_var_names))
 
     return t
