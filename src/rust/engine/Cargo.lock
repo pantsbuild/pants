@@ -3257,6 +3257,7 @@ version = "0.0.1"
 dependencies = [
  "arc-swap",
  "futures",
+ "itertools",
  "lazy_static",
  "log",
  "parking_lot 0.12.1",

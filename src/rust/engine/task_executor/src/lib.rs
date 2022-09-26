@@ -33,6 +33,7 @@ use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
@@ -262,7 +263,7 @@ impl TailTasks {
     let mut inner = match self.inner.lock().take() {
       Some(inner) => inner,
       None => {
-        log::warn!("Session end tasks awaited multiple times!");
+        log::debug!("Session end tasks awaited multiple times!");
         return;
       }
     };
@@ -288,9 +289,12 @@ impl TailTasks {
 
         next_result = inner.task_set.join_next_with_id() => {
           match next_result {
-            Some(Ok(_)) => (),
+            Some(Ok((id, _))) => {
+              inner.id_to_name.remove(&id);
+            },
             Some(Err(err)) => {
-              log::error!("a session end task failed: {err:?}");
+              let name = inner.id_to_name.get(&err.id());
+              log::error!("Session end task `{name:?}` failed: {err:?}");
             }
             None => break,
           }
@@ -302,8 +306,9 @@ impl TailTasks {
       log::debug!("all session end tasks completed successfully");
     } else {
       log::debug!(
-        "{} session end task(s) failed to complete within timeout",
-        inner.task_set.len()
+        "{} session end task(s) failed to complete within timeout: {}",
+        inner.task_set.len(),
+        inner.id_to_name.values().join(", "),
       );
       inner.task_set.abort_all();
     }
