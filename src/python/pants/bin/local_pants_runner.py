@@ -123,13 +123,14 @@ class LocalPantsRunner:
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
         options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
-        build_config, options = options_initializer.build_config_and_options(
-            options_bootstrapper, env, raise_=True
+        build_config = options_initializer.build_config(options_bootstrapper, env)
+        union_membership = UnionMembership.from_rules(build_config.union_rules)
+        options = options_initializer.options(
+            options_bootstrapper, env, build_config, union_membership, raise_=True
         )
         stdio_destination_use_color(options.for_global_scope().colors)
 
         run_tracker = RunTracker(options_bootstrapper.args, options)
-        union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.

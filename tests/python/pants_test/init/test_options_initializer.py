@@ -5,6 +5,7 @@ import unittest
 
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -18,9 +19,15 @@ class OptionsInitializerTest(unittest.TestCase):
         )
 
         env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(options_bootstrapper)
+        build_config = initializer.build_config(options_bootstrapper, env)
         with self.assertRaises(ExecutionError):
-            OptionsInitializer(options_bootstrapper).build_config_and_options(
-                options_bootstrapper, env, raise_=True
+            initializer.options(
+                options_bootstrapper,
+                env,
+                build_config,
+                union_membership=UnionMembership({}),
+                raise_=True,
             )
 
     def test_global_options_validation(self) -> None:
@@ -31,8 +38,12 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
         env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(ob)
+        build_config = initializer.build_config(ob, env)
         with self.assertRaises(ExecutionError) as exc:
-            OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
+            initializer.options(
+                ob, env, build_config, union_membership=UnionMembership({}), raise_=True
+            )
         self.assertIn(
             "The `--no-watch-filesystem` option may not be set if `--pantsd` or `--loop` is set.",
             str(exc.exception),
