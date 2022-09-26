@@ -26,7 +26,6 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     FallbackEnvironmentField,
     LocalEnvironmentTarget,
-    NoCompatibleEnvironmentError,
     NoFallbackEnvironmentError,
     RemoteEnvironmentTarget,
     RemoteExtraPlatformPropertiesField,
@@ -189,10 +188,9 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--environments-preview-names={'e': '//:e1'}"])
     assert get_env().val.address == Address("", target_name="e1")  # type: ignore[union-attr]
 
-    # Error if `--names` set, but no compatible platforms
+    # If `--names` is set, but no compatible platforms, do not choose an environment.
     rule_runner.set_options(["--environments-preview-names={'e': '//:not-compatible'}"])
-    with engine_error(NoCompatibleEnvironmentError):
-        get_env()
+    assert get_env().val is None
 
     # Error if >1 compatible targets.
     rule_runner.set_options(["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2'}"])
