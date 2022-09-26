@@ -43,6 +43,7 @@ class OpenAPIGeneratorProcess:
     extra_env: FrozenDict[str, str]
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_classpath_entries: tuple[str, ...]
+    extra_jvm_options: tuple[str, ...]
     cache_scope: ProcessCacheScope | None
     output_directories: tuple[str, ...]
     output_files: tuple[str, ...]
@@ -60,6 +61,7 @@ class OpenAPIGeneratorProcess:
         extra_env: Mapping[str, str] | None = None,
         extra_classpath_entries: Iterable[str] | None = None,
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
+        extra_jvm_options: Iterable[str] | None = None,
         cache_scope: ProcessCacheScope | None = None,
     ):
         self.generator_type = generator_type
@@ -72,6 +74,7 @@ class OpenAPIGeneratorProcess:
         self.extra_env = FrozenDict(extra_env or {})
         self.extra_classpath_entries = tuple(extra_classpath_entries or ())
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
+        self.extra_jvm_options = tuple(extra_jvm_options or ())
         self.cache_scope = cache_scope
 
 
@@ -96,6 +99,8 @@ async def openapi_generator_process(
         *request.extra_classpath_entries,
     ]
 
+    extra_jvm_options = [*subsystem.jvm_options, *request.extra_jvm_options]
+
     jvm_process = JvmProcess(
         jdk=jdk,
         argv=[
@@ -109,6 +114,7 @@ async def openapi_generator_process(
         input_digest=request.input_digest,
         extra_env=request.extra_env,
         extra_immutable_input_digests=immutable_input_digests,
+        extra_jvm_options=extra_jvm_options,
         description=request.description,
         level=request.level,
         output_directories=request.output_directories,
