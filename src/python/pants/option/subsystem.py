@@ -88,8 +88,11 @@ class Subsystem(metaclass=_SubsystemMeta):
         """
 
         subsystem: ClassVar[type[Subsystem]]
+        depends_on_env_vars: ClassVar[tuple[str, ...]] = ()
+
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
+        env_vars: EnvironmentVars
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
@@ -255,14 +258,6 @@ class Subsystem(metaclass=_SubsystemMeta):
         return bool(self.options == other.options)
 
 
-class DependsOnEnvVars:
-    """Indicates that an `EnvironmentAware` subclass depends environment variables, and makes them
-    available to instances at construction time."""
-
-    env_var_names: ClassVar[tuple[str, ...]]
-    env_vars: EnvironmentVars
-
-
 async def _construct_subsytem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
     scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
     return subsystem_typ(scoped_options.options)
@@ -281,7 +276,7 @@ async def _construct_env_aware(
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
 
-    if isinstance(t, DependsOnEnvVars):
-        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.env_var_names))
+    if t.depends_on_env_vars:
+        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.depends_on_env_vars))
 
     return t

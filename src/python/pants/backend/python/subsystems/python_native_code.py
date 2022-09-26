@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from pants.option.option_types import StrListOption
-from pants.option.subsystem import DependsOnEnvVars, Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
@@ -15,8 +15,8 @@ class PythonNativeCodeSubsystem(Subsystem):
     options_scope = "python-native-code"
     help = "Options for building native code using Python, e.g. when resolving distributions."
 
-    class EnvironmentAware(DependsOnEnvVars):
-        env_var_names = ("CPPFLAGS", "LDFLAGS")
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        depends_on_env_vars = ("CPPFLAGS", "LDFLAGS")
 
         # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
         _cpp_flags = StrListOption(

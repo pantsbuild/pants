@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 
 from pants.option.option_types import BoolOption, StrListOption
-from pants.option.subsystem import DependsOnEnvVars, Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
@@ -31,8 +31,8 @@ class ShellSetup(Subsystem):
         advanced=True,
     )
 
-    class EnvironmentAware(DependsOnEnvVars):
-        env_var_names = ("PATH",)
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        depends_on_env_vars = ("PATH",)
 
         _executable_search_path = StrListOption(
             default=["<PATH>"],
