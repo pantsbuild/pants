@@ -9,8 +9,8 @@ from pants.backend.java.target_types import JavaSourceField
 from pants.backend.openapi.codegen.java import extra_fields
 from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaApiPackageField,
-    OpenApiJavaCodegenSkipField,
     OpenApiJavaModelPackageField,
+    OpenApiJavaSkipField,
 )
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.target_types import (
@@ -78,7 +78,7 @@ class OpenApiDocumentJavaFieldSet(FieldSet):
     dependencies: OpenApiDocumentDependenciesField
     api_package: OpenApiJavaApiPackageField
     model_package: OpenApiJavaModelPackageField
-    skip: OpenApiJavaCodegenSkipField
+    skip: OpenApiJavaSkipField
 
 
 @dataclass(frozen=True)
@@ -209,6 +209,7 @@ class OpenApiDocumentJavaRuntimeInferenceFieldSet(FieldSet):
 
     dependencies: OpenApiDocumentDependenciesField
     resolve: JvmResolveField
+    skip: OpenApiJavaSkipField
 
 
 class InferOpenApiJavaRuntimeDependencyRequest(InferDependenciesRequest):
@@ -221,6 +222,9 @@ async def infer_openapi_java_dependencies(
     jvm: JvmSubsystem,
     jvm_artifact_targets: AllJvmArtifactTargets,
 ) -> InferredDependencies:
+    if request.field_set.skip.value:
+        return InferredDependencies([])
+
     resolve = request.field_set.resolve.normalized_value(jvm)
 
     # Because the runtime dependencies are the same regardless of the source being compiled

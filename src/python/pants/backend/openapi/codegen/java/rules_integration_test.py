@@ -124,7 +124,14 @@ def test_skip_generate_java(rule_runner: RuleRunner) -> None:
     def assert_gen(address: Address, expected: Iterable[str]) -> None:
         _assert_generated_files(rule_runner, address, expected_files=expected)
 
-    assert_gen(Address("", target_name="petstore"), [])
+    tgt_address = Address("", target_name="petstore")
+    assert_gen(tgt_address, [])
+
+    tgt = rule_runner.get_target(tgt_address)
+    runtime_dependencies = rule_runner.request(
+        Addresses, [DependenciesRequest(tgt[OpenApiDocumentDependenciesField])]
+    )
+    assert not runtime_dependencies
 
 
 @maybe_skip_jdk_test

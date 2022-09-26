@@ -16,7 +16,7 @@ class OpenApiJavaApiPackageField(StringField):
     help = "Root package for generated API code"
 
 
-class OpenApiJavaCodegenSkipField(BoolField):
+class OpenApiJavaSkipField(BoolField):
     alias = "skip_java"
     default = False
     help = "If true, skips generation of Java sources from this target"
@@ -24,10 +24,10 @@ class OpenApiJavaCodegenSkipField(BoolField):
 
 def rules():
     return [
-        OpenApiDocumentTarget.register_plugin_field(OpenApiJavaCodegenSkipField),
+        OpenApiDocumentTarget.register_plugin_field(OpenApiJavaSkipField),
         OpenApiDocumentTarget.register_plugin_field(OpenApiJavaModelPackageField),
         OpenApiDocumentTarget.register_plugin_field(OpenApiJavaApiPackageField),
-        OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiJavaCodegenSkipField),
+        OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiJavaSkipField),
         OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiJavaModelPackageField),
         OpenApiDocumentGeneratorTarget.register_plugin_field(OpenApiJavaApiPackageField),
         # Default Pants JVM fields
