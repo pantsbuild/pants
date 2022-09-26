@@ -49,6 +49,7 @@ from pants.engine.target import (
     InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
+    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -1318,6 +1319,23 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
             "demo:parent@parent=b": {"demo:child@child=b"},
         },
     )
+
+
+@pytest.mark.parametrize(
+    "field_content",
+    [
+        "tagz=['tag']",
+        "tagz=parametrize(['tag1'], ['tag2'])",
+    ],
+)
+def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
+    with engine_error(InvalidFieldException, contains=f"Unrecognized field `{field_content}`"):
+        assert_generated(
+            generated_targets_rule_runner,
+            Address("demo"),
+            f"generator({field_content}, sources=['*.ext'])",
+            ["f1.ext", "f2.ext"],
+        )
 
 
 # -----------------------------------------------------------------------------------------------
