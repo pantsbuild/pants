@@ -26,6 +26,7 @@ from pants.base.build_environment import (
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
@@ -1208,9 +1209,16 @@ class BootstrapOptions:
         advanced=True,
         default=None,
         help=softwrap(
-            """
+            f"""
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+
+            Even when using the `docker_environment` and `remote_environment` targets, this path
+            will be read from the local host, and those certs will be used in the environment.
+
+            This option cannot be overridden via environment targets, so if you need a different
+            value than what the rest of your organization is using, override the value via an
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('options')}.
             """
         ),
     )
@@ -1932,3 +1940,20 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+def ca_certs_path_to_file_content(path: str) -> FileContent:
+    """Set up FileContent for using the ca_certs_path locally in a process sandbox.
+
+    This helper can be used when setting up a Process so that the certs are included in the process.
+    Use `Get(Digest, CreateDigest)`, and then include this in the `input_digest` for the Process.
+    Typically, you will also need to configure the invoking tool to load those certs, via its argv
+    or environment variables.
+
+    Note that the certs are always read on the localhost, even when using Docker and remote
+    execution. Then, those certs can be copied into the process.
+    """
+    # Because the certs path may not exist in the repo, we use `Path`. Better would be
+    # https://github.com/pantsbuild/pants/issues/10842 so that we invalidate when the contents
+    # change.
+    return FileContent(os.path.basename(path), Path(path).read_bytes())
