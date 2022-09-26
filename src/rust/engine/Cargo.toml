@@ -5,8 +5,9 @@ name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
-# NOTE: See `.cargo/config` for `--cfg` flags enabled for these crates.
-# For now, that files enabled `tokio_unstable` to access some unstable APIs in Tokio.
+# NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
+# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
+# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
 
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
