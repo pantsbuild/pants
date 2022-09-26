@@ -92,7 +92,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
-        env_vars: EnvironmentVars
+        env_vars: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
