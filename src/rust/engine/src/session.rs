@@ -370,9 +370,9 @@ impl Session {
     }
   }
 
-  /// Returns a Vec of futures representing an asynchronous "tail" task that should not block
-  /// individual nodes in the build graph but should block (up to a configurable timeout)
-  /// ending this `Session`.
+  /// Return a reference to `TailTasks` for this session which monitors tasks representing
+  /// asynchronous "tail" tasks that should not block individual nodes in the build graph but
+  /// should block the ending of this `Session` (when the `.wait` method is called).
   pub fn tail_tasks(&self) -> TailTasks {
     self.state.tail_tasks.clone()
   }
