@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -64,6 +65,7 @@ async def run_golangci_lint(
     goroot: GoRoot,
     bash: BashBinary,
     platform: Platform,
+    golang_subsystem: GolangSubsystem,
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
@@ -123,9 +125,7 @@ async def run_golangci_lint(
             export GOPATH="${{sandbox_root}})/gopath"
             export GOCACHE="${{sandbox_root}}/gocache"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
-            # TODO: figure out combination of env variables
-            # that allows CGO?
-            export CGO_ENABLED=0
+            export CGO_ENABLED={1 if golang_subsystem.cgo_enabled else 0}
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             exec "$@"
             """
