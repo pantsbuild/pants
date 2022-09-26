@@ -3,6 +3,7 @@
 
 import itertools
 import logging
+import shlex
 from itertools import chain
 from pathlib import Path
 
@@ -87,6 +88,9 @@ async def assemble_resources_jar(
     input_files = {str(path) for path in chain(paths, directories)}
 
     resources_jar_input_digest = source_files.snapshot.digest
+
+    input_filenames = shlex.join(sorted(input_files))
+
     resources_jar_result = await Get(
         ProcessResult,
         Process(
@@ -97,13 +101,13 @@ async def assemble_resources_jar(
                     [
                         touch.path,
                         "-d 1980-01-01T00:00:00Z",
-                        *sorted(input_files),
-                        ";",
+                        input_filenames,
+                        "&&",
                         "TZ=UTC",
                         zip.path,
                         "-oX",
                         output_filename,
-                        *sorted(input_files),
+                        input_filenames,
                     ]
                 ),
             ],
