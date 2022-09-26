@@ -63,9 +63,15 @@ class ThirdPartyPkgAnalysis:
     # tests directly on a third-party package.
     imports: tuple[str, ...]
     go_files: tuple[str, ...]
-    s_files: tuple[str, ...]
     cgo_files: tuple[str, ...]
     cgo_flags: CGoCompilerFlags
+
+    c_files: tuple[str, ...]
+    cxx_files: tuple[str, ...]
+    m_files: tuple[str, ...]
+    h_files: tuple[str, ...]
+    f_files: tuple[str, ...]
+    s_files: tuple[str, ...]
 
     minimum_go_version: str | None
 
@@ -408,11 +414,6 @@ async def analyze_go_third_party_package(
 
     for key in (
         "CompiledGoFiles",
-        "CFiles",
-        "CXXFiles",
-        "MFiles",
-        "HFiles",
-        "FFiles",
         "SwigFiles",
         "SwigCXXFiles",
         "SysoFiles",
@@ -445,6 +446,11 @@ async def analyze_go_third_party_package(
         dir_path=request.package_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
+        c_files=tuple(request.pkg_json.get("CFiles", ())),
+        cxx_files=tuple(request.pkg_json.get("CXXFiles", ())),
+        m_files=tuple(request.pkg_json.get("MFiles", ())),
+        h_files=tuple(request.pkg_json.get("HFiles", ())),
+        f_files=tuple(request.pkg_json.get("FFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
         cgo_files=tuple(request.pkg_json.get("CgoFiles", ())),
         minimum_go_version=request.minimum_go_version,
@@ -606,6 +612,11 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),
+            c_files=(),
+            cxx_files=(),
+            h_files=(),
+            m_files=(),
+            f_files=(),
             s_files=(),
             minimum_go_version=None,
             embed_patterns=(),

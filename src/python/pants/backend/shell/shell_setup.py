@@ -17,19 +17,6 @@ class ShellSetup(Subsystem):
     options_scope = "shell-setup"
     help = "Options for Pants's Shell support."
 
-    _executable_search_path = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used to find shells and to run certain processes
-            like the shunit2 test runner.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-    )
     dependency_inference = BoolOption(
         default=True,
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
@@ -45,15 +32,30 @@ class ShellSetup(Subsystem):
         advanced=True,
     )
 
-    @memoized_method
-    def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_path:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
+    class EnvironmentAware:
+        _executable_search_path = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                The PATH value that will be used to find shells and to run certain processes
+                like the shunit2 test runner.
 
-        return tuple(OrderedSet(iter_path_entries()))
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @memoized_method
+        def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_path:
+                    if entry == "<PATH>":
+                        path = env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))

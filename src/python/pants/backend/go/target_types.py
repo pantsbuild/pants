@@ -148,7 +148,23 @@ class GoModTarget(TargetGenerator):
 
 class GoPackageSourcesField(MultipleSourcesField):
     default = ("*.go", "*.s")
-    expected_file_extensions = (".go", ".s")
+    expected_file_extensions = (
+        ".go",
+        ".s",
+        ".c",
+        ".h",
+        ".hh",
+        ".hpp",
+        ".hxx",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".m",
+        ".f",
+        ".F",
+        ".for",
+        ".f90",
+    )
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`"

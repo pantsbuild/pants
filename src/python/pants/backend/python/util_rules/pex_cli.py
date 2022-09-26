@@ -124,7 +124,7 @@ async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_pex: PexPEX,
     pex_env: PexEnvironment,
-    python_native_code_subsystem: PythonNativeCodeSubsystem,
+    python_native_code_subsystem: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
 ) -> Process:

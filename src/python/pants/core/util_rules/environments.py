@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import shlex
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, Callable, ClassVar, Iterable, Optional, Tuple, Type, Union, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -29,6 +30,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option import custom_types
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import DictOption, OptionsInfo, collect_options_info
 from pants.option.subsystem import Subsystem
@@ -656,15 +658,28 @@ class _EnvironmentSensitiveOptionFieldMixin:
     option_name: ClassVar[str]
 
 
+class ShellStringSequenceField(StringSequenceField):
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        """Computes a flattened shlexed arg list from an iterable of strings."""
+        if not raw_value:
+            return ()
+
+        return tuple(arg for raw_arg in raw_value for arg in shlex.split(raw_arg))
+
+
 # Maps between non-list option value types and corresponding fields
-_SIMPLE_OPTIONS: dict[type, type[Field]] = {
+_SIMPLE_OPTIONS: dict[Union[Type, Callable[[str], Any]], Type[Field]] = {
     str: StringField,
 }
 
 # Maps between the member types for list options. Each element is the
 # field type, and the `value` type for the field.
-_LIST_OPTIONS: dict[type, type[Field]] = {
+_LIST_OPTIONS: dict[Union[Type, Callable[[str], Any]], Type[Field]] = {
     str: StringSequenceField,
+    custom_types.shell_str: ShellStringSequenceField,
 }
 
 
