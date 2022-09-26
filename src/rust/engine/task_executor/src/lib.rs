@@ -216,7 +216,7 @@ impl Executor {
 /// completed (subject to a timeout).
 #[derive(Clone)]
 pub struct TailTasks {
-  inner: Arc<Mutex<TailTasksInner>>,
+  inner: Arc<Mutex<Option<TailTasksInner>>>,
 }
 
 struct TailTasksInner {
@@ -227,10 +227,10 @@ struct TailTasksInner {
 impl TailTasks {
   pub fn new() -> Self {
     Self {
-      inner: Arc::new(Mutex::new(TailTasksInner {
+      inner: Arc::new(Mutex::new(Some(TailTasksInner {
         id_to_name: HashMap::new(),
         task_set: JoinSet::new(),
-      })),
+      }))),
     }
   }
 
@@ -240,7 +240,18 @@ impl TailTasks {
     F: Future<Output = ()>,
     F: Send + 'static,
   {
-    let mut inner = self.inner.lock();
+    let mut guard = self.inner.lock();
+    let inner = match &mut *guard {
+      Some(inner) => inner,
+      None => {
+        log::warn!(
+          "Session end task `{}` submitted after session completed.",
+          name
+        );
+        return;
+      }
+    };
+
     let h = inner.task_set.spawn_on(task, handle);
     inner.id_to_name.insert(h.id(), name.to_string());
   }
@@ -248,7 +259,13 @@ impl TailTasks {
   /// Wait for all tail tasks to complete subject to the given timeout. If tasks
   /// fail or do not complete, log that fact.
   pub async fn wait(self, timeout: Duration) {
-    let mut inner = self.inner.lock();
+    let mut inner = match self.inner.lock().take() {
+      Some(inner) => inner,
+      None => {
+        log::warn!("Session end tasks awaited multiple times!");
+        return;
+      }
+    };
 
     if inner.task_set.is_empty() {
       return;
