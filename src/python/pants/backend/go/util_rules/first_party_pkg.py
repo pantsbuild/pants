@@ -91,6 +91,11 @@ class FirstPartyPkgAnalysis:
 
     cgo_flags: CGoCompilerFlags
 
+    c_files: tuple[str, ...]
+    cxx_files: tuple[str, ...]
+    m_files: tuple[str, ...]
+    h_files: tuple[str, ...]
+    f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
     minimum_go_version: str | None
@@ -173,6 +178,11 @@ class FallibleFirstPartyPkgAnalysis:
                 ldflags=tuple(metadata.get("CgoLDFLAGS", [])),
                 pkg_config=tuple(metadata.get("CgoPkgConfig", [])),
             ),
+            c_files=tuple(metadata.get("CFiles", [])),
+            cxx_files=tuple(metadata.get("CXXFiles", [])),
+            m_files=tuple(metadata.get("MFiles", [])),
+            h_files=tuple(metadata.get("HFiles", [])),
+            f_files=tuple(metadata.get("FFiles", [])),
             s_files=tuple(metadata.get("SFiles", [])),
             minimum_go_version=minimum_go_version,
             embed_patterns=tuple(metadata.get("EmbedPatterns", [])),

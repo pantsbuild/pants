@@ -63,9 +63,10 @@ class CGoCompileRequest(EngineAwareParameter):
     dir_path: str
     cgo_files: tuple[str, ...]
     cgo_flags: CGoCompilerFlags
+    c_files: tuple[str, ...] = ()
     cxx_files: tuple[str, ...] = ()
-    m_files: tuple[str, ...] = ()
-    f_files: tuple[str, ...] = ()
+    objc_files: tuple[str, ...] = ()
+    fortran_files: tuple[str, ...] = ()
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -649,13 +650,13 @@ async def cgo_compile_request(
         )
 
     # If we are compiling Objective-C code, then we need to link against libobjc
-    if request.m_files:
+    if request.objc_files:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lobjc",))
 
     # Likewise for Fortran, except there are many Fortran compilers.
     # Support gfortran out of the box and let others pass the correct link options
     # via CGO_LDFLAGS
-    if request.f_files and "gfortran" in golang_subsystem.cgo_fortran_binary_name:
+    if request.fortran_files and "gfortran" in golang_subsystem.cgo_fortran_binary_name:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lgfortran",))
 
     # TODO(#16838): Add MSan (memory sanitizer) option.
@@ -681,12 +682,15 @@ async def cgo_compile_request(
     )
 
     go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
-    c_files: list[str] = ["_cgo_export.c"]
+    c_files: list[str] = [
+        os.path.join(obj_dir_path, "_cgo_export.c"),
+        *(os.path.join(dir_path, c_file) for c_file in request.c_files),
+    ]
     for cgo_file in request.cgo_files:
         cgo_file_path = PurePath(cgo_file)
         stem = cgo_file_path.stem
         go_files.append(os.path.join(obj_dir_path, f"{stem}.cgo1.go"))
-        c_files.append(f"{stem}.cgo2.c")
+        c_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
 
     # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
     # for building certain `runtime` modules.
@@ -748,7 +752,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, c_file),
+            src_file=c_file,
             flags=cflags,
             obj_file=ofile,
             description=f"Compile cgo C source: {c_file}",
@@ -760,7 +764,7 @@ async def cgo_compile_request(
 
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
-    for cxx_file in request.cxx_files:
+    for cxx_file in (os.path.join(dir_path, cxx_file) for cxx_file in request.cxx_files):
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -778,7 +782,7 @@ async def cgo_compile_request(
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
     # Objective-C files
-    for m_file in request.m_files:
+    for objc_file in (os.path.join(dir_path, objc_file) for objc_file in request.objc_files):
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -787,16 +791,16 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, m_file),
+            src_file=os.path.join(obj_dir_path, objc_file),
             flags=cflags,
             obj_file=ofile,
-            description=f"Compile cgo Objective-C source: {m_file}",
+            description=f"Compile cgo Objective-C source: {objc_file}",
             golang_subsystem=golang_subsystem,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
     fflags = [*flags.cppflags, *flags.fflags]
-    for f_file in request.f_files:
+    for fortran_file in (os.path.join(fortran_file) for fortran_file in request.fortran_files):
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -805,10 +809,10 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, f_file),
+            src_file=os.path.join(obj_dir_path, fortran_file),
             flags=fflags,
             obj_file=ofile,
-            description=f"Compile cgo Fortran source: {f_file}",
+            description=f"Compile cgo Fortran source: {fortran_file}",
             golang_subsystem=golang_subsystem,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
