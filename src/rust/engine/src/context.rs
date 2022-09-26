@@ -78,7 +78,6 @@ pub struct Core {
   pub named_caches: NamedCaches,
   pub immutable_inputs: ImmutableInputs,
   pub local_execution_root_dir: PathBuf,
-  pub session_end_tasks_timeout: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -116,7 +115,6 @@ pub struct ExecutionStrategyOptions {
   pub child_max_memory: usize,
   pub child_default_memory: usize,
   pub graceful_shutdown_timeout: Duration,
-  pub session_end_tasks_timeout: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -617,7 +615,6 @@ impl Core {
       named_caches,
       immutable_inputs,
       local_execution_root_dir,
-      session_end_tasks_timeout: exec_strategy_opts.session_end_tasks_timeout,
     })
   }
 

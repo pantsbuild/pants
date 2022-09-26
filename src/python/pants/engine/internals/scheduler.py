@@ -209,7 +209,6 @@ class Scheduler:
             child_max_memory=execution_options.process_total_child_memory_usage or 0,
             child_default_memory=execution_options.process_per_child_memory_usage,
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
-            session_end_tasks_timeout=execution_options.session_end_tasks_timeout,
         )
 
         self._py_scheduler = native_engine.scheduler_create(
@@ -640,6 +639,9 @@ class SchedulerSession:
 
     def cancel(self) -> None:
         self.py_session.cancel()
+
+    def wait_for_tail_tasks(self, timeout: float) -> None:
+        native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
 
 
 def register_rules(

@@ -30,7 +30,7 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer
+from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer, BootstrapOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
@@ -51,6 +51,7 @@ class LocalPantsRunner:
 
     options: Options
     options_bootstrapper: OptionsBootstrapper
+    global_bootstrap_options: BootstrapOptions
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
@@ -167,6 +168,7 @@ class LocalPantsRunner:
         return cls(
             options=options,
             options_bootstrapper=options_bootstrapper,
+            global_bootstrap_options=global_bootstrap_options,
             build_config=build_config,
             run_tracker=run_tracker,
             specs=specs,
@@ -278,5 +280,6 @@ class LocalPantsRunner:
                 metrics = self.graph_session.scheduler_session.metrics()
                 self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                 self.run_tracker.end_run(engine_result)
+                self.graph_session.scheduler_session.wait_for_tail_tasks(self.global_bootstrap_options.session_end_tasks_timeout)
 
             return engine_result

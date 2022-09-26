@@ -321,9 +321,6 @@ impl Scheduler {
             refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
           }
           res = &mut execution_task => {
-            // Wait for session end ("tail") tasks to complete.
-            session.tail_tasks().wait(self.core.session_end_tasks_timeout).await;
-
             // Completed successfully.
             break Ok(Self::execute_record_results(&request.roots, session, res));
           }
