@@ -12,13 +12,13 @@ from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaCodegenSkipField,
     OpenApiJavaModelPackageField,
 )
+from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
     OpenApiDocumentTarget,
     OpenApiSourceField,
 )
-from pants.backend.openapi.testutils.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.util_rules import generator_process, pom_parser
 from pants.backend.openapi.util_rules.generator_process import (
     OpenAPIGeneratorProcess,

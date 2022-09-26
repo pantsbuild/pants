@@ -13,6 +13,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 )
 from pants.backend.openapi.codegen.java.rules import GenerateJavaFromOpenAPIRequest
 from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
+from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
@@ -21,7 +22,6 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceGeneratorTarget,
     OpenApiSourceTarget,
 )
-from pants.backend.openapi.testutils.resources import PETSTORE_SAMPLE_SPEC
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
