@@ -195,7 +195,12 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
 @rule
 async def prepare_jdk_environment(
-    jvm: JvmSubsystem, coursier: Coursier, nailgun_: Nailgun, bash: BashBinary, request: JdkRequest
+    jvm: JvmSubsystem,
+    jvm_env_aware: JvmSubsystem.EnvironmentAware,
+    coursier: Coursier,
+    nailgun_: Nailgun,
+    bash: BashBinary,
+    request: JdkRequest,
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
@@ -297,7 +302,7 @@ async def prepare_jdk_environment(
                 ]
             ),
         ),
-        global_jvm_options=jvm.global_options,
+        global_jvm_options=jvm_env_aware.global_options,
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,

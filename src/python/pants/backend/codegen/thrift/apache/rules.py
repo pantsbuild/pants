@@ -121,9 +121,12 @@ async def generate_apache_thrift_sources(
 
 
 @rule
-async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThriftSetup:
+async def setup_thrift_tool(
+    apache_thrift: ApacheThriftSubsystem,
+    apache_thrift_env_aware: ApacheThriftSubsystem.EnvironmentAware,
+) -> ApacheThriftSetup:
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    search_paths = apache_thrift.thrift_search_paths(env)
+    search_paths = apache_thrift_env_aware.thrift_search_paths(env)
     all_thrift_binary_paths = await Get(
         BinaryPaths,
         BinaryPathRequest(

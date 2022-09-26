@@ -60,12 +60,14 @@ class DockerBuildEnvironmentRequest:
 
 @rule
 async def docker_build_environment_vars(
-    request: DockerBuildEnvironmentRequest, docker_options: DockerOptions
+    request: DockerBuildEnvironmentRequest,
+    docker_options: DockerOptions,
+    docker_env_aware: DockerOptions.EnvironmentAware,
 ) -> DockerBuildEnvironment:
     build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(request.target))
     env_vars = KeyValueSequenceUtil.from_strings(
         *{build_arg for build_arg in build_args if "=" not in build_arg},
-        *docker_options.env_vars,
+        *docker_env_aware.env_vars,
     )
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(tuple(env_vars)))
     return DockerBuildEnvironment.create(env)

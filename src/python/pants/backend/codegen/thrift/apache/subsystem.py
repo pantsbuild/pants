@@ -15,19 +15,6 @@ class ApacheThriftSubsystem(Subsystem):
     options_scope = "apache-thrift"
     help = "Apache Thrift IDL compiler (https://thrift.apache.org/)."
 
-    _thrift_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            A list of paths to search for Thrift.
-
-            Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`.
-            Earlier entries will be searched first.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-    )
     expected_version = StrOption(
         default="0.15",
         help=softwrap(
@@ -42,14 +29,29 @@ class ApacheThriftSubsystem(Subsystem):
         ),
     )
 
-    def thrift_search_paths(self, env: EnvironmentVars) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._thrift_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
+    class EnvironmentAware:
+        _thrift_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                A list of paths to search for Thrift.
 
-        return tuple(OrderedSet(iter_path_entries()))
+                Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`.
+                Earlier entries will be searched first.
+
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+        )
+
+        def thrift_search_paths(self, env: EnvironmentVars) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._thrift_search_paths:
+                    if entry == "<PATH>":
+                        path = env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))

@@ -23,6 +23,20 @@ class JvmSubsystem(Subsystem):
         """
     )
 
+    class EnvironmentAware:
+        global_options = StrListOption(
+            help=softwrap(
+                """
+                List of JVM options to pass to all JVM processes.
+
+                Options set here will be used by any JVM processes required by Pants, with
+                the exception of heap memory settings like `-Xmx`, which need to be set
+                using `[GLOBAL].process_total_child_memory_usage` and `[GLOBAL].process_per_child_memory_usage`.
+                """
+            ),
+            advanced=True,
+        )
+
     tool_jdk = StrOption(
         default="temurin:1.11",
         help=softwrap(
@@ -73,18 +87,6 @@ class JvmSubsystem(Subsystem):
             ['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']
             """
         ),
-    )
-    global_options = StrListOption(
-        help=softwrap(
-            """
-            List of JVM options to pass to all JVM processes.
-
-            Options set here will be used by any JVM processes required by Pants, with
-            the exception of heap memory settings like `-Xmx`, which need to be set
-            using `[GLOBAL].process_total_child_memory_usage` and `[GLOBAL].process_per_child_memory_usage`.
-            """
-        ),
-        advanced=True,
     )
     reproducible_jars = BoolOption(
         default=False,
