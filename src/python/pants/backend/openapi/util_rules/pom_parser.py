@@ -25,17 +25,12 @@ _MAVEN_NAMESPACE = "http://maven.apache.org/POM/4.0.0"
 _MAVEN_NAMESPACE_MAP = {"mvn": _MAVEN_NAMESPACE}
 
 
-@rule
+@rule(desc="Analysing Maven POM file")
 async def analyse_pom(request: AnalysePomRequest) -> PomReport:
     contents = await Get(DigestContents, Digest, request.pom_digest)
     assert len(contents) == 1
 
     root = ET.fromstring(contents[0].content)
-
-    def strip_namespace(txt: str) -> str:
-        if "}" in txt:
-            return txt[txt.rindex("}") + 1 :]
-        return txt
 
     def maybe_lookup_property(txt: str | None) -> str | None:
         if not txt:

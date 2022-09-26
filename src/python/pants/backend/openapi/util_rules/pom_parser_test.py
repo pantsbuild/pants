@@ -38,11 +38,15 @@ def test_collects_non_test_dependencies(rule_runner: RuleRunner) -> None:
                   <artifactId>project</artifactId>
                   <version>1.0</version>
 
+                  <properties>
+                    <foo.version>1.0</foo.version>
+                  </properties>
+
                   <dependencies>
                     <dependency>
                       <artifactId>foo</artifactId>
                       <groupId>com.example</groupId>
-                      <version>1.0</version>
+                      <version>${foo.version}</version>
                     </dependency>
                     <dependency>
                       <artifactId>test</artifactId>
