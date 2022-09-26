@@ -47,7 +47,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
@@ -262,7 +262,10 @@ class RuleRunner:
         self.extra_session_values = extra_session_values or {}
         self.max_workunit_verbosity = max_workunit_verbosity
         options = self.options_bootstrapper.full_options(
-            self.build_config, union_membership=self.union_membership
+            self.build_config,
+            union_membership=UnionMembership.from_rules(
+                rule for rule in self.rules if isinstance(rule, UnionRule)
+            ),
         )
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
