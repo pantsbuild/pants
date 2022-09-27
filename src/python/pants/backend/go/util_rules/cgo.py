@@ -422,6 +422,7 @@ async def _dynimport(
     goroot: GoRoot,
     import_go_path: str,
     golang_subsystem: GolangSubsystem,
+    use_cxx_linker: bool,
 ) -> _DynImportResult:
     cgo_main_compile_process = await _cc(
         binary_name=golang_subsystem.cgo_gcc_binary_name,
@@ -453,8 +454,14 @@ async def _dynimport(
             # Issue 26197.
             ldflags = [arg for arg in ldflags if arg != "-static"]
 
+    linker_binary_name = (
+        golang_subsystem.cgo_gxx_binary_name
+        if use_cxx_linker
+        else golang_subsystem.cgo_gcc_binary_name
+    )
+
     cgo_binary_link_result = await _gccld(
-        binary_name=golang_subsystem.cgo_gcc_binary_name,
+        binary_name=linker_binary_name,
         input_digest=obj_digest,
         obj_dir_path=obj_dir_path,
         outfile=dynobj,
@@ -496,7 +503,7 @@ async def _dynimport(
         # particular compiler/linker pair and would obscure the true reason for
         # the failure of the original command.
         cgo_binary_link_result = await _gccld(
-            binary_name=golang_subsystem.cgo_gcc_binary_name,
+            binary_name=linker_binary_name,
             input_digest=obj_digest,
             obj_dir_path=obj_dir_path,
             outfile=dynobj,
@@ -847,6 +854,7 @@ async def cgo_compile_request(
         goroot=goroot,
         import_go_path=os.path.join(obj_dir_path, "_cgo_import.go"),
         golang_subsystem=golang_subsystem,
+        use_cxx_linker=bool(request.cxx_files),
     )
     if dynimport_result.dyn_out_go:
         go_files.append(dynimport_result.dyn_out_go)
