@@ -26,7 +26,6 @@ from pants.backend.go.util_rules import (
 from pants.core.goals.test import get_filtered_environment
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
