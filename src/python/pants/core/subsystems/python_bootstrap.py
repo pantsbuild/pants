@@ -18,7 +18,6 @@ from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -86,21 +85,7 @@ class PythonBootstrap:
     EXTRA_ENV_VAR_NAMES = ("PATH", "PYENV_ROOT")
 
     interpreter_names: tuple[str, ...]
-    raw_interpreter_search_paths: tuple[str, ...]
-    environment: EnvironmentVars
-    asdf_standard_tool_paths: tuple[str, ...]
-    asdf_local_tool_paths: tuple[str, ...]
-
-    @memoized_property
-    def interpreter_search_paths(self) -> tuple[str, ...]:
-        return tuple(
-            _expand_interpreter_search_paths(
-                self.raw_interpreter_search_paths,
-                self.environment,
-                self.asdf_standard_tool_paths,
-                self.asdf_local_tool_paths,
-            )
-        )
+    interpreter_search_paths: tuple[str, ...]
 
 
 def _expand_interpreter_search_paths(
@@ -252,12 +237,16 @@ async def python_bootstrap(
         ),
     )
 
+    expanded_paths = _expand_interpreter_search_paths(
+        interpreter_search_paths,
+        result.env,
+        result.standard_tool_paths,
+        result.local_tool_paths,
+    )
+
     return PythonBootstrap(
         interpreter_names=interpreter_names,
-        raw_interpreter_search_paths=interpreter_search_paths,
-        environment=result.env,
-        asdf_standard_tool_paths=result.standard_tool_paths,
-        asdf_local_tool_paths=result.local_tool_paths,
+        interpreter_search_paths=expanded_paths,
     )
 
 
