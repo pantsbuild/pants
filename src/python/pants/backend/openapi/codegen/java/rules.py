@@ -13,6 +13,7 @@ from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaSkipField,
 )
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
+from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.openapi.target_types import (
     OpenApiDocumentDependenciesField,
     OpenApiDocumentField,
@@ -187,13 +188,11 @@ async def generate_java_from_openapi(request: GenerateJavaFromOpenAPIRequest) ->
         for file in document_sources.snapshot.files
     )
 
-    output_digest = await Get(
-        Digest, MergeDigests([sources.output_digest for sources in compiled_sources])
+    output_digest, source_root = await MultiGet(
+        Get(Digest, MergeDigests([sources.output_digest for sources in compiled_sources])),
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
     )
 
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
-    )
     source_root_restored = (
         await Get(Snapshot, AddPrefix(output_digest, source_root.path))
         if source_root.path != "."
@@ -220,6 +219,7 @@ async def infer_openapi_java_dependencies(
     request: InferOpenApiJavaRuntimeDependencyRequest,
     jvm: JvmSubsystem,
     jvm_artifact_targets: AllJvmArtifactTargets,
+    openapi_generator: OpenAPIGenerator,
 ) -> InferredDependencies:
     if request.field_set.skip.value:
         return InferredDependencies([])
@@ -241,7 +241,7 @@ async def infer_openapi_java_dependencies(
         CompileOpenApiIntoJavaRequest(
             input_file=sample_spec_name,
             input_digest=sample_source_digest,
-            description=f"Inferring Java runtime dependencies for OpenAPI {request.field_set.address}",
+            description=f"Inferring Java runtime dependencies for OpenAPI v{openapi_generator.version}",
         ),
     )
 
