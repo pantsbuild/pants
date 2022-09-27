@@ -211,7 +211,6 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
                 """\
             package main
 
-            // #cgo LDFLAGS: -lstdc++
             // #include <stdlib.h>
             // extern void do_print(const char *);
             import "C"

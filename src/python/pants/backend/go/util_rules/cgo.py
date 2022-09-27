@@ -657,6 +657,10 @@ async def cgo_compile_request(
             ldflags=flags.ldflags + pkg_config_flags.ldflags,
         )
 
+    # If compiling C++, then link against C++ standard library.
+    if request.cxx_files:
+        flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lstdc++",))
+
     # If we are compiling Objective-C code, then we need to link against libobjc
     if request.objc_files:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lobjc",))
