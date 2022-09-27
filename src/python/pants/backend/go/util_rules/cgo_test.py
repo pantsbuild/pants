@@ -278,6 +278,7 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
     assert result.stdout.decode() == "Hello World!\n"
 
 
+@pytest.mark.no_error_if_skipped
 def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
     gcc_path = _find_binary(["clang", "gcc"])
     if gcc_path is None:
