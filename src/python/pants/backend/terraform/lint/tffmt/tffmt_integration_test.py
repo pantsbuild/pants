@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import textwrap
 from typing import List, NewType
 
@@ -10,7 +12,7 @@ from pants.backend.terraform.lint.tffmt import tffmt
 from pants.backend.terraform.lint.tffmt.tffmt import TffmtRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
 from pants.backend.terraform.tool import TerraformTool
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.external_tool import ExternalToolVersion
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -53,7 +55,8 @@ def rule_runner() -> RuleRunner:
             *tffmt.rules(),
             *tool.rules(),
             *source_files.rules(),
-            QueryRule(FmtResult, (TffmtRequest,)),
+            QueryRule(Partitions, (TffmtRequest.PartitionRequest,)),
+            QueryRule(FmtResult, (TffmtRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
@@ -117,7 +120,7 @@ def run_tffmt(
     rule_runner: RuleRunner,
     targets: List[Target],
     options: RuleRunnerOptions,
-) -> FmtResult:
+) -> FmtResult | None:
     rule_runner.set_options(options)
     field_sets = [TerraformFieldSet.create(tgt) for tgt in targets]
     input_sources = rule_runner.request(
@@ -126,10 +129,26 @@ def run_tffmt(
             SourceFilesRequest(field_set.sources for field_set in field_sets),
         ],
     )
+    partitions = rule_runner.request(
+        Partitions,
+        [
+            TffmtRequest.PartitionRequest(tuple(field_sets)),
+        ],
+    )
+    if not partitions:
+        return None
+
+    assert len(partitions) == 1
+    key, files = next(iter(partitions.items()))
+    assert set(files) == set(input_sources.snapshot.files)
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            TffmtRequest(field_sets, snapshot=input_sources.snapshot),
+            TffmtRequest.SubPartition(
+                files,
+                key=key,
+                _snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result
@@ -147,6 +166,7 @@ def get_snapshot(rule_runner: RuleRunner, source_files: List[FileContent]) -> Sn
 def test_passing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE])
     fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
+    assert fmt_result
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
@@ -155,6 +175,7 @@ def test_passing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunner
 def test_failing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
     fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
+    assert fmt_result
     contents = get_content(rule_runner, fmt_result.output.digest)
     print(f">>>{contents[0].content.decode()}<<<")
     assert fmt_result.stderr == ""
@@ -165,6 +186,7 @@ def test_failing_source(rule_runner: RuleRunner, rule_runner_options: RuleRunner
 def test_mixed_sources(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -> None:
     target = make_target(rule_runner, [GOOD_SOURCE, BAD_SOURCE])
     fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
+    assert fmt_result
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -175,6 +197,7 @@ def test_multiple_targets(rule_runner: RuleRunner, rule_runner_options: RuleRunn
         make_target(rule_runner, [BAD_SOURCE], target_name="tgt_bad"),
     ]
     fmt_result = run_tffmt(rule_runner, targets, rule_runner_options)
+    assert fmt_result
     assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
@@ -185,5 +208,4 @@ def test_skip(rule_runner: RuleRunner, rule_runner_options: RuleRunnerOptions) -
     rule_runner_options.append("--terraform-fmt-skip")  # skips running terraform
 
     fmt_result = run_tffmt(rule_runner, [target], rule_runner_options)
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
+    assert fmt_result is None

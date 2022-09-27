@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -45,11 +45,24 @@ class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = KtlintSubsystem.options_scope
 
 
-@rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
-async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: InternalJdk) -> FmtResult:
-    if tool.skip:
-        return FmtResult.skip(formatter_name=request.name)
+@rule
+async def partition_ktlint(
+    request: KtlintRequest.PartitionRequest, tool: KtlintSubsystem
+) -> Partitions:
+    return (
+        Partitions()
+        if tool.skip
+        else Partitions.single_partition(
+            field_set.source.file_path for field_set in request.field_sets
+        )
+    )
 
+
+@rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
+async def ktlint_fmt(
+    request: KtlintRequest.SubPartition, tool: KtlintSubsystem, jdk: InternalJdk
+) -> FmtResult:
+    snapshot = await KtlintRequest.SubPartition.get_snapshot(request)
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
@@ -61,7 +74,7 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: Interna
     args = [
         "com.pinterest.ktlint.Main",
         "-F",
-        *request.snapshot.files,
+        *snapshot.files,
     ]
 
     result = await Get(
@@ -70,18 +83,20 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: Interna
             jdk=jdk,
             argv=args,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            input_digest=request.snapshot.digest,
+            input_digest=snapshot.digest,
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=request.snapshot.files,
-            description=f"Run Ktlint on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=snapshot.files,
+            description=f"Run Ktlint on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
 
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return FmtResult.create(
+        result, snapshot, output_snapshot, strip_chroot_path=True, formatter_name=KtlintRequest.name
+    )
 
 
 @rule
@@ -95,6 +110,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        UnionRule(FmtTargetsRequest, KtlintRequest),
+        *KtlintRequest.registration_rules(),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]
