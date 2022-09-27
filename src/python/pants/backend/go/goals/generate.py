@@ -162,7 +162,7 @@ async def _run_generators(
     dir_path: str,
     go_file: str,
     goroot: GoRoot,
-    env: Mapping[str, str],
+    base_env: Mapping[str, str],
 ) -> Digest:
     digest_contents = await Get(DigestContents, Digest, digest)
     content: bytes | None = None
@@ -199,13 +199,11 @@ async def _run_generators(
         if args[0] in cmd_shorthand:
             args = [*cmd_shorthand[args[0]], *args[1:]]
 
-        # TODO: Substitute environment variables.
-
         # If the program calls for `go`, then use the full path to the `go` binary in the GOROOT.
         if args[0] == "go":
             args[0] = os.path.join(goroot.path, "bin", "go")
 
-        generate_env = {
+        env = {
             "GOOS": goroot.goos,
             "GOARCH": goroot.goarch,
             "GOFILE": go_file,
@@ -213,10 +211,11 @@ async def _run_generators(
             "GOPACKAGE": analysis.name,
             "GOROOT": goroot.path,
             "DOLLAR": "$",
+            **base_env,
         }
 
         for i, arg in enumerate(args):
-            args[i] = _expand_env(arg, generate_env)
+            args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
         result = await Get(
@@ -226,10 +225,7 @@ async def _run_generators(
                 input_digest=digest,
                 working_directory=dir_path,
                 output_directories=["."],
-                env={
-                    **generate_env,
-                    **env,
-                },
+                env=env,
                 description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
             ),
         )
