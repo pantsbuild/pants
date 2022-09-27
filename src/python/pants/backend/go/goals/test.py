@@ -420,6 +420,8 @@ async def run_go_tests(
         coverage_data = GoCoverageData(
             coverage_digest=result.output_digest,
             import_path=import_path,
+            sources_digest=pkg_digest.digest,
+            sources_dir_path=pkg_analysis.dir_path,
         )
 
     return TestResult.from_fallible_process_result(

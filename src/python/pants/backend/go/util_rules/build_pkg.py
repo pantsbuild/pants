@@ -501,6 +501,8 @@ async def build_go_package(
         BuiltGoPackageCodeCoverageMetadata(
             import_path=request.import_path,
             cover_file_metadatas=cover_file_metadatas,
+            sources_digest=request.digest,
+            sources_dir_path=request.dir_path,
         )
         if cover_file_metadatas
         else None

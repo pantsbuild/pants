@@ -7,7 +7,7 @@ from pathlib import PurePath
 
 from pants.backend.go.util_rules.coverage import GoCoverMode
 from pants.core.util_rules.distdir import DistDir
-from pants.option.option_types import ArgsListOption, EnumOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -52,6 +52,16 @@ class GoTestSubsystem(Subsystem):
             `{distdir}` is replaced with the Pants `distdir`, and `{import_path_escaped}` is
             replaced with the applicable package's import path but with slashes converted to
             underscores.
+            """
+        ),
+    )
+
+    coverage_html = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, then convert coverage reports to HTML format and write a `coverage.html` file next to the
+            raw coverage data.
             """
         ),
     )
