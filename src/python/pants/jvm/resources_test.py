@@ -102,3 +102,28 @@ def test_resources(rule_runner: RuleRunner) -> None:
     contents = rule_runner.request(DigestContents, list(classpath.digests()))
     assert contents[0].path == ".one.txt.root.resources.jar"
     assert filenames_from_zip(contents[0]) == ["one.txt"]
+
+
+@maybe_skip_jdk_test
+def test_resources_jar_is_determinstic(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "resources(name='root', sources=['**/*.txt'])",
+            "one.txt": "",
+            "two.txt": "",
+            "three/four.txt": "",
+            "three/five.txt": "",
+            "three/six/seven/eight.txt": "",
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
+        }
+    )
+
+    classpath = rule_runner.request(
+        Classpath, [Addresses([Address(spec_path="", target_name="root")])]
+    )
+
+    contents = rule_runner.request(DigestContents, list(classpath.digests()))
+
+    z = ZipFile(BytesIO(contents[0].content))
+    for info in z.infolist():
+        assert info.date_time == (1980, 1, 1, 0, 0, 0)

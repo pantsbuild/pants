@@ -3,6 +3,7 @@
 
 import itertools
 import logging
+import shlex
 from itertools import chain
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSe
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.core.util_rules.system_binaries import ZipBinary
+from pants.core.util_rules.system_binaries import BashBinary, TouchBinary, ZipBinary
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessResult
@@ -42,6 +43,8 @@ class JvmResourcesRequest(ClasspathEntryRequest):
 @rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
+    bash: BashBinary,
+    touch: TouchBinary,
     request: JvmResourcesRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
@@ -82,13 +85,28 @@ async def assemble_resources_jar(
     input_files = {str(path) for path in chain(paths, directories)}
 
     resources_jar_input_digest = source_files.snapshot.digest
+
+    input_filenames = " ".join(shlex.quote(file) for file in sorted(input_files))
+
     resources_jar_result = await Get(
         ProcessResult,
         Process(
             argv=[
-                zip.path,
-                output_filename,
-                *sorted(input_files),
+                bash.path,
+                "-c",
+                " ".join(
+                    [
+                        touch.path,
+                        "-d 1980-01-01T00:00:00Z",
+                        input_filenames,
+                        "&&",
+                        "TZ=UTC",
+                        zip.path,
+                        "-oX",
+                        output_filename,
+                        input_filenames,
+                    ]
+                ),
             ],
             description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
