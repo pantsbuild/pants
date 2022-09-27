@@ -39,7 +39,7 @@ class PythonNativeCodeSubsystem(Subsystem):
         )
 
         @property
-        def environment_dict(self) -> dict[str, str]:
+        def subprocess_env_vars(self) -> dict[str, str]:
             return {
                 "CPPFLAGS": safe_shlex_join(self._iter_values("CPPFLAGS", self._cpp_flags)),
                 "LDFLAGS": safe_shlex_join(self._iter_values("LDFLAGS", self._ld_flags)),
