@@ -371,7 +371,6 @@ async def _gccld(
         ),
     )
 
-    # TODO(#16830): Select CXX if any C++ code is present.
     compiler_args_result, env = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), obj_dir_path)),
         Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
