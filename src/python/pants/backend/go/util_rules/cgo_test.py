@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 from textwrap import dedent
 from typing import Iterable
@@ -284,7 +283,7 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
         pytest.skip("Skipping test since C/Objective-C compiler was not found.")
 
     # This test relies on Foundation library being available. Skip if not on macOS.
-    if sys.platform != "darwin":
+    if os.uname().sysname != "Darwin":
         pytest.skip("Skipping Objective-C test because not running on macOS.")
 
     rule_runner.write_files(
