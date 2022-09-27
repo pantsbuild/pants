@@ -52,7 +52,7 @@ pub enum Metric {
   /// Number of times that we backtracked due to missing digests.
   BacktrackAttempts,
   DockerExecutionRequests,
-  DockerExecutionSuccess,
+  DockerExecutionSuccesses,
   DockerExecutionErrors,
 }
 

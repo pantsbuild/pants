@@ -403,7 +403,7 @@ impl super::CommandRunner for CommandRunner {
           .await;
 
         match &res {
-          Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccess, 1),
+          Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
           Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
         }
 
