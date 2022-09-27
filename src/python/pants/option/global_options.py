@@ -1952,8 +1952,9 @@ def ca_certs_path_to_file_content(path: str) -> FileContent:
 
     Note that the certs are always read on the localhost, even when using Docker and remote
     execution. Then, those certs can be copied into the process.
+
+    Warning: this will not detect when the contents of cert files changes, because we use
+    `pathlib.Path.read_bytes()`. Better would be
+    # https://github.com/pantsbuild/pants/issues/10842
     """
-    # Because the certs path may not exist in the repo, we use `Path`. Better would be
-    # https://github.com/pantsbuild/pants/issues/10842 so that we invalidate when the contents
-    # change.
     return FileContent(os.path.basename(path), Path(path).read_bytes())

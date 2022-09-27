@@ -102,9 +102,9 @@ class TwineSubsystem(PythonToolBase):
         )
 
     def ca_certs_digest_request(self, default_ca_certs_path: str | None) -> CreateDigest | None:
-        if not self.ca_certs_path or self.ca_certs_path == "<none>":
-            return None
         path = default_ca_certs_path if self.ca_certs_path == "<inherit>" else self.ca_certs_path
+        if not path or path == "<none>":
+            return None
         return CreateDigest((ca_certs_path_to_file_content(path),))
 
 
