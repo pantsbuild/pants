@@ -67,6 +67,7 @@ class CGoCompileRequest(EngineAwareParameter):
     cxx_files: tuple[str, ...] = ()
     objc_files: tuple[str, ...] = ()
     fortran_files: tuple[str, ...] = ()
+    s_files: tuple[str, ...] = ()
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -682,15 +683,16 @@ async def cgo_compile_request(
     )
 
     go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
-    c_files: list[str] = [
+    gcc_files: list[str] = [
         os.path.join(obj_dir_path, "_cgo_export.c"),
         *(os.path.join(dir_path, c_file) for c_file in request.c_files),
+        *(os.path.join(dir_path, s_file) for s_file in request.s_files),
     ]
     for cgo_file in request.cgo_files:
         cgo_file_path = PurePath(cgo_file)
         stem = cgo_file_path.stem
         go_files.append(os.path.join(obj_dir_path, f"{stem}.cgo1.go"))
-        c_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
+        gcc_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
 
     # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
     # for building certain `runtime` modules.
@@ -743,7 +745,7 @@ async def cgo_compile_request(
 
     # C files
     cflags = [*flags.cppflags, *flags.cflags]
-    for c_file in c_files:
+    for gcc_file in gcc_files:
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -752,15 +754,13 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=c_file,
+            src_file=gcc_file,
             flags=cflags,
             obj_file=ofile,
-            description=f"Compile cgo C source: {c_file}",
+            description=f"Compile cgo source: {gcc_file}",
             golang_subsystem=golang_subsystem,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
-
-    # TODO(#16836): Compile "gccfiles"
 
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
