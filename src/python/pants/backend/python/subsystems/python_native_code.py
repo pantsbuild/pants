@@ -3,21 +3,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Sequence
+from typing import Sequence
 
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 class PythonNativeCodeSubsystem(Subsystem):
+
     options_scope = "python-native-code"
     help = "Options for building native code using Python, e.g. when resolving distributions."
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
+        depends_on_env_vars = ("CPPFLAGS", "LDFLAGS")
+
         # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
         _cpp_flags = StrListOption(
             default=["<CPPFLAGS>"],
@@ -38,40 +38,16 @@ class PythonNativeCodeSubsystem(Subsystem):
             advanced=True,
         )
 
+        @property
+        def subprocess_env_vars(self) -> dict[str, str]:
+            return {
+                "CPPFLAGS": safe_shlex_join(self._iter_values("CPPFLAGS", self._cpp_flags)),
+                "LDFLAGS": safe_shlex_join(self._iter_values("LDFLAGS", self._ld_flags)),
+            }
 
-@dataclass(frozen=True)
-class PythonNativeCodeEnvironment:
-
-    cpp_flags: tuple[str, ...]
-    ld_flags: tuple[str, ...]
-
-    @property
-    def environment_dict(self) -> Dict[str, str]:
-        return {
-            "CPPFLAGS": safe_shlex_join(self.cpp_flags),
-            "LDFLAGS": safe_shlex_join(self.ld_flags),
-        }
-
-
-@rule
-async def resolve_python_native_code_environment(
-    env_aware: PythonNativeCodeSubsystem.EnvironmentAware,
-) -> PythonNativeCodeEnvironment:
-
-    env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(("CPPFLAGS", "LDFLAGS")))
-
-    def iter_values(env_var: str, values: Sequence[str]):
-        for value in values:
-            if value == f"<{env_var}>":
-                yield from safe_shlex_split(env_vars.get(env_var, ""))
-            else:
-                yield value
-
-    return PythonNativeCodeEnvironment(
-        cpp_flags=tuple(iter_values("CPPFLAGS", env_aware._cpp_flags)),
-        ld_flags=tuple(iter_values("LDFLAGS", env_aware._ld_flags)),
-    )
-
-
-def rules():
-    return [*collect_rules()]
+        def _iter_values(self, env_var: str, values: Sequence[str]):
+            for value in values:
+                if value == f"<{env_var}>":
+                    yield from safe_shlex_split(self.env_vars.get(env_var, ""))
+                else:
+                    yield value

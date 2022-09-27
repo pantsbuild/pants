@@ -11,6 +11,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import OptionsInfo, collect_options_info
@@ -87,8 +88,11 @@ class Subsystem(metaclass=_SubsystemMeta):
         """
 
         subsystem: ClassVar[type[Subsystem]]
+        depends_on_env_vars: ClassVar[tuple[str, ...]] = ()
+
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
+        env_vars: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
@@ -191,7 +195,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
             func=inner,
-            input_gets=(),
+            input_gets=(
+                AwaitableConstraints(
+                    output_type=EnvironmentVars,
+                    input_types=(EnvironmentVarsRequest,),
+                    is_effect=False,
+                ),
+            ),
             canonical_name=name,
         )
 
@@ -265,5 +275,8 @@ async def _construct_env_aware(
 
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
+
+    if t.depends_on_env_vars:
+        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.depends_on_env_vars))
 
     return t

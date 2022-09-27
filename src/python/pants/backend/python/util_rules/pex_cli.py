@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional, Tuple
 
-from pants.backend.python.subsystems import python_native_code
-from pants.backend.python.subsystems.python_native_code import PythonNativeCodeEnvironment
+from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.util_rules import pex_environment
 from pants.backend.python.util_rules.pex_environment import (
     PexEnvironment,
@@ -125,7 +124,7 @@ async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_pex: PexPEX,
     pex_env: PexEnvironment,
-    python_native_code_environment: PythonNativeCodeEnvironment,
+    python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
 ) -> Process:
@@ -191,7 +190,7 @@ async def setup_pex_cli_process(
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
-        **python_native_code_environment.environment_dict,
+        **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
@@ -216,5 +215,4 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *pex_environment.rules(),
-        *python_native_code.rules(),
     ]

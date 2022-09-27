@@ -133,8 +133,7 @@ async def prepare_shell_command_process(
                 f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
 
-        env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-        search_path = shell_setup.executable_search_path(env)
+        search_path = shell_setup.executable_search_path
         tool_requests = [
             BinaryPathRequest(
                 binary_name=tool,
