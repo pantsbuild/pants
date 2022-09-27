@@ -17,7 +17,7 @@ use nails::execution::ExitCode;
 use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
-use workunit_store::{in_workunit, RunningWorkunit};
+use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
@@ -326,7 +326,7 @@ impl super::CommandRunner for CommandRunner {
       // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
       // renders at the Process's level.
       desc = Some(req.description.clone()),
-      |_workunit| async move {
+      |workunit| async move {
         let mut workdir = create_sandbox(
           self.executor.clone(),
           &self.work_dir_base,
@@ -376,8 +376,7 @@ impl super::CommandRunner for CommandRunner {
         )
         .await?;
 
-        // DOCKER-TODO: Add a metric for local docker execution?
-        // workunit.increment_counter(Metric::LocalExecutionRequests, 1);
+        workunit.increment_counter(Metric::DockerExecutionRequests, 1);
 
         let res = self
           .run_and_capture_workdir(
@@ -402,6 +401,11 @@ impl super::CommandRunner for CommandRunner {
             ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
           })
           .await;
+
+        match &res {
+          Ok(_) => workunit.increment_counter(Metric::DockerExecutionSuccesses, 1),
+          Err(_) => workunit.increment_counter(Metric::DockerExecutionErrors, 1),
+        }
 
         if self.keep_sandboxes == KeepSandboxes::Always
           || self.keep_sandboxes == KeepSandboxes::OnFailure
