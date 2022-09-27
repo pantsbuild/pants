@@ -53,7 +53,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Rhys Madigan**       | "Making unit test run times easier to understand"                                                       |
 | **Suresh Joshi (SJ)**  | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                              |
 | **Tansy Arron-Walker** | "Writing my first task in the new engine was really exciting!"                                          |
-| **Thales Menato**      |                                                                                                         |
+| **Thales Menato**      | "Making sure Pants can run even under heavily secured work environments!"                                                                                                        |
 
 ***
 
