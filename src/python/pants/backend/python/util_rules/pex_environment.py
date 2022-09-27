@@ -171,7 +171,7 @@ async def find_pex_python(
 ) -> PexEnvironment:
     return PexEnvironment(
         path=pex_environment_aware.path,
-        interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
+        interpreter_search_paths=python_bootstrap.interpreter_search_paths,
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),

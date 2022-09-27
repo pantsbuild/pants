@@ -18,7 +18,7 @@ from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class PythonBootstrap:
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
 
-    @memoized_method
+    @memoized_property
     def interpreter_search_paths(self) -> tuple[str, ...]:
         return tuple(
             _expand_interpreter_search_paths(
