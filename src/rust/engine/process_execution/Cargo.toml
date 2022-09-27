@@ -32,7 +32,7 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "1.16", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 uname = "0.1.1"
@@ -61,4 +61,4 @@ sharded_lmdb = { path = "../sharded_lmdb" }
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "1.16", features = ["macros"] }
+tokio = { version = "1.21", features = ["macros"] }
