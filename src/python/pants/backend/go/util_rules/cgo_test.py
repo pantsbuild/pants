@@ -205,6 +205,7 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
 
                 extern "C" void do_print(const char * str) {
                     std::cout << str << "\n";
+                    std::cout.flush();
                 }
                 """
             ),
