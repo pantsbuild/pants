@@ -379,6 +379,7 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
     assert "Got: Hello World!" in result.stderr.decode()
 
 
+@pytest.mark.no_error_if_skipped
 def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
     # gcc needed for linking
     gcc_path = _find_binary(["clang", "gcc"])
