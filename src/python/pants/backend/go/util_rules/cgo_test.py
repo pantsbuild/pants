@@ -2,7 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -138,6 +141,109 @@ def test_cgo_compile(rule_runner: RuleRunner) -> None:
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
     assert analysis.cgo_files == ("printer.go",)
+
+    maybe_digest = rule_runner.request(
+        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+    )
+    assert maybe_digest.pkg_digest is not None
+    pkg_digest = maybe_digest.pkg_digest
+
+    cgo_request = CGoCompileRequest(
+        import_path=analysis.import_path,
+        pkg_name=analysis.name,
+        digest=pkg_digest.digest,
+        dir_path=analysis.dir_path,
+        cgo_files=analysis.cgo_files,
+        cgo_flags=analysis.cgo_flags,
+    )
+    cgo_compile_result = rule_runner.request(CGoCompileResult, [cgo_request])
+    assert cgo_compile_result.digest != EMPTY_DIGEST
+
+    tgt = rule_runner.get_target(Address("", target_name="bin"))
+    pkg = rule_runner.request(BuiltPackage, [GoBinaryFieldSet.create(tgt)])
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            Process(
+                argv=["./bin"],
+                input_digest=pkg.digest,
+                description="Run cgo binary",
+            )
+        ],
+    )
+    assert result.stdout.decode() == "Hello World!\n"
+
+
+def _find_binary(binary_names: Iterable[str]) -> Path | None:
+    for path in os.environ["PATH"].split(os.pathsep):
+        for gxx_binary_name in binary_names:
+            candidate_binary_path = Path(path, gxx_binary_name)
+            if candidate_binary_path.exists():
+                return candidate_binary_path
+    return None
+
+
+def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
+    gxx_path = _find_binary(["clang++", "g++"])
+    if gxx_path is None:
+        pytest.skip("Skipping test since C++ compiler was not found.")
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            go_mod(name="mod")
+            go_package(name="pkg", sources=["*.go", "*.cxx"])
+            go_binary(name="bin")
+            """
+            ),
+            "go.mod": "module example.pantsbuild.org/cgotest\n",
+            "print.cxx": dedent(
+                r"""\
+                #include <iostream>
+
+                extern "C" void do_print(const char * str) {
+                    std::cout << str << "\n";
+                }
+                """
+            ),
+            "main.go": dedent(
+                """\
+            package main
+
+            // #cgo LDFLAGS: -lstdc++
+            // #include <stdlib.h>
+            // extern void do_print(const char *);
+            import "C"
+            import "unsafe"
+
+            func main() {
+                cs := C.CString("Hello World!")
+                C.do_print(cs)
+                C.free(unsafe.Pointer(cs))
+            }
+            """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--golang-cgo-enabled",
+            f"--golang-cgo-tool-search-paths=['{str(gxx_path.parent)}']",
+            f"--golang-cgo-gxx-binary-name={gxx_path.name}",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+    )
+    assert maybe_analysis.analysis is not None
+    analysis = maybe_analysis.analysis
+    assert analysis.cgo_files == ("main.go",)
+    assert analysis.cxx_files == ("print.cxx",)
 
     maybe_digest = rule_runner.request(
         FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
