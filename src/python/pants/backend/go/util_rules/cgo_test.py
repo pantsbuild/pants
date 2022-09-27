@@ -415,10 +415,9 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
                 """
             ),
             "main.go": dedent(
-                rf"""
+                r"""
             package main
 
-            // #cgo LDFLAGS: -L{libgfortran_path.parent}
             // extern int the_answer();
             import "C"
             import "fmt"
@@ -437,6 +436,7 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
             f"--golang-cgo-tool-search-paths=['{str(gcc_path.parent)}', '{str(fortran_path.parent)}']",
             f"--golang-cgo-gcc-binary-name={gcc_path.name}",
             f"--golang-cgo-fortran-binary-name={fortran_path.name}",
+            f"--golang-cgo-linker-flags=-L{libgfortran_path.parent}",
         ],
         env_inherit={"PATH"},
     )
