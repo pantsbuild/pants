@@ -773,7 +773,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gxx_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, cxx_file),
+            src_file=cxx_file,
             flags=cxxflags,
             obj_file=ofile,
             description=f"Compile cgo C++ source: {cxx_file}",
@@ -791,7 +791,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, objc_file),
+            src_file=objc_file,
             flags=cflags,
             obj_file=ofile,
             description=f"Compile cgo Objective-C source: {objc_file}",
@@ -800,7 +800,9 @@ async def cgo_compile_request(
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
     fflags = [*flags.cppflags, *flags.fflags]
-    for fortran_file in (os.path.join(fortran_file) for fortran_file in request.fortran_files):
+    for fortran_file in (
+        os.path.join(dir_path, fortran_file) for fortran_file in request.fortran_files
+    ):
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -809,7 +811,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, fortran_file),
+            src_file=fortran_file,
             flags=fflags,
             obj_file=ofile,
             description=f"Compile cgo Fortran source: {fortran_file}",
