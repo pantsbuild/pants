@@ -31,7 +31,7 @@ from pants.core.util_rules.stripped_source_files import StrippedFileName, Stripp
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
 from pants.engine.unions import UnionRule
@@ -56,8 +56,9 @@ async def generate_python_from_setuptools_scm(
     request: GeneratePythonFromSetuptoolsSCMRequest,
     setuptools_scm: SetuptoolsSCM,
 ) -> GeneratedSources:
-    # A GitWorktreeRequest is uncacheable, so this enclosing rule will run every time its result
-    # is needed, meaning it will always return a result based on the current underlying git state.
+    # A MaybeGitWorktree is uncacheable, so this enclosing rule will run every time its result
+    # is needed, and the process invocation below caches at session scope, meaning this rule
+    # will always return a result based on the current underlying git state.
     maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
@@ -104,6 +105,7 @@ async def generate_python_from_setuptools_scm(
             input_digest=input_digest,
             description=f"Run setuptools_scm for {request.protocol_target.address.spec}",
             level=LogLevel.INFO,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
     version = result.stdout.decode().strip()
