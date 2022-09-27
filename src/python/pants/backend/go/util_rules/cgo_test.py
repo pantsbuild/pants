@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
@@ -375,3 +376,107 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
         ],
     )
     assert "Got: Hello World!" in result.stderr.decode()
+
+
+def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
+    # gcc needed for linking
+    gcc_path = _find_binary(["clang", "gcc"])
+    if gcc_path is None:
+        pytest.skip("Skipping test since C compiler was not found.")
+
+    fortran_path = _find_binary(["gfortran"])
+    if fortran_path is None:
+        pytest.skip("Skipping test since Fortran compiler was not found.")
+
+    # Find the Fortran standard library.
+    libgfortran_path = Path(
+        subprocess.check_output([str(fortran_path), "-print-file-name=libgfortran.a"])
+        .decode()
+        .strip()
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            go_mod(name="mod")
+            go_package(name="pkg", sources=["*.go", "*.f90"])
+            go_binary(name="bin")
+            """
+            ),
+            "go.mod": "module example.pantsbuild.org/cgotest\n",
+            "answer.f90": dedent(
+                """\
+                function the_answer() result(j) bind(C)
+                  use iso_c_binding, only: c_int
+                  integer(c_int) :: j ! output
+                  j = 42
+                end function the_answer
+                """
+            ),
+            "main.go": dedent(
+                rf"""
+            package main
+
+            // #cgo LDFLAGS: -L{libgfortran_path.parent}
+            // extern int the_answer();
+            import "C"
+            import "fmt"
+
+            func main() {{
+                fmt.Printf("Answer: %d\n", C.the_answer())
+            }}
+            """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--golang-cgo-enabled",
+            f"--golang-cgo-tool-search-paths=['{str(gcc_path.parent)}', '{str(fortran_path.parent)}']",
+            f"--golang-cgo-gcc-binary-name={gcc_path.name}",
+            f"--golang-cgo-fortran-binary-name={fortran_path.name}",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+    )
+    assert maybe_analysis.analysis is not None
+    analysis = maybe_analysis.analysis
+    assert analysis.cgo_files == ("main.go",)
+    assert analysis.f_files == ("answer.f90",)
+
+    maybe_digest = rule_runner.request(
+        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+    )
+    assert maybe_digest.pkg_digest is not None
+    pkg_digest = maybe_digest.pkg_digest
+
+    cgo_request = CGoCompileRequest(
+        import_path=analysis.import_path,
+        pkg_name=analysis.name,
+        digest=pkg_digest.digest,
+        dir_path=analysis.dir_path,
+        cgo_files=analysis.cgo_files,
+        cgo_flags=analysis.cgo_flags,
+    )
+    cgo_compile_result = rule_runner.request(CGoCompileResult, [cgo_request])
+    assert cgo_compile_result.digest != EMPTY_DIGEST
+
+    tgt = rule_runner.get_target(Address("", target_name="bin"))
+    pkg = rule_runner.request(BuiltPackage, [GoBinaryFieldSet.create(tgt)])
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            Process(
+                argv=["./bin"],
+                input_digest=pkg.digest,
+                description="Run cgo binary",
+            )
+        ],
+    )
+    assert result.stdout.decode() == "Answer: 42\n"
