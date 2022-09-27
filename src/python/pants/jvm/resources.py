@@ -93,7 +93,7 @@ async def assemble_resources_jar(
                 output_filename,
                 *sorted(input_files),
             ],
-            description="Build resources JAR for {request.component}",
+            description=f"Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
             output_files=output_files,
             level=LogLevel.DEBUG,
