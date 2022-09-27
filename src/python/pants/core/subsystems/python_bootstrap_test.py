@@ -177,7 +177,7 @@ def test_expand_interpreter_search_paths() -> None:
                 asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
             )
 
-    expected = [
+    expected = (
         "/foo",
         "/env/path1",
         "/env/path2",
@@ -190,5 +190,5 @@ def test_expand_interpreter_search_paths() -> None:
         *expected_pyenv_paths,
         *expected_pyenv_local_paths,
         "/qux",
-    ]
+    )
     assert expected == expanded_paths

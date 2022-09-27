@@ -92,12 +92,14 @@ class PythonBootstrap:
     asdf_local_tool_paths: tuple[str, ...]
 
     @memoized_method
-    def interpreter_search_paths(self):
-        return _expand_interpreter_search_paths(
-            self.raw_interpreter_search_paths,
-            self.environment,
-            self.asdf_standard_tool_paths,
-            self.asdf_local_tool_paths,
+    def interpreter_search_paths(self) -> tuple[str, ...]:
+        return tuple(
+            _expand_interpreter_search_paths(
+                self.raw_interpreter_search_paths,
+                self.environment,
+                self.asdf_standard_tool_paths,
+                self.asdf_local_tool_paths,
+            )
         )
 
 
@@ -106,7 +108,8 @@ def _expand_interpreter_search_paths(
     env: EnvironmentVars,
     asdf_standard_tool_paths: tuple[str, ...],
     asdf_local_tool_paths: tuple[str, ...],
-):
+) -> tuple[str, ...]:
+
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
         "<PATH>": lambda: _get_environment_paths(env),
@@ -115,7 +118,7 @@ def _expand_interpreter_search_paths(
         "<PYENV>": lambda: _get_pyenv_paths(env),
         "<PYENV_LOCAL>": lambda: _get_pyenv_paths(env, pyenv_local=True),
     }
-    expanded = []
+    expanded: list[str] = []
     from_pexrc = None
     for s in interpreter_search_paths:
         if s in special_strings:
@@ -137,7 +140,7 @@ def _expand_interpreter_search_paths(
                 """
             )
         )
-    return expanded
+    return tuple(expanded)
 
 
 def _get_environment_paths(env: EnvironmentVars):
