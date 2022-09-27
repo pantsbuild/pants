@@ -234,13 +234,19 @@ async def _run_generators(
     return digest
 
 
-@rule_helper
-async def _merge_digests_with_overwrite(orig_digest: Digest, new_digest: Digest) -> Digest:
+@dataclass(frozen=True)
+class OverwriteMergeDigests:
+    orig_digest: Digest
+    new_digest: Digest
+
+
+@rule
+async def merge_digests_with_overwrite(request: OverwriteMergeDigests) -> Digest:
     orig_snapshot, new_snapshot, orig_digest_entries, new_digest_entries = await MultiGet(
-        Get(Snapshot, Digest, orig_digest),
-        Get(Snapshot, Digest, new_digest),
-        Get(DigestEntries, Digest, orig_digest),
-        Get(DigestEntries, Digest, new_digest),
+        Get(Snapshot, Digest, request.orig_digest),
+        Get(Snapshot, Digest, request.new_digest),
+        Get(DigestEntries, Digest, request.orig_digest),
+        Get(DigestEntries, Digest, request.new_digest),
     )
 
     orig_snapshot_grouped = group_by_dir(orig_snapshot.files)
@@ -306,8 +312,8 @@ async def run_go_package_generators(
         output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await _merge_digests_with_overwrite(
-            output_digest, output_digest_for_go_file
+        output_digest = await Get(
+            Digest, OverwriteMergeDigests(output_digest, output_digest_for_go_file)
         )
 
     return RunPackageGeneratorsResult(output_digest)

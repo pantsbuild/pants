@@ -10,7 +10,7 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import generate
-from pants.backend.go.goals.generate import GoGenerateGoal, _expand_env
+from pants.backend.go.goals.generate import GoGenerateGoal, OverwriteMergeDigests, _expand_env
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -25,7 +25,10 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.test import get_filtered_environment
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.engine.fs import DigestContents, FileContent
+from pants.engine.internals.native_engine import Digest
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
 @pytest.fixture
@@ -46,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
+            QueryRule(DigestContents, (OverwriteMergeDigests,)),
         ],
         target_types=[GoModTarget, GoPackageTarget],
         preserve_tmpdirs=True,
@@ -99,7 +103,6 @@ def test_expand_env(input, output) -> None:
     assert _expand_env(input, m) == output
 
 
-@logging
 def test_generate_run_commands(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -120,3 +123,46 @@ def test_generate_run_commands(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     generated_file = Path(rule_runner.build_root, "grok", "generated.txt")
     assert generated_file.read_text() == "grok-4\n"
+
+
+def test_overwrite_merge_digests(rule_runner: RuleRunner) -> None:
+    orig_snapshot = rule_runner.make_snapshot(
+        {
+            "dir1/orig.txt": "orig",
+            "dir1/foo/only-orig.txt": "orig",
+            "dir1/shared.txt": "orig",
+        }
+    )
+    new_snapshot = rule_runner.make_snapshot(
+        {
+            "dir1/new.txt": "new",
+            "dir1/bar/only-new.txt": "new",
+            "dir1/shared.txt": "new",
+        }
+    )
+    raw_entries = rule_runner.request(
+        DigestContents, [OverwriteMergeDigests(orig_snapshot.digest, new_snapshot.digest)]
+    )
+    entries = sorted(raw_entries, key=lambda elem: elem.path)
+    assert entries == [
+        FileContent(
+            path="dir1/bar/only-new.txt",
+            content=b"new",
+        ),
+        FileContent(
+            path="dir1/foo/only-orig.txt",
+            content=b"orig",
+        ),
+        FileContent(
+            path="dir1/new.txt",
+            content=b"new",
+        ),
+        FileContent(
+            path="dir1/orig.txt",
+            content=b"orig",
+        ),
+        FileContent(
+            path="dir1/shared.txt",
+            content=b"new",
+        ),
+    ]
