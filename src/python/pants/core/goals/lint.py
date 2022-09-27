@@ -168,7 +168,7 @@ class LintRequest:
                         return Partitions()
 
                     # One possible implementation
-                    return Partitions.single_partition(request.field_sets)LintRequest
+                    return Partitions.single_partition(request.field_sets)
 
         2. A rule which takes an instance of your request type's `SubPartition` class property, and
             returns a `LintResult instance.
