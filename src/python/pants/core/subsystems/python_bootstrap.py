@@ -109,12 +109,12 @@ class PythonBootstrap:
         asdf_local_tool_paths: tuple[str, ...],
     ):
         special_strings = {
-            "<PEXRC>": cls.get_pex_python_paths,
-            "<PATH>": lambda: cls.get_environment_paths(env),
+            "<PEXRC>": _get_pex_python_paths,
+            "<PATH>": lambda: _get_environment_paths(env),
             "<ASDF>": lambda: asdf_standard_tool_paths,
             "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
-            "<PYENV>": lambda: cls.get_pyenv_paths(env),
-            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(env, pyenv_local=True),
+            "<PYENV>": lambda: _get_pyenv_paths(env),
+            "<PYENV_LOCAL>": lambda: _get_pyenv_paths(env, pyenv_local=True),
         }
         expanded = []
         from_pexrc = None
@@ -140,81 +140,80 @@ class PythonBootstrap:
             )
         return expanded
 
-    @staticmethod
-    def get_environment_paths(env: EnvironmentVars):
-        """Returns a list of paths specified by the PATH env var."""
-        pathstr = env.get("PATH")
-        if pathstr:
-            return pathstr.split(os.pathsep)
+
+def _get_environment_paths(env: EnvironmentVars):
+    """Returns a list of paths specified by the PATH env var."""
+    pathstr = env.get("PATH")
+    if pathstr:
+        return pathstr.split(os.pathsep)
+    return []
+
+
+def _get_pex_python_paths():
+    """Returns a list of paths to Python interpreters as defined in a pexrc file.
+
+    These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'. PEX_PYTHON_PATH
+    defines a colon-separated list of paths to interpreters that a pex can be built and run against.
+    """
+    ppp = Variables.from_rc().get("PEX_PYTHON_PATH")
+    if ppp:
+        return ppp.split(os.pathsep)
+    else:
         return []
 
-    @staticmethod
-    def get_pex_python_paths():
-        """Returns a list of paths to Python interpreters as defined in a pexrc file.
 
-        These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'.
-        PEX_PYTHON_PATH defines a colon-separated list of paths to interpreters that a pex can be
-        built and run against.
-        """
-        ppp = Variables.from_rc().get("PEX_PYTHON_PATH")
-        if ppp:
-            return ppp.split(os.pathsep)
-        else:
-            return []
+def _contains_asdf_path_tokens(interpreter_search_paths: Iterable[str]) -> tuple[bool, bool]:
+    """Returns tuple of whether the path list contains standard or local ASDF path tokens."""
+    standard_path_token = False
+    local_path_token = False
+    for interpreter_search_path in interpreter_search_paths:
+        if interpreter_search_path == "<ASDF>":
+            standard_path_token = True
+        elif interpreter_search_path == "<ASDF_LOCAL>":
+            local_path_token = True
+    return standard_path_token, local_path_token
 
-    @staticmethod
-    def contains_asdf_path_tokens(interpreter_search_paths: Iterable[str]) -> tuple[bool, bool]:
-        """Returns tuple of whether the path list contains standard or local ASDF path tokens."""
-        standard_path_token = False
-        local_path_token = False
-        for interpreter_search_path in interpreter_search_paths:
-            if interpreter_search_path == "<ASDF>":
-                standard_path_token = True
-            elif interpreter_search_path == "<ASDF_LOCAL>":
-                local_path_token = True
-        return standard_path_token, local_path_token
 
-    @staticmethod
-    def get_pyenv_paths(env: EnvironmentVars, *, pyenv_local: bool = False) -> list[str]:
-        """Returns a list of paths to Python interpreters managed by pyenv.
+def _get_pyenv_paths(env: EnvironmentVars, *, pyenv_local: bool = False) -> list[str]:
+    """Returns a list of paths to Python interpreters managed by pyenv.
 
-        :param env: The environment to use to look up pyenv.
-        :param bool pyenv_local: If True, only use the interpreter specified by
-                                 '.python-version' file under `build_root`.
-        """
-        pyenv_root = get_pyenv_root(env)
-        if not pyenv_root:
-            return []
+    :param env: The environment to use to look up pyenv.
+    :param bool pyenv_local: If True, only use the interpreter specified by
+                                '.python-version' file under `build_root`.
+    """
+    pyenv_root = get_pyenv_root(env)
+    if not pyenv_root:
+        return []
 
-        versions_dir = Path(pyenv_root, "versions")
-        if not versions_dir.is_dir():
-            return []
+    versions_dir = Path(pyenv_root, "versions")
+    if not versions_dir.is_dir():
+        return []
 
-        if pyenv_local:
-            local_version_file = Path(get_buildroot(), ".python-version")
-            if not local_version_file.exists():
-                logger.warning(
-                    softwrap(
-                        """
-                        No `.python-version` file found in the build root,
-                        but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`.
-                        """
-                    )
+    if pyenv_local:
+        local_version_file = Path(get_buildroot(), ".python-version")
+        if not local_version_file.exists():
+            logger.warning(
+                softwrap(
+                    """
+                    No `.python-version` file found in the build root,
+                    but <PYENV_LOCAL> was set in `[python-bootstrap].search_path`.
+                    """
                 )
-                return []
-
-            local_version = local_version_file.read_text().strip()
-            path = Path(versions_dir, local_version, "bin")
-            if path.is_dir():
-                return [str(path)]
+            )
             return []
 
-        paths = []
-        for version in sorted(versions_dir.iterdir()):
-            path = Path(versions_dir, version, "bin")
-            if path.is_dir():
-                paths.append(str(path))
-        return paths
+        local_version = local_version_file.read_text().strip()
+        path = Path(versions_dir, local_version, "bin")
+        if path.is_dir():
+            return [str(path)]
+        return []
+
+    paths = []
+    for version in sorted(versions_dir.iterdir()):
+        path = Path(versions_dir, version, "bin")
+        if path.is_dir():
+            paths.append(str(path))
+    return paths
 
 
 def get_pyenv_root(env: EnvironmentVars) -> str | None:
@@ -236,7 +235,7 @@ async def python_bootstrap(
     interpreter_search_paths = python_bootstrap_subsystem.search_path
     interpreter_names = python_bootstrap_subsystem.names
 
-    has_standard_path_token, has_local_path_token = PythonBootstrap.contains_asdf_path_tokens(
+    has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
         interpreter_search_paths
     )
     result = await Get(
