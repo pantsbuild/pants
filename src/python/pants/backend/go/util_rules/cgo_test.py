@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from textwrap import dedent
 from typing import Iterable
@@ -274,3 +275,103 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
         ],
     )
     assert result.stdout.decode() == "Hello World!\n"
+
+
+def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
+    gcc_path = _find_binary(["clang", "gcc"])
+    if gcc_path is None:
+        pytest.skip("Skipping test since C/Objective-C compiler was not found.")
+
+    # This test relies on Foundation library being available. Skip if not on macOS.
+    if sys.platform != "darwin":
+        pytest.skip("Skipping Objective-C test because not running on macOS.")
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            go_mod(name="mod")
+            go_package(name="pkg", sources=["*.go", "*.m"])
+            go_binary(name="bin")
+            """
+            ),
+            "go.mod": "module example.pantsbuild.org/cgotest\n",
+            "print.m": dedent(
+                r"""\
+                #import <Foundation/Foundation.h>
+
+                void do_print(const char * str) {
+                    NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+                    NSLog(@"Got: %s", str);
+                    [pool drain];
+                }
+                """
+            ),
+            "main.go": dedent(
+                """\
+            package main
+
+            // #cgo LDFLAGS: -framework Foundation
+            // #include <stdlib.h>
+            // extern void do_print(const char *);
+            import "C"
+            import "unsafe"
+
+            func main() {
+                cs := C.CString("Hello World!")
+                C.do_print(cs)
+                C.free(unsafe.Pointer(cs))
+            }
+            """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--golang-cgo-enabled",
+            f"--golang-cgo-tool-search-paths=['{str(gcc_path.parent)}']",
+            f"--golang-cgo-gcc-binary-name={gcc_path.name}",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+    )
+    assert maybe_analysis.analysis is not None
+    analysis = maybe_analysis.analysis
+    assert analysis.cgo_files == ("main.go",)
+    assert analysis.m_files == ("print.m",)
+
+    maybe_digest = rule_runner.request(
+        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+    )
+    assert maybe_digest.pkg_digest is not None
+    pkg_digest = maybe_digest.pkg_digest
+
+    cgo_request = CGoCompileRequest(
+        import_path=analysis.import_path,
+        pkg_name=analysis.name,
+        digest=pkg_digest.digest,
+        dir_path=analysis.dir_path,
+        cgo_files=analysis.cgo_files,
+        cgo_flags=analysis.cgo_flags,
+    )
+    cgo_compile_result = rule_runner.request(CGoCompileResult, [cgo_request])
+    assert cgo_compile_result.digest != EMPTY_DIGEST
+
+    tgt = rule_runner.get_target(Address("", target_name="bin"))
+    pkg = rule_runner.request(BuiltPackage, [GoBinaryFieldSet.create(tgt)])
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            Process(
+                argv=["./bin"],
+                input_digest=pkg.digest,
+                description="Run cgo binary",
+            )
+        ],
+    )
+    assert "Got: Hello World!" in result.stderr.decode()
