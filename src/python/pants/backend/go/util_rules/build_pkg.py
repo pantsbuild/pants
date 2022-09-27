@@ -44,14 +44,14 @@ class BuildGoPackageRequest(EngineAwareParameter):
         pkg_name: str,
         digest: Digest,
         dir_path: str,
-        go_file_names: tuple[str, ...],
-        s_file_names: tuple[str, ...],
+        go_files: tuple[str, ...],
+        s_files: tuple[str, ...],
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
         coverage_config: GoCoverageConfig | None = None,
-        cgo_file_names: tuple[str, ...] = (),
+        cgo_files: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
         c_files: tuple[str, ...] = (),
         cxx_files: tuple[str, ...] = (),
@@ -68,14 +68,14 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.pkg_name = pkg_name
         self.digest = digest
         self.dir_path = dir_path
-        self.go_file_names = go_file_names
-        self.s_file_names = s_file_names
+        self.go_files = go_files
+        self.s_files = s_files
         self.direct_dependencies = direct_dependencies
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
         self.coverage_config = coverage_config
-        self.cgo_file_names = cgo_file_names
+        self.cgo_files = cgo_files
         self.cgo_flags = cgo_flags
         self.c_files = c_files
         self.cxx_files = cxx_files
@@ -87,14 +87,14 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.pkg_name,
                 self.digest,
                 self.dir_path,
-                self.go_file_names,
-                self.s_file_names,
+                self.go_files,
+                self.s_files,
                 self.direct_dependencies,
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
                 self.coverage_config,
-                self.cgo_file_names,
+                self.cgo_files,
                 self.cgo_flags,
                 self.c_files,
                 self.cxx_files,
@@ -112,14 +112,14 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"pkg_name={self.pkg_name}, "
             f"digest={self.digest}, "
             f"dir_path={self.dir_path}, "
-            f"go_file_names={self.go_file_names}, "
-            f"s_file_names={self.s_file_names}, "
+            f"go_files={self.go_files}, "
+            f"s_files={self.s_files}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
             f"coverage_config={self.coverage_config}, "
-            f"cgo_file_names={self.cgo_file_names}, "
+            f"cgo_files={self.cgo_files}, "
             f"cgo_flags={self.cgo_flags}, "
             f"c_files={self.c_files}, "
             f"cxx_files={self.cxx_files}, "
@@ -140,13 +140,13 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.pkg_name == other.pkg_name
             and self.digest == other.digest
             and self.dir_path == other.dir_path
-            and self.go_file_names == other.go_file_names
-            and self.s_file_names == other.s_file_names
+            and self.go_files == other.go_files
+            and self.s_files == other.s_files
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
             and self.coverage_config == other.coverage_config
-            and self.cgo_file_names == other.cgo_file_names
+            and self.cgo_files == other.cgo_files
             and self.cgo_flags == other.cgo_flags
             and self.c_files == other.c_files
             and self.cxx_files == other.cxx_files
@@ -326,8 +326,8 @@ async def build_go_package(
 
     # If coverage is enabled for this package, then replace the Go source files with versions modified to
     # contain coverage code.
-    go_files = request.go_file_names
-    cgo_files = request.cgo_file_names
+    go_files = request.go_files
+    cgo_files = request.cgo_files
     go_files_digest = request.digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
     if request.coverage_config:
@@ -376,12 +376,12 @@ async def build_go_package(
 
     assembly_digests = None
     symabis_path = None
-    if request.s_file_names:
+    if request.s_files:
         assembly_setup = await Get(
             FallibleAssemblyPreCompilation,
             AssemblyPreCompilationRequest(
                 compilation_input=input_digest,
-                s_files=request.s_file_names,
+                s_files=request.s_files,
                 dir_path=request.dir_path,
                 import_path=request.import_path,
             ),
@@ -424,7 +424,7 @@ async def build_go_package(
     if embedcfg.digest != EMPTY_DIGEST:
         compile_args.extend(["-embedcfg", RenderedEmbedConfig.PATH])
 
-    if not request.s_file_names:
+    if not request.s_files:
         # If there are no non-Go sources, then pass -complete flag which tells the compiler that the provided
         # Go files are the entire package.
         compile_args.append("-complete")
@@ -460,7 +460,7 @@ async def build_go_package(
             AssemblyPostCompilationRequest(
                 compilation_result=compilation_digest,
                 assembly_digests=assembly_digests,
-                s_files=request.s_file_names,
+                s_files=request.s_files,
                 dir_path=request.dir_path,
             ),
         )
@@ -568,7 +568,7 @@ async def compute_compile_action_id(
     compile_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("compile"))
     h.update(f"compile {compile_tool_id.tool_id}\n".encode())
     # TODO: Add compiler flags as per `go`'s algorithm. Need to figure out
-    if bq.s_file_names:
+    if bq.s_files:
         asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
         h.update(f"asm {asm_tool_id.tool_id}\n".encode())
         # TODO: Add asm flags as per `go`'s algorithm.
