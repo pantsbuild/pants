@@ -114,7 +114,7 @@ def test_resources_jar_is_determinstic(rule_runner: RuleRunner) -> None:
             "three/four.txt": "",
             "three/five.txt": "",
             "three/six/seven/eight.txt": "",
-            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
+            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
         }
     )
 
