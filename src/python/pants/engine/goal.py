@@ -46,7 +46,12 @@ class GoalSubsystem(Subsystem):
 
     @classmethod
     def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
-        return super().create_scope_info(is_goal=True, **scope_info_kwargs)
+        return super().create_scope_info(
+            # `filter` should now be treated as a subsystem for `help`, even though it
+            # still works as a goal for backwards compatibility.
+            is_goal=False if cls.name == "filter" else True,
+            **scope_info_kwargs,
+        )
 
     @classproperty
     @abstractmethod
