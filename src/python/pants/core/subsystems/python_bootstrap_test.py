@@ -8,6 +8,7 @@ from typing import Iterable, List, Sequence, TypeVar
 from pants.base.build_environment import get_pants_cachedir
 from pants.core.subsystems.python_bootstrap import (
     PythonBootstrap,
+    _expand_interpreter_search_paths,
     _get_environment_paths,
     _get_pex_python_paths,
     _get_pyenv_paths,
@@ -169,7 +170,7 @@ def test_expand_interpreter_search_paths() -> None:
                 local=True,
                 extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
             )
-            expanded_paths = PythonBootstrap._expand_interpreter_search_paths(
+            expanded_paths = _expand_interpreter_search_paths(
                 paths,
                 env=asdf_paths_result.env,
                 asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,

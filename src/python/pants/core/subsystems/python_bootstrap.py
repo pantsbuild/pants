@@ -93,52 +93,51 @@ class PythonBootstrap:
 
     @memoized_method
     def interpreter_search_paths(self):
-        return self._expand_interpreter_search_paths(
+        return _expand_interpreter_search_paths(
             self.raw_interpreter_search_paths,
             self.environment,
             self.asdf_standard_tool_paths,
             self.asdf_local_tool_paths,
         )
 
-    @classmethod
-    def _expand_interpreter_search_paths(
-        cls,
-        interpreter_search_paths: Sequence[str],
-        env: EnvironmentVars,
-        asdf_standard_tool_paths: tuple[str, ...],
-        asdf_local_tool_paths: tuple[str, ...],
-    ):
-        special_strings = {
-            "<PEXRC>": _get_pex_python_paths,
-            "<PATH>": lambda: _get_environment_paths(env),
-            "<ASDF>": lambda: asdf_standard_tool_paths,
-            "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
-            "<PYENV>": lambda: _get_pyenv_paths(env),
-            "<PYENV_LOCAL>": lambda: _get_pyenv_paths(env, pyenv_local=True),
-        }
-        expanded = []
-        from_pexrc = None
-        for s in interpreter_search_paths:
-            if s in special_strings:
-                special_paths = special_strings[s]()
-                if s == "<PEXRC>":
-                    from_pexrc = special_paths
-                expanded.extend(special_paths)
-            else:
-                expanded.append(s)
-        # Some special-case logging to avoid misunderstandings.
-        if from_pexrc and len(expanded) > len(from_pexrc):
-            logger.info(
-                softwrap(
-                    f"""
-                    pexrc interpreters requested and found, but other paths were also specified,
-                    so interpreters may not be restricted to the pexrc ones. Full search path is:
 
-                    {":".join(expanded)}
-                    """
-                )
+def _expand_interpreter_search_paths(
+    interpreter_search_paths: Sequence[str],
+    env: EnvironmentVars,
+    asdf_standard_tool_paths: tuple[str, ...],
+    asdf_local_tool_paths: tuple[str, ...],
+):
+    special_strings = {
+        "<PEXRC>": _get_pex_python_paths,
+        "<PATH>": lambda: _get_environment_paths(env),
+        "<ASDF>": lambda: asdf_standard_tool_paths,
+        "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
+        "<PYENV>": lambda: _get_pyenv_paths(env),
+        "<PYENV_LOCAL>": lambda: _get_pyenv_paths(env, pyenv_local=True),
+    }
+    expanded = []
+    from_pexrc = None
+    for s in interpreter_search_paths:
+        if s in special_strings:
+            special_paths = special_strings[s]()
+            if s == "<PEXRC>":
+                from_pexrc = special_paths
+            expanded.extend(special_paths)
+        else:
+            expanded.append(s)
+    # Some special-case logging to avoid misunderstandings.
+    if from_pexrc and len(expanded) > len(from_pexrc):
+        logger.info(
+            softwrap(
+                f"""
+                pexrc interpreters requested and found, but other paths were also specified,
+                so interpreters may not be restricted to the pexrc ones. Full search path is:
+
+                {":".join(expanded)}
+                """
             )
-        return expanded
+        )
+    return expanded
 
 
 def _get_environment_paths(env: EnvironmentVars):
