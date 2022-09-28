@@ -793,14 +793,18 @@ async def run_tests(
     for result in results:
         results_by_tool[result.tester_name].append(result)
 
-    _print_results(console, results_by_tool, run_id)
-
+    # Print summary.
     exit_code = 0
-
-    for tool in results_by_tool:
+    if results_by_tool:
+        console.print_stderr("")
+    for tool in sorted(results_by_tool):
         for result in results_by_tool[tool]:
+            if result.skipped:
+                continue
             if result.exit_code:
                 exit_code = result.exit_code
+
+            console.print_stderr(_format_test_summary(result, run_id, console))
 
             if result.extra_output and result.extra_output.files:
                 workspace.write_digest(
@@ -868,50 +872,37 @@ async def run_tests(
     return Test(exit_code)
 
 
-def _print_results(
-    console: Console,
-    results_by_tool: dict[str, list[TestResult]],
-    run_id: RunId,
-) -> None:
-    if results_by_tool:
-        console.print_stderr("")
-
-    for tool_name in sorted(results_by_tool):
-        results = results_by_tool[tool_name]
-        for result in results:
-            if result.skipped:
-                continue
-            if result.exit_code:
-                sigil = console.sigil_failed()
-                status = "failed"
-            else:
-                sigil = console.sigil_succeeded()
-                status = "succeeded"
-
-            assert (
-                result.result_metadata
-            ), "Skipped results should be skipped while printing results"
-
-            source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-            source_print = f" ({source})" if source else ""
-
-            elapsed_print = ""
-            total_elapsed_ms = result.result_metadata.total_elapsed_ms
-            if total_elapsed_ms is not None:
-                elapsed_secs = total_elapsed_ms / 1000
-                elapsed_print = f"in {elapsed_secs:.2f}s"
-
-            suffix = f" {elapsed_print}{source_print}"
-
-            console.print_stderr(f"{sigil} {result.partition_description} {status}{suffix}.")
-
-
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
     ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
+
+
+def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
+    """Format the test summary printed to the console."""
+    assert (
+        result.result_metadata is not None
+    ), "Skipped test results should not be outputted in the test summary"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
+    else:
+        sigil = console.sigil_failed()
+        status = "failed"
+
+    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+    source_print = f" ({source})" if source else ""
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_print}"
+    return f"{sigil} {result.partition_description} {status}{suffix}."
 
 
 @dataclass(frozen=True)

@@ -35,12 +35,14 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
     TestTimeoutField,
+    _format_test_summary,
     build_runtime_package_dependencies,
     run_tests,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
+from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -342,6 +344,57 @@ def test_summary(rule_runner: RuleRunner) -> None:
     )
 
 
+def _assert_test_summary(
+    expected: str,
+    *,
+    exit_code: int | None,
+    run_id: int,
+    result_metadata: ProcessResultMetadata | None,
+) -> None:
+    assert expected == _format_test_summary(
+        TestResult(
+            exit_code=exit_code,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            tester_name="",
+            partition_description="//:dummy_address",
+            output_setting=ShowOutput.FAILED,
+            result_metadata=result_metadata,
+        ),
+        RunId(run_id),
+        Console(use_colors=False),
+    )
+
+
+def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+    )
+
+
+def test_format_summary_local(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s.",
+        exit_code=0,
+        run_id=0,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
+def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+    )
+
+
 def test_debug_target(rule_runner: RuleRunner) -> None:
     exit_code, _ = run_test_rule(
         rule_runner,
@@ -395,7 +448,7 @@ def test_coverage(rule_runner: RuleRunner) -> None:
 
 def assert_streaming_output(
     *,
-    exit_code: int,
+    exit_code: int | None,
     stdout: str = "stdout",
     stderr: str = "stderr",
     output_setting: ShowOutput = ShowOutput.ALL,
@@ -416,6 +469,20 @@ def assert_streaming_output(
     )
     assert result.level() == expected_level
     assert result.message() == expected_message
+
+
+def test_streaming_output_skip() -> None:
+    assert_streaming_output(
+        exit_code=None,
+        stdout="",
+        stderr="",
+        expected_level=LogLevel.DEBUG,
+        expected_message=dedent(
+            """\
+            demo_test skipped.
+            Partition: demo_test"""
+        ),
+    )
 
 
 def test_streaming_output_success() -> None:
