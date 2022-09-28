@@ -57,7 +57,7 @@ class PythonBootstrapSubsystem(Subsystem):
 
                 * `<PATH>`, the contents of the PATH env var
 
-                For only local runtime environments:
+                When the environment is a `local_environment` target:
 
                 * `<ASDF>`, all Python versions currently configured by ASDF \
                     `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
@@ -232,8 +232,7 @@ def _preprocessed_interpreter_search_paths(
     * The search paths, with invalid tokens removed, if the provided value was unaltered from the
       default value in the options system
       (see `PythonBootstrapSubsystem.EnvironmentAware.search_paths`)
-    * The search paths unaltered, if the search paths do not contain tokens invalid for this
-      environment
+    * The search paths unaltered, if the search paths are all valid tokens for this environment
 
     If the environment is non-local and there are invalid tokens for those environments, raise
     `ValueError`.
@@ -242,9 +241,7 @@ def _preprocessed_interpreter_search_paths(
     env = env_tgt.val
     search_paths = tuple(_search_paths)
 
-    if isinstance(env, LocalEnvironmentTarget):
-        return search_paths
-    if env is None:
+    if env is None or isinstance(env, LocalEnvironmentTarget):
         return search_paths
 
     not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>", "<PEXRC>"}
@@ -259,10 +256,13 @@ def _preprocessed_interpreter_search_paths(
     if any_not_allowed:
         env_type = type(env)
         raise ValueError(
-            f"`[python-bootstrap].search_paths` is configured to use local Python discovery "
-            f"tools, which do not work in {env_type.__name__} runtime environments. To fix this, "
-            f"set the value of `python_bootstrap_search_path` in the {env.alias} defined at "
-            f"`{env.address}` to contain only hardcoded paths or the `<PATH>` special string."
+            softwrap(
+                f"`[python-bootstrap].search_paths` is configured to use local Python discovery "
+                f"tools, which do not work in {env_type.__name__} runtime environments. To fix "
+                f"this, set the value of `python_bootstrap_search_path` in the `{env.alias}` "
+                f"defined at `{env.address}` to contain only hardcoded paths or the `<PATH>` "
+                "special string."
+            )
         )
 
     return search_paths

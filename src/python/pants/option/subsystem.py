@@ -125,6 +125,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             return default
 
         def _is_default(self, __name: str) -> bool:
+            """Returns true if the value of the named option is unchanged from the default."""
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
 
             v = getattr(type(self), __name)
