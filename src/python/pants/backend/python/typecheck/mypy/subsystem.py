@@ -94,7 +94,7 @@ class MyPy(PythonToolBase):
     name = "MyPy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.961"
+    default_version = "mypy==0.981"
     default_main = ConsoleScript("mypy")
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.

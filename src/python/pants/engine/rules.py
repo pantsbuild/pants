@@ -19,6 +19,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
     get_type_hints,
     overload,
 )
@@ -357,7 +358,7 @@ def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Calla
         raise ValueError("@rule_helpers must be async.")
 
     setattr(func, "rule_helper", func)
-    return func
+    return cast(Callable[P, R], func)
 
 
 @overload

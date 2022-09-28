@@ -422,7 +422,7 @@ async def infer_python_dependencies_via_source(
             )
         )
 
-    _ = await _handle_unowned_imports(
+    await _handle_unowned_imports(
         address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,

@@ -93,7 +93,7 @@ class PytestPluginSetup:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)  # type: ignore[misc]
+@dataclass(frozen=True)
 class PytestPluginSetupRequest(ABC):
     """A request to set up the test environment before Pytest runs, e.g. to set up databases.
 

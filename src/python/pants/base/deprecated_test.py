@@ -37,7 +37,7 @@ def test_deprecated_function(caplog) -> None:
         def deprecated_method(self):
             return "some val"
 
-        @property  # type: ignore[misc]
+        @property
         @deprecated(FUTURE_VERSION)
         def deprecated_property(self):
             return "some val"
