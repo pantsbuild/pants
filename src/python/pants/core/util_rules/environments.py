@@ -528,7 +528,7 @@ async def resolve_environment_name(
                     `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
                     not explicitly setting the field `{DockerPlatformField.alias}` for the target
                     {env_tgt.val.address} because the default behavior is to use the CPU architecture
-                    of the current host for the platform (although this requires the docker image
+                    of the current host for the platform (although this requires that the docker image
                     supports that CPU architecture).
                     """
                 ),
