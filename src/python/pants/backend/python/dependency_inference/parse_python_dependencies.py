@@ -32,7 +32,7 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
     """All the discovered imports from a Python source file mapped to the relevant info."""
 
     def serialisable(self):
-        return {k: dataclasses.asdict(v) for k,v in self.items()}
+        return {k: dataclasses.asdict(v) for k, v in self.items()}
 
 
 class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
@@ -42,16 +42,14 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     def serialisable(self):
         return tuple(self)
 
+
 @dataclass(frozen=True)
 class ParsedPythonDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
 
     def serialisable(self):
-        return {
-            "imports": self.imports.serialisable(),
-            "assets": self.assets.serialisable()
-        }
+        return {"imports": self.imports.serialisable(), "assets": self.assets.serialisable()}
 
 
 @dataclass(frozen=True)
