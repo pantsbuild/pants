@@ -10,15 +10,18 @@ from abc import ABCMeta
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
+from typing_extensions import final
+
 from pants import ox
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.errors import OptionsError
 from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
-from pants.util.memo import memoized_classmethod
+from pants.util.memo import memoized_classmethod, memoized_classproperty
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
@@ -137,6 +140,28 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return list(inner())
 
+    @final
+    @memoized_classproperty
+    def _plugin_option_cls(cls) -> type:
+        @union
+        class PluginOption:
+            pass
+
+        return PluginOption
+
+    @classmethod
+    def register_plugin_options(cls, options_container: type) -> UnionRule:
+        """Register additional options on the subsystem.
+
+        In the `rules()` register.py entry-point, include `OtherSubsystem.register_plugin_options(<OptionsContainer>)`.
+        `<OptionsContainer>` should be a type with option class attributes, similar to how they are
+        defined for subsystems.
+
+        This will register the option as a first-class citizen.
+        Plugins can use this new option like any other.
+        """
+        return UnionRule(cls._plugin_option_cls, options_container)
+
     @classmethod
     def _construct_subsystem_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem."""
@@ -233,14 +258,17 @@ class Subsystem(metaclass=_SubsystemMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
-    def register_options_on_scope(cls, options: Options):
+    def register_options_on_scope(cls, options: Options, union_membership: UnionMembership):
         """Trigger registration of this Subsystem's options.
 
         Subclasses should not generally need to override this method.
         """
         register = options.registration_function_for_subsystem(cls)
+        plugin_option_containers = union_membership.get(cls._plugin_option_cls)
         for options_info in chain(
-            collect_options_info(cls), collect_options_info(cls.EnvironmentAware)
+            collect_options_info(cls),
+            collect_options_info(cls.EnvironmentAware),
+            *(collect_options_info(container) for container in plugin_option_containers),
         ):
             register(*options_info.flag_names, **options_info.flag_options)
 

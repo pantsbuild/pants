@@ -13,6 +13,7 @@ from typing_extensions import Protocol
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import AuthPluginResult, DynamicRemoteOptions
@@ -126,8 +127,10 @@ class PantsDaemonCore:
         """
 
         with self._handle_exceptions():
-            build_config, options = self._options_initializer.build_config_and_options(
-                options_bootstrapper, env, raise_=True
+            build_config = self._options_initializer.build_config(options_bootstrapper, env)
+            union_membership = UnionMembership.from_rules(build_config.union_rules)
+            options = self._options_initializer.options(
+                options_bootstrapper, env, build_config, union_membership, raise_=True
             )
 
         scheduler_restart_explanation: str | None = None

@@ -9,6 +9,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
@@ -133,7 +134,8 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                     ScopeInfo("fruit"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             # So we don't choke on these on the cmd line.
             opts.register("", "--pants-workdir")
@@ -175,6 +177,7 @@ class TestOptionsBootstrapper:
                     ScopeInfo("compile_apt"),
                     ScopeInfo("fruit"),
                 ],
+                union_membership=UnionMembership({}),
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
@@ -244,7 +247,8 @@ class TestOptionsBootstrapper:
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("resolver"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
@@ -259,13 +263,15 @@ class TestOptionsBootstrapper:
                 known_scope_infos=[
                     ScopeInfo(""),
                     ScopeInfo("foo"),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             opts2 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
                     ScopeInfo("foo"),
                     ScopeInfo(""),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             assert opts1 is opts2
 
@@ -274,14 +280,21 @@ class TestOptionsBootstrapper:
                     ScopeInfo(""),
                     ScopeInfo("foo"),
                     ScopeInfo(""),
-                ]
+                ],
+                union_membership=UnionMembership({}),
             )
             assert opts1 is opts3
 
-            opts4 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
+            opts4 = bootstrapper.full_options_for_scopes(
+                known_scope_infos=[ScopeInfo("")],
+                union_membership=UnionMembership({}),
+            )
             assert opts1 is not opts4
 
-            opts5 = bootstrapper.full_options_for_scopes(known_scope_infos=[ScopeInfo("")])
+            opts5 = bootstrapper.full_options_for_scopes(
+                known_scope_infos=[ScopeInfo("")],
+                union_membership=UnionMembership({}),
+            )
             assert opts4 is opts5
             assert opts1 is not opts5
 

@@ -14,6 +14,7 @@ from pants.backend.explorer.rules import validate_explorer_dependencies
 from pants.backend.project_info import peek
 from pants.engine.explorer import RequestState
 from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import AllHelpInfo, HelpInfoExtracter
 from pants.testutil.rule_runner import RuleRunner
 
@@ -38,7 +39,9 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     return HelpInfoExtracter.get_all_help_info(
-        options=rule_runner.options_bootstrapper.full_options(rule_runner.build_config),
+        options=rule_runner.options_bootstrapper.full_options(
+            rule_runner.build_config, union_membership=UnionMembership({})
+        ),
         union_membership=rule_runner.union_membership,
         consumed_scopes_mapper=fake_consumed_scopes_mapper,
         registered_target_types=RegisteredTargetTypes.create(rule_runner.build_config.target_types),
