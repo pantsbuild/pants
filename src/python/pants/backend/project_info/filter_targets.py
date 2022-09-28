@@ -14,6 +14,7 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import RegisteredTargetTypes, Tags, Target, UnrecognizedTargetTypeException
 from pants.option.option_types import EnumOption, StrListOption
+from pants.util.docutil import bin_name
 from pants.util.enums import match
 from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized
@@ -149,6 +150,27 @@ class FilterGoal(Goal):
 def filter_targets(
     addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
+    # When removing, also remove the special casing in `help_info_extractor.py` to reclassify the
+    # subsystem as not a goal with `pants_help`.
+    warn_or_error(
+        "3.0.0.dev0",
+        "using `filter` as a goal",
+        softwrap(
+            f"""
+            You can now specify `filter` arguments with any goal, e.g. `{bin_name()}
+            --filter-target-type=python_test test ::`.
+
+            This means that the `filter` goal is now identical to `list`. For example, rather than
+            `{bin_name()} filter --target-type=python_test ::`, use
+            `{bin_name()} --filter-target-type=python_test list ::`.
+
+            Often, the `filter` goal was combined with `xargs` to build pipelines of commands. You
+            can often now simplify those to a single command. Rather than `{bin_name()} filter
+            --target-type=python_test filter :: | xargs {bin_name()} test`, simply use
+            `{bin_name()} --filter-target-type=python_test test ::`.
+            """
+        ),
+    )
     # `SpecsFilter` will have already filtered for us.
     with filter_subsystem.line_oriented(console) as print_stdout:
         for address in sorted(addresses):
