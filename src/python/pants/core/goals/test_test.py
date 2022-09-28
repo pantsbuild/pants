@@ -130,7 +130,6 @@ class MockTestRequest(TestRequest):
             result_metadata=None
             if cls.skipped(addresses)
             else ProcessResultMetadata(999, "ran_locally", 0),
-            tester_name="mock",
             partition_description=partition,
         )
 
@@ -358,7 +357,6 @@ def _assert_test_summary(
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            tester_name="",
             partition_description="//:dummy_address",
             output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
@@ -464,7 +462,6 @@ def assert_streaming_output(
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         result_metadata=result_metadata,
-        tester_name="demo_test",
         partition_description="demo_test",
     )
     assert result.level() == expected_level
@@ -477,11 +474,7 @@ def test_streaming_output_skip() -> None:
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message=dedent(
-            """\
-            demo_test skipped.
-            Partition: demo_test"""
-        ),
+        expected_message="demo_test skipped.",
     )
 
 
@@ -493,7 +486,6 @@ def test_streaming_output_success() -> None:
         expected_message=dedent(
             """\
             demo_test succeeded.
-            Partition: demo_test
             stdout
             stderr
 
@@ -502,19 +494,11 @@ def test_streaming_output_success() -> None:
     )
     assert_success_streamed(
         output_setting=ShowOutput.FAILED,
-        expected_message=dedent(
-            """\
-            demo_test succeeded.
-            Partition: demo_test"""
-        ),
+        expected_message="demo_test succeeded.",
     )
     assert_success_streamed(
         output_setting=ShowOutput.NONE,
-        expected_message=dedent(
-            """\
-            demo_test succeeded.
-            Partition: demo_test"""
-        ),
+        expected_message="demo_test succeeded.",
     )
 
 
@@ -525,7 +509,6 @@ def test_streaming_output_failure() -> None:
     message = dedent(
         """\
         demo_test failed (exit code 1).
-        Partition: demo_test
         stdout
         stderr
 
@@ -535,11 +518,7 @@ def test_streaming_output_failure() -> None:
     assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
     assert_failure_streamed(
         output_setting=ShowOutput.NONE,
-        expected_message=dedent(
-            """\
-            demo_test failed (exit code 1).
-            Partition: demo_test"""
-        ),
+        expected_message="demo_test failed (exit code 1).",
     )
 
 

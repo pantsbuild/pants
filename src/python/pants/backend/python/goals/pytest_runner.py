@@ -425,7 +425,6 @@ async def run_python_test(
 
     return TestResult.from_fallible_process_result(
         result,
-        tester_name="pytest",
         partition_description=partition.key,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,

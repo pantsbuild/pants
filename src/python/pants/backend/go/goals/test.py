@@ -199,7 +199,6 @@ async def run_go_tests(
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=test_subsystem.output,
             result_metadata=None,
-            tester_name=GoTestSubsystem.options_scope,
             partition_description=partition.key,
         )
 
@@ -237,9 +236,7 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.skip(
-            GoTestSubsystem.options_scope, partition.key, output_setting=test_subsystem.output
-        )
+        return TestResult.skip(partition.key, output_setting=test_subsystem.output)
 
     coverage_config: GoCoverageConfig | None = None
     if test_subsystem.use_coverage:
@@ -446,7 +443,6 @@ async def run_go_tests(
         process_result=result,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
-        tester_name=GoTestSubsystem.options_scope,
         partition_description=partition.key,
     )
 

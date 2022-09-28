@@ -84,7 +84,6 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
-    tester_name: str
     partition_description: str
 
     coverage_data: CoverageData | None = None
@@ -98,9 +97,7 @@ class TestResult(EngineAwareReturnType):
     __test__ = False
 
     @classmethod
-    def skip(
-        cls, tester_name: str, partition_description: str, output_setting: ShowOutput
-    ) -> TestResult:
+    def skip(cls, partition_description: str, output_setting: ShowOutput) -> TestResult:
         return cls(
             exit_code=None,
             stdout="",
@@ -108,7 +105,6 @@ class TestResult(EngineAwareReturnType):
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=output_setting,
-            tester_name=tester_name,
             partition_description=partition_description,
             result_metadata=None,
         )
@@ -123,7 +119,6 @@ class TestResult(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output_setting: ShowOutput,
         *,
-        tester_name: str,
         partition_description: str,
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
@@ -137,7 +132,6 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=process_result.stderr_digest,
             output_setting=output_setting,
             result_metadata=process_result.metadata,
-            tester_name=tester_name,
             partition_description=partition_description,
             coverage_data=coverage_data,
             xml_results=xml_results,
@@ -159,14 +153,13 @@ class TestResult(EngineAwareReturnType):
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        message = self.tester_name
+        message = self.partition_description
         if self.skipped:
             message += " skipped."
         elif self.exit_code == 0:
             message += " succeeded."
         else:
             message += f" failed (exit code {self.exit_code})."
-        message += f"\nPartition: {self.partition_description}"
 
         if (
             self.skipped
@@ -789,16 +782,11 @@ async def run_tests(
         Get(TestResult, TestRequest.SubPartition, request) for request in subpartitions
     )
 
-    results_by_tool = defaultdict(list)
-    for result in results:
-        results_by_tool[result.tester_name].append(result)
-
     # Print summary.
     exit_code = 0
-    if results_by_tool:
+    if results:
         console.print_stderr("")
-    for tool in sorted(results_by_tool):
-        for result in results_by_tool[tool]:
+        for result in results:
             if result.skipped:
                 continue
             if result.exit_code:
@@ -809,7 +797,9 @@ async def run_tests(
             if result.extra_output and result.extra_output.files:
                 workspace.write_digest(
                     result.extra_output.digest,
-                    path_prefix=str(distdir.relpath / "test" / tool / result.partition_description),
+                    # TODO: `partition_description` isn't guaranteed to be path-safe.
+                    # Do we sanitize it? Or use something else?
+                    path_prefix=str(distdir.relpath / "test" / result.partition_description),
                 )
 
     if test_subsystem.report:

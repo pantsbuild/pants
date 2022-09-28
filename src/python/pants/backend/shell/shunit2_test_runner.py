@@ -270,7 +270,6 @@ async def run_tests_with_shunit2(
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
         result,
-        tester_name="shunit2",
         partition_description=partition.key,
         output_setting=test_subsystem.output,
     )

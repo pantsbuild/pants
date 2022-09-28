@@ -197,7 +197,6 @@ async def run_scalatest_test(
         process_result,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
-        tester_name=Scalatest.options_scope,
         partition_description=partition.key,
     )
 

@@ -170,7 +170,6 @@ async def run_helm_unittest(
         process_result,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
-        tester_name=HelmUnitTestSubsystem.options_scope,
         partition_description=partition.key,
     )
 
