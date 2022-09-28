@@ -109,10 +109,6 @@ class TestResult(EngineAwareReturnType):
             result_metadata=None,
         )
 
-    @property
-    def skipped(self) -> bool:
-        return self.exit_code is None or self.result_metadata is None
-
     @classmethod
     def from_fallible_process_result(
         cls,
@@ -137,6 +133,23 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
         )
+
+    @property
+    def skipped(self) -> bool:
+        return self.exit_code is None or self.result_metadata is None
+
+    def __lt__(self, other: Any) -> bool:
+        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
+        each group."""
+        if not isinstance(other, TestResult):
+            return NotImplemented
+        if self.exit_code == other.exit_code:
+            return self.partition_description < other.partition_description
+        if self.skipped or self.exit_code is None:
+            return True
+        if other.skipped or other.exit_code is None:
+            return False
+        return abs(self.exit_code) < abs(other.exit_code)
 
     def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         output: dict[str, FileDigest | Snapshot] = {
@@ -786,21 +799,21 @@ async def run_tests(
     exit_code = 0
     if results:
         console.print_stderr("")
-        for result in results:
-            if result.skipped:
-                continue
-            if result.exit_code:
-                exit_code = result.exit_code
+    for result in sorted(results):
+        if result.skipped:
+            continue
+        if result.exit_code:
+            exit_code = result.exit_code
 
-            console.print_stderr(_format_test_summary(result, run_id, console))
+        console.print_stderr(_format_test_summary(result, run_id, console))
 
-            if result.extra_output and result.extra_output.files:
-                workspace.write_digest(
-                    result.extra_output.digest,
-                    # TODO: `partition_description` isn't guaranteed to be path-safe.
-                    # Do we sanitize it? Or use something else?
-                    path_prefix=str(distdir.relpath / "test" / result.partition_description),
-                )
+        if result.extra_output and result.extra_output.files:
+            workspace.write_digest(
+                result.extra_output.digest,
+                # TODO: `partition_description` isn't guaranteed to be path-safe.
+                # Do we sanitize it? Or use something else?
+                path_prefix=str(distdir.relpath / "test" / result.partition_description),
+            )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)

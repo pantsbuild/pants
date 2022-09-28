@@ -444,6 +444,32 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     assert stderr.strip().endswith(f"Ran coverage on {addr1.spec}, {addr2.spec}")
 
 
+def test_sort_results() -> None:
+    create_test_result = partial(
+        TestResult,
+        stdout="",
+        stdout_digest=EMPTY_FILE_DIGEST,
+        stderr="",
+        stderr_digest=EMPTY_FILE_DIGEST,
+        output_setting=ShowOutput.ALL,
+        result_metadata=ProcessResultMetadata(999, "dummy", 0),
+    )
+    skip1 = create_test_result(exit_code=None, partition_description="t1")
+    skip2 = create_test_result(exit_code=None, partition_description="t2")
+    success1 = create_test_result(exit_code=0, partition_description="t1")
+    success2 = create_test_result(exit_code=0, partition_description="t2")
+    fail1 = create_test_result(exit_code=1, partition_description="t1")
+    fail2 = create_test_result(exit_code=1, partition_description="t2")
+    assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
+        skip1,
+        skip2,
+        success1,
+        success2,
+        fail1,
+        fail2,
+    ]
+
+
 def assert_streaming_output(
     *,
     exit_code: int | None,
