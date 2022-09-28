@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import dataclasses
 import json
 
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
@@ -9,9 +10,10 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
 
@@ -27,35 +29,36 @@ class DumpPythonSourceAnalysis(Goal):
 
 @goal_rule
 async def dump_python_source_analysis(
-    targets: Targets,
-    console: Console,
-    python_infer_subsystem: PythonInferSubsystem,
-    python_setup: PythonSetup,
+        targets: Targets,
+        console: Console,
+        python_infer_subsystem: PythonInferSubsystem,
+        python_setup: PythonSetup,
 ) -> DumpPythonSourceAnalysis:
     source_field_sets = [
         PythonSourceFieldSet.create(tgt)
         for tgt in targets
         if PythonSourceFieldSet.is_applicable(tgt)
     ]
-    field_set = source_field_sets[0]
+    # source_field_sets = source_field_sets[:3]
 
-    # interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-    #     [request.field_set.interpreter_constraints], python_setup
-    # )
-    interpreter_constraints = None
-    source_analysis = await Get(
-        ParsedPythonDependencies,
-        ParsePythonDependenciesRequest(
-            field_set.source,
-            interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
-        ),
-    )
-    serialised = [str(fs) for fs in source_analysis]
-    console.print_stdout(json.dumps(serialised))
+    interpreter_constraints = InterpreterConstraints()
+    source_analysis = await \
+        MultiGet(
+            Get(
+                ParsedPythonDependencies,
+                ParsePythonDependenciesRequest(
+                    fs.source,
+                    interpreter_constraints,
+                    string_imports=python_infer_subsystem.string_imports,
+                    string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
+                    assets=python_infer_subsystem.assets,
+                    assets_min_slashes=python_infer_subsystem.assets_min_slashes,
+                ),
+            ) for fs in source_field_sets
+
+        )
+    marshalled = [{"address": str(fs.address), "analysis": analysis.serialisable()} for (fs, analysis) in zip(source_field_sets, source_analysis)]
+    console.print_stdout(json.dumps(marshalled))
     return DumpPythonSourceAnalysis(exit_code=0)
 
 
