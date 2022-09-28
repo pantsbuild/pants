@@ -197,9 +197,10 @@ def _contains_asdf_path_tokens(interpreter_search_paths: Iterable[str]) -> tuple
 
 @_uncacheable_rule
 async def _get_pyenv_paths(request: _PyEnvPathsRequest) -> _SearchPaths:
-    """Returns a list of paths to Python interpreters managed by pyenv.
+    """Returns a tuple of paths to Python interpreters managed by pyenv.
 
-    :param env: The environment to use to look up pyenv.
+    :param `request.env_tgt`: The environment target -- if not referring to a local/no environment,
+                                this will return an empty path.
     :param bool pyenv_local: If True, only use the interpreter specified by
                                 '.python-version' file under `build_root`.
     """
@@ -210,7 +211,7 @@ async def _get_pyenv_paths(request: _PyEnvPathsRequest) -> _SearchPaths:
     pyenv_local = request.pyenv_local
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PYENV_ROOT", "HOME")))
 
-    pyenv_root = get_pyenv_root(env)
+    pyenv_root = _get_pyenv_root(env)
     if not pyenv_root:
         return _SearchPaths(())
 
@@ -245,7 +246,7 @@ async def _get_pyenv_paths(request: _PyEnvPathsRequest) -> _SearchPaths:
     return _SearchPaths(tuple(paths))
 
 
-def get_pyenv_root(env: EnvironmentVars) -> str | None:
+def _get_pyenv_root(env: EnvironmentVars) -> str | None:
     """See https://github.com/pyenv/pyenv#environment-variables."""
     from_env = env.get("PYENV_ROOT")
     if from_env:

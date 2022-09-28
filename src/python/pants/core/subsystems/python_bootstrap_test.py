@@ -15,10 +15,10 @@ from pants.core.subsystems.python_bootstrap import (
     _ExpandInterpreterSearchPathsRequest,
     _get_environment_paths,
     _get_pex_python_paths,
+    _get_pyenv_root,
     _preprocessed_interpreter_search_paths,
     _PyEnvPathsRequest,
     _SearchPaths,
-    get_pyenv_root,
 )
 from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
 from pants.core.util_rules import asdf
@@ -112,9 +112,9 @@ def test_get_pyenv_root() -> None:
     default_root = f"{home}/.pyenv"
     explicit_root = f"{home}/explicit"
 
-    assert explicit_root == get_pyenv_root(EnvironmentVars({"PYENV_ROOT": explicit_root}))
-    assert default_root == get_pyenv_root(EnvironmentVars({"HOME": home}))
-    assert get_pyenv_root(EnvironmentVars({})) is None
+    assert explicit_root == _get_pyenv_root(EnvironmentVars({"PYENV_ROOT": explicit_root}))
+    assert default_root == _get_pyenv_root(EnvironmentVars({"HOME": home}))
+    assert _get_pyenv_root(EnvironmentVars({})) is None
 
 
 def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
