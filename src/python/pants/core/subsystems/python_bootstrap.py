@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.engine.env_vars import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -98,15 +98,13 @@ class PythonBootstrap:
 class _ExpandInterpreterSearchPathsRequest:
     interpreter_search_paths: Sequence[str]
     env_tgt: EnvironmentTarget
-    env: EnvironmentVars
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class _PyEnvPathsRequest:
-    environment: LocalEnvironmentTarget | None
-    env_vars: EnvironmentVars
+    env_tgt: EnvironmentTarget
     pyenv_local: bool = False
 
 
@@ -120,13 +118,14 @@ async def _expand_interpreter_search_paths(
     request: _ExpandInterpreterSearchPathsRequest,
 ) -> _SearchPaths:
 
-    interpreter_search_paths, env_tgt, env, asdf_standard_tool_paths, asdf_local_tool_paths = (
+    interpreter_search_paths, env_tgt, asdf_standard_tool_paths, asdf_local_tool_paths = (
         request.interpreter_search_paths,
         request.env_tgt,
-        request.env,
         request.asdf_standard_tool_paths,
         request.asdf_local_tool_paths,
     )
+
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
 
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
@@ -144,10 +143,7 @@ async def _expand_interpreter_search_paths(
                 from_pexrc = special_paths
             expanded.extend(special_paths)
         elif s == "<PYENV>" or s == "<PYENV_LOCAL>":
-            assert isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None
-            paths = await Get(
-                _SearchPaths, _PyEnvPathsRequest(env_tgt.val, env, s == "<PYENV_LOCAL>")
-            )
+            paths = await Get(_SearchPaths, _PyEnvPathsRequest(env_tgt, s == "<PYENV_LOCAL>"))
             expanded.extend(paths.paths)
         else:
             expanded.append(s)
@@ -208,7 +204,11 @@ async def _get_pyenv_paths(request: _PyEnvPathsRequest) -> _SearchPaths:
                                 '.python-version' file under `build_root`.
     """
 
-    env, pyenv_local = request.env_vars, request.pyenv_local
+    if not (request.env_tgt.val is None or isinstance(request.env_tgt.val, LocalEnvironmentTarget)):
+        return _SearchPaths(())
+
+    pyenv_local = request.pyenv_local
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PYENV_ROOT", "HOME")))
 
     pyenv_root = get_pyenv_root(env)
     if not pyenv_root:
@@ -326,7 +326,7 @@ async def python_bootstrap(
             tool_description="Python interpreters",
             resolve_standard=has_standard_path_token,
             resolve_local=has_local_path_token,
-            extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
+            extra_env_var_names=(),
             paths_option_name="[python-bootstrap].search_path",
         ),
     )
@@ -336,7 +336,6 @@ async def python_bootstrap(
         _ExpandInterpreterSearchPathsRequest(
             interpreter_search_paths,
             python_bootstrap_subsystem.env_tgt,
-            result.env,
             result.standard_tool_paths,
             result.local_tool_paths,
         ),

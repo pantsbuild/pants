@@ -32,7 +32,7 @@ from pants.core.util_rules.environments import (
     RemoteEnvironmentTarget,
 )
 from pants.engine.addresses import Address
-from pants.engine.env_vars import EnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_dir
@@ -126,14 +126,17 @@ def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
         expected_paths,
         expected_local_paths,
     ):
-        tgt = LocalEnvironmentTarget({}, Address("flem"))
+        rule_runner.set_session_values(
+            {CompleteEnvironmentVars: CompleteEnvironmentVars({"PYENV_ROOT": pyenv_root})}
+        )
+        tgt = EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem")))
         paths = rule_runner.request(
             _SearchPaths,
-            [_PyEnvPathsRequest(tgt, EnvironmentVars({"PYENV_ROOT": pyenv_root}), False)],
+            [_PyEnvPathsRequest(tgt, False)],
         )
         local_paths = rule_runner.request(
             _SearchPaths,
-            [_PyEnvPathsRequest(tgt, EnvironmentVars({"PYENV_ROOT": pyenv_root}), True)],
+            [_PyEnvPathsRequest(tgt, True)],
         )
     assert expected_paths == paths.paths
     assert expected_local_paths == local_paths.paths
@@ -206,7 +209,6 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
                     _ExpandInterpreterSearchPathsRequest(
                         paths,
                         EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem"))),
-                        env=asdf_paths_result.env,
                         asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
                         asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
                     )
