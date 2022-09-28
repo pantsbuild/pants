@@ -592,7 +592,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
+    interpreter_search_paths = python_bootstrap.interpreter_search_paths
     all_python_binary_paths = await MultiGet(
         Get(
             BinaryPaths,

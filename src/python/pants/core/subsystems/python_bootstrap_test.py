@@ -6,7 +6,14 @@ from contextlib import contextmanager
 from typing import Iterable, List, Sequence, TypeVar
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.core.subsystems.python_bootstrap import PythonBootstrap, get_pyenv_root
+from pants.core.subsystems.python_bootstrap import (
+    PythonBootstrap,
+    _expand_interpreter_search_paths,
+    _get_environment_paths,
+    _get_pex_python_paths,
+    _get_pyenv_paths,
+    get_pyenv_root,
+)
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
@@ -59,15 +66,13 @@ def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[
 
 
 def test_get_environment_paths() -> None:
-    paths = PythonBootstrap.get_environment_paths(
-        EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"})
-    )
+    paths = _get_environment_paths(EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"}))
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
 def test_get_pex_python_paths() -> None:
     with setup_pexrc_with_pex_python_path(["foo/bar", "baz", "/qux/quux"]):
-        paths = PythonBootstrap.get_pex_python_paths()
+        paths = _get_pex_python_paths()
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
@@ -90,8 +95,8 @@ def test_get_pyenv_paths() -> None:
         expected_paths,
         expected_local_paths,
     ):
-        paths = PythonBootstrap.get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
-        local_paths = PythonBootstrap.get_pyenv_paths(
+        paths = _get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
+        local_paths = _get_pyenv_paths(
             EnvironmentVars({"PYENV_ROOT": pyenv_root}), pyenv_local=True
         )
     assert expected_paths == paths
@@ -165,14 +170,14 @@ def test_expand_interpreter_search_paths() -> None:
                 local=True,
                 extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
             )
-            expanded_paths = PythonBootstrap._expand_interpreter_search_paths(
+            expanded_paths = _expand_interpreter_search_paths(
                 paths,
                 env=asdf_paths_result.env,
                 asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
                 asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
             )
 
-    expected = [
+    expected = (
         "/foo",
         "/env/path1",
         "/env/path2",
@@ -185,5 +190,5 @@ def test_expand_interpreter_search_paths() -> None:
         *expected_pyenv_paths,
         *expected_pyenv_local_paths,
         "/qux",
-    ]
+    )
     assert expected == expanded_paths
