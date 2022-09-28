@@ -130,7 +130,7 @@ async def parse_kube_manifest(
             tool.pex,
             argv=[request.file.path],
             input_digest=file_digest,
-            description=f"Parsing Kubernetes manifest {request.file.path}",
+            description=f"Analyzing Kubernetes manifest {request.file.path}",
             level=LogLevel.DEBUG,
         ),
     )
