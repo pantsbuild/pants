@@ -277,9 +277,9 @@ class LocalPantsRunner:
             try:
                 engine_result = self._run_inner()
             finally:
+                self.graph_session.scheduler_session.wait_for_tail_tasks(self.global_bootstrap_options.session_end_tasks_timeout)
                 metrics = self.graph_session.scheduler_session.metrics()
                 self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                 self.run_tracker.end_run(engine_result)
-                self.graph_session.scheduler_session.wait_for_tail_tasks(self.global_bootstrap_options.session_end_tasks_timeout)
 
             return engine_result

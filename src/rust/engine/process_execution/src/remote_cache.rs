@@ -529,7 +529,7 @@ impl crate::CommandRunner for CommandRunner {
       let task_name = format!("remote cache write {:?}", action_digest);
       context
         .tail_tasks
-        .spawn_on(&task_name, write_fut.boxed(), self.executor.handle());
+        .spawn_on(&task_name, self.executor.handle(), write_fut.boxed());
     }
 
     Ok(result)

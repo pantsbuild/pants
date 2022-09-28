@@ -1,7 +1,4 @@
 # tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
 # See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
-#
-# tokio_no_const_thread_local is necessary to avoid a clippy lint related to the use of task_local!
-# at stdio/src/lib.rs:420:1.
 [build]
-rustflags = ["--cfg", "tokio_unstable", "--cfg", "tokio_no_const_thread_local"]
+rustflags = ["--cfg", "tokio_unstable"]

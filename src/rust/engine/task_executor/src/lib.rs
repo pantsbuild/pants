@@ -236,7 +236,7 @@ impl TailTasks {
   }
 
   /// Spawn a tail task with the given name.
-  pub fn spawn_on<F>(&self, name: &str, task: F, handle: &Handle)
+  pub fn spawn_on<F>(&self, name: &str, handle: &Handle, task: F)
   where
     F: Future<Output = ()>,
     F: Send + 'static,
