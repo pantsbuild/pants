@@ -10,7 +10,14 @@ files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 python_test_utils(name="test_utils")
 
 _local_environment(
-    name="default_env",
+    name="linux_env",
+    compatible_platforms=["linux_arm64", "linux_x86_64"],
+)
+
+_local_environment(
+    name="macos_ci_env",
+    compatible_platforms=["macos_arm64", "macos_x86_64"],
+    python_bootstrap_search_path=["<PATH>"],
 )
 
 _local_environment(

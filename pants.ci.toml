@@ -4,6 +4,10 @@ colors = true
 remote_cache_read = true
 remote_cache_write = true
 
+[environments-preview.names.add]
+# Override what macos refers to.
+macos = "//:macos_ci_env"
+
 [test]
 use_coverage = true
 
