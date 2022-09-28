@@ -600,14 +600,14 @@ def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
         raise ValueError(
             softwrap(
                 f"""
-                The global option `use_deprecated_cli_args_semantics` is set to `true`, so the
+                The global option `use_deprecated_directory_cli_args_semantics` is set to `true`, so the
                 tailor goal is using deprecated semantics for CLI arguments. In this mode, the
                 tailor goal only accepts literal directories as arguments, which it will run
                 recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
 
-                To fix, either set `use_deprecated_cli_args_semantics` to false, or rerun with
+                To fix, either set `use_deprecated_directory_cli_args_semantics` to false, or rerun with
                 specifying only literal directories, e.g. `{bin_name()} tailor dir1 dir2`. If
-                changing `use_deprecated_cli_args_semantics` to false, you should specify which
+                changing `use_deprecated_directory_cli_args_semantics` to false, you should specify which
                 directories to run on when using `tailor`:
 
                   * `{bin_name()} tailor ::` to run on everything
