@@ -153,9 +153,6 @@ async def parse_kube_manifest(
             image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
         return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
-    elif result.exit_code == 2:
-        # Unrecognised YAML manifests, we complete with an empty list of image references
-        return ParsedKubeManifest(filename=request.file.path, found_image_refs=())
     else:
         parser_error = result.stderr.decode("utf-8")
         raise Exception(
