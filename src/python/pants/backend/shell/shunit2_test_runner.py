@@ -17,11 +17,13 @@ from pants.backend.shell.target_types import (
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
+    Partitions,
     RuntimePackageDependenciesField,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -71,6 +73,12 @@ class Shunit2FieldSet(TestFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipShunit2TestsField).value
+
+
+@dataclass(frozen=True)
+class Shunit2Request(TestRequest):
+    name = "shunit2"
+    field_set_type = Shunit2FieldSet
 
 
 @dataclass(frozen=True)
@@ -244,22 +252,36 @@ async def setup_shunit2_for_target(
     return TestSetup(process)
 
 
+@rule(desc="Partition Shunit2 tests", level=LogLevel.DEBUG)
+async def partition(
+    request: Shunit2Request.PartitionRequest[Shunit2FieldSet],
+) -> Partitions[Shunit2FieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
 async def run_tests_with_shunit2(
-    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+    partition: Shunit2Request.SubPartition[Shunit2FieldSet],
+    test_subsystem: TestSubsystem,
 ) -> TestResult:
+    assert len(partition.elements) == 1, "Shunit2 partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
         result,
-        address=field_set.address,
+        tester_name="shunit2",
+        partition_description=partition.key,
         output_setting=test_subsystem.output,
     )
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
-async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set))
+async def setup_shunit2_debug_test(
+    partition: Shunit2Request.SubPartition[Shunit2FieldSet],
+) -> TestDebugRequest:
+    assert len(partition.elements) == 1, "Shunit2 partitions must contain exactly 1 file"
+    setup = await Get(TestSetup, TestSetupRequest(partition.elements[0]))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -268,9 +290,15 @@ async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugReque
 
 
 @rule
-async def setup_shunit2_debug_adapter_test(field_set: Shunit2FieldSet) -> TestDebugAdapterRequest:
+async def setup_shunit2_debug_adapter_test(
+    _: Shunit2Request.SubPartition[Shunit2FieldSet],
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
 
 
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, Shunit2FieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, Shunit2FieldSet),
+        *Shunit2Request.registration_rules(),
+    ]

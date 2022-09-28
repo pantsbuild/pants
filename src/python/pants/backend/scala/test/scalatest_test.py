@@ -20,10 +20,10 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.backend.scala.target_types import rules as target_types_rules
-from pants.backend.scala.test.scalatest import ScalatestTestFieldSet
+from pants.backend.scala.test.scalatest import ScalatestRequest, ScalatestTestFieldSet
 from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult, get_filtered_environment
+from pants.core.goals.test import Partitions, TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
@@ -64,7 +64,8 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (ScalatestTestFieldSet,)),
+            QueryRule(Partitions[ScalatestTestFieldSet], (ScalatestRequest.PartitionRequest,)),
+            QueryRule(TestResult, (ScalatestRequest.SubPartition,)),
             QueryRule(Scalatest, ()),
         ],
         target_types=[
@@ -276,4 +277,7 @@ def run_scalatest_test(
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )
-    return rule_runner.request(TestResult, [ScalatestTestFieldSet.create(tgt)])
+    field_set = ScalatestTestFieldSet.create(tgt)
+    return rule_runner.request(
+        TestResult, [ScalatestRequest.SubPartition((field_set,), tgt.address.spec)]
+    )

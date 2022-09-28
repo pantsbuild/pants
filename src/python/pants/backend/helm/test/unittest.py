@@ -24,9 +24,11 @@ from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
+    Partitions,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -69,12 +71,27 @@ class HelmUnitTestFieldSet(TestFieldSet):
     timeout: HelmUnitTestTimeoutField
 
 
+@dataclass(frozen=True)
+class HelmUnitTestRequest(TestRequest):
+    name = HelmUnitTestSubsystem.options_scope
+    field_set_type = HelmUnitTestFieldSet
+
+
+@rule(desc="Partition Helm Unittest tests", level=LogLevel.DEBUG)
+async def partition(
+    request: HelmUnitTestRequest.PartitionRequest[HelmUnitTestFieldSet],
+) -> Partitions[HelmUnitTestFieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
 async def run_helm_unittest(
-    field_set: HelmUnitTestFieldSet,
+    partition: HelmUnitTestRequest.SubPartition[HelmUnitTestFieldSet],
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
+    assert len(partition.elements) == 1, "Helm Unittest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     direct_dep_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
         Get(
@@ -151,20 +168,23 @@ async def run_helm_unittest(
 
     return TestResult.from_fallible_process_result(
         process_result,
-        address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
+        tester_name=HelmUnitTestSubsystem.options_scope,
+        partition_description=partition.key,
     )
 
 
 @rule
-async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) -> TestDebugRequest:
+async def generate_helm_unittest_debug_request(
+    _: HelmUnitTestRequest.SubPartition[HelmUnitTestFieldSet],
+) -> TestDebugRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
 
 @rule
 async def generate_helm_unittest_debug_adapter_request(
-    field_set: HelmUnitTestFieldSet,
+    _: HelmUnitTestRequest.SubPartition[HelmUnitTestFieldSet],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
@@ -176,4 +196,5 @@ def rules():
         *dependency_rules(),
         *tool.rules(),
         UnionRule(TestFieldSet, HelmUnitTestFieldSet),
+        *HelmUnitTestRequest.registration_rules(),
     ]

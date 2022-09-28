@@ -6,16 +6,33 @@ from __future__ import annotations
 import itertools
 import logging
 from abc import ABC, ABCMeta
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Generic,
+    Iterable,
+    Iterator,
+    Optional,
+    Tuple,
+    TypeVar,
+    cast,
+)
 
+from typing_extensions import final
+
+from pants.base.specs import Specs
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.style_request import style_batch_size_help
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentName, EnvironmentNameRequest
-from pants.engine.addresses import Address, UnparsedAddressInputs
+from pants.core.util_rules.environments import EnvironmentName
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
@@ -35,21 +52,24 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    FilteredTargets,
     IntField,
-    NoApplicableTargetsBehavior,
     SourcesField,
     SpecialCasedDependencies,
     StringSequenceField,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
     Targets,
     ValidNumbers,
+    get_shard,
     parse_shard_spec,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
+from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_classproperty
+from pants.util.meta import runtime_ignore_subscripts
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -62,9 +82,10 @@ class TestResult(EngineAwareReturnType):
     stdout_digest: FileDigest
     stderr: str
     stderr_digest: FileDigest
-    address: Address
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
+    tester_name: str
+    partition_description: str
 
     coverage_data: CoverageData | None = None
     # TODO: Rename this to `reports`. There is no guarantee that every language will produce
@@ -77,25 +98,33 @@ class TestResult(EngineAwareReturnType):
     __test__ = False
 
     @classmethod
-    def skip(cls, address: Address, output_setting: ShowOutput) -> TestResult:
+    def skip(
+        cls, tester_name: str, partition_description: str, output_setting: ShowOutput
+    ) -> TestResult:
         return cls(
             exit_code=None,
             stdout="",
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=address,
             output_setting=output_setting,
+            tester_name=tester_name,
+            partition_description=partition_description,
             result_metadata=None,
         )
+
+    @property
+    def skipped(self) -> bool:
+        return self.exit_code is None or self.result_metadata is None
 
     @classmethod
     def from_fallible_process_result(
         cls,
         process_result: FallibleProcessResult,
-        address: Address,
         output_setting: ShowOutput,
         *,
+        tester_name: str,
+        partition_description: str,
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
@@ -106,30 +135,14 @@ class TestResult(EngineAwareReturnType):
             stdout_digest=process_result.stdout_digest,
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
-            address=address,
             output_setting=output_setting,
             result_metadata=process_result.metadata,
+            tester_name=tester_name,
+            partition_description=partition_description,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
         )
-
-    @property
-    def skipped(self) -> bool:
-        return self.exit_code is None or self.result_metadata is None
-
-    def __lt__(self, other: Any) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
-        if not isinstance(other, TestResult):
-            return NotImplemented
-        if self.exit_code == other.exit_code:
-            return self.address.spec < other.address.spec
-        if self.skipped or self.exit_code is None:
-            return True
-        if other.skipped or other.exit_code is None:
-            return False
-        return abs(self.exit_code) < abs(other.exit_code)
 
     def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         output: dict[str, FileDigest | Snapshot] = {
@@ -146,14 +159,22 @@ class TestResult(EngineAwareReturnType):
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
+        message = self.tester_name
         if self.skipped:
-            return f"{self.address} skipped."
-        status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
-        message = f"{self.address} {status}."
-        if self.output_setting == ShowOutput.NONE or (
-            self.output_setting == ShowOutput.FAILED and self.exit_code == 0
+            message += " skipped."
+        elif self.exit_code == 0:
+            message += " succeeded."
+        else:
+            message += f" failed (exit code {self.exit_code})."
+        message += f"\nPartition: {self.partition_description}"
+
+        if (
+            self.skipped
+            or self.output_setting == ShowOutput.NONE
+            or (self.output_setting == ShowOutput.FAILED and self.exit_code == 0)
         ):
             return message
+
         output = ""
         if self.stdout:
             output += f"\n{self.stdout}"
@@ -161,10 +182,11 @@ class TestResult(EngineAwareReturnType):
             output += f"\n{self.stderr}"
         if output:
             output = f"{output.rstrip()}\n\n"
+
         return f"{message}{output}"
 
     def metadata(self) -> dict[str, Any]:
-        return {"address": self.address.spec}
+        return {"partition": self.partition_description}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -202,6 +224,149 @@ class TestFieldSet(FieldSet, metaclass=ABCMeta):
     sources: SourcesField
 
     __test__ = False
+
+
+_T = TypeVar("_T")
+_FieldSetT = TypeVar("_FieldSetT", bound=TestFieldSet)
+
+
+@runtime_ignore_subscripts
+class Partitions(FrozenDict[Any, "tuple[_FieldSetT, ...]"]):
+    """A mapping from <partition key> to <partition>.
+
+    When implementing a test-runner, one of your rules will return this type, taking in a
+    `PartitionRequest` specific to your runner.
+
+    The return likely will fit into one of:
+        - Returning no empty partitions, if your tool is being skipped.
+        - Returning a singleton partition per input, if your tool can only run tests
+            from within one input per process.
+        - Returning partitions containing a variable number of inputs, if your tool
+            supports processing inputs in batches.
+
+    The partition key can be of any type able to cross a rule-boundary, and will be provided
+    to the rule which "runs" your tool.
+
+    NOTE: The partition may be divided further into multiple sub-partitions.
+    """
+
+    @classmethod
+    def partition_per_input(cls, elements: Iterable[_FieldSetT]) -> Partitions[_FieldSetT]:
+        """Helper constructor for implementations that have a partition per input."""
+        return Partitions([(e.address.spec, (e,)) for e in elements])
+
+
+@union
+class TestRequest:
+    """Base class for plugin types wanting to be run as part of `test`.
+
+    Plugins should define a new type which subclasses `TestReqest`, and set the appropriate class
+    variables. E.g.
+        class SuperTesterRequest(TestRequest):
+                name = SuperTesterSubsystem.options_scope
+                field_set_type = SuperTesterFieldSet
+
+    Then, define 4 `@rule`s:
+        1. A rule which takes an instance of your request type's `PartitionRequest` class property,
+            and returns a `Partitions` instance. E.g.
+                @rule
+                async def partition(
+                    request: SuperTesterRequest.PartitionRequest[SuperTesterFieldSet],
+                    subsystem: SuperTesterSubsystem,
+                ) -> Partitions[SuperTesterFieldSet]:
+                    if subsystem.skip:
+                        return Partitions()
+
+                    # One possible implementation
+                    return Partitions.partition_per_input(request.field_sets)
+
+        2. A rule which takes an instance of your request type's `SubPartition` class property, and
+            returns a `TestResult` instance. E.g.
+                @rule
+                async def super_test(
+                    request: SuperTesterRequest.SubPartition[SuperTesterFieldSet],
+                ) -> TestResult:
+                    ...
+
+        3. A rule which takes an instance of your request type's `SubPartition` class property, and
+            returns a `TestDebugRequest` instance. E.g.
+                @rule
+                async def setup_super_test_debug(
+                    request: SuperTesterRequest.SubPartition[SuperTesterFieldSet],
+                ) -> TestDebugRequest:
+                    ...
+
+        4. A rule which takes an instance of your request type's `SubPartition` class property, and
+            returns a `TestDebugAdapterRequest` instance. E.g.
+                @rule
+                async def setup_super_test_debug(
+                    request: SuperTesterRequest.SubPartition[SuperTesterFieldSet],
+                ) -> TestDebugAdapterRequest:
+                    ...
+
+    NOTE: If your tester doesn't support running in debug mode / running with the debug adapter, you
+        can have the `@rule`s in 3 and 4 raise `NotImplementedError`s.
+
+    Lastly, register the rules which tell Pants about your plugin.
+    E.g.
+        def rules():
+            return [
+                *collect_rules(),
+                *SuperTesterRequest.registration_rules(),
+            ]
+    """
+
+    name: ClassVar[str]
+    field_set_type: ClassVar[type[TestFieldSet]]
+
+    # Prevent this class from being detected by pytest as a test class.
+    __test__ = False
+
+    @dataclass(frozen=True)
+    @runtime_ignore_subscripts
+    class PartitionRequest(Generic[_FieldSetT]):
+        """Returns a unique `PartitionRequest` type per calling type.
+
+        This serves us 2 purposes:
+            1. `TestRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
+        """
+
+        field_sets: tuple[_FieldSetT, ...]
+
+    @dataclass(frozen=True)
+    @runtime_ignore_subscripts
+    class SubPartition(Generic[_FieldSetT]):
+        elements: Tuple[_FieldSetT, ...]
+        key: str
+
+    _PartitionRequestBase = PartitionRequest
+    _SubPartitionBase = SubPartition
+
+    if not TYPE_CHECKING:
+
+        @memoized_classproperty
+        def PartitionRequest(cls):
+            @union(in_scope_types=[EnvironmentName])
+            class PartitionRequest(cls._PartitionRequestBase):
+                pass
+
+            return PartitionRequest
+
+        @memoized_classproperty
+        def SubPartition(cls):
+            @union(in_scope_types=[EnvironmentName])
+            class SubPartition(cls._SubPartitionBase):
+                pass
+
+            return SubPartition
+
+    @final
+    @classmethod
+    def registration_rules(cls) -> Iterable[UnionRule]:
+        yield UnionRule(TestRequest, cls)
+        yield UnionRule(TestRequest.PartitionRequest, cls.PartitionRequest)
+        yield UnionRule(TestRequest.SubPartition, cls.SubPartition)
 
 
 class CoverageData(ABC):
@@ -396,6 +561,11 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    batch_size = IntOption(
+        advanced=True,
+        default=128,
+        help=style_batch_size_help(uppercase="Tester", lowercase="tester"),
+    )
     timeouts = BoolOption(
         default=True,
         help=softwrap(
@@ -482,27 +652,68 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
 
 
 @rule_helper
+async def _get_partitions_by_request_type(
+    core_request_types: Iterable[type[TestRequest]],
+    partitioners: Iterable[type[TestRequest.PartitionRequest]],
+    specs: Specs,
+    subsystem: TestSubsystem,
+) -> dict[type[TestRequest], list[Partitions]]:
+    core_partition_request_types = {
+        getattr(request_type, "PartitionRequest") for request_type in core_request_types
+    }
+    partitioners = [
+        partitioner for partitioner in partitioners if partitioner in core_partition_request_types
+    ]
+
+    targets = await Get(
+        FilteredTargets,
+        Specs,
+        specs if partitioners else Specs.empty(),
+    )
+
+    shard, num_shards = parse_shard_spec(subsystem.shard, "the [test].shard option")
+
+    def partition_request_get(request_type: type[TestRequest]) -> Get[Partitions]:
+        partition_type = cast(TestRequest, request_type)
+        field_set_type = partition_type.field_set_type
+        field_sets = tuple(
+            field_set_type.create(target)
+            for target in targets
+            if field_set_type.is_applicable(target)
+        )
+        if num_shards > 0:
+            field_sets = tuple(
+                fs for fs in field_sets if get_shard(fs.address.spec, num_shards) == shard
+            )
+
+        return Get(
+            Partitions, TestRequest.PartitionRequest, partition_type.PartitionRequest(field_sets)
+        )
+
+    all_partitions = await MultiGet(
+        partition_request_get(request_type) for request_type in core_request_types
+    )
+
+    partitions_by_request_type = defaultdict(list)
+    for request_type, partition in zip(core_request_types, all_partitions):
+        partitions_by_request_type[request_type].append(partition)
+
+    return partitions_by_request_type
+
+
+@rule_helper
 async def _run_debug_tests(
+    subpartitions: Iterable[TestRequest.SubPartition],
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
 ) -> Test:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            TestFieldSet,
-            goal_description=(
-                "`test --debug-adapter`" if test_subsystem.debug_adapter else "`test --debug`"
-            ),
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-        ),
-    )
     debug_requests = await MultiGet(
         (
-            Get(TestDebugRequest, TestFieldSet, field_set)
+            Get(TestDebugRequest, TestRequest.SubPartition, subpartition)
             if not test_subsystem.debug_adapter
-            else Get(TestDebugAdapterRequest, TestFieldSet, field_set)
+            else Get(TestDebugAdapterRequest, TestRequest.SubPartition, subpartition)
         )
-        for field_set in targets_to_valid_field_sets.field_sets
+        for subpartition in subpartitions
     )
     exit_code = 0
     for debug_request in debug_requests:
@@ -533,53 +744,69 @@ async def run_tests(
     union_membership: UnionMembership,
     distdir: DistDir,
     run_id: RunId,
+    specs: Specs,
 ) -> Test:
+    request_types = union_membership.get(TestRequest)
+    partitioners = union_membership.get(TestRequest.PartitionRequest)
+    partitions_by_request_type = await _get_partitions_by_request_type(
+        request_types, partitioners, specs, test_subsystem
+    )
+    # TODO: Restore warning/error if no applicable targets were matched.
+
+    def batch(
+        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
+    ) -> Iterator[tuple[_T, ...]]:
+        batches = partition_sequentially(
+            iterable,
+            key=key,
+            size_target=test_subsystem.batch_size,
+            size_max=4 * test_subsystem.batch_size,
+        )
+        for batch in batches:
+            yield tuple(batch)
+
+    batches_by_request_type = {
+        request_type: [
+            (subpartition, key)
+            for partitions in partitions_list
+            for key, partition in partitions.items()
+            for subpartition in batch(partition)
+        ]
+        for request_type, partitions_list in partitions_by_request_type.items()
+    }
+
+    subpartitions = [
+        request_type.SubPartition(elements, key)
+        for request_type, batch in batches_by_request_type.items()
+        for elements, key in batch
+    ]
+
     if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(test_subsystem, debug_adapter)
+        return await _run_debug_tests(subpartitions, test_subsystem, debug_adapter)
 
-    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            TestFieldSet,
-            goal_description=f"the `{test_subsystem.name}` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
-            shard=shard,
-            num_shards=num_shards,
-        ),
-    )
-    environment_names_per_field_set = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
-        for field_set in targets_to_valid_field_sets.field_sets
-    )
+    # TODO: Environments??
     results = await MultiGet(
-        Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
-        for field_set, environment_name in zip(
-            targets_to_valid_field_sets.field_sets, environment_names_per_field_set
-        )
+        Get(TestResult, TestRequest.SubPartition, request) for request in subpartitions
     )
 
-    # Print summary.
+    results_by_tool = defaultdict(list)
+    for result in results:
+        results_by_tool[result.tester_name].append(result)
+
+    _print_results(console, results_by_tool, run_id)
+
     exit_code = 0
-    if results:
-        console.print_stderr("")
-    for result in sorted(results):
-        if result.skipped:
-            continue
-        if result.exit_code != 0:
-            exit_code = cast(int, result.exit_code)
 
-        console.print_stderr(_format_test_summary(result, run_id, console))
+    for tool in results_by_tool:
+        for result in results_by_tool[tool]:
+            if result.exit_code:
+                exit_code = result.exit_code
 
-        if result.extra_output and result.extra_output.files:
-            workspace.write_digest(
-                result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
-            )
+            if result.extra_output and result.extra_output.files:
+                workspace.write_digest(
+                    result.extra_output.digest,
+                    path_prefix=str(distdir.relpath / "test" / tool / result.partition_description),
+                )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
@@ -641,37 +868,50 @@ async def run_tests(
     return Test(exit_code)
 
 
+def _print_results(
+    console: Console,
+    results_by_tool: dict[str, list[TestResult]],
+    run_id: RunId,
+) -> None:
+    if results_by_tool:
+        console.print_stderr("")
+
+    for tool_name in sorted(results_by_tool):
+        results = results_by_tool[tool_name]
+        for result in results:
+            if result.skipped:
+                continue
+            if result.exit_code:
+                sigil = console.sigil_failed()
+                status = "failed"
+            else:
+                sigil = console.sigil_succeeded()
+                status = "succeeded"
+
+            assert (
+                result.result_metadata
+            ), "Skipped results should be skipped while printing results"
+
+            source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+            source_print = f" ({source})" if source else ""
+
+            elapsed_print = ""
+            total_elapsed_ms = result.result_metadata.total_elapsed_ms
+            if total_elapsed_ms is not None:
+                elapsed_secs = total_elapsed_ms / 1000
+                elapsed_print = f"in {elapsed_secs:.2f}s"
+
+            suffix = f" {elapsed_print}{source_print}"
+
+            console.print_stderr(f"{sigil} {result.partition_description} {status}{suffix}.")
+
+
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
     ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
-
-
-def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
-    """Format the test summary printed to the console."""
-    assert (
-        result.result_metadata is not None
-    ), "Skipped test results should not be outputted in the test summary"
-    if result.exit_code == 0:
-        sigil = console.sigil_succeeded()
-        status = "succeeded"
-    else:
-        sigil = console.sigil_failed()
-        status = "failed"
-
-    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-    source_print = f" ({source})" if source else ""
-
-    elapsed_print = ""
-    total_elapsed_ms = result.result_metadata.total_elapsed_ms
-    if total_elapsed_ms is not None:
-        elapsed_secs = total_elapsed_ms / 1000
-        elapsed_print = f"in {elapsed_secs:.2f}s"
-
-    suffix = f" {elapsed_print}{source_print}"
-    return f"{sigil} {result.address} {status}{suffix}."
 
 
 @dataclass(frozen=True)

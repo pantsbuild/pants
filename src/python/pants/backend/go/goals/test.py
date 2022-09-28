@@ -38,10 +38,12 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
 from pants.core.goals.test import (
+    Partitions,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -104,6 +106,12 @@ class GoTestFieldSet(TestFieldSet):
         return tgt.get(SkipGoTestsField).value
 
 
+@dataclass(frozen=True)
+class GoTestRequest(TestRequest):
+    name = GoTestSubsystem.options_scope
+    field_set_type = GoTestFieldSet
+
+
 def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
     result = []
     i = 0
@@ -159,14 +167,23 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
     return tuple(result)
 
 
+@rule(desc="Partition Go tests", level=LogLevel.DEBUG)
+async def partition(
+    request: GoTestRequest.PartitionRequest[GoTestFieldSet],
+) -> Partitions[GoTestFieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
-    field_set: GoTestFieldSet,
+    partition: GoTestRequest.SubPartition[GoTestFieldSet],
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
     test_extra_env: TestExtraEnv,
     goroot: GoRoot,
 ) -> TestResult:
+    assert len(partition.elements) == 1, "Go test partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
         Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
@@ -180,9 +197,10 @@ async def run_go_tests(
             stderr=stderr or "",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=field_set.address,
             output_setting=test_subsystem.output,
             result_metadata=None,
+            tester_name=GoTestSubsystem.options_scope,
+            partition_description=partition.key,
         )
 
     if maybe_pkg_analysis.analysis is None:
@@ -219,7 +237,9 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
+        return TestResult.skip(
+            GoTestSubsystem.options_scope, partition.key, output_setting=test_subsystem.output
+        )
 
     coverage_config: GoCoverageConfig | None = None
     if test_subsystem.use_coverage:
@@ -424,20 +444,23 @@ async def run_go_tests(
 
     return TestResult.from_fallible_process_result(
         process_result=result,
-        address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
+        tester_name=GoTestSubsystem.options_scope,
+        partition_description=partition.key,
     )
 
 
 @rule
-async def generate_go_tests_debug_request(field_set: GoTestFieldSet) -> TestDebugRequest:
+async def generate_go_tests_debug_request(
+    _: GoTestRequest.SubPartition[GoTestFieldSet],
+) -> TestDebugRequest:
     raise NotImplementedError("This is a stub.")
 
 
 @rule
 async def generate_go_tests_debug_adapter_request(
-    field_set: GoTestFieldSet,
+    _: GoTestRequest.SubPartition[GoTestFieldSet],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("This is a stub.")
 
@@ -446,4 +469,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TestFieldSet, GoTestFieldSet),
+        *GoTestRequest.registration_rules(),
     ]

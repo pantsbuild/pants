@@ -15,6 +15,7 @@ from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell import shunit2_test_runner
 from pants.backend.shell.shunit2_test_runner import (
     Shunit2FieldSet,
+    Shunit2Request,
     Shunit2Runner,
     Shunit2RunnerRequest,
 )
@@ -26,6 +27,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.test import (
+    Partitions,
     TestDebugRequest,
     TestResult,
     build_runtime_package_dependencies,
@@ -51,8 +53,9 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             build_runtime_package_dependencies,
             get_filtered_environment,
-            QueryRule(TestResult, [Shunit2FieldSet]),
-            QueryRule(TestDebugRequest, [Shunit2FieldSet]),
+            QueryRule(Partitions[Shunit2FieldSet], [Shunit2Request.PartitionRequest]),
+            QueryRule(TestResult, [Shunit2Request.SubPartition]),
+            QueryRule(TestDebugRequest, [Shunit2Request.SubPartition]),
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
         target_types=[
@@ -90,7 +93,8 @@ def run_shunit2(
         env=env,
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    inputs = [Shunit2FieldSet.create(test_target)]
+    field_set = Shunit2FieldSet.create(test_target)
+    inputs = [Shunit2Request.SubPartition((field_set,), test_target.address.spec)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:

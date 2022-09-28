@@ -19,7 +19,7 @@ from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.backend.kotlin.target_types import KotlinJunitTestsGeneratorTarget
 from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
-from pants.core.goals.test import TestResult, get_filtered_environment
+from pants.core.goals.test import Partitions, TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -32,7 +32,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.test.junit import JunitTestFieldSet
+from pants.jvm.test.junit import JunitRequest, JunitTestFieldSet
 from pants.jvm.test.junit import rules as jvm_junit_rules
 from pants.jvm.test.junit_test import run_junit_test
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -81,7 +81,8 @@ def rule_runner() -> RuleRunner:
             *kotlin_dep_inf_rules(),
             get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (JunitTestFieldSet,)),
+            QueryRule(Partitions[JunitTestFieldSet], (JunitRequest.PartitionRequest,)),
+            QueryRule(TestResult, (JunitRequest.SubPartition,)),
         ],
         target_types=[
             FileTarget,

@@ -28,11 +28,13 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
+    Partitions,
     RuntimePackageDependenciesField,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -148,6 +150,12 @@ async def run_all_setup_plugins(
 # they must ensure that output goes under this directory. E.g.,
 # ./pants test <target> -- --html=extra-output/report.html
 _EXTRA_OUTPUT_DIR = "extra-output"
+
+
+@dataclass(frozen=True)
+class PytestRequest(TestRequest):
+    name = PyTest.options_scope
+    field_set_type = PythonTestFieldSet
 
 
 @dataclass(frozen=True)
@@ -374,11 +382,20 @@ async def setup_pytest_for_target(
     return TestSetup(process, results_file_name=results_file_name)
 
 
+@rule(desc="Partition Pytest tests", level=LogLevel.DEBUG)
+async def partition(
+    request: PytestRequest.PartitionRequest[PythonTestFieldSet],
+) -> Partitions[PythonTestFieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
-    field_set: PythonTestFieldSet,
+    partition: PytestRequest.SubPartition[PythonTestFieldSet],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
+    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -408,7 +425,8 @@ async def run_python_test(
 
     return TestResult.from_fallible_process_result(
         result,
-        address=field_set.address,
+        tester_name="pytest",
+        partition_description=partition.key,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
@@ -417,7 +435,11 @@ async def run_python_test(
 
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
-async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
+async def debug_python_test(
+    partition: PytestRequest.SubPartition[PythonTestFieldSet],
+) -> TestDebugRequest:
+    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(
@@ -428,11 +450,13 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 
 @rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
 async def debugpy_python_test(
-    field_set: PythonTestFieldSet,
+    partition: PytestRequest.SubPartition[PythonTestFieldSet],
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
+    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
 
     setup = await Get(
@@ -480,4 +504,5 @@ def rules():
         *pytest.rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+        *PytestRequest.registration_rules(),
     ]

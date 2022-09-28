@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
+    Partitions,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestExtraEnvVarsField,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -60,6 +62,12 @@ class JunitTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: TestExtraEnvVarsField
+
+
+@dataclass(frozen=True)
+class JunitRequest(TestRequest):
+    name = JUnit.options_scope
+    field_set_type = JunitTestFieldSet
 
 
 class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -161,11 +169,20 @@ async def setup_junit_for_target(
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)
 
 
+@rule(desc="Partition JUnit tests", level=LogLevel.DEBUG)
+async def partition(
+    request: JunitRequest.PartitionRequest[JunitTestFieldSet],
+) -> Partitions[JunitTestFieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     test_subsystem: TestSubsystem,
-    field_set: JunitTestFieldSet,
+    partition: JunitRequest.SubPartition[JunitTestFieldSet],
 ) -> TestResult:
+    assert len(partition.elements) == 1, "JUnit partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -177,14 +194,19 @@ async def run_junit_test(
 
     return TestResult.from_fallible_process_result(
         process_result,
-        address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
+        tester_name=JUnit.options_scope,
+        partition_description=partition.key,
     )
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRequest:
+async def setup_junit_debug_request(
+    partition: JunitRequest.SubPartition[JunitTestFieldSet],
+) -> TestDebugRequest:
+    assert len(partition.elements) == 1, "JUnit partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
@@ -194,7 +216,7 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 
 @rule
 async def setup_junit_debug_adapter_request(
-    field_set: JunitTestFieldSet,
+    _: JunitRequest.SubPartition[JunitTestFieldSet],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError(
         "Debugging JUnit tests using a debug adapter has not yet been implemented."
@@ -214,4 +236,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, JunitTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
+        *JunitRequest.registration_rules(),
     ]

@@ -14,7 +14,11 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.goals.pytest_runner import (
+    PytestPluginSetup,
+    PytestPluginSetupRequest,
+    PytestRequest,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -28,6 +32,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
+    Partitions,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestResult,
@@ -64,9 +69,10 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *setup_py.rules(),
-            QueryRule(TestResult, (PythonTestFieldSet,)),
-            QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
-            QueryRule(TestDebugAdapterRequest, (PythonTestFieldSet,)),
+            QueryRule(Partitions[PythonTestFieldSet], (PytestRequest.PartitionRequest,)),
+            QueryRule(TestResult, (PytestRequest.SubPartition,)),
+            QueryRule(TestDebugRequest, (PytestRequest.SubPartition,)),
+            QueryRule(TestDebugAdapterRequest, (PytestRequest.SubPartition,)),
         ],
         target_types=[
             PexBinary,
@@ -113,7 +119,8 @@ def run_pytest(
     env: dict[str, str] | None = None,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
+    field_set = PythonTestFieldSet.create(test_target)
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
@@ -131,7 +138,8 @@ def run_pytest_noninteractive(
     env: dict[str, str] | None = None,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
+    field_set = PythonTestFieldSet.create(test_target)
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     return rule_runner.request(TestResult, inputs)
 
 
@@ -143,7 +151,8 @@ def run_pytest_interactive(
     env: dict[str, str] | None = None,
 ) -> InteractiveProcessResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
+    field_set = PythonTestFieldSet.create(test_target)
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     with mock_console(rule_runner.options_bootstrapper):
         return rule_runner.run_interactive_process(debug_request.process)
@@ -709,7 +718,8 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
     )
-    inputs = [PythonTestFieldSet.create(tgt)]
+    field_set = PythonTestFieldSet.create(tgt)
+    inputs = [PytestRequest.SubPartition((field_set,), tgt.address.spec)]
     request = rule_runner.request(TestDebugAdapterRequest, inputs)
     assert request.process is not None
     assert request.process.process.argv == (

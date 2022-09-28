@@ -13,10 +13,12 @@ from pants.backend.scala.target_types import (
 )
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
+    Partitions,
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -58,6 +60,12 @@ class ScalatestTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: ScalatestTestExtraEnvVarsField
+
+
+@dataclass(frozen=True)
+class ScalatestRequest(TestRequest):
+    name = Scalatest.options_scope
+    field_set_type = ScalatestTestFieldSet
 
 
 class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -162,11 +170,20 @@ async def setup_scalatest_for_target(
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)
 
 
+@rule(desc="Partition Scalatest tests", level=LogLevel.DEBUG)
+async def partition(
+    request: ScalatestRequest.PartitionRequest[ScalatestTestFieldSet],
+) -> Partitions[ScalatestTestFieldSet]:
+    return Partitions.partition_per_input(request.field_sets)
+
+
 @rule(desc="Run Scalatest", level=LogLevel.DEBUG)
 async def run_scalatest_test(
     test_subsystem: TestSubsystem,
-    field_set: ScalatestTestFieldSet,
+    partition: ScalatestRequest.SubPartition[ScalatestTestFieldSet],
 ) -> TestResult:
+    assert len(partition.elements) == 1, "Scalatest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -178,14 +195,19 @@ async def run_scalatest_test(
 
     return TestResult.from_fallible_process_result(
         process_result,
-        address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
+        tester_name=Scalatest.options_scope,
+        partition_description=partition.key,
     )
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> TestDebugRequest:
+async def setup_scalatest_debug_request(
+    partition: ScalatestRequest.SubPartition[ScalatestTestFieldSet],
+) -> TestDebugRequest:
+    assert len(partition.elements) == 1, "Scalatest partitions must contain exactly 1 file"
+    field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
@@ -195,7 +217,7 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 
 @rule
 async def setup_scalatest_debug_adapter_request(
-    field_set: ScalatestTestFieldSet,
+    _: ScalatestRequest.SubPartition[ScalatestTestFieldSet],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
 
@@ -213,4 +235,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        *ScalatestRequest.registration_rules(),
     ]
