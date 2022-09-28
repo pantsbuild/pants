@@ -12,13 +12,15 @@ import pytest
 from pants.base.build_environment import get_pants_cachedir
 from pants.core.subsystems.python_bootstrap import (
     PythonBootstrap,
-    _expand_interpreter_search_paths,
+    _ExpandInterpreterSearchPathsRequest,
     _get_environment_paths,
     _get_pex_python_paths,
-    _get_pyenv_paths,
     _preprocessed_interpreter_search_paths,
+    _PyEnvPathsRequest,
+    _SearchPaths,
     get_pyenv_root,
 )
+from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
@@ -37,6 +39,20 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir_for
 
 _T = TypeVar("_T")
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *python_bootstrap_rules(),
+            *asdf.rules(),
+            QueryRule(AsdfToolPathsResult, (AsdfToolPathsRequest,)),
+            QueryRule(_SearchPaths, [_PyEnvPathsRequest]),
+            QueryRule(_SearchPaths, [_ExpandInterpreterSearchPathsRequest]),
+        ],
+        target_types=[],
+    )
 
 
 @contextmanager
@@ -67,10 +83,12 @@ def setup_pexrc_with_pex_python_path(interpreter_paths):
 @contextmanager
 def fake_pyenv_root(fake_versions, fake_local_version):
     with temporary_dir() as pyenv_root:
-        fake_version_dirs = [os.path.join(pyenv_root, "versions", v, "bin") for v in fake_versions]
+        fake_version_dirs = tuple(
+            os.path.join(pyenv_root, "versions", v, "bin") for v in fake_versions
+        )
         for d in fake_version_dirs:
             os.makedirs(d)
-        fake_local_version_dirs = [os.path.join(pyenv_root, "versions", fake_local_version, "bin")]
+        fake_local_version_dirs = (os.path.join(pyenv_root, "versions", fake_local_version, "bin"),)
         yield pyenv_root, fake_version_dirs, fake_local_version_dirs
 
 
@@ -99,36 +117,35 @@ def test_get_pyenv_root() -> None:
     assert get_pyenv_root(EnvironmentVars({})) is None
 
 
-def test_get_pyenv_paths() -> None:
+def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_pyenv_versions = ["2.7.14", local_pyenv_version]
-    RuleRunner().write_files({".python-version": f"{local_pyenv_version}\n"})
+    rule_runner.write_files({".python-version": f"{local_pyenv_version}\n"})
     with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
         pyenv_root,
         expected_paths,
         expected_local_paths,
     ):
-        paths = _get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
-        local_paths = _get_pyenv_paths(
-            EnvironmentVars({"PYENV_ROOT": pyenv_root}), pyenv_local=True
+        tgt = LocalEnvironmentTarget({}, Address("flem"))
+        paths = rule_runner.request(
+            _SearchPaths,
+            [_PyEnvPathsRequest(tgt, EnvironmentVars({"PYENV_ROOT": pyenv_root}), False)],
         )
-    assert expected_paths == paths
-    assert expected_local_paths == local_paths
+        local_paths = rule_runner.request(
+            _SearchPaths,
+            [_PyEnvPathsRequest(tgt, EnvironmentVars({"PYENV_ROOT": pyenv_root}), True)],
+        )
+    assert expected_paths == paths.paths
+    assert expected_local_paths == local_paths.paths
 
 
-def test_expand_interpreter_search_paths() -> None:
+def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_python_versions = ["2.7.14", local_pyenv_version, "3.7.10", "3.9.4", "3.9.5"]
     asdf_home_versions = [0, 1, 2]
     asdf_local_versions = [2, 1, 4]
     asdf_local_versions_str = " ".join(
         materialize_indices(all_python_versions, asdf_local_versions)
-    )
-    rule_runner = RuleRunner(
-        rules=[
-            *asdf.rules(),
-            QueryRule(AsdfToolPathsResult, (AsdfToolPathsRequest,)),
-        ]
     )
     rule_runner.write_files(
         {
@@ -159,7 +176,7 @@ def test_expand_interpreter_search_paths() -> None:
             expected_pyenv_paths,
             expected_pyenv_local_paths,
         ):
-            paths = [
+            paths = (
                 "/foo",
                 "<PATH>",
                 "/bar",
@@ -170,7 +187,7 @@ def test_expand_interpreter_search_paths() -> None:
                 "<PYENV>",
                 "<PYENV_LOCAL>",
                 "/qux",
-            ]
+            )
             asdf_paths_result = get_asdf_paths(
                 rule_runner,
                 {
@@ -183,11 +200,17 @@ def test_expand_interpreter_search_paths() -> None:
                 local=True,
                 extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
             )
-            expanded_paths = _expand_interpreter_search_paths(
-                paths,
-                env=asdf_paths_result.env,
-                asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
-                asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
+            expanded_paths = rule_runner.request(
+                _SearchPaths,
+                [
+                    _ExpandInterpreterSearchPathsRequest(
+                        paths,
+                        EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem"))),
+                        env=asdf_paths_result.env,
+                        asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
+                        asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
+                    )
+                ],
             )
 
     expected = (
@@ -204,7 +227,7 @@ def test_expand_interpreter_search_paths() -> None:
         *expected_pyenv_local_paths,
         "/qux",
     )
-    assert expected == expanded_paths
+    assert expected == expanded_paths.paths
 
 
 @pytest.mark.parametrize(
