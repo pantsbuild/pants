@@ -124,6 +124,18 @@ class Subsystem(metaclass=_SubsystemMeta):
             # We should just return the default at this point.
             return default
 
+        def _is_default(self, __name: str) -> bool:
+            """Returns true if the value of the named option is unchanged from the default."""
+            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+
+            v = getattr(type(self), __name)
+            assert isinstance(v, OptionsInfo)
+
+            return (
+                self.options.is_default(__name)
+                and resolve_environment_sensitive_option(v.flag_names[0], self) is None
+            )
+
     @memoized_classmethod
     def rules(cls: Any) -> Iterable[Rule]:
         from pants.core.util_rules.environments import add_option_fields_for

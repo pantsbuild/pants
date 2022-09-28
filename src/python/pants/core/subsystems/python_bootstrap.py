@@ -14,6 +14,7 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -35,7 +36,7 @@ class PythonBootstrapSubsystem(Subsystem):
         """
     )
 
-    class EnvironmentAware:
+    class EnvironmentAware(Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PYENV>", "<PATH>"],
             help=softwrap(
@@ -52,7 +53,12 @@ class PythonBootstrapSubsystem(Subsystem):
 
                 The following special strings are supported:
 
+                For all runtime environment types:
+
                 * `<PATH>`, the contents of the PATH env var
+
+                When the environment is a `local_environment` target:
+
                 * `<ASDF>`, all Python versions currently configured by ASDF \
                     `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
                 * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
@@ -214,12 +220,64 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
     return None
 
 
+def _preprocessed_interpreter_search_paths(
+    env_tgt: EnvironmentTarget,
+    _search_paths: Iterable[str],
+    is_default: bool,
+) -> tuple[str, ...]:
+    """Checks for special search path strings, and errors if any are invalid for the environment.
+
+    This will return:
+    * The search paths, unaltered, for local/undefined environments, OR
+    * The search paths, with invalid tokens removed, if the provided value was unaltered from the
+      default value in the options system
+      (see `PythonBootstrapSubsystem.EnvironmentAware.search_paths`)
+    * The search paths unaltered, if the search paths are all valid tokens for this environment
+
+    If the environment is non-local and there are invalid tokens for those environments, raise
+    `ValueError`.
+    """
+
+    env = env_tgt.val
+    search_paths = tuple(_search_paths)
+
+    if env is None or isinstance(env, LocalEnvironmentTarget):
+        return search_paths
+
+    not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>", "<PEXRC>"}
+
+    if is_default:
+        # Strip out the not-allowed special strings from search_paths.
+        # An error will occur on the off chance the non-local environment expects pyenv
+        # but there's nothing we can do here to detect it.
+        return tuple(path for path in search_paths if path not in not_allowed)
+
+    any_not_allowed = set(search_paths) & not_allowed
+    if any_not_allowed:
+        env_type = type(env)
+        raise ValueError(
+            softwrap(
+                f"`[python-bootstrap].search_paths` is configured to use local Python discovery "
+                f"tools, which do not work in {env_type.__name__} runtime environments. To fix "
+                f"this, set the value of `python_bootstrap_search_path` in the `{env.alias}` "
+                f"defined at `{env.address}` to contain only hardcoded paths or the `<PATH>` "
+                "special string."
+            )
+        )
+
+    return search_paths
+
+
 @rule
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
 
-    interpreter_search_paths = python_bootstrap_subsystem.search_path
+    interpreter_search_paths = _preprocessed_interpreter_search_paths(
+        python_bootstrap_subsystem.env_tgt,
+        python_bootstrap_subsystem.search_path,
+        python_bootstrap_subsystem._is_default("search_path"),
+    )
     interpreter_names = python_bootstrap_subsystem.names
 
     has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
