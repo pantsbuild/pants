@@ -255,14 +255,18 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
 
 def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> None:
     # We can't monkeypatch the Platform with RuleRunner, so instead use run_run_with_mocks.
-    def get_env_name(env_tgt: Target, platform: Platform) -> str | None:
+    def get_env_name(
+        env_tgt: Target, platform: Platform, *, docker_execution: bool = True
+    ) -> str | None:
         monkeypatch.setattr(Platform, "create_for_localhost", lambda: platform)
         result = run_rule_with_mocks(
             resolve_environment_name,
             rule_args=[
                 EnvironmentNameRequest("env", description_of_origin="foo"),
                 create_subsystem(EnvironmentsSubsystem, names={"env": "", "fallback": ""}),
-                create_subsystem(GlobalOptions, remote_execution=False),
+                create_subsystem(
+                    GlobalOptions, remote_execution=False, docker_execution=docker_execution
+                ),
             ],
             mock_gets=[
                 MockGet(
@@ -326,6 +330,14 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
     # If the Docker platform is not set, we default to the CPU arch. So regardless of localhost,
     # the Docker environment should be used.
     assert get_env_name(create_docker_tgt(), Platform.linux_arm64) == "env"
+
+    # If Docker execution is disabled, though, fallback.
+    assert (
+        get_env_name(create_docker_tgt(fallback=True), Platform.linux_arm64, docker_execution=False)
+        == "fallback"
+    )
+    with pytest.raises(NoFallbackEnvironmentError):
+        get_env_name(create_docker_tgt(), Platform.linux_arm64, docker_execution=False)
 
     # The Docker env can be used if we're on macOS, or on Linux and the CPU arch matches.
     for plat in (Platform.macos_arm64, Platform.macos_x86_64, Platform.linux_x86_64):
