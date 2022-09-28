@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.project_info import list_targets
-from pants.backend.project_info.filter_targets import TargetGranularity
+from pants.backend.project_info import filter_targets, list_targets
+from pants.backend.project_info.filter_targets import FilterGoal, TargetGranularity
 from pants.backend.project_info.list_targets import List
 from pants.engine.rules import rule
 from pants.engine.target import (
@@ -87,6 +87,7 @@ async def generate_mock_generated_target(request: MockGenerateTargetsRequest) ->
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *filter_targets.rules(),
             *list_targets.rules(),
             generate_mock_generated_target,
             UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
@@ -104,6 +105,18 @@ def assert_targets(
     tag_regex: list[str] | None = None,
     granularity: TargetGranularity = TargetGranularity.all_targets,
 ) -> None:
+    filter_result = rule_runner.run_goal_rule(
+        FilterGoal,
+        args=[
+            f"--target-type={target_type or []}",
+            f"--address-regex={address_regex or []}",
+            f"--tag-regex={tag_regex or []}",
+            f"--granularity={granularity.value}",
+            "::",
+        ],
+    )
+    assert set(filter_result.stdout.splitlines()) == expected
+
     list_result = rule_runner.run_goal_rule(
         List,
         global_args=[
