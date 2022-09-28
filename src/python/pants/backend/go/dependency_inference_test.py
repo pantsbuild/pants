@@ -7,7 +7,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals.test import GoTestFieldSet
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as test_rules
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
@@ -23,7 +23,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult, get_filtered_environment
+from pants.core.goals.test import Partitions, TestResult, get_filtered_environment
 from pants.core.util_rules import source_files
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule
@@ -47,7 +47,8 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, (GoTestFieldSet,)),
+            QueryRule(Partitions[GoTestFieldSet], [GoTestRequest.PartitionRequest]),
+            QueryRule(TestResult, [GoTestRequest.SubPartition]),
             QueryRule(ProcessResult, (GoSdkProcess,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
@@ -114,11 +115,17 @@ def test_multiple_go_mod_support(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    field_set = GoTestFieldSet.create(tgt)
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestFoo" in result.stdout
 
     tgt = rule_runner.get_target(Address("bar"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    field_set = GoTestFieldSet.create(tgt)
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestBar" in result.stdout

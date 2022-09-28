@@ -7,7 +7,7 @@ import textwrap
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals.test import GoTestFieldSet
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as test_rules
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
@@ -29,6 +29,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.test import (
     CoverageReports,
     FilesystemCoverageReport,
+    Partitions,
     TestResult,
     get_filtered_environment,
 )
@@ -59,7 +60,8 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, (GoTestFieldSet,)),
+            QueryRule(Partitions[GoTestFieldSet], [GoTestRequest.PartitionRequest]),
+            QueryRule(TestResult, [GoTestRequest.SubPartition]),
             QueryRule(CoverageReports, (GoCoverageDataCollection,)),
             QueryRule(DigestContents, (Digest,)),
         ],
@@ -98,7 +100,10 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    field_set = GoTestFieldSet.create(tgt)
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
     coverage_data = result.coverage_data
