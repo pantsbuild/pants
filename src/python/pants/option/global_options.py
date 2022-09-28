@@ -1701,6 +1701,22 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    docker_execution = BoolOption(
+        default=True,
+        advanced=True,
+        help=softwrap(
+            """
+            If true, `docker_environment` targets can be used to run builds inside a Docker
+            container.
+
+            If false, anytime a `docker_environment` target is used, Pants will instead fallback to
+            whatever the target's `fallback_environment` field is set to.
+
+            This can be useful, for example, if you want to always use Docker locally, but disable
+            it in CI, or vice versa.
+            """
+        ),
+    )
     remote_execution_extra_platform_properties = StrListOption(
         advanced=True,
         help=softwrap(

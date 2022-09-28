@@ -200,9 +200,10 @@ def docker_platform_field_default_factory(
 class DockerFallbackEnvironmentField(FallbackEnvironmentField):
     help = softwrap(
         f"""
-        The environment to fallback to when this Docker environment cannot be used because the
+        The environment to fallback to when this Docker environment cannot be used because either
+        the global option `--docker-execution` is false, or the
         field `{DockerPlatformField.alias}` is not compatible with the local host's CPU
-        architecture. (This is only an issue when the local host is Linux; macOS is fine.)
+        architecture (this is only an issue when the local host is Linux; macOS is fine).
 
         Must be an environment name from the option `[environments-preview].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
@@ -494,30 +495,44 @@ async def resolve_environment_name(
 
     localhost_platform = Platform.create_for_localhost().value
 
-    if (
-        env_tgt.val.has_field(DockerFallbackEnvironmentField)
-        and localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
-        and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
-    ):
-        return await _apply_fallback_environment(
-            env_tgt.val,
-            error_msg=softwrap(
-                f"""
-                The docker environment `{request.raw_value}` is specified in
-                {request.description_of_origin}, but it cannot be used because the local host has
-                the platform `{localhost_platform}` and the Docker environment has the platform
-                {env_tgt.val[DockerPlatformField].normalized_value}.
+    if env_tgt.val.has_field(DockerFallbackEnvironmentField):
+        if not global_options.docker_execution:
+            return await _apply_fallback_environment(
+                env_tgt.val,
+                error_msg=softwrap(
+                    f"""
+                    The global option `--docker-execution` is set to false, but the Docker
+                    environment `{request.raw_value}` is used in {request.description_of_origin}.
 
-                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
-                {env_tgt.val.address}, such as to a `docker_environment` target that sets
-                `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
-                not explicitly setting the field `{DockerPlatformField.alias}` for the target
-                {env_tgt.val.address} because the default behavior is to use the CPU architecture
-                of the current host for the platform (although this requires the docker image
-                supports that CPU architecture).
-                """
-            ),
-        )
+                    Either enable the option `--docker-execution`, or set the field
+                    `{FallbackEnvironmentField.alias}` for the target {env_tgt.val.address}.
+                    """
+                ),
+            )
+
+        if (
+            localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
+            and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
+        ):
+            return await _apply_fallback_environment(
+                env_tgt.val,
+                error_msg=softwrap(
+                    f"""
+                    The Docker environment `{request.raw_value}` is specified in
+                    {request.description_of_origin}, but it cannot be used because the local host has
+                    the platform `{localhost_platform}` and the Docker environment has the platform
+                    {env_tgt.val[DockerPlatformField].normalized_value}.
+
+                    Consider setting the field `{FallbackEnvironmentField.alias}` for the target
+                    {env_tgt.val.address}, such as to a `docker_environment` target that sets
+                    `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
+                    not explicitly setting the field `{DockerPlatformField.alias}` for the target
+                    {env_tgt.val.address} because the default behavior is to use the CPU architecture
+                    of the current host for the platform (although this requires the docker image
+                    supports that CPU architecture).
+                    """
+                ),
+            )
 
     if (
         env_tgt.val.has_field(LocalFallbackEnvironmentField)
