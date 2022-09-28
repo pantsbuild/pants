@@ -8,7 +8,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence, Tuple, Type, TypeVar
+from typing import Any, Iterable, Iterator, Sequence, Tuple, Type, TypeVar
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import LintFilesRequest, LintRequest, LintResult, LintTargetsRequest
@@ -23,11 +23,10 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotD
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -121,6 +120,7 @@ Partitions = LintPartitions[str]
 class FmtRequest(LintRequest):
     is_formatter = True
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @runtime_ignore_subscripts
     @frozen_after_init
     @dataclass(unsafe_hash=True)
@@ -137,18 +137,6 @@ class FmtRequest(LintRequest):
                 return await Get(Snapshot, PathGlobs(self.files))
 
             return self._snapshot
-
-    _SubPartitionBase = SubPartition
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def SubPartition(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class SubPartition(cls._SubPartitionBase):
-                pass
-
-            return SubPartition
 
     @classmethod
     def _get_registration_rules(cls) -> Iterable[UnionRule]:

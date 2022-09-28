@@ -10,18 +10,16 @@ from abc import ABCMeta
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
-from typing_extensions import final
-
 from pants import ox
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
 from pants.option.errors import OptionsError
 from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
-from pants.util.memo import memoized_classmethod, memoized_classproperty
+from pants.util.memo import memoized_classmethod
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
@@ -140,14 +138,9 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return list(inner())
 
-    @final
-    @memoized_classproperty
-    def _plugin_option_cls(cls) -> type:
-        @union
-        class PluginOption:
-            pass
-
-        return PluginOption
+    @distinct_union_type_per_subclass
+    class PluginOption:
+        pass
 
     @classmethod
     def register_plugin_options(cls, options_container: type) -> UnionRule:
@@ -160,7 +153,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         This will register the option as a first-class citizen.
         Plugins can use this new option like any other.
         """
-        return UnionRule(cls._plugin_option_cls, options_container)
+        return UnionRule(cls.PluginOption, options_container)
 
     @classmethod
     def _construct_subsystem_rule(cls) -> Rule:
@@ -264,7 +257,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         Subclasses should not generally need to override this method.
         """
         register = options.registration_function_for_subsystem(cls)
-        plugin_option_containers = union_membership.get(cls._plugin_option_cls)
+        plugin_option_containers = union_membership.get(cls.PluginOption)
         for options_info in chain(
             collect_options_info(cls),
             collect_options_info(cls.EnvironmentAware),
