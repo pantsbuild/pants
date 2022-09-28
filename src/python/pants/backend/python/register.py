@@ -10,6 +10,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
+    debug_goals,
     export,
     lockfile,
     package_pex_binary,
@@ -83,6 +84,8 @@ def rules():
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),
+        # Test
+        *debug_goals.rules(),
     )
 
 
