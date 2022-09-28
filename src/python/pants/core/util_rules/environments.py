@@ -438,12 +438,12 @@ async def determine_local_environment(
 
             Then, for CI, override what the name `macos` points to by setting this in
             `pants.ci.toml`:
-            
+
                 [environments-preview.names.add]
                 macos = "//:macos_ci_env"
 
             Locally, you can override `[environments-preview].names` like this by using a
-            `.pants.rc` file, for example.            
+            `.pants.rc` file, for example.
             """
         )
     )
