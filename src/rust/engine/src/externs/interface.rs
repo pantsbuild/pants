@@ -808,7 +808,7 @@ async fn workunit_to_py_value(
           .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest_handle) => {
-        let digest = (&**digest_handle)
+        let digest = (**digest_handle)
           .as_any()
           .downcast_ref::<DirectoryDigest>()
           .ok_or_else(|| {
@@ -840,7 +840,7 @@ async fn workunit_to_py_value(
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+      UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
         .as_any()
         .downcast_ref::<Value>()
         .ok_or_else(|| {
