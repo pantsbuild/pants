@@ -326,6 +326,10 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class TouchBinary(BinaryPath):
+    pass
+
+
 class CpBinary(BinaryPath):
     pass
 
@@ -705,6 +709,14 @@ async def find_mkdir() -> MkdirBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
+async def find_touch() -> TouchBinary:
+    request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="touch file")
+    return TouchBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
