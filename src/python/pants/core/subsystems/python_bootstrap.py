@@ -14,6 +14,7 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.environments import LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -35,7 +36,7 @@ class PythonBootstrapSubsystem(Subsystem):
         """
     )
 
-    class EnvironmentAware:
+    class EnvironmentAware(Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PYENV>", "<PATH>"],
             help=softwrap(
@@ -52,7 +53,12 @@ class PythonBootstrapSubsystem(Subsystem):
 
                 The following special strings are supported:
 
+                For all runtime environment types:
+
                 * `<PATH>`, the contents of the PATH env var
+
+                For only local runtime environments:
+
                 * `<ASDF>`, all Python versions currently configured by ASDF \
                     `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
                 * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
@@ -214,12 +220,45 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
     return None
 
 
+def _preprocessed_interpreter_search_paths(
+    python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
+) -> tuple[str, ...]:
+
+    env = python_bootstrap_subsystem.env_tgt.val
+
+    if isinstance(env, LocalEnvironmentTarget):
+        return python_bootstrap_subsystem.search_path
+    if env is None:
+        return python_bootstrap_subsystem.search_path
+
+    if python_bootstrap_subsystem.options.is_default(
+        "search_path"
+    ) and python_bootstrap_subsystem.search_path == tuple(
+        python_bootstrap_subsystem.options.get("search_path")
+    ):
+        return ("<PATH>",)  # Just skip `PyEnv`
+
+    search_paths = python_bootstrap_subsystem.search_path
+    not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>"}
+    any_not_allowed = set(search_paths) & not_allowed
+    if any_not_allowed:
+        env_type = type(env)
+        raise ValueError(
+            f"`[python-bootstrap].search_paths` is configured to use local Python discovery "
+            f"tools, which do not work in {env_type.__name__} runtime environments. To fix this, "
+            f"set the value of `python_bootstrap_search_path` in the {env.alias} defined at "
+            f"`{env.address}` to contain only hardcoded paths or the `<PATH>` special string."
+        )
+
+    return search_paths
+
+
 @rule
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
 
-    interpreter_search_paths = python_bootstrap_subsystem.search_path
+    interpreter_search_paths = _preprocessed_interpreter_search_paths(python_bootstrap_subsystem)
     interpreter_names = python_bootstrap_subsystem.names
 
     has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
