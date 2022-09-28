@@ -27,6 +27,7 @@ from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -34,8 +35,10 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
     FileContent,
     MergeDigests,
+    PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
@@ -297,6 +300,11 @@ async def _add_objects_to_archive(
 
 
 def _maybe_is_golang_assembly(data: bytes) -> bool:
+    """Return true if `data` looks like it could be a Golang-format assembly language file.
+
+    This is used by the cgo rules as a heuristic to determine if the user is passing Golang assembly
+    format instead of gcc assembly format.
+    """
     return (
         data.startswith(b"TEXT")
         or b"\nTEXT" in data
@@ -311,7 +319,23 @@ def _maybe_is_golang_assembly(data: bytes) -> bool:
 async def _any_file_is_golang_assembly(
     digest: Digest, dir_path: str, s_files: Iterable[str]
 ) -> bool:
-    digest_contents = await Get(DigestContents, Digest, digest)
+    """Return true if any of the given `s_files` look like it could be a Golang-format assembly
+    language file.
+
+    This is used by the cgo rules as a heuristic to determine if the user is passing Golang assembly
+    format instead of gcc assembly format.
+    """
+    digest_contents = await Get(
+        DigestContents,
+        DigestSubset(
+            digest,
+            PathGlobs(
+                globs=[os.path.join(dir_path, s_file) for s_file in s_files],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin="golang cgo rules",
+            ),
+        ),
+    )
     for s_file in s_files:
         for entry in digest_contents:
             if entry.path == os.path.join(dir_path, s_file):
