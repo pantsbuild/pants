@@ -407,7 +407,8 @@ async def build_go_package(
 
     cgo_compile_result: CGoCompileResult | None = None
     if cgo_files:
-        # Check any assembly files contain gcc assembly, and not Go assembly
+        # Check if any assembly files contain gcc assembly, and not Go assembly. Raise an exception if any are
+        # likely in Go format since in cgo packages, assembly files are passed to gcc and must be in gcc format.
         if s_files and await _any_file_is_golang_assembly(
             request.digest, request.dir_path, s_files
         ):
