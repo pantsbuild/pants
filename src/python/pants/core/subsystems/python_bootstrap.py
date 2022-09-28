@@ -225,6 +225,19 @@ def _preprocessed_interpreter_search_paths(
     _search_paths: Iterable[str],
     is_default: bool,
 ) -> tuple[str, ...]:
+    """Checks for special search path strings, and errors if any are invalid for the environment.
+
+    This will return:
+    * The search paths, unaltered, for local/undefined environments, OR
+    * The search paths, with invalid tokens removed, if the provided value was unaltered from the
+      default value in the options system
+      (see `PythonBootstrapSubsystem.EnvironmentAware.search_paths`)
+    * The search paths unaltered, if the search paths do not contain tokens invalid for this
+      environment
+
+    If the environment is non-local and there are invalid tokens for those environments, raise
+    `ValueError`.
+    """
 
     env = env_tgt.val
     search_paths = tuple(_search_paths)
@@ -234,9 +247,12 @@ def _preprocessed_interpreter_search_paths(
     if env is None:
         return search_paths
 
-    not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>"}
+    not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>", "<PEXRC>"}
 
     if is_default:
+        # Strip out the not-allowed special strings from search_paths.
+        # An error will occur on the off chance the non-local environment expects pyenv
+        # but there's nothing we can do here to detect it.
         return tuple(path for path in search_paths if path not in not_allowed)
 
     any_not_allowed = set(search_paths) & not_allowed
