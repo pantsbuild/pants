@@ -14,7 +14,7 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.environments import LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -221,25 +221,24 @@ def get_pyenv_root(env: EnvironmentVars) -> str | None:
 
 
 def _preprocessed_interpreter_search_paths(
-    python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
+    env_tgt: EnvironmentTarget,
+    _search_paths: Iterable[str],
+    is_default: bool,
 ) -> tuple[str, ...]:
 
-    env = python_bootstrap_subsystem.env_tgt.val
+    env = env_tgt.val
+    search_paths = tuple(_search_paths)
 
     if isinstance(env, LocalEnvironmentTarget):
-        return python_bootstrap_subsystem.search_path
+        return search_paths
     if env is None:
-        return python_bootstrap_subsystem.search_path
+        return search_paths
 
-    if python_bootstrap_subsystem.options.is_default(
-        "search_path"
-    ) and python_bootstrap_subsystem.search_path == tuple(
-        python_bootstrap_subsystem.options.get("search_path")
-    ):
-        return ("<PATH>",)  # Just skip `PyEnv`
-
-    search_paths = python_bootstrap_subsystem.search_path
     not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>"}
+
+    if is_default:
+        return tuple(path for path in search_paths if path not in not_allowed)
+
     any_not_allowed = set(search_paths) & not_allowed
     if any_not_allowed:
         env_type = type(env)
@@ -258,7 +257,11 @@ async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
 
-    interpreter_search_paths = _preprocessed_interpreter_search_paths(python_bootstrap_subsystem)
+    interpreter_search_paths = _preprocessed_interpreter_search_paths(
+        python_bootstrap_subsystem.env_tgt,
+        python_bootstrap_subsystem.search_path,
+        python_bootstrap_subsystem._is_default("search_path"),
+    )
     interpreter_names = python_bootstrap_subsystem.names
 
     has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
