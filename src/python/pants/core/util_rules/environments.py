@@ -425,12 +425,13 @@ async def determine_local_environment(
 
             To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
             targets so that only one includes the value `{platform.value}`, or change
-            `[environments-preview].names` so that it does not define some of those targets. It is
-            often useful to still keep the same `local_environment` target definitions in BUILD
-            files; instead, do not give a name to each of them in `[environments-preview].names` to
-            avoid ambiguity. Then, you can override which target a particular name points to by
-            overriding `[environments-preview].names`. For example, you could set this in
-            `pants.toml`:
+            `[environments-preview].names` so that it does not define some of those targets.
+
+            It is often useful to still keep the same `local_environment` target definitions in
+            BUILD files; instead, do not give a name to each of them in
+            `[environments-preview].names` to avoid ambiguity. Then, you can override which target
+            a particular name points to by overriding `[environments-preview].names`. For example,
+            you could set this in `pants.toml`:
 
                 [environments-preview.names]
                 linux = "//:linux_env"
