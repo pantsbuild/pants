@@ -44,6 +44,23 @@ lazy_static! {
     static ref GLOBAL_EXECUTOR: ArcSwapOption<Runtime> = ArcSwapOption::from_pointee(None);
 }
 
+/// Copy our (thread-local or task-local) stdio destination and current workunit parent into
+/// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
+/// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
+/// is created it has an accurate handle to its parent.
+fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
+  let stdio_destination = stdio::get_destination();
+  let workunit_store_handle = workunit_store::get_workunit_store_handle();
+
+  // NB: It is important that the first portion of this method is synchronous (meaning that this
+  // method cannot be `async`), because that means that it will run on the thread that calls it.
+  // The second, async portion of the method will run in the spawned Task.
+
+  stdio::scope_task_destination(stdio_destination, async move {
+    workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
+  })
+}
+
 #[derive(Debug, Clone)]
 pub struct Executor {
   _runtime: Option<Arc<Runtime>>,
@@ -137,7 +154,7 @@ impl Executor {
   ) -> impl Future<Output = O> {
     self
       .handle
-      .spawn(Self::future_with_correct_context(future))
+      .spawn(future_with_correct_context(future))
       .map(|r| r.expect("Background task exited unsafely."))
   }
 
@@ -154,9 +171,7 @@ impl Executor {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
-    self
-      .handle
-      .block_on(Self::future_with_correct_context(future))
+    self.handle.block_on(future_with_correct_context(future))
   }
 
   ///
@@ -185,25 +200,6 @@ impl Executor {
         f()
       })
       .map(|r| r.expect("Background task exited unsafely."))
-  }
-
-  ///
-  /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
-  /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
-  /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
-  /// is created it has an accurate handle to its parent.
-  ///
-  fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
-    let stdio_destination = stdio::get_destination();
-    let workunit_store_handle = workunit_store::get_workunit_store_handle();
-
-    // NB: It is important that the first portion of this method is synchronous (meaning that this
-    // method cannot be `async`), because that means that it will run on the thread that calls it.
-    // The second, async portion of the method will run in the spawned Task.
-
-    stdio::scope_task_destination(stdio_destination, async move {
-      workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
-    })
   }
 
   /// Return a reference to this executor's runtime handle.
@@ -241,6 +237,7 @@ impl TailTasks {
     F: Future<Output = ()>,
     F: Send + 'static,
   {
+    let task = future_with_correct_context(task);
     let mut guard = self.inner.lock();
     let inner = match &mut *guard {
       Some(inner) => inner,
@@ -290,6 +287,11 @@ impl TailTasks {
         next_result = inner.task_set.join_next_with_id() => {
           match next_result {
             Some(Ok((id, _))) => {
+              if let Some(name) = inner.id_to_name.get(&id) {
+                log::trace!("Session end task `{name}` completed successfully");
+              } else {
+                log::debug!("Session end task completed successfully but name not found.");
+              }
               inner.id_to_name.remove(&id);
             },
             Some(Err(err)) => {
