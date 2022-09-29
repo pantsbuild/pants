@@ -448,6 +448,7 @@ impl ExecuteProcess {
       context.session.workunit_store(),
       context.session.build_id().to_string(),
       context.session.run_id(),
+      context.session.tail_tasks(),
     );
 
     let res = command_runner

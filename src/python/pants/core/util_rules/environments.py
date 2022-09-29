@@ -200,9 +200,10 @@ def docker_platform_field_default_factory(
 class DockerFallbackEnvironmentField(FallbackEnvironmentField):
     help = softwrap(
         f"""
-        The environment to fallback to when this Docker environment cannot be used because the
+        The environment to fallback to when this Docker environment cannot be used because either
+        the global option `--docker-execution` is false, or the
         field `{DockerPlatformField.alias}` is not compatible with the local host's CPU
-        architecture. (This is only an issue when the local host is Linux; macOS is fine.)
+        architecture (this is only an issue when the local host is Linux; macOS is fine).
 
         Must be an environment name from the option `[environments-preview].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
@@ -415,7 +416,6 @@ async def determine_local_environment(
         result_name, _tgt = compatible_name_and_targets[0]
         return ChosenLocalEnvironmentName(result_name)
 
-    # TODO(#7735): Maybe allow the user to disambiguate what __local__ means via an option?
     raise AmbiguousEnvironmentError(
         softwrap(
             f"""
@@ -427,6 +427,25 @@ async def determine_local_environment(
             To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
             targets so that only one includes the value `{platform.value}`, or change
             `[environments-preview].names` so that it does not define some of those targets.
+
+            It is often useful to still keep the same `local_environment` target definitions in
+            BUILD files; instead, do not give a name to each of them in
+            `[environments-preview].names` to avoid ambiguity. Then, you can override which target
+            a particular name points to by overriding `[environments-preview].names`. For example,
+            you could set this in `pants.toml`:
+
+                [environments-preview.names]
+                linux = "//:linux_env"
+                macos = "//:macos_local_env"
+
+            Then, for CI, override what the name `macos` points to by setting this in
+            `pants.ci.toml`:
+
+                [environments-preview.names.add]
+                macos = "//:macos_ci_env"
+
+            Locally, you can override `[environments-preview].names` like this by using a
+            `.pants.rc` file, for example.
             """
         )
     )
@@ -494,30 +513,44 @@ async def resolve_environment_name(
 
     localhost_platform = Platform.create_for_localhost().value
 
-    if (
-        env_tgt.val.has_field(DockerFallbackEnvironmentField)
-        and localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
-        and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
-    ):
-        return await _apply_fallback_environment(
-            env_tgt.val,
-            error_msg=softwrap(
-                f"""
-                The docker environment `{request.raw_value}` is specified in
-                {request.description_of_origin}, but it cannot be used because the local host has
-                the platform `{localhost_platform}` and the Docker environment has the platform
-                {env_tgt.val[DockerPlatformField].normalized_value}.
+    if env_tgt.val.has_field(DockerFallbackEnvironmentField):
+        if not global_options.docker_execution:
+            return await _apply_fallback_environment(
+                env_tgt.val,
+                error_msg=softwrap(
+                    f"""
+                    The global option `--docker-execution` is set to false, but the Docker
+                    environment `{request.raw_value}` is used in {request.description_of_origin}.
 
-                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
-                {env_tgt.val.address}, such as to a `docker_environment` target that sets
-                `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
-                not explicitly setting the field `{DockerPlatformField.alias}` for the target
-                {env_tgt.val.address} because the default behavior is to use the CPU architecture
-                of the current host for the platform (although this requires the docker image
-                supports that CPU architecture).
-                """
-            ),
-        )
+                    Either enable the option `--docker-execution`, or set the field
+                    `{FallbackEnvironmentField.alias}` for the target {env_tgt.val.address}.
+                    """
+                ),
+            )
+
+        if (
+            localhost_platform in (Platform.linux_x86_64.value, Platform.linux_arm64.value)
+            and localhost_platform != env_tgt.val[DockerPlatformField].normalized_value.value
+        ):
+            return await _apply_fallback_environment(
+                env_tgt.val,
+                error_msg=softwrap(
+                    f"""
+                    The Docker environment `{request.raw_value}` is specified in
+                    {request.description_of_origin}, but it cannot be used because the local host has
+                    the platform `{localhost_platform}` and the Docker environment has the platform
+                    {env_tgt.val[DockerPlatformField].normalized_value}.
+
+                    Consider setting the field `{FallbackEnvironmentField.alias}` for the target
+                    {env_tgt.val.address}, such as to a `docker_environment` target that sets
+                    `{DockerPlatformField.alias}` to `{localhost_platform}`. Alternatively, consider
+                    not explicitly setting the field `{DockerPlatformField.alias}` for the target
+                    {env_tgt.val.address} because the default behavior is to use the CPU architecture
+                    of the current host for the platform (although this requires that the docker image
+                    supports that CPU architecture).
+                    """
+                ),
+            )
 
     if (
         env_tgt.val.has_field(LocalFallbackEnvironmentField)

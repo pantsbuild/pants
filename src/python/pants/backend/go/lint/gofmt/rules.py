@@ -11,14 +11,13 @@ from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -39,32 +38,44 @@ class GofmtRequest(FmtTargetsRequest):
     name = GofmtSubsystem.options_scope
 
 
+@rule
+async def partition_gofmt(
+    request: GofmtRequest.PartitionRequest, gofmt: GofmtSubsystem
+) -> Partitions:
+    return (
+        Partitions()
+        if gofmt.skip
+        else Partitions.single_partition(
+            field_set.sources.file_path for field_set in request.field_sets
+        )
+    )
+
+
 @rule(desc="Format with gofmt")
-async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem, goroot: GoRoot) -> FmtResult:
-    if gofmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtResult:
+    snapshot = await GofmtRequest.SubPartition.get_snapshot(request)
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
-        *request.snapshot.files,
+        *snapshot.files,
     )
     result = await Get(
         ProcessResult,
         Process(
             argv=argv,
-            input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=f"Run gofmt on {pluralize(len(request.snapshot.files), 'file')}.",
+            input_digest=snapshot.digest,
+            output_files=snapshot.files,
+            description=f"Run gofmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=GofmtRequest.name)
 
 
 def rules():
     return [
         *collect_rules(),
         *goroot.rules(),
-        UnionRule(FmtTargetsRequest, GofmtRequest),
+        *GofmtRequest.registration_rules(),
     ]

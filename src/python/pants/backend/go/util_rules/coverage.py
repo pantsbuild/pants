@@ -23,6 +23,8 @@ from pants.util.ordered_set import FrozenOrderedSet
 class GoCoverageData(CoverageData):
     coverage_digest: Digest
     import_path: str
+    sources_digest: Digest
+    sources_dir_path: str
 
 
 class GoCoverMode(enum.Enum):
@@ -62,6 +64,8 @@ class FileCodeCoverageMetadata:
 class BuiltGoPackageCodeCoverageMetadata:
     import_path: str
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...]
+    sources_digest: Digest
+    sources_dir_path: str
 
 
 @dataclass(frozen=True)

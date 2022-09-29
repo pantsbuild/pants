@@ -269,9 +269,9 @@ def test_get_all_help_info():
         args=["./pants"],
         bootstrap_option_values=None,
     )
-    Global.register_options_on_scope(options)
-    Foo.register_options_on_scope(options)
-    Bar.register_options_on_scope(options)
+    Global.register_options_on_scope(options, UnionMembership({}))
+    Foo.register_options_on_scope(options, UnionMembership({}))
+    Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
     def rule_info_test(foo: Foo) -> Target:

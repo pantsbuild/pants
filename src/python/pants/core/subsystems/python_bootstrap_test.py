@@ -1,15 +1,35 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from contextlib import contextmanager
 from typing import Iterable, List, Sequence, TypeVar
 
+import pytest
+
 from pants.base.build_environment import get_pants_cachedir
-from pants.core.subsystems.python_bootstrap import PythonBootstrap, get_pyenv_root
+from pants.core.subsystems.python_bootstrap import (
+    PythonBootstrap,
+    _expand_interpreter_search_paths,
+    _get_environment_paths,
+    _get_pex_python_paths,
+    _get_pyenv_paths,
+    _preprocessed_interpreter_search_paths,
+    get_pyenv_root,
+)
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
+from pants.core.util_rules.environments import (
+    DockerEnvironmentTarget,
+    DockerImageField,
+    EnvironmentTarget,
+    LocalEnvironmentTarget,
+    RemoteEnvironmentTarget,
+)
+from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -59,15 +79,13 @@ def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[
 
 
 def test_get_environment_paths() -> None:
-    paths = PythonBootstrap.get_environment_paths(
-        EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"})
-    )
+    paths = _get_environment_paths(EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"}))
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
 def test_get_pex_python_paths() -> None:
     with setup_pexrc_with_pex_python_path(["foo/bar", "baz", "/qux/quux"]):
-        paths = PythonBootstrap.get_pex_python_paths()
+        paths = _get_pex_python_paths()
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
@@ -90,8 +108,8 @@ def test_get_pyenv_paths() -> None:
         expected_paths,
         expected_local_paths,
     ):
-        paths = PythonBootstrap.get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
-        local_paths = PythonBootstrap.get_pyenv_paths(
+        paths = _get_pyenv_paths(EnvironmentVars({"PYENV_ROOT": pyenv_root}))
+        local_paths = _get_pyenv_paths(
             EnvironmentVars({"PYENV_ROOT": pyenv_root}), pyenv_local=True
         )
     assert expected_paths == paths
@@ -165,14 +183,14 @@ def test_expand_interpreter_search_paths() -> None:
                 local=True,
                 extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
             )
-            expanded_paths = PythonBootstrap._expand_interpreter_search_paths(
+            expanded_paths = _expand_interpreter_search_paths(
                 paths,
                 env=asdf_paths_result.env,
                 asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
                 asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
             )
 
-    expected = [
+    expected = (
         "/foo",
         "/env/path1",
         "/env/path2",
@@ -185,5 +203,79 @@ def test_expand_interpreter_search_paths() -> None:
         *expected_pyenv_paths,
         *expected_pyenv_local_paths,
         "/qux",
-    ]
+    )
     assert expected == expanded_paths
+
+
+@pytest.mark.parametrize(
+    ("env_tgt_type", "search_paths", "is_default", "expected"),
+    (
+        (LocalEnvironmentTarget, ("<PYENV>",), False, ("<PYENV>",)),
+        (LocalEnvironmentTarget, ("<ASDF>",), False, ("<ASDF>",)),
+        (
+            LocalEnvironmentTarget,
+            ("<ASDF_LOCAL>", "/home/derryn/pythons"),
+            False,
+            ("<ASDF_LOCAL>", "/home/derryn/pythons"),
+        ),
+        (DockerEnvironmentTarget, ("<PYENV>", "<PATH>"), True, ("<PATH>",)),
+        (DockerEnvironmentTarget, ("<PYENV>", "<PATH>"), False, ValueError),
+        (DockerEnvironmentTarget, ("<PYENV>", "<PATH>"), False, ValueError),
+        (
+            DockerEnvironmentTarget,
+            ("<ASDF>", "/home/derryn/pythons"),
+            False,
+            ValueError,
+        ),  # Contains a banned special-string
+        (DockerEnvironmentTarget, ("<ASDF_LOCAL>",), False, ValueError),
+        (DockerEnvironmentTarget, ("<PYENV_LOCAL>",), False, ValueError),
+        (DockerEnvironmentTarget, ("<PEXRC>",), False, ValueError),
+        (DockerEnvironmentTarget, ("<PATH>",), False, ("<PATH>",)),
+        (
+            DockerEnvironmentTarget,
+            ("<PATH>", "/home/derryn/pythons"),
+            False,
+            ("<PATH>", "/home/derryn/pythons"),
+        ),
+        (RemoteEnvironmentTarget, ("<PYENV>", "<PATH>"), True, ("<PATH>",)),
+        (RemoteEnvironmentTarget, ("<PYENV>", "<PATH>"), False, ValueError),
+        (RemoteEnvironmentTarget, ("<PYENV>", "<PATH>"), False, ValueError),
+        (
+            RemoteEnvironmentTarget,
+            ("<ASDF>", "/home/derryn/pythons"),
+            False,
+            ValueError,
+        ),  # Contains a banned special-string
+        (RemoteEnvironmentTarget, ("<ASDF_LOCAL>",), False, ValueError),
+        (RemoteEnvironmentTarget, ("<PYENV_LOCAL>",), False, ValueError),
+        (RemoteEnvironmentTarget, ("<PEXRC>",), False, ValueError),
+        (RemoteEnvironmentTarget, ("<PATH>",), False, ("<PATH>",)),
+        (
+            RemoteEnvironmentTarget,
+            ("<PATH>", "/home/derryn/pythons"),
+            False,
+            ("<PATH>", "/home/derryn/pythons"),
+        ),
+    ),
+)
+def test_preprocessed_interpreter_search_paths(
+    env_tgt_type: type[LocalEnvironmentTarget]
+    | type[DockerEnvironmentTarget]
+    | type[RemoteEnvironmentTarget],
+    search_paths: Iterable[str],
+    is_default: bool,
+    expected: tuple[str] | type[ValueError],
+):
+
+    extra_kwargs: dict = {}
+    if env_tgt_type is DockerEnvironmentTarget:
+        extra_kwargs = {
+            DockerImageField.alias: "my_img",
+        }
+
+    env_tgt = EnvironmentTarget(env_tgt_type(extra_kwargs, address=Address("flem")))
+    if expected is not ValueError:
+        assert expected == _preprocessed_interpreter_search_paths(env_tgt, search_paths, is_default)
+    else:
+        with pytest.raises(ValueError):
+            _preprocessed_interpreter_search_paths(env_tgt, search_paths, is_default)

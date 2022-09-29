@@ -67,6 +67,7 @@ class CGoCompileRequest(EngineAwareParameter):
     cxx_files: tuple[str, ...] = ()
     objc_files: tuple[str, ...] = ()
     fortran_files: tuple[str, ...] = ()
+    s_files: tuple[str, ...] = ()
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -370,7 +371,6 @@ async def _gccld(
         ),
     )
 
-    # TODO(#16830): Select CXX if any C++ code is present.
     compiler_args_result, env = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), obj_dir_path)),
         Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
@@ -421,6 +421,7 @@ async def _dynimport(
     goroot: GoRoot,
     import_go_path: str,
     golang_subsystem: GolangSubsystem,
+    use_cxx_linker: bool,
 ) -> _DynImportResult:
     cgo_main_compile_process = await _cc(
         binary_name=golang_subsystem.cgo_gcc_binary_name,
@@ -452,8 +453,14 @@ async def _dynimport(
             # Issue 26197.
             ldflags = [arg for arg in ldflags if arg != "-static"]
 
+    linker_binary_name = (
+        golang_subsystem.cgo_gxx_binary_name
+        if use_cxx_linker
+        else golang_subsystem.cgo_gcc_binary_name
+    )
+
     cgo_binary_link_result = await _gccld(
-        binary_name=golang_subsystem.cgo_gcc_binary_name,
+        binary_name=linker_binary_name,
         input_digest=obj_digest,
         obj_dir_path=obj_dir_path,
         outfile=dynobj,
@@ -495,7 +502,7 @@ async def _dynimport(
         # particular compiler/linker pair and would obscure the true reason for
         # the failure of the original command.
         cgo_binary_link_result = await _gccld(
-            binary_name=golang_subsystem.cgo_gcc_binary_name,
+            binary_name=linker_binary_name,
             input_digest=obj_digest,
             obj_dir_path=obj_dir_path,
             outfile=dynobj,
@@ -649,6 +656,10 @@ async def cgo_compile_request(
             ldflags=flags.ldflags + pkg_config_flags.ldflags,
         )
 
+    # If compiling C++, then link against C++ standard library.
+    if request.cxx_files:
+        flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lstdc++",))
+
     # If we are compiling Objective-C code, then we need to link against libobjc
     if request.objc_files:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lobjc",))
@@ -682,15 +693,16 @@ async def cgo_compile_request(
     )
 
     go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
-    c_files: list[str] = [
+    gcc_files: list[str] = [
         os.path.join(obj_dir_path, "_cgo_export.c"),
         *(os.path.join(dir_path, c_file) for c_file in request.c_files),
+        *(os.path.join(dir_path, s_file) for s_file in request.s_files),
     ]
     for cgo_file in request.cgo_files:
         cgo_file_path = PurePath(cgo_file)
         stem = cgo_file_path.stem
         go_files.append(os.path.join(obj_dir_path, f"{stem}.cgo1.go"))
-        c_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
+        gcc_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
 
     # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
     # for building certain `runtime` modules.
@@ -743,7 +755,7 @@ async def cgo_compile_request(
 
     # C files
     cflags = [*flags.cppflags, *flags.cflags]
-    for c_file in c_files:
+    for gcc_file in gcc_files:
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -752,15 +764,13 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=c_file,
+            src_file=gcc_file,
             flags=cflags,
             obj_file=ofile,
-            description=f"Compile cgo C source: {c_file}",
+            description=f"Compile cgo source: {gcc_file}",
             golang_subsystem=golang_subsystem,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
-
-    # TODO(#16836): Compile "gccfiles"
 
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
@@ -773,7 +783,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gxx_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, cxx_file),
+            src_file=cxx_file,
             flags=cxxflags,
             obj_file=ofile,
             description=f"Compile cgo C++ source: {cxx_file}",
@@ -791,7 +801,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, objc_file),
+            src_file=objc_file,
             flags=cflags,
             obj_file=ofile,
             description=f"Compile cgo Objective-C source: {objc_file}",
@@ -800,7 +810,9 @@ async def cgo_compile_request(
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
     fflags = [*flags.cppflags, *flags.fflags]
-    for fortran_file in (os.path.join(fortran_file) for fortran_file in request.fortran_files):
+    for fortran_file in (
+        os.path.join(dir_path, fortran_file) for fortran_file in request.fortran_files
+    ):
         ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
@@ -809,7 +821,7 @@ async def cgo_compile_request(
             binary_name=golang_subsystem.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
-            src_file=os.path.join(obj_dir_path, fortran_file),
+            src_file=fortran_file,
             flags=fflags,
             obj_file=ofile,
             description=f"Compile cgo Fortran source: {fortran_file}",
@@ -845,6 +857,7 @@ async def cgo_compile_request(
         goroot=goroot,
         import_go_path=os.path.join(obj_dir_path, "_cgo_import.go"),
         golang_subsystem=golang_subsystem,
+        use_cxx_linker=bool(request.cxx_files),
     )
     if dynimport_result.dyn_out_go:
         go_files.append(dynimport_result.dyn_out_go)

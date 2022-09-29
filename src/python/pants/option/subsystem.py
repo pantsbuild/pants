@@ -10,14 +10,18 @@ from abc import ABCMeta
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
+from typing_extensions import final
+
 from pants import ox
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.errors import OptionsError
 from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
-from pants.util.memo import memoized_classmethod
+from pants.util.memo import memoized_classmethod, memoized_classproperty
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
@@ -87,8 +91,11 @@ class Subsystem(metaclass=_SubsystemMeta):
         """
 
         subsystem: ClassVar[type[Subsystem]]
+        depends_on_env_vars: ClassVar[tuple[str, ...]] = ()
+
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
+        env_vars: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
@@ -117,6 +124,18 @@ class Subsystem(metaclass=_SubsystemMeta):
             # We should just return the default at this point.
             return default
 
+        def _is_default(self, __name: str) -> bool:
+            """Returns true if the value of the named option is unchanged from the default."""
+            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+
+            v = getattr(type(self), __name)
+            assert isinstance(v, OptionsInfo)
+
+            return (
+                self.options.is_default(__name)
+                and resolve_environment_sensitive_option(v.flag_names[0], self) is None
+            )
+
     @memoized_classmethod
     def rules(cls: Any) -> Iterable[Rule]:
         from pants.core.util_rules.environments import add_option_fields_for
@@ -132,6 +151,28 @@ class Subsystem(metaclass=_SubsystemMeta):
                 yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
 
         return list(inner())
+
+    @final
+    @memoized_classproperty
+    def _plugin_option_cls(cls) -> type:
+        @union
+        class PluginOption:
+            pass
+
+        return PluginOption
+
+    @classmethod
+    def register_plugin_options(cls, options_container: type) -> UnionRule:
+        """Register additional options on the subsystem.
+
+        In the `rules()` register.py entry-point, include `OtherSubsystem.register_plugin_options(<OptionsContainer>)`.
+        `<OptionsContainer>` should be a type with option class attributes, similar to how they are
+        defined for subsystems.
+
+        This will register the option as a first-class citizen.
+        Plugins can use this new option like any other.
+        """
+        return UnionRule(cls._plugin_option_cls, options_container)
 
     @classmethod
     def _construct_subsystem_rule(cls) -> Rule:
@@ -191,7 +232,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
             func=inner,
-            input_gets=(),
+            input_gets=(
+                AwaitableConstraints(
+                    output_type=EnvironmentVars,
+                    input_types=(EnvironmentVarsRequest,),
+                    is_effect=False,
+                ),
+            ),
             canonical_name=name,
         )
 
@@ -223,14 +270,17 @@ class Subsystem(metaclass=_SubsystemMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
-    def register_options_on_scope(cls, options: Options):
+    def register_options_on_scope(cls, options: Options, union_membership: UnionMembership):
         """Trigger registration of this Subsystem's options.
 
         Subclasses should not generally need to override this method.
         """
         register = options.registration_function_for_subsystem(cls)
+        plugin_option_containers = union_membership.get(cls._plugin_option_cls)
         for options_info in chain(
-            collect_options_info(cls), collect_options_info(cls.EnvironmentAware)
+            collect_options_info(cls),
+            collect_options_info(cls.EnvironmentAware),
+            *(collect_options_info(container) for container in plugin_option_containers),
         ):
             register(*options_info.flag_names, **options_info.flag_options)
 
@@ -265,5 +315,8 @@ async def _construct_env_aware(
 
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
+
+    if t.depends_on_env_vars:
+        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.depends_on_env_vars))
 
     return t

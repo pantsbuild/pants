@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             *buildifier_rules(),
             *external_tool.rules(),
             *target_types_rules(),
-            QueryRule(FmtResult, [BuildifierRequest]),
+            QueryRule(FmtResult, [BuildifierRequest.SubPartition]),
         ],
         # NB: Objects are easier to test with
         objects={"materials": Materials},
@@ -59,7 +59,12 @@ def run_buildifier(rule_runner: RuleRunner) -> FmtResult:
         env_inherit={"PATH", "PYENV_ROOT"},
     )
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/BUILD"])])
-    fmt_result = rule_runner.request(FmtResult, [BuildifierRequest(snapshot)])
+    fmt_result = rule_runner.request(
+        FmtResult,
+        [
+            BuildifierRequest.SubPartition(snapshot.files, key=None, _snapshot=snapshot),
+        ],
+    )
     return fmt_result
 
 

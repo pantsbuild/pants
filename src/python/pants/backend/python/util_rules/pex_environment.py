@@ -13,14 +13,13 @@ from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, softwrap
 
@@ -29,9 +28,12 @@ class PexSubsystem(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
-    class EnvironmentAware:
+    class EnvironmentAware(Subsystem.EnvironmentAware):
         # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
         #  per-process override.
+
+        depends_on_env_vars = ("PATH",)
+
         _executable_search_paths = StrListOption(
             default=["<PATH>"],
             help=softwrap(
@@ -46,12 +48,12 @@ class PexSubsystem(Subsystem):
             metavar="<binary-paths>",
         )
 
-        @memoized_method
-        def path(self, env: EnvironmentVars) -> tuple[str, ...]:
+        @memoized_property
+        def path(self) -> tuple[str, ...]:
             def iter_path_entries():
                 for entry in self._executable_search_paths:
                     if entry == "<PATH>":
-                        path = env.get("PATH")
+                        path = self.env_vars.get("PATH")
                         if path:
                             yield from path.split(os.pathsep)
                     else:
@@ -168,8 +170,8 @@ async def find_pex_python(
     named_caches_dir: NamedCachesDirOption,
 ) -> PexEnvironment:
     return PexEnvironment(
-        path=pex_environment_aware.path(python_bootstrap.environment),
-        interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
+        path=pex_environment_aware.path,
+        interpreter_search_paths=python_bootstrap.interpreter_search_paths,
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),

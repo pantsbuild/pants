@@ -328,6 +328,10 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class TouchBinary(BinaryPath):
+    pass
+
+
 class CpBinary(BinaryPath):
     pass
 
@@ -588,7 +592,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
+    interpreter_search_paths = python_bootstrap.interpreter_search_paths
     all_python_binary_paths = await MultiGet(
         Get(
             BinaryPaths,
@@ -711,6 +715,14 @@ async def find_mkdir() -> MkdirBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
+async def find_touch() -> TouchBinary:
+    request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="touch file")
+    return TouchBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)

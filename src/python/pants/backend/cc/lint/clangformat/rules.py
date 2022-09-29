@@ -10,7 +10,7 @@ from typing import Iterable
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.cc.target_types import CCSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
@@ -35,16 +35,30 @@ class ClangFormatRequest(FmtTargetsRequest):
     name = ClangFormat.options_scope
 
 
+@rule
+async def partition_clangformat(
+    request: ClangFormatRequest.PartitionRequest, clangformat: ClangFormat
+) -> Partitions:
+    return (
+        Partitions()
+        if clangformat.skip
+        else Partitions.single_partition(
+            field_set.sources.file_path for field_set in request.field_sets
+        )
+    )
+
+
 @rule(level=LogLevel.DEBUG)
-async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat) -> FmtResult:
-    if clangformat.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def clangformat_fmt(
+    request: ClangFormatRequest.SubPartition, clangformat: ClangFormat
+) -> FmtResult:
+    snapshot = await ClangFormatRequest.SubPartition.get_snapshot(request)
 
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
-        clangformat.config_request(request.snapshot.dirs),
+        clangformat.config_request(snapshot.dirs),
     )
 
     clangformat_pex, config_files = await MultiGet(
@@ -56,7 +70,7 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
         Digest,
         MergeDigests(
             [
-                request.snapshot.digest,
+                snapshot.digest,
                 config_files.snapshot.digest,
                 clangformat_pex.digest,
             ]
@@ -73,20 +87,26 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
                 "-i",  # In-place edits
                 "--Werror",  # Formatting warnings as errors
                 *clangformat.args,  # User-added arguments
-                *request.snapshot.files,
+                *snapshot.files,
             ),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run clang-format on {pluralize(len(request.snapshot.files), 'file')}.",
+            output_files=snapshot.files,
+            description=f"Run clang-format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return FmtResult.create(
+        result,
+        snapshot,
+        output_snapshot,
+        formatter_name=ClangFormatRequest.name,
+        strip_chroot_path=True,
+    )
 
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, ClangFormatRequest),
+        *ClangFormatRequest.registration_rules(),
     )
