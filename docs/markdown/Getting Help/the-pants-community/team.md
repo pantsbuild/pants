@@ -45,7 +45,7 @@ Pants open source project has had many team members in over a decade. The curren
 | ---------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Chris Williams**     |                                                                                                         |
 | **Dan Moran**          | "Enabling automatic usage of `pytest-xdist` in `./pants test`"                                          |
-| **Doron Somech**       |                                                                                                         |
+| **Doron Somech**       | "Improving Scala dependency inference to support our codebase"                                                                                                        |
 | **Jacob Floyd**        | Gave the idea for skip_flake8 et al, which grew into a flagship feature: incremental adoption           |
 | **Jonas Stendahl**     | "Adding formatting and linting support for Protobuf"                                                                                                        |
 | **Marcelo Trylesinski**            | "Improving onboarding experience"     |
@@ -54,7 +54,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Rhys Madigan**       | "Making unit test run times easier to understand"                                                       |
 | **Suresh Joshi (SJ)**  | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                              |
 | **Tansy Arron-Walker** | "Writing my first task in the new engine was really exciting!"                                          |
-| **Thales Menato**      |                                                                                                         |
+| **Thales Menato**      | "Making sure Pants can run even under heavily secured work environments!"                                                                                                        |
 
 ***
 

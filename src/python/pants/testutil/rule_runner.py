@@ -47,7 +47,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
 from pants.option.global_options import (
@@ -261,7 +261,12 @@ class RuleRunner:
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         self.extra_session_values = extra_session_values or {}
         self.max_workunit_verbosity = max_workunit_verbosity
-        options = self.options_bootstrapper.full_options(self.build_config)
+        options = self.options_bootstrapper.full_options(
+            self.build_config,
+            union_membership=UnionMembership.from_rules(
+                rule for rule in self.rules if isinstance(rule, UnionRule)
+            ),
+        )
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
         dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, self.environment)
@@ -356,7 +361,8 @@ class RuleRunner:
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
         raw_specs = self.options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
+            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
+            self.union_membership,
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(
             raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
@@ -683,7 +689,7 @@ def mock_console(
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     colors = (
         options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info()], allow_unknown_options=True
+            [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
         )
         .for_global_scope()
         .colors

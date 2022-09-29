@@ -266,8 +266,8 @@ async def run_go_tests(
             pkg_name=f"{pkg_analysis.name}_test",
             digest=pkg_digest.digest,
             dir_path=pkg_analysis.dir_path,
-            go_file_names=pkg_analysis.xtest_go_files,
-            s_file_names=(),  # TODO: Are there .s files for xtest?
+            go_files=pkg_analysis.xtest_go_files,
+            s_files=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_analysis.minimum_go_version,
             embed_config=pkg_digest.xtest_embed_config,
@@ -313,8 +313,8 @@ async def run_go_tests(
             pkg_name="main",
             digest=testmain_input_digest,
             dir_path="",
-            go_file_names=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
-            s_file_names=(),
+            go_files=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
+            s_files=(),
             direct_dependencies=tuple(main_direct_deps),
             minimum_go_version=pkg_analysis.minimum_go_version,
         ),
@@ -420,6 +420,8 @@ async def run_go_tests(
         coverage_data = GoCoverageData(
             coverage_digest=result.output_digest,
             import_path=import_path,
+            sources_digest=pkg_digest.digest,
+            sources_dir_path=pkg_analysis.dir_path,
         )
 
     return TestResult.from_fallible_process_result(

@@ -12,6 +12,7 @@ import pytest
 from pants.base.build_environment import get_buildroot
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DynamicRemoteOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -41,7 +42,9 @@ def create_dynamic_remote_options(
         args.append(f"--remote-auth-plugin={plugin}")
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironmentVars({})
-    _build_config, options = OptionsInitializer(ob).build_config_and_options(ob, env, raise_=False)
+    oi = OptionsInitializer(ob)
+    _build_config = oi.build_config(ob, env)
+    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
     return DynamicRemoteOptions.from_options(
         options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
     )[0]

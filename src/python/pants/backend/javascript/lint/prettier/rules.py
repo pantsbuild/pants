@@ -10,7 +10,7 @@ from typing import Iterable
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.javascript.target_types import JSSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
@@ -35,16 +35,28 @@ class PrettierFmtRequest(FmtTargetsRequest):
     name = Prettier.options_scope
 
 
+@rule
+async def partition_prettier(
+    request: PrettierFmtRequest.PartitionRequest, prettier: Prettier
+) -> Partitions:
+    return (
+        Partitions()
+        if prettier.skip
+        else Partitions.single_partition(
+            field_set.sources.file_path for field_set in request.field_sets
+        )
+    )
+
+
 @rule(level=LogLevel.DEBUG)
-async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtResult:
-    if prettier.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prettier) -> FmtResult:
+    snapshot = await PrettierFmtRequest.SubPartition.get_snapshot(request)
 
     # Look for any/all of the Prettier configuration files
     config_files = await Get(
         ConfigFiles,
         ConfigFilesRequest,
-        prettier.config_request(request.snapshot.dirs),
+        prettier.config_request(snapshot.dirs),
     )
 
     # Merge source files, config files, and prettier_tool process
@@ -52,7 +64,7 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
         Digest,
         MergeDigests(
             (
-                request.snapshot.digest,
+                snapshot.digest,
                 config_files.snapshot.digest,
             )
         ),
@@ -64,20 +76,26 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
             npm_package=prettier.default_version,
             args=(
                 "--write",
-                *request.snapshot.files,
+                *snapshot.files,
             ),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run Prettier on {pluralize(len(request.snapshot.files), 'file')}.",
+            output_files=snapshot.files,
+            description=f"Run Prettier on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return FmtResult.create(
+        result,
+        snapshot,
+        output_snapshot,
+        strip_chroot_path=True,
+        formatter_name=PrettierFmtRequest.name,
+    )
 
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, PrettierFmtRequest),
+        *PrettierFmtRequest.registration_rules(),
     )

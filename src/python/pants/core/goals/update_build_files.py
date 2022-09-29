@@ -311,7 +311,11 @@ async def format_build_file_with_yapf(
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
     yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
-    result = await _run_yapf(YapfRequest(input_snapshot), yapf, yapf_ics)
+    result = await _run_yapf(
+        YapfRequest.SubPartition(input_snapshot.files, key=None, _snapshot=input_snapshot),
+        yapf,
+        yapf_ics,
+    )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
@@ -336,7 +340,11 @@ async def format_build_file_with_black(
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
     black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
-    result = await _run_black(BlackRequest(input_snapshot), black, black_ics)
+    result = await _run_black(
+        BlackRequest.SubPartition(input_snapshot.files, key=None, _snapshot=input_snapshot),
+        black,
+        black_ics,
+    )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)

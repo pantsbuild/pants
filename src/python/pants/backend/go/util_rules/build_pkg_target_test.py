@@ -77,8 +77,8 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
             pkg_name="gen",
             digest=digest,
             dir_path="codegen",
-            go_file_names=("f.go",),
-            s_file_names=(),
+            go_files=("f.go",),
+            s_files=(),
             direct_dependencies=(thirdparty_dep.request,),
             minimum_go_version=None,
         ),
@@ -139,8 +139,8 @@ def assert_pkg_target_built(
     build_request = rule_runner.request(BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr)])
     assert build_request.import_path == expected_import_path
     assert build_request.dir_path == expected_dir_path
-    assert build_request.go_file_names == tuple(expected_go_file_names)
-    assert not build_request.s_file_names
+    assert build_request.go_files == tuple(expected_go_file_names)
+    assert not build_request.s_files
     assert [
         dep.import_path for dep in build_request.direct_dependencies
     ] == expected_direct_dependency_import_paths

@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *black_fmt_rules(),
             *black_subsystem_rules(),
             *config_files.rules(),
-            QueryRule(FmtResult, (BlackRequest,)),
+            QueryRule(FmtResult, (BlackRequest.SubPartition,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -58,7 +58,12 @@ def run_black(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -
         env_inherit={"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"},
     )
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/BUILD"])])
-    fmt_result = rule_runner.request(FmtResult, [BlackRequest(snapshot)])
+    fmt_result = rule_runner.request(
+        FmtResult,
+        [
+            BlackRequest.SubPartition(snapshot.files, key=None, _snapshot=snapshot),
+        ],
+    )
     return fmt_result
 
 

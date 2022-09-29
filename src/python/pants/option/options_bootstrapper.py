@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
+from pants.engine.unions import UnionMembership
 from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import DictValueComponent, ListValueComponent
@@ -236,7 +237,10 @@ class OptionsBootstrapper:
 
     @memoized_method
     def _full_options(
-        self, known_scope_infos: FrozenOrderedSet[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: FrozenOrderedSet[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
@@ -253,12 +257,15 @@ class OptionsBootstrapper:
             if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue
             distinct_subsystem_classes.add(ksi.subsystem_cls)
-            ksi.subsystem_cls.register_options_on_scope(options)
+            ksi.subsystem_cls.register_options_on_scope(options, union_membership)
 
         return options
 
     def full_options_for_scopes(
-        self, known_scope_infos: Iterable[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: Iterable[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
@@ -268,10 +275,13 @@ class OptionsBootstrapper:
         """
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),
+            union_membership,
             allow_unknown_options=allow_unknown_options,
         )
 
-    def full_options(self, build_configuration: BuildConfiguration) -> Options:
+    def full_options(
+        self, build_configuration: BuildConfiguration, union_membership: UnionMembership
+    ) -> Options:
         global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
@@ -284,7 +294,9 @@ class OptionsBootstrapper:
             subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
         ]
         options = self.full_options_for_scopes(
-            known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options
+            known_scope_infos,
+            union_membership,
+            allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
         self.alias.check_name_conflicts(options.known_scope_to_info)

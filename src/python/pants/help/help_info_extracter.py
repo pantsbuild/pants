@@ -439,7 +439,9 @@ class HelpInfoExtracter:
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
                     options.get_parser(scope_info.scope),
-                    scope_info.is_goal,
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    scope_info.is_goal if scope_info.scope != "filter" else False,
                     provider,
                     scope_info.deprecated_scope,
                 )
@@ -499,7 +501,13 @@ class HelpInfoExtracter:
             {
                 scope_info.scope: goal_help_info_loader_for(scope_info)
                 for scope_info in known_scope_infos
-                if scope_info.is_goal and not scope_info.scope.startswith("_")
+                if (
+                    scope_info.is_goal
+                    and not scope_info.scope.startswith("_")
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    and scope_info.scope != "filter"
+                )
             }
         )
 

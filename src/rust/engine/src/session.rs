@@ -17,7 +17,7 @@ use graph::LastObserved;
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
-use task_executor::Executor;
+use task_executor::{Executor, TailTasks};
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
@@ -89,6 +89,8 @@ struct SessionState {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
+  /// Tasks to await at the "tail" of the session.
+  tail_tasks: TailTasks,
 }
 
 ///
@@ -183,6 +185,7 @@ impl Session {
         workunit_store,
         session_values: Mutex::new(session_values),
         run_id: AtomicU32::new(run_id.0),
+        tail_tasks: TailTasks::new(),
       }),
     })
   }
@@ -365,6 +368,13 @@ impl Session {
         }
       }
     }
+  }
+
+  /// Return a reference to `TailTasks` for this session which monitors tasks representing
+  /// asynchronous "tail" tasks that should not block individual nodes in the build graph but
+  /// should block the ending of this `Session` (when the `.wait` method is called).
+  pub fn tail_tasks(&self) -> TailTasks {
+    self.state.tail_tasks.clone()
   }
 }
 

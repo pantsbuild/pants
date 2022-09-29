@@ -14,6 +14,7 @@ import pkg_resources
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.unions import UnionMembership
 from pants.help.flag_error_help_printer import FlagErrorHelpPrinter
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.init.engine_initializer import EngineInitializer
@@ -102,19 +103,24 @@ class OptionsInitializer:
         self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
 
-    def build_config_and_options(
+    def build_config(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
+    ) -> BuildConfiguration:
+        return _initialize_build_configuration(self._plugin_resolver, options_bootstrapper, env)
+
+    def options(
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        env: CompleteEnvironmentVars,
+        build_config: BuildConfiguration,
+        union_membership: UnionMembership,
         *,
         raise_: bool,
-    ) -> tuple[BuildConfiguration, Options]:
-        build_config = _initialize_build_configuration(
-            self._plugin_resolver, options_bootstrapper, env
-        )
+    ) -> Options:
         with self.handle_unknown_flags(options_bootstrapper, env, raise_=raise_):
-            options = options_bootstrapper.full_options(build_config)
-        return build_config, options
+            return options_bootstrapper.full_options(build_config, union_membership)
 
     @contextmanager
     def handle_unknown_flags(
@@ -136,7 +142,10 @@ class OptionsInitializer:
             no_arg_bootstrapper = dataclasses.replace(
                 options_bootstrapper, args=("dummy_first_arg",)
             )
-            options = no_arg_bootstrapper.full_options(build_config)
+            options = no_arg_bootstrapper.full_options(
+                build_config,
+                union_membership=UnionMembership({}),
+            )
             FlagErrorHelpPrinter(options).handle_unknown_flags(err)
             if raise_:
                 raise err

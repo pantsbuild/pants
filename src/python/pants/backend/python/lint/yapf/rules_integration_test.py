@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (YapfRequest,)),
+            QueryRule(FmtResult, (YapfRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -69,7 +69,9 @@ def run_yapf(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            YapfRequest(field_sets, snapshot=input_sources.snapshot),
+            YapfRequest.SubPartition(
+                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -102,7 +104,6 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_yapf(rule_runner, [tgt])
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
@@ -153,11 +154,3 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     )
     assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_NEEDS_CONFIG_FILE_INDENT4})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_yapf(rule_runner, [tgt], extra_args=["--yapf-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
