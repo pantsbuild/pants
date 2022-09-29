@@ -104,14 +104,14 @@ async def setup_go_sdk_process(
     request: GoSdkProcess,
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
-    golang_subsystem: GolangSubsystem,
+    golang_env_aware: GolangSubsystem.EnvironmentAware,
     goroot: GoRoot,
 ) -> Process:
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
         Get(
             EnvironmentVars,
-            EnvironmentVarsRequest(golang_subsystem.env_vars_to_pass_to_subprocesses),
+            EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
         ),
     )
     maybe_replace_sandbox_root_env = (
