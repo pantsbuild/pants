@@ -44,6 +44,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
@@ -166,7 +167,7 @@ def mock_partitioner(
     return Partitions.partition_per_input(request.field_sets)
 
 
-def mock_test_partition(request: MockTestRequest.SubPartition) -> TestResult:
+def mock_test_partition(request: MockTestRequest.SubPartition, _: EnvironmentName) -> TestResult:
     request_type = {cls.SubPartition: cls for cls in MockTestRequest.__subclasses__()}[
         type(request)
     ]
@@ -261,13 +262,23 @@ def run_test_rule(
             ],
             mock_gets=[
                 MockGet(
+                    output_type=FilteredTargets,
+                    input_types=(Specs,),
+                    mock=lambda _: FilteredTargets(tuple(targets)),
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(TestRequest.SubPartition,),
+                    mock=lambda _: EnvironmentName(None),
+                ),
+                MockGet(
                     output_type=Partitions,
                     input_types=(TestRequest.PartitionRequest,),
                     mock=mock_partitioner,
                 ),
                 MockGet(
                     output_type=TestResult,
-                    input_types=(TestRequest.SubPartition,),
+                    input_types=(TestRequest.SubPartition, EnvironmentName),
                     mock=mock_test_partition,
                 ),
                 MockGet(
@@ -279,11 +290,6 @@ def run_test_rule(
                     output_type=TestDebugAdapterRequest,
                     input_types=(TestRequest.SubPartition,),
                     mock=mock_debug_adapter_request,
-                ),
-                MockGet(
-                    output_type=FilteredTargets,
-                    input_types=(Specs,),
-                    mock=lambda _: FilteredTargets(tuple(targets)),
                 ),
                 # Merge XML results.
                 MockGet(

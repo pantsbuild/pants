@@ -30,13 +30,14 @@ from pants.base.specs import Specs
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentName
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.session import RunId
@@ -735,6 +736,23 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
+@rule(desc="Determine environment for partition", level=LogLevel.DEBUG)
+async def get_environment(partition: TestRequest.SubPartition) -> EnvironmentName:
+    environment_names_per_element = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
+        for field_set in partition.elements
+    )
+    unique_environments = len({name.val for name in environment_names_per_element})
+    assert (
+        unique_environments == 1
+    ), f"Test partition {partition.key} contains elements from {unique_environments} environments; exactly 1 environment is expected"
+    return environment_names_per_element[0]
+
+
 @goal_rule
 async def run_tests(
     console: Console,
@@ -784,9 +802,13 @@ async def run_tests(
     if test_subsystem.debug or test_subsystem.debug_adapter:
         return await _run_debug_tests(subpartitions, test_subsystem, debug_adapter)
 
-    # TODO: Environments??
+    environment_names = await MultiGet(
+        Get(EnvironmentName, TestRequest.SubPartition, partition) for partition in subpartitions
+    )
+
     results = await MultiGet(
-        Get(TestResult, TestRequest.SubPartition, request) for request in subpartitions
+        Get(TestResult, {partition: TestRequest.SubPartition, environment_name: EnvironmentName})
+        for partition, environment_name in zip(subpartitions, environment_names)
     )
 
     # Print summary.
