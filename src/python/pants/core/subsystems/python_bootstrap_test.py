@@ -11,7 +11,6 @@ import pytest
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.core.subsystems.python_bootstrap import (
-    PythonBootstrap,
     _ExpandInterpreterSearchPathsRequest,
     _get_environment_paths,
     _get_pex_python_paths,
@@ -23,7 +22,7 @@ from pants.core.subsystems.python_bootstrap import (
 from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.asdf_test import fake_asdf_root, get_asdf_paths
+from pants.core.util_rules.asdf_test import fake_asdf_root
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     DockerImageField,
@@ -179,6 +178,20 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
             expected_pyenv_paths,
             expected_pyenv_local_paths,
         ):
+
+            rule_runner.set_session_values(
+                {
+                    CompleteEnvironmentVars: CompleteEnvironmentVars(
+                        {
+                            "HOME": home_dir,
+                            "PATH": "/env/path1:/env/path2",
+                            "PYENV_ROOT": pyenv_root,
+                            "ASDF_DATA_DIR": asdf_dir,
+                        },
+                    )
+                }
+            )
+
             paths = (
                 "/foo",
                 "<PATH>",
@@ -191,26 +204,12 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
                 "<PYENV_LOCAL>",
                 "/qux",
             )
-            asdf_paths_result = get_asdf_paths(
-                rule_runner,
-                {
-                    "HOME": home_dir,
-                    "PATH": "/env/path1:/env/path2",
-                    "PYENV_ROOT": pyenv_root,
-                    "ASDF_DATA_DIR": asdf_dir,
-                },
-                standard=True,
-                local=True,
-                extra_env_var_names=PythonBootstrap.EXTRA_ENV_VAR_NAMES,
-            )
             expanded_paths = rule_runner.request(
                 _SearchPaths,
                 [
                     _ExpandInterpreterSearchPathsRequest(
                         paths,
                         EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem"))),
-                        asdf_standard_tool_paths=asdf_paths_result.standard_tool_paths,
-                        asdf_local_tool_paths=asdf_paths_result.local_tool_paths,
                     )
                 ],
             )

@@ -24,7 +24,6 @@ class AsdfToolPathsRequest:
     tool_description: str
     resolve_standard: bool
     resolve_local: bool
-    extra_env_var_names: tuple[str, ...]
     paths_option_name: str
     bin_relpath: str = "bin"
 
@@ -32,7 +31,6 @@ class AsdfToolPathsRequest:
 @dataclass(frozen=True)
 class AsdfToolPathsResult:
     tool_name: str
-    env: EnvironmentVars
     standard_tool_paths: tuple[str, ...] = ()
     local_tool_paths: tuple[str, ...] = ()
 
@@ -193,7 +191,6 @@ async def resolve_asdf_tool_paths(
         "ASDF_DATA_DIR",
         tool_env_name,
         "HOME",
-        *request.extra_env_var_names,
     ]
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(env_vars_to_request))
 
@@ -223,7 +220,6 @@ async def resolve_asdf_tool_paths(
 
     return AsdfToolPathsResult(
         tool_name=request.tool_name,
-        env=env,
         standard_tool_paths=standard_tool_paths,
         local_tool_paths=local_tool_paths,
     )

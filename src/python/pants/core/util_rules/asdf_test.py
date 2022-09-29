@@ -83,7 +83,6 @@ def get_asdf_paths(
     *,
     standard: bool,
     local: bool,
-    extra_env_var_names: Iterable[str] = (),
 ) -> AsdfToolPathsResult:
     rule_runner.set_session_values(
         {
@@ -98,7 +97,6 @@ def get_asdf_paths(
                 tool_description="<test>",
                 resolve_standard=standard,
                 resolve_local=local,
-                extra_env_var_names=tuple(extra_env_var_names),
                 paths_option_name="<test>",
             )
         ],

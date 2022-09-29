@@ -88,8 +88,6 @@ class PythonBootstrapSubsystem(Subsystem):
 
 @dataclass(frozen=True)
 class PythonBootstrap:
-    EXTRA_ENV_VAR_NAMES = ("PATH", "PYENV_ROOT")
-
     interpreter_names: tuple[str, ...]
     interpreter_search_paths: tuple[str, ...]
 
@@ -98,8 +96,6 @@ class PythonBootstrap:
 class _ExpandInterpreterSearchPathsRequest:
     interpreter_search_paths: Sequence[str]
     env_tgt: EnvironmentTarget
-    asdf_standard_tool_paths: tuple[str, ...]
-    asdf_local_tool_paths: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -118,14 +114,29 @@ async def _expand_interpreter_search_paths(
     request: _ExpandInterpreterSearchPathsRequest,
 ) -> _SearchPaths:
 
-    interpreter_search_paths, env_tgt, asdf_standard_tool_paths, asdf_local_tool_paths = (
-        request.interpreter_search_paths,
-        request.env_tgt,
-        request.asdf_standard_tool_paths,
-        request.asdf_local_tool_paths,
-    )
+    interpreter_search_paths, env_tgt = (request.interpreter_search_paths, request.env_tgt)
 
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
+
+    has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
+        interpreter_search_paths
+    )
+
+    asdf_paths = await Get(
+        AsdfToolPathsResult,
+        AsdfToolPathsRequest(
+            tool_name="python",
+            tool_description="Python interpreters",
+            resolve_standard=has_standard_path_token,
+            resolve_local=has_local_path_token,
+            paths_option_name="[python-bootstrap].search_path",
+        ),
+    )
+
+    asdf_standard_tool_paths, asdf_local_tool_paths = (
+        asdf_paths.standard_tool_paths,
+        asdf_paths.local_tool_paths,
+    )
 
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
@@ -317,28 +328,11 @@ async def python_bootstrap(
     )
     interpreter_names = python_bootstrap_subsystem.names
 
-    has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
-        interpreter_search_paths
-    )
-    result = await Get(
-        AsdfToolPathsResult,
-        AsdfToolPathsRequest(
-            tool_name="python",
-            tool_description="Python interpreters",
-            resolve_standard=has_standard_path_token,
-            resolve_local=has_local_path_token,
-            extra_env_var_names=(),
-            paths_option_name="[python-bootstrap].search_path",
-        ),
-    )
-
     expanded_paths = await Get(
         _SearchPaths,
         _ExpandInterpreterSearchPathsRequest(
             interpreter_search_paths,
             python_bootstrap_subsystem.env_tgt,
-            result.standard_tool_paths,
-            result.local_tool_paths,
         ),
     )
 
