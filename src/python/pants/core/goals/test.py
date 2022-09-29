@@ -28,7 +28,6 @@ from typing_extensions import final
 
 from pants.base.specs import Specs
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.style_request import style_batch_size_help
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentName
@@ -567,11 +566,6 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    batch_size = IntOption(
-        advanced=True,
-        default=128,
-        help=style_batch_size_help(uppercase="Tester", lowercase="tester"),
-    )
     timeouts = BoolOption(
         default=True,
         help=softwrap(
@@ -765,8 +759,8 @@ async def run_tests(
         batches = partition_sequentially(
             iterable,
             key=key,
-            size_target=test_subsystem.batch_size,
-            size_max=4 * test_subsystem.batch_size,
+            # TODO: Add a config option to the `[test]` subsystem to set this value.
+            size_target=1,
         )
         for batch in batches:
             yield tuple(batch)
