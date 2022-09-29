@@ -9,10 +9,10 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.rules import (
     PythonImportDependenciesInferenceFieldSet,
     PythonInferSubsystem,
+    _exec_parse_deps,
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -45,16 +45,8 @@ async def dump_python_source_analysis(
     source_analysis = await MultiGet(
         Get(
             ParsedPythonDependencies,
-            ParsePythonDependenciesRequest(
-                fs.source,
-                InterpreterConstraints.create_from_compatibility_fields(
-                    [fs.interpreter_constraints], python_setup
-                ),
-                string_imports=python_infer_subsystem.string_imports,
-                string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-                assets=python_infer_subsystem.assets,
-                assets_min_slashes=python_infer_subsystem.assets_min_slashes,
-            ),
+            ParsePythonDependenciesRequest,
+            _exec_parse_deps(fs, python_infer_subsystem, python_setup),
         )
         for fs in source_field_sets
     )

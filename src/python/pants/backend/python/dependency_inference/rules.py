@@ -359,6 +359,24 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
+def _exec_parse_deps(
+    field_set: PythonImportDependenciesInferenceFieldSet,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
+) -> ParsePythonDependenciesRequest:
+    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+        [field_set.interpreter_constraints], python_setup
+    )
+    return ParsePythonDependenciesRequest(
+        field_set.source,
+        interpreter_constraints,
+        string_imports=python_infer_subsystem.string_imports,
+        string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
+        assets=python_infer_subsystem.assets,
+        assets_min_slashes=python_infer_subsystem.assets_min_slashes,
+    )
+
+
 @rule(desc="Inferring Python dependencies by analyzing source")
 async def infer_python_dependencies_via_source(
     request: InferPythonImportDependencies,
@@ -368,21 +386,13 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    address = request.field_set.address
-    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        [request.field_set.interpreter_constraints], python_setup
-    )
     parsed_dependencies = await Get(
         ParsedPythonDependencies,
-        ParsePythonDependenciesRequest(
-            request.field_set.source,
-            interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
-        ),
+        ParsePythonDependenciesRequest,
+        _exec_parse_deps(request.field_set, python_infer_subsystem, python_setup),
     )
+
+    address = request.field_set.address
 
     inferred_deps: set[Address] = set()
     unowned_imports: set[str] = set()
@@ -531,6 +541,7 @@ async def infer_python_conftest_dependencies(
 # This is a separate function to facilitate tests registering import inference.
 def import_rules():
     return [
+        # _exec_parse_deps,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),
