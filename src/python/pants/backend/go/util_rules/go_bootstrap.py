@@ -10,6 +10,7 @@ from typing import Iterable
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule, rule_helper
@@ -24,7 +25,7 @@ class GoBootstrap:
 
 @rule_helper
 async def _go_search_paths(
-    golang_subsystem: GolangSubsystem, paths: Iterable[str]
+    env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Iterable[str]
 ) -> tuple[str, ...]:
 
     resolve_standard, resolve_local = "<ASDF>" in paths, "<ASDF_LOCAL>" in paths
@@ -34,12 +35,12 @@ async def _go_search_paths(
         asdf_result = await Get(
             AsdfToolPathsResult,
             AsdfToolPathsRequest(
+                env_tgt=env_tgt,
                 tool_name=golang_subsystem.asdf_tool_name,
                 tool_description="Go distribution",
                 resolve_standard=resolve_standard,
                 resolve_local=resolve_local,
                 paths_option_name="[golang].go_search_paths",
-                extra_env_var_names=(),
                 bin_relpath=golang_subsystem.asdf_bin_relpath,
             ),
         )
@@ -80,7 +81,9 @@ async def _environment_paths() -> list[str]:
 async def resolve_go_bootstrap(
     golang_subsystem: GolangSubsystem, golang_env_aware: GolangSubsystem.EnvironmentAware
 ) -> GoBootstrap:
-    paths = await _go_search_paths(golang_subsystem, golang_env_aware.raw_go_search_paths)
+    paths = await _go_search_paths(
+        golang_env_aware.env_tgt, golang_subsystem, golang_env_aware.raw_go_search_paths
+    )
 
     return GoBootstrap(go_search_paths=paths)
 
