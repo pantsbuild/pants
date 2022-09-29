@@ -104,16 +104,13 @@ def test_entry_point(
 
 @pytest.mark.parametrize("execution_mode", [None, PexExecutionMode.VENV])
 @pytest.mark.parametrize("include_tools", [True, False])
-@pytest.mark.parametrize("venv_site_packages_copies", [True, False])
 def test_execution_mode_and_include_tools(
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    venv_site_packages_copies: bool,
 ):
     run = run_generic_test(
         execution_mode=execution_mode,
         include_tools=include_tools,
-        venv_site_packages_copies=venv_site_packages_copies,
     )
 
     if include_tools:
