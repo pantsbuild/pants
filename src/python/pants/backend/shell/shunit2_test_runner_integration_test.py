@@ -94,7 +94,7 @@ def run_shunit2(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     field_set = Shunit2FieldSet.create(test_target)
-    inputs = [Shunit2Request.SubPartition((field_set,), test_target.address.spec)]
+    inputs = [Shunit2Request.SubPartition((field_set,), "", test_target.address.spec)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:

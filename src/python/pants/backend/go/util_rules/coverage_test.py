@@ -102,7 +102,7 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout

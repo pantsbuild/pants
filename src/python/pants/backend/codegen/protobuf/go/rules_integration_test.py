@@ -292,7 +292,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/go/people", target_name="pkg"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestProtoGen" in result.stdout

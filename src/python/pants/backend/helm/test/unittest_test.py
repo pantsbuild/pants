@@ -74,7 +74,7 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     field_set = HelmUnitTestFieldSet.create(target)
 
     result = rule_runner.request(
-        TestResult, [HelmUnitTestRequest.SubPartition((field_set,), target.address.spec)]
+        TestResult, [HelmUnitTestRequest.SubPartition((field_set,), "", target.address.spec)]
     )
 
     assert result.exit_code == 0
@@ -115,6 +115,6 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
     field_set = HelmUnitTestFieldSet.create(target)
 
     result = rule_runner.request(
-        TestResult, [HelmUnitTestRequest.SubPartition((field_set,), target.address.spec)]
+        TestResult, [HelmUnitTestRequest.SubPartition((field_set,), "", target.address.spec)]
     )
     assert result.exit_code == 1

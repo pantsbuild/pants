@@ -120,7 +120,7 @@ def run_pytest(
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
@@ -139,7 +139,7 @@ def run_pytest_noninteractive(
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
     return rule_runner.request(TestResult, inputs)
 
 
@@ -152,7 +152,7 @@ def run_pytest_interactive(
 ) -> InteractiveProcessResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     with mock_console(rule_runner.options_bootstrapper):
         return rule_runner.run_interactive_process(debug_request.process)
@@ -719,7 +719,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
     )
     field_set = PythonTestFieldSet.create(tgt)
-    inputs = [PytestRequest.SubPartition((field_set,), tgt.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     request = rule_runner.request(TestDebugAdapterRequest, inputs)
     assert request.process is not None
     assert request.process.process.argv == (

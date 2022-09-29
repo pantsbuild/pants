@@ -425,11 +425,12 @@ async def run_python_test(
 
     return TestResult.from_fallible_process_result(
         result,
-        partition_description=partition.key,
+        description=partition.description,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
+        extra_output_prefix=partition.key,
     )
 
 

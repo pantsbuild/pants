@@ -159,7 +159,7 @@ def test_embed_in_source_code(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     _assert_test_result_success(result)
 
@@ -208,7 +208,7 @@ def test_embed_in_internal_test(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     _assert_test_result_success(result)
 
@@ -257,7 +257,7 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     _assert_test_result_success(result)
 
@@ -351,6 +351,6 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     _assert_test_result_success(result)

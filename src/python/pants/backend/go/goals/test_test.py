@@ -126,7 +126,7 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
@@ -151,7 +151,7 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
@@ -189,7 +189,7 @@ def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
@@ -218,7 +218,7 @@ def test_internal_example_passes(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
@@ -250,7 +250,7 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "foo.TestMain called" in result.stdout
@@ -290,7 +290,7 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
@@ -298,7 +298,7 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo/uses_dep"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
@@ -336,7 +336,7 @@ def test_external_test_success(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
@@ -372,7 +372,7 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
@@ -413,7 +413,7 @@ def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
@@ -451,7 +451,7 @@ def test_external_example_passes(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
@@ -494,7 +494,7 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "foo_test.TestMain called" in result.stdout
@@ -541,7 +541,7 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout
@@ -581,7 +581,7 @@ def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: FuzzFoo" in result.stdout
@@ -652,7 +652,7 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     )
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestEnvs" in result.stdout
@@ -697,7 +697,7 @@ def test_no_tests(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.skipped
 
@@ -732,7 +732,7 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 1
     assert "failed to parse" in result.stderr
@@ -777,6 +777,6 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
     )
     assert result.exit_code == 0

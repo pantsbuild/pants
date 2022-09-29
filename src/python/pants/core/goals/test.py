@@ -10,19 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ClassVar,
-    Generic,
-    Iterable,
-    Iterator,
-    Optional,
-    Tuple,
-    TypeVar,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Iterable, Optional, Tuple, TypeVar, cast
 
 from typing_extensions import final
 
@@ -64,7 +52,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
-from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -84,7 +71,7 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
-    partition_description: str
+    description: str
 
     coverage_data: CoverageData | None = None
     # TODO: Rename this to `reports`. There is no guarantee that every language will produce
@@ -92,12 +79,14 @@ class TestResult(EngineAwareReturnType):
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
+    # Path prefix to use for the extra output above when materializing it into the final dist dir.
+    extra_output_prefix: str | None = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @classmethod
-    def skip(cls, partition_description: str, output_setting: ShowOutput) -> TestResult:
+    def skip(cls, description: str, output_setting: ShowOutput) -> TestResult:
         return cls(
             exit_code=None,
             stdout="",
@@ -105,7 +94,8 @@ class TestResult(EngineAwareReturnType):
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=output_setting,
-            partition_description=partition_description,
+            description=description,
+            extra_output_prefix=None,
             result_metadata=None,
         )
 
@@ -115,10 +105,11 @@ class TestResult(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output_setting: ShowOutput,
         *,
-        partition_description: str,
+        description: str,
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        extra_output_prefix: str | None = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
@@ -128,10 +119,11 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=process_result.stderr_digest,
             output_setting=output_setting,
             result_metadata=process_result.metadata,
-            partition_description=partition_description,
+            description=description,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            extra_output_prefix=extra_output_prefix,
         )
 
     @property
@@ -144,7 +136,7 @@ class TestResult(EngineAwareReturnType):
         if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
-            return self.partition_description < other.partition_description
+            return self.description < other.description
         if self.skipped or self.exit_code is None:
             return True
         if other.skipped or other.exit_code is None:
@@ -166,7 +158,7 @@ class TestResult(EngineAwareReturnType):
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        message = self.partition_description
+        message = self.description
         if self.skipped:
             message += " skipped."
         elif self.exit_code == 0:
@@ -192,7 +184,7 @@ class TestResult(EngineAwareReturnType):
         return f"{message}{output}"
 
     def metadata(self) -> dict[str, Any]:
-        return {"partition": self.partition_description}
+        return {"description": self.description}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -236,8 +228,14 @@ _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=TestFieldSet)
 
 
+@dataclass(frozen=True)
+class Partition(Generic[_FieldSetT]):
+    field_sets: tuple[_FieldSetT, ...]
+    description: str
+
+
 @runtime_ignore_subscripts
-class Partitions(FrozenDict[Any, "tuple[_FieldSetT, ...]"]):
+class Partitions(FrozenDict[str, Partition[_FieldSetT]]):
     """A mapping from <partition key> to <partition>.
 
     When implementing a test-runner, one of your rules will return this type, taking in a
@@ -250,16 +248,15 @@ class Partitions(FrozenDict[Any, "tuple[_FieldSetT, ...]"]):
         - Returning partitions containing a variable number of inputs, if your tool
             supports processing inputs in batches.
 
-    The partition key can be of any type able to cross a rule-boundary, and will be provided
-    to the rule which "runs" your tool.
-
     NOTE: The partition may be divided further into multiple sub-partitions.
     """
 
     @classmethod
     def partition_per_input(cls, elements: Iterable[_FieldSetT]) -> Partitions[_FieldSetT]:
         """Helper constructor for implementations that have a partition per input."""
-        return Partitions([(e.address.spec, (e,)) for e in elements])
+        return Partitions(
+            [(e.address.path_safe_spec, Partition((e,), e.address.spec)) for e in elements]
+        )
 
 
 @union
@@ -345,6 +342,7 @@ class TestRequest:
     class SubPartition(Generic[_FieldSetT]):
         elements: Tuple[_FieldSetT, ...]
         key: str
+        description: str
 
     _PartitionRequestBase = PartitionRequest
     _SubPartitionBase = SubPartition
@@ -676,8 +674,8 @@ async def _get_partitions_by_request_type(
     )
 
     partitions_by_request_type = defaultdict(list)
-    for request_type, partition in zip(core_request_types, all_partitions):
-        partitions_by_request_type[request_type].append(partition)
+    for request_type, partitions in zip(core_request_types, all_partitions):
+        partitions_by_request_type[request_type].append(partitions)
 
     return partitions_by_request_type
 
@@ -771,32 +769,11 @@ async def run_tests(
         request_types, targets_to_valid_field_sets
     )
 
-    def batch(
-        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
-    ) -> Iterator[tuple[_T, ...]]:
-        batches = partition_sequentially(
-            iterable,
-            key=key,
-            # TODO: Add a config option to the `[test]` subsystem to set this value.
-            size_target=1,
-        )
-        for batch in batches:
-            yield tuple(batch)
-
-    batches_by_request_type = {
-        request_type: [
-            (subpartition, key)
-            for partitions in partitions_list
-            for key, partition in partitions.items()
-            for subpartition in batch(partition)
-        ]
-        for request_type, partitions_list in partitions_by_request_type.items()
-    }
-
     subpartitions = [
-        request_type.SubPartition(elements, key)
-        for request_type, batch in batches_by_request_type.items()
-        for elements, key in batch
+        request_type.SubPartition(partition.field_sets, key, partition.description)
+        for request_type, partitions_list in partitions_by_request_type.items()
+        for partitions in partitions_list
+        for key, partition in partitions.items()
     ]
 
     if test_subsystem.debug or test_subsystem.debug_adapter:
@@ -823,12 +800,10 @@ async def run_tests(
 
         console.print_stderr(_format_test_summary(result, run_id, console))
 
-        if result.extra_output and result.extra_output.files:
+        if result.extra_output_prefix and result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                # TODO: `partition_description` isn't guaranteed to be path-safe.
-                # Do we sanitize it? Or use something else?
-                path_prefix=str(distdir.relpath / "test" / result.partition_description),
+                path_prefix=str(distdir.relpath / "test" / result.extra_output_prefix),
             )
 
     if test_subsystem.report:
@@ -921,7 +896,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
     suffix = f" {elapsed_print}{source_print}"
-    return f"{sigil} {result.partition_description} {status}{suffix}."
+    return f"{sigil} {result.description} {status}{suffix}."
 
 
 @dataclass(frozen=True)
