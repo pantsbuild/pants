@@ -416,7 +416,6 @@ async def determine_local_environment(
         result_name, _tgt = compatible_name_and_targets[0]
         return ChosenLocalEnvironmentName(result_name)
 
-    # TODO(#7735): Maybe allow the user to disambiguate what __local__ means via an option?
     raise AmbiguousEnvironmentError(
         softwrap(
             f"""
@@ -428,6 +427,25 @@ async def determine_local_environment(
             To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
             targets so that only one includes the value `{platform.value}`, or change
             `[environments-preview].names` so that it does not define some of those targets.
+
+            It is often useful to still keep the same `local_environment` target definitions in
+            BUILD files; instead, do not give a name to each of them in
+            `[environments-preview].names` to avoid ambiguity. Then, you can override which target
+            a particular name points to by overriding `[environments-preview].names`. For example,
+            you could set this in `pants.toml`:
+
+                [environments-preview.names]
+                linux = "//:linux_env"
+                macos = "//:macos_local_env"
+
+            Then, for CI, override what the name `macos` points to by setting this in
+            `pants.ci.toml`:
+
+                [environments-preview.names.add]
+                macos = "//:macos_ci_env"
+
+            Locally, you can override `[environments-preview].names` like this by using a
+            `.pants.rc` file, for example.
             """
         )
     )
