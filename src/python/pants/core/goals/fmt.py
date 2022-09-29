@@ -3,12 +3,21 @@
 
 from __future__ import annotations
 
-import dataclasses
 import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence, Tuple, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Iterator,
+    NamedTuple,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import LintFilesRequest, LintRequest, LintResult, LintTargetsRequest
@@ -125,20 +134,13 @@ class FmtRequest(LintRequest):
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class SubPartition(LintRequest.SubPartition):
-        _snapshot: Snapshot | None = None
+        snapshot: Snapshot
 
         @property
         def files(self) -> tuple[str, ...]:
             return self.elements
 
-        @rule_helper(_public=True)
-        async def get_snapshot(self) -> Snapshot:
-            if self._snapshot is None:
-                return await Get(Snapshot, PathGlobs(self.files))
-
-            return self._snapshot
-
-    _SubPartitionBase = SubPartition
+    _SubPartitionBase: type[SubPartition] = SubPartition
 
     if not TYPE_CHECKING:
 
@@ -171,7 +173,13 @@ class FmtFilesRequest(FmtRequest, LintFilesRequest):
         yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class _FmtSubpartitionBatchRequest(Collection[FmtRequest.SubPartition]):
+class _FmtSubpartitionBatchElement(NamedTuple):
+    request_type: type[FmtRequest.SubPartition]
+    files: tuple[str, ...]
+    key: Any
+
+
+class _FmtSubpartitionBatchRequest(Collection[_FmtSubpartitionBatchElement]):
     """Request to serially format all the subpartitions in the given batch."""
 
 
@@ -298,7 +306,9 @@ async def fmt(
         for partition_infos, files in files_by_partition_info.items():
             for subpartition in batch(files):
                 yield _FmtSubpartitionBatchRequest(
-                    request_type.SubPartition(subpartition, partition_key)
+                    _FmtSubpartitionBatchElement(
+                        request_type.SubPartition, subpartition, partition_key
+                    )
                     for request_type, partition_key in partition_infos
                 )
 
@@ -323,23 +333,18 @@ async def fmt(
 async def fmt_batch(
     request: _FmtSubpartitionBatchRequest,
 ) -> _FmtBatchResult:
-    current_snapshot = None
+    current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
-    for subpartition in request:
-        subpartition = dataclasses.replace(subpartition, _snapshot=current_snapshot)
+    for request_type, files, key in request:
+        subpartition = request_type(files, key, current_snapshot)
         result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
         results.append(result)
 
         assert set(result.output.files) == set(
             subpartition.files
         ), f"Expected {result.output.files} to match {subpartition.files}"
-        # NB: We don't unconditionally assign to `current_snapshot`, so that the case in which the
-        # formatter (and all prior formatters) do not change the source we'll use a `None` snapshot.
-        # This speeds up runs of `./pants fmt lint` since `lint.py` will always use a `None` snapshot
-        # and so the result will be memoized.
-        if result.did_change:
-            current_snapshot = result.output
+        current_snapshot = result.output
     return _FmtBatchResult(tuple(results))
 
 
