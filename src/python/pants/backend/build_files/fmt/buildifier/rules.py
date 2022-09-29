@@ -42,7 +42,7 @@ async def partition_build_files(
 async def buildfier_fmt(
     request: BuildifierRequest.SubPartition, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
-    snapshot = await BuildifierRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     buildifier_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, buildifier.get_request(platform)
     )

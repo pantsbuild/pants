@@ -63,7 +63,7 @@ def run_buf(
         FmtResult,
         [
             BufFormatRequest.SubPartition(
-                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+                input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
     )

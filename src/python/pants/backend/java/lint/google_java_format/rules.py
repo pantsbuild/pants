@@ -65,7 +65,7 @@ async def google_java_format_fmt(
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> FmtResult:
-    snapshot = await GoogleJavaFormatRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )

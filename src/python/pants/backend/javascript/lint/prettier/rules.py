@@ -50,7 +50,7 @@ async def partition_prettier(
 
 @rule(level=LogLevel.DEBUG)
 async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prettier) -> FmtResult:
-    snapshot = await PrettierFmtRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
 
     # Look for any/all of the Prettier configuration files
     config_files = await Get(

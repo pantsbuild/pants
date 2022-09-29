@@ -50,7 +50,7 @@ async def partition_shfmt(request: ShfmtRequest.PartitionRequest, shfmt: Shfmt) 
 async def shfmt_fmt(
     request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform
 ) -> FmtResult:
-    snapshot = await ShfmtRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
 
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)

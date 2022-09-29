@@ -51,7 +51,7 @@ async def partition_docformatter(
 async def docformatter_fmt(
     request: DocformatterRequest.SubPartition, docformatter: Docformatter
 ) -> FmtResult:
-    snapshot = await DocformatterRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
     result = await Get(
         ProcessResult,

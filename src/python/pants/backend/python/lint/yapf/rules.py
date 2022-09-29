@@ -44,7 +44,7 @@ async def _run_yapf(
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:
-    snapshot = await FmtRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     yapf_pex_get = Get(
         VenvPex, PexRequest, yapf.to_pex_request(interpreter_constraints=interpreter_constraints)
     )

@@ -50,7 +50,7 @@ async def partition_pyupgrade(
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpgrade) -> FmtResult:
-    snapshot = await PyUpgradeRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
 
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 

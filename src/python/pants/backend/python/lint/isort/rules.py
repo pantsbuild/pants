@@ -73,7 +73,7 @@ async def partition_isort(request: IsortRequest.PartitionRequest, isort: Isort) 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResult:
-    snapshot = await IsortRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, isort.config_request(snapshot.dirs))
     isort_pex, config_files = await MultiGet(isort_pex_get, config_files_get)

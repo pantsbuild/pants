@@ -31,7 +31,7 @@ async def _run_black(
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
-    snapshot = await FmtRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     black_pex_get = Get(
         VenvPex,
         PexRequest,

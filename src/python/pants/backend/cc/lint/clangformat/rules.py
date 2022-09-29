@@ -52,7 +52,7 @@ async def partition_clangformat(
 async def clangformat_fmt(
     request: ClangFormatRequest.SubPartition, clangformat: ClangFormat
 ) -> FmtResult:
-    snapshot = await ClangFormatRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
 
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(

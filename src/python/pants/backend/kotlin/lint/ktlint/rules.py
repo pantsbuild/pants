@@ -62,7 +62,7 @@ async def partition_ktlint(
 async def ktlint_fmt(
     request: KtlintRequest.SubPartition, tool: KtlintSubsystem, jdk: InternalJdk
 ) -> FmtResult:
-    snapshot = await KtlintRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 

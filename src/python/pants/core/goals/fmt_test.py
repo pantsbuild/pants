@@ -70,7 +70,7 @@ async def fortran_partition(request: FortranFmtRequest.PartitionRequest) -> Part
 
 @rule
 async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
-    input = await FortranFmtRequest.SubPartition.get_snapshot(request)
+    input = request.snapshot
     output = await Get(
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
     )
@@ -107,7 +107,7 @@ async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionReques
 
 @rule
 async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResult:
-    snapshot = await SmalltalkNoopRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     assert snapshot != EMPTY_SNAPSHOT
     return FmtResult(
         input=snapshot,
@@ -157,7 +157,7 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> Fmt
             new_lines.append(line)
         return "".join(new_lines).encode()
 
-    snapshot = await BrickyBuildFileFormatter.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     new_contents = [
         dataclasses.replace(file_content, content=brickify(file_content.content))

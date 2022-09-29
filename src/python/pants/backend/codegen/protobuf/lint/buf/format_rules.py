@@ -60,7 +60,7 @@ async def partition_buf(
 async def run_buf_format(
     request: BufFormatRequest.SubPartition, buf: BufSubsystem, platform: Platform
 ) -> FmtResult:
-    snapshot = await BufFormatRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(

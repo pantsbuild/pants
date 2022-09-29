@@ -47,7 +47,7 @@ async def partition(request: AutoflakeRequest.PartitionRequest, autoflake: Autof
 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autoflake) -> FmtResult:
-    snapshot = await AutoflakeRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     result = await Get(

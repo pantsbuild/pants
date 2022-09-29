@@ -53,7 +53,7 @@ async def partition_gofmt(
 
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtResult:
-    snapshot = await GofmtRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",

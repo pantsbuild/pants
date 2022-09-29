@@ -51,7 +51,7 @@ async def partition(
 async def add_trailing_comma_fmt(
     request: AddTrailingCommaRequest.SubPartition, add_trailing_comma: AddTrailingComma
 ) -> FmtResult:
-    snapshot = await AddTrailingCommaRequest.SubPartition.get_snapshot(request)
+    snapshot = request.snapshot
     add_trailing_comma_pex = await Get(VenvPex, PexRequest, add_trailing_comma.to_pex_request())
 
     result = await Get(
