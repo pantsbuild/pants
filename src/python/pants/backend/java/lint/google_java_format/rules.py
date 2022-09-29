@@ -65,7 +65,6 @@ async def google_java_format_fmt(
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> FmtResult:
-    snapshot = request.snapshot
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )
@@ -91,7 +90,7 @@ async def google_java_format_fmt(
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
         "--replace",
-        *snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -100,11 +99,11 @@ async def google_java_format_fmt(
             jdk=jdk,
             argv=args,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            input_digest=snapshot.digest,
+            input_digest=request.snapshot.digest,
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run Google Java Format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -112,7 +111,7 @@ async def google_java_format_fmt(
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        snapshot,
+        request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
         formatter_name=GoogleJavaFormatRequest.name,

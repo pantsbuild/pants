@@ -107,11 +107,10 @@ async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionReques
 
 @rule
 async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResult:
-    snapshot = request.snapshot
-    assert snapshot != EMPTY_SNAPSHOT
+    assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult(
-        input=snapshot,
-        output=snapshot,
+        input=request.snapshot,
+        output=request.snapshot,
         stdout="",
         stderr="",
         formatter_name=SmalltalkNoopRequest.name,

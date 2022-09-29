@@ -172,11 +172,9 @@ async def scalafmt_fmt(
     request: ScalafmtRequest.SubPartition, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
     partition_info = cast(PartitionInfo, request.key)
-    original_snapshot = request.snapshot
-
     merged_digest = await Get(
         Digest,
-        MergeDigests([partition_info.config_snapshot.digest, original_snapshot.digest]),
+        MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest]),
     )
 
     result = await Get(
@@ -204,7 +202,7 @@ async def scalafmt_fmt(
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        original_snapshot,
+        request.snapshot,
         output_snapshot,
         formatter_name=ScalafmtRequest.name,
     )

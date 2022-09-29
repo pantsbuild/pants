@@ -73,9 +73,10 @@ async def partition_isort(request: IsortRequest.PartitionRequest, isort: Isort) 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResult:
-    snapshot = request.snapshot
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, isort.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
+    )
     isort_pex, config_files = await MultiGet(isort_pex_get, config_files_get)
 
     # Isort 5+ changes how config files are handled. Determine which semantics we should use.
@@ -85,22 +86,28 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
         isort_info = isort_pex_info.find("isort")
         is_isort5 = isort_info is not None and isort_info.version.major >= 5
 
-    input_digest = await Get(Digest, MergeDigests((snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(snapshot.files, isort, is_isort5=is_isort5),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run isort on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, strip_chroot_path=True, formatter_name=IsortRequest.name
+        result,
+        request.snapshot,
+        output_snapshot,
+        strip_chroot_path=True,
+        formatter_name=IsortRequest.name,
     )
 
 

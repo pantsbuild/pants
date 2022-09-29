@@ -31,17 +31,20 @@ async def _run_black(
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
-    snapshot = request.snapshot
     black_pex_get = Get(
         VenvPex,
         PexRequest,
         black.to_pex_request(interpreter_constraints=interpreter_constraints),
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, black.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+    )
 
     black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
 
-    input_digest = await Get(Digest, MergeDigests((snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     result = await Get(
         ProcessResult,
@@ -52,18 +55,22 @@ async def _run_black(
                 "-W",
                 "{pants_concurrency}",
                 *black.args,
-                *snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=snapshot.files,
-            concurrency_available=len(snapshot.files),
+            output_files=request.files,
+            concurrency_available=len(request.files),
             description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, strip_chroot_path=True, formatter_name=BlackRequest.name
+        result,
+        request.snapshot,
+        output_snapshot,
+        strip_chroot_path=True,
+        formatter_name=BlackRequest.name,
     )
 
 

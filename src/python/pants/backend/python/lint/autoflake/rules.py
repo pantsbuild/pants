@@ -47,7 +47,6 @@ async def partition(request: AutoflakeRequest.PartitionRequest, autoflake: Autof
 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autoflake) -> FmtResult:
-    snapshot = request.snapshot
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     result = await Get(
@@ -57,10 +56,10 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
             argv=(
                 "--in-place",
                 *autoflake.args,
-                *snapshot.files,
+                *request.files,
             ),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run Autoflake on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -68,7 +67,7 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        snapshot,
+        request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
         formatter_name=AutoflakeRequest.name,

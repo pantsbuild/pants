@@ -51,7 +51,6 @@ async def partition_docformatter(
 async def docformatter_fmt(
     request: DocformatterRequest.SubPartition, docformatter: Docformatter
 ) -> FmtResult:
-    snapshot = request.snapshot
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
     result = await Get(
         ProcessResult,
@@ -60,17 +59,17 @@ async def docformatter_fmt(
             argv=(
                 "--in-place",
                 *docformatter.args,
-                *snapshot.files,
+                *request.files,
             ),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=(f"Run Docformatter on {pluralize(len(request.files), 'file')}."),
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, formatter_name=DocformatterRequest.name
+        result, request.snapshot, output_snapshot, formatter_name=DocformatterRequest.name
     )
 
 

@@ -44,14 +44,17 @@ async def _run_yapf(
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:
-    snapshot = request.snapshot
     yapf_pex_get = Get(
         VenvPex, PexRequest, yapf.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, yapf.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, yapf.config_request(request.snapshot.dirs)
+    )
     yapf_pex, config_files = await MultiGet(yapf_pex_get, config_files_get)
 
-    input_digest = await Get(Digest, MergeDigests((snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     result = await Get(
         ProcessResult,
@@ -61,16 +64,18 @@ async def _run_yapf(
                 *yapf.args,
                 "--in-place",
                 *(("--style", yapf.config) if yapf.config else ()),
-                *snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run yapf on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=YapfRequest.name)
+    return FmtResult.create(
+        result, request.snapshot, output_snapshot, formatter_name=YapfRequest.name
+    )
 
 
 @rule
