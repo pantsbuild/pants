@@ -10,6 +10,7 @@ from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AsdfToolPathsRequest:
+    env_tgt: EnvironmentTarget
     tool_name: str
     tool_description: str
     resolve_standard: bool
@@ -37,6 +39,7 @@ class AsdfToolPathsResult:
 
 @rule_helper
 async def _resolve_asdf_tool_paths(
+    env_tgt: EnvironmentTarget,
     tool_name: str,
     paths_option_name: str,
     tool_description: str,
@@ -45,6 +48,10 @@ async def _resolve_asdf_tool_paths(
     env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
+
+    if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
+        return ()
+
     asdf_dir = get_asdf_data_dir(env)
     if not asdf_dir:
         return ()
@@ -197,6 +204,7 @@ async def resolve_asdf_tool_paths(
     standard_tool_paths: tuple[str, ...] = ()
     if request.resolve_standard:
         standard_tool_paths = await _resolve_asdf_tool_paths(
+            env_tgt=request.env_tgt,
             tool_name=request.tool_name,
             paths_option_name=request.paths_option_name,
             tool_description=request.tool_description,
@@ -209,6 +217,7 @@ async def resolve_asdf_tool_paths(
     local_tool_paths: tuple[str, ...] = ()
     if request.resolve_local:
         local_tool_paths = await _resolve_asdf_tool_paths(
+            env_tgt=request.env_tgt,
             tool_name=request.tool_name,
             paths_option_name=request.paths_option_name,
             tool_description=request.tool_description,

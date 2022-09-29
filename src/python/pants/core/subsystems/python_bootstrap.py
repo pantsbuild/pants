@@ -127,6 +127,7 @@ async def _expand_interpreter_search_paths(
         asdf_paths = await Get(
             AsdfToolPathsResult,
             AsdfToolPathsRequest(
+                env_tgt=env_tgt,
                 tool_name="python",
                 tool_description="Python interpreters",
                 resolve_standard=has_asdf_standard_path_token,
