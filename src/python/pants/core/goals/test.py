@@ -26,7 +26,6 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.specs import Specs
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
@@ -52,14 +51,15 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
-    FilteredTargets,
     IntField,
+    NoApplicableTargetsBehavior,
     SourcesField,
     SpecialCasedDependencies,
     StringSequenceField,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     Targets,
     ValidNumbers,
-    get_shard,
     parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -655,40 +655,20 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
 @rule_helper
 async def _get_partitions_by_request_type(
     core_request_types: Iterable[type[TestRequest]],
-    partitioners: Iterable[type[TestRequest.PartitionRequest]],
-    specs: Specs,
-    subsystem: TestSubsystem,
+    targets_to_field_sets: TargetRootsToFieldSets,
 ) -> dict[type[TestRequest], list[Partitions]]:
-    core_partition_request_types = {
-        getattr(request_type, "PartitionRequest") for request_type in core_request_types
-    }
-    partitioners = [
-        partitioner for partitioner in partitioners if partitioner in core_partition_request_types
-    ]
-
-    targets = await Get(
-        FilteredTargets,
-        Specs,
-        specs if partitioners else Specs.empty(),
-    )
-
-    shard, num_shards = parse_shard_spec(subsystem.shard, "the [test].shard option")
-
     def partition_request_get(request_type: type[TestRequest]) -> Get[Partitions]:
         partition_type = cast(TestRequest, request_type)
         field_set_type = partition_type.field_set_type
-        field_sets = tuple(
-            field_set_type.create(target)
-            for target in targets
-            if field_set_type.is_applicable(target)
-        )
-        if num_shards > 0:
-            field_sets = tuple(
-                fs for fs in field_sets if get_shard(fs.address.spec, num_shards) == shard
-            )
+        applicable_field_sets: list[TestFieldSet] = []
+        for target, field_sets in targets_to_field_sets.mapping.items():
+            if field_set_type.is_applicable(target):
+                applicable_field_sets.extend(field_sets)
 
         return Get(
-            Partitions, TestRequest.PartitionRequest, partition_type.PartitionRequest(field_sets)
+            Partitions,
+            TestRequest.PartitionRequest,
+            partition_type.PartitionRequest(tuple(applicable_field_sets)),
         )
 
     all_partitions = await MultiGet(
@@ -762,14 +742,34 @@ async def run_tests(
     union_membership: UnionMembership,
     distdir: DistDir,
     run_id: RunId,
-    specs: Specs,
 ) -> Test:
-    request_types = union_membership.get(TestRequest)
-    partitioners = union_membership.get(TestRequest.PartitionRequest)
-    partitions_by_request_type = await _get_partitions_by_request_type(
-        request_types, partitioners, specs, test_subsystem
+    if test_subsystem.debug_adapter:
+        goal_description = f"`{test_subsystem.name} --debug-adapter`"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.error
+    elif test_subsystem.debug:
+        goal_description = f"`{test_subsystem.name} --debug`"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.error
+    else:
+        goal_description = f"The `{test_subsystem.name}` goal"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.warn
+
+    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
+
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            TestFieldSet,
+            goal_description=goal_description,
+            no_applicable_targets_behavior=no_applicable_targets_behavior,
+            shard=shard,
+            num_shards=num_shards,
+        ),
     )
-    # TODO: Restore warning/error if no applicable targets were matched.
+
+    request_types = union_membership.get(TestRequest)
+    partitions_by_request_type = await _get_partitions_by_request_type(
+        request_types, targets_to_valid_field_sets
+    )
 
     def batch(
         iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)

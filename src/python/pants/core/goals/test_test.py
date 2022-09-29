@@ -16,7 +16,6 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
-from pants.base.specs import Specs
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
@@ -55,7 +54,13 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.session import RunId
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
-from pants.engine.target import BoolField, FilteredTargets, MultipleSourcesField, Target
+from pants.engine.target import (
+    BoolField,
+    MultipleSourcesField,
+    Target,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
+)
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
@@ -195,8 +200,8 @@ def run_test_rule(
     report: bool = False,
     report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
+    valid_targets: bool = True,
     run_id: RunId = RunId(999),
-    batch_size: int = 128,
 ) -> tuple[int, str]:
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
@@ -209,7 +214,6 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
-        batch_size=batch_size,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -225,6 +229,20 @@ def run_test_rule(
             CoverageDataCollection: [MockCoverageDataCollection],
         }
     )
+
+    def mock_find_valid_field_sets(
+        _: TargetRootsToFieldSetsRequest,
+    ) -> TargetRootsToFieldSets:
+        if not valid_targets:
+            return TargetRootsToFieldSets({})
+        return TargetRootsToFieldSets(
+            {
+                tgt: [request_type.field_set_type.create(tgt)]
+                for tgt in targets
+                for request_type in request_types
+                if request_type.field_set_type.is_applicable(tgt)
+            }
+        )
 
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
@@ -258,13 +276,12 @@ def run_test_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
                 run_id,
-                Specs.empty(),
             ],
             mock_gets=[
                 MockGet(
-                    output_type=FilteredTargets,
-                    input_types=(Specs,),
-                    mock=lambda _: FilteredTargets(tuple(targets)),
+                    output_type=TargetRootsToFieldSets,
+                    input_types=(TargetRootsToFieldSetsRequest,),
+                    mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
                     output_type=EnvironmentName,
