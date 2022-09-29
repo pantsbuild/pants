@@ -359,22 +359,39 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-def _exec_parse_deps(
-    field_set: PythonImportDependenciesInferenceFieldSet,
+@dataclass(frozen=True)
+class ExecParseDepsRequest:
+    field_set: PythonImportDependenciesInferenceFieldSet
+
+
+@dataclass(frozen=True)
+class ExecParseDepsResponse:
+    value: ParsedPythonDependencies
+
+
+@rule
+async def _exec_parse_deps(
+    req: ExecParseDepsRequest,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> ParsePythonDependenciesRequest:
+) -> ExecParseDepsResponse:
+    field_set = req.field_set
+
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
         [field_set.interpreter_constraints], python_setup
     )
-    return ParsePythonDependenciesRequest(
-        field_set.source,
-        interpreter_constraints,
-        string_imports=python_infer_subsystem.string_imports,
-        string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-        assets=python_infer_subsystem.assets,
-        assets_min_slashes=python_infer_subsystem.assets_min_slashes,
+    resp = await Get(
+        ParsedPythonDependencies,
+        ParsePythonDependenciesRequest(
+            field_set.source,
+            interpreter_constraints,
+            string_imports=python_infer_subsystem.string_imports,
+            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
+            assets=python_infer_subsystem.assets,
+            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
+        ),
     )
+    return ExecParseDepsResponse(resp)
 
 
 @rule(desc="Inferring Python dependencies by analyzing source")
@@ -386,11 +403,13 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await Get(
-        ParsedPythonDependencies,
-        ParsePythonDependenciesRequest,
-        _exec_parse_deps(request.field_set, python_infer_subsystem, python_setup),
-    )
+    parsed_dependencies = (
+        await Get(
+            ExecParseDepsResponse,
+            ExecParseDepsRequest,
+            ExecParseDepsRequest(request.field_set),
+        )
+    ).value
 
     address = request.field_set.address
 
@@ -541,7 +560,7 @@ async def infer_python_conftest_dependencies(
 # This is a separate function to facilitate tests registering import inference.
 def import_rules():
     return [
-        # _exec_parse_deps,
+        _exec_parse_deps,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),
