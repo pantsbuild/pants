@@ -1306,6 +1306,16 @@ class BootstrapOptions:
         ),
         advanced=True,
     )
+    session_end_tasks_timeout = FloatOption(
+        default=3.0,
+        help=softwrap(
+            """
+            The time in seconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
+    )
     remote_execution = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
         help=softwrap(

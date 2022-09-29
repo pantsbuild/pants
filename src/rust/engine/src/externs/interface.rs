@@ -137,6 +137,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
   m.add_function(wrap_pyfunction!(session_record_test_observation, m)?)?;
   m.add_function(wrap_pyfunction!(session_isolated_shallow_clone, m)?)?;
+  m.add_function(wrap_pyfunction!(session_wait_for_tail_tasks, m)?)?;
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
@@ -1308,6 +1309,25 @@ fn session_isolated_shallow_clone(
     .isolated_shallow_clone(build_id)
     .map_err(PyException::new_err)?;
   Ok(PySession(session_clone))
+}
+
+#[pyfunction]
+fn session_wait_for_tail_tasks(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_session: &PySession,
+  timeout: f64,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  let timeout = Duration::from_secs_f64(timeout);
+  core.executor.enter(|| {
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(py_session.0.tail_tasks().wait(timeout));
+    })
+  });
+  Ok(())
 }
 
 #[pyfunction]

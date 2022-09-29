@@ -25,18 +25,40 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::collections::HashMap;
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
+use itertools::Itertools;
 use lazy_static::lazy_static;
+use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::task::{Id, JoinSet};
 
 lazy_static! {
     // Lazily initialized in Executor::global.
     static ref GLOBAL_EXECUTOR: ArcSwapOption<Runtime> = ArcSwapOption::from_pointee(None);
+}
+
+/// Copy our (thread-local or task-local) stdio destination and current workunit parent into
+/// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
+/// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
+/// is created it has an accurate handle to its parent.
+fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
+  let stdio_destination = stdio::get_destination();
+  let workunit_store_handle = workunit_store::get_workunit_store_handle();
+
+  // NB: It is important that the first portion of this method is synchronous (meaning that this
+  // method cannot be `async`), because that means that it will run on the thread that calls it.
+  // The second, async portion of the method will run in the spawned Task.
+
+  stdio::scope_task_destination(stdio_destination, async move {
+    workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
+  })
 }
 
 #[derive(Debug, Clone)]
@@ -132,7 +154,7 @@ impl Executor {
   ) -> impl Future<Output = O> {
     self
       .handle
-      .spawn(Self::future_with_correct_context(future))
+      .spawn(future_with_correct_context(future))
       .map(|r| r.expect("Background task exited unsafely."))
   }
 
@@ -149,9 +171,7 @@ impl Executor {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
-    self
-      .handle
-      .block_on(Self::future_with_correct_context(future))
+    self.handle.block_on(future_with_correct_context(future))
   }
 
   ///
@@ -182,22 +202,117 @@ impl Executor {
       .map(|r| r.expect("Background task exited unsafely."))
   }
 
-  ///
-  /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
-  /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
-  /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
-  /// is created it has an accurate handle to its parent.
-  ///
-  fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
-    let stdio_destination = stdio::get_destination();
-    let workunit_store_handle = workunit_store::get_workunit_store_handle();
+  /// Return a reference to this executor's runtime handle.
+  pub fn handle(&self) -> &Handle {
+    &self.handle
+  }
+}
 
-    // NB: It is important that the first portion of this method is synchronous (meaning that this
-    // method cannot be `async`), because that means that it will run on the thread that calls it.
-    // The second, async portion of the method will run in the spawned Task.
+/// Store "tail" tasks which are async tasks that can execute concurrently with regular
+/// build actions. Tail tasks block completion of a session until all of them have been
+/// completed (subject to a timeout).
+#[derive(Clone)]
+pub struct TailTasks {
+  inner: Arc<Mutex<Option<TailTasksInner>>>,
+}
 
-    stdio::scope_task_destination(stdio_destination, async move {
-      workunit_store::scope_task_workunit_store_handle(workunit_store_handle, future).await
-    })
+struct TailTasksInner {
+  id_to_name: HashMap<Id, String>,
+  task_set: JoinSet<()>,
+}
+
+impl TailTasks {
+  pub fn new() -> Self {
+    Self {
+      inner: Arc::new(Mutex::new(Some(TailTasksInner {
+        id_to_name: HashMap::new(),
+        task_set: JoinSet::new(),
+      }))),
+    }
+  }
+
+  /// Spawn a tail task with the given name.
+  pub fn spawn_on<F>(&self, name: &str, handle: &Handle, task: F)
+  where
+    F: Future<Output = ()>,
+    F: Send + 'static,
+  {
+    let task = future_with_correct_context(task);
+    let mut guard = self.inner.lock();
+    let inner = match &mut *guard {
+      Some(inner) => inner,
+      None => {
+        log::warn!(
+          "Session end task `{}` submitted after session completed.",
+          name
+        );
+        return;
+      }
+    };
+
+    let h = inner.task_set.spawn_on(task, handle);
+    inner.id_to_name.insert(h.id(), name.to_string());
+  }
+
+  /// Wait for all tail tasks to complete subject to the given timeout. If tasks
+  /// fail or do not complete, log that fact.
+  pub async fn wait(self, timeout: Duration) {
+    let mut inner = match self.inner.lock().take() {
+      Some(inner) => inner,
+      None => {
+        log::debug!("Session end tasks awaited multiple times!");
+        return;
+      }
+    };
+
+    if inner.task_set.is_empty() {
+      return;
+    }
+
+    log::debug!(
+      "waiting for {} session end task(s) to complete",
+      inner.task_set.len()
+    );
+
+    let mut timeout = tokio::time::sleep(timeout).boxed();
+
+    loop {
+      tokio::select! {
+        // Use biased mode to prefer an expired timeout over joining on remaining tasks.
+        biased;
+
+        // Exit monitoring loop if timeout expires.
+        _ = &mut timeout => break,
+
+        next_result = inner.task_set.join_next_with_id() => {
+          match next_result {
+            Some(Ok((id, _))) => {
+              if let Some(name) = inner.id_to_name.get(&id) {
+                log::trace!("Session end task `{name}` completed successfully");
+              } else {
+                log::debug!("Session end task completed successfully but name not found.");
+              }
+              inner.id_to_name.remove(&id);
+            },
+            Some(Err(err)) => {
+              let name = inner.id_to_name.get(&err.id());
+              log::error!("Session end task `{name:?}` failed: {err:?}");
+            }
+            None => break,
+          }
+        }
+      }
+    }
+
+    if inner.task_set.is_empty() {
+      log::debug!("all session end tasks completed successfully");
+    } else {
+      log::debug!(
+        "{} session end task(s) failed to complete within timeout: {}",
+        inner.task_set.len(),
+        inner.id_to_name.values().join(", "),
+      );
+      inner.task_set.abort_all();
+    }
   }
 }

@@ -900,6 +900,7 @@ async fn sends_headers() {
     workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
     run_id: RunId(0),
+    ..Context::default()
   };
   command_runner
     .run(context, &mut workunit, execute_request)

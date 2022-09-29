@@ -45,6 +45,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use store::{SnapshotOps, Store, StoreError};
+use task_executor::TailTasks;
 use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -855,6 +856,7 @@ pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
   run_id: RunId,
+  tail_tasks: TailTasks,
 }
 
 impl Default for Context {
@@ -863,16 +865,23 @@ impl Default for Context {
       workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
+      tail_tasks: TailTasks::new(),
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: RunId) -> Context {
+  pub fn new(
+    workunit_store: WorkunitStore,
+    build_id: String,
+    run_id: RunId,
+    tail_tasks: TailTasks,
+  ) -> Context {
     Context {
       workunit_store,
       build_id,
       run_id,
+      tail_tasks,
     }
   }
 }

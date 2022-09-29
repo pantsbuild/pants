@@ -417,6 +417,9 @@ thread_local! {
   static THREAD_DESTINATION: RefCell<Arc<Destination>> = RefCell::new(Arc::new(Destination(Mutex::new(InnerDestination::Logging))))
 }
 
+// Note: The behavior of this task_local! invocation is affected by the `tokio_no_const_thread_local`
+// config set in `src/rust/engine/.cargo/config`. Without that config, this item triggers the
+// `clippy::declare_interior_mutable_const` lint.
 task_local! {
   static TASK_DESTINATION: Arc<Destination>;
 }
