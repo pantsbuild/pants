@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.engine.env_vars import EnvironmentVars
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
@@ -18,17 +18,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GoBootstrap:
-    EXTRA_ENV_VAR_NAMES = ("PATH",)
-
     raw_go_search_paths: tuple[str, ...]
-    environment: EnvironmentVars
     asdf_standard_tool_paths: tuple[str, ...]
     asdf_local_tool_paths: tuple[str, ...]
+    _path: str | None
 
     @property
     def go_search_paths(self) -> tuple[str, ...]:
         special_strings = {
-            "<PATH>": lambda: GoBootstrap.get_environment_paths(self.environment),
+            "<PATH>": lambda: self.environment_paths,
             "<ASDF>": lambda: self.asdf_standard_tool_paths,
             "<ASDF_LOCAL>": lambda: self.asdf_local_tool_paths,
         }
@@ -41,18 +39,19 @@ class GoBootstrap:
                 expanded.append(s)
         return tuple(expanded)
 
-    @staticmethod
-    def get_environment_paths(env: EnvironmentVars) -> list[str]:
+    @property
+    def environment_paths(self) -> list[str]:
         """Returns a list of paths specified by the PATH env var."""
-        pathstr = env.get("PATH")
-        if pathstr:
-            return pathstr.split(os.pathsep)
+        if self._path:
+            return self._path.split(os.pathsep)
         return []
 
 
 @rule
-async def resolve_go_bootstrap(golang_subsystem: GolangSubsystem) -> GoBootstrap:
-    raw_go_search_paths = golang_subsystem.raw_go_search_paths
+async def resolve_go_bootstrap(
+    golang_subsystem: GolangSubsystem, golang_env_aware: GolangSubsystem.EnvironmentAware
+) -> GoBootstrap:
+    raw_go_search_paths = golang_env_aware.raw_go_search_paths
     result = await Get(
         AsdfToolPathsResult,
         AsdfToolPathsRequest(
@@ -60,17 +59,19 @@ async def resolve_go_bootstrap(golang_subsystem: GolangSubsystem) -> GoBootstrap
             tool_description="Go distribution",
             resolve_standard="<ASDF>" in raw_go_search_paths,
             resolve_local="<ASDF_LOCAL>" in raw_go_search_paths,
-            extra_env_var_names=("PATH",),
             paths_option_name="[golang].go_search_paths",
+            extra_env_var_names=(),
             bin_relpath=golang_subsystem.asdf_bin_relpath,
         ),
     )
 
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
+
     return GoBootstrap(
         raw_go_search_paths=raw_go_search_paths,
-        environment=result.env,
         asdf_standard_tool_paths=result.standard_tool_paths,
         asdf_local_tool_paths=result.local_tool_paths,
+        _path=env.get("PATH", None),
     )
 
 

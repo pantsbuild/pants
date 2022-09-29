@@ -313,7 +313,7 @@ async def _cc(
     flags: Iterable[str],
     obj_file: str,
     description: str,
-    golang_subsystem: GolangSubsystem,
+    golang_env_aware: GolangSubsystem.EnvironmentAware,
 ) -> Process:
     compiler_path = await Get(
         BinaryPath,
@@ -328,7 +328,7 @@ async def _cc(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), work_dir)),
         Get(
             EnvironmentVars,
-            EnvironmentVarsRequest(golang_subsystem.env_vars_to_pass_to_subprocesses),
+            EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
         ),
         Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
     )
@@ -361,7 +361,6 @@ async def _gccld(
     flags: Iterable[str],
     objs: Iterable[str],
     description: str,
-    golang_subsystem: GolangSubsystem,
 ) -> FallibleProcessResult:
     compiler_path = await Get(
         BinaryPath,
@@ -420,18 +419,18 @@ async def _dynimport(
     pkg_name: str,
     goroot: GoRoot,
     import_go_path: str,
-    golang_subsystem: GolangSubsystem,
+    golang_env_aware: GolangSubsystem.EnvironmentAware,
     use_cxx_linker: bool,
 ) -> _DynImportResult:
     cgo_main_compile_process = await _cc(
-        binary_name=golang_subsystem.cgo_gcc_binary_name,
+        binary_name=golang_env_aware.cgo_gcc_binary_name,
         input_digest=input_digest,
         work_dir=obj_dir_path,
         src_file=os.path.join(obj_dir_path, "_cgo_main.c"),
         flags=cflags,
         obj_file=os.path.join(obj_dir_path, "_cgo_main.o"),
         description="Compile _cgo_main.c",
-        golang_subsystem=golang_subsystem,
+        golang_env_aware=golang_env_aware,
     )
     cgo_main_compile_result = await Get(ProcessResult, Process, cgo_main_compile_process)
     obj_digest = await Get(
@@ -454,9 +453,9 @@ async def _dynimport(
             ldflags = [arg for arg in ldflags if arg != "-static"]
 
     linker_binary_name = (
-        golang_subsystem.cgo_gxx_binary_name
+        golang_env_aware.cgo_gxx_binary_name
         if use_cxx_linker
-        else golang_subsystem.cgo_gcc_binary_name
+        else golang_env_aware.cgo_gcc_binary_name
     )
 
     cgo_binary_link_result = await _gccld(
@@ -467,7 +466,6 @@ async def _dynimport(
         flags=ldflags,
         objs=[*obj_files, os.path.join(obj_dir_path, "_cgo_main.o")],
         description="Link _cgo_.o",
-        golang_subsystem=golang_subsystem,
     )
     if cgo_binary_link_result.exit_code != 0:
         # From `go` source:
@@ -509,7 +507,6 @@ async def _dynimport(
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
             objs=obj_files,
             description="Link _cgo_.o",
-            golang_subsystem=golang_subsystem,
         )
         if cgo_binary_link_result.exit_code != 0:
             raise ValueError(
@@ -623,7 +620,7 @@ def _replace_srcdir_in_flags(flags: Iterable[str], dir_path: str) -> tuple[str, 
 
 @rule
 async def cgo_compile_request(
-    request: CGoCompileRequest, goroot: GoRoot, golang_subsystem: GolangSubsystem
+    request: CGoCompileRequest, goroot: GoRoot, golang_env_aware: GolangSubsystem.EnvironmentAware
 ) -> CGoCompileResult:
     dir_path = request.dir_path if request.dir_path else "."
     obj_dir_path = f"{dir_path}/__obj__" if dir_path else "__obj__"
@@ -636,10 +633,10 @@ async def cgo_compile_request(
     # directives.
     flags = dataclasses.replace(
         flags,
-        cflags=golang_subsystem.cgo_c_flags + flags.cflags,
-        cxxflags=golang_subsystem.cgo_cxx_flags + flags.cxxflags,
-        fflags=golang_subsystem.cgo_fortran_flags + flags.fflags,
-        ldflags=golang_subsystem.cgo_linker_flags + flags.ldflags,
+        cflags=golang_env_aware.cgo_c_flags + flags.cflags,
+        cxxflags=golang_env_aware.cgo_cxx_flags + flags.cxxflags,
+        fflags=golang_env_aware.cgo_fortran_flags + flags.fflags,
+        ldflags=golang_env_aware.cgo_linker_flags + flags.ldflags,
     )
 
     # Resolve pkg-config flags into compiler and linker flags.
@@ -667,7 +664,7 @@ async def cgo_compile_request(
     # Likewise for Fortran, except there are many Fortran compilers.
     # Support gfortran out of the box and let others pass the correct link options
     # via CGO_LDFLAGS
-    if request.fortran_files and "gfortran" in golang_subsystem.cgo_fortran_binary_name:
+    if request.fortran_files and "gfortran" in golang_env_aware.cgo_fortran_binary_name:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lgfortran",))
 
     # TODO(#16838): Add MSan (memory sanitizer) option.
@@ -761,14 +758,14 @@ async def cgo_compile_request(
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
-            binary_name=golang_subsystem.cgo_gcc_binary_name,
+            binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
             src_file=gcc_file,
             flags=cflags,
             obj_file=ofile,
             description=f"Compile cgo source: {gcc_file}",
-            golang_subsystem=golang_subsystem,
+            golang_env_aware=golang_env_aware,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -780,14 +777,14 @@ async def cgo_compile_request(
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
-            binary_name=golang_subsystem.cgo_gxx_binary_name,
+            binary_name=golang_env_aware.cgo_gxx_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
             src_file=cxx_file,
             flags=cxxflags,
             obj_file=ofile,
             description=f"Compile cgo C++ source: {cxx_file}",
-            golang_subsystem=golang_subsystem,
+            golang_env_aware=golang_env_aware,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -798,14 +795,14 @@ async def cgo_compile_request(
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
-            binary_name=golang_subsystem.cgo_gcc_binary_name,
+            binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
             src_file=objc_file,
             flags=cflags,
             obj_file=ofile,
             description=f"Compile cgo Objective-C source: {objc_file}",
-            golang_subsystem=golang_subsystem,
+            golang_env_aware=golang_env_aware,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -818,14 +815,14 @@ async def cgo_compile_request(
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
-            binary_name=golang_subsystem.cgo_fortran_binary_name,
+            binary_name=golang_env_aware.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
             work_dir=obj_dir_path,
             src_file=fortran_file,
             flags=fflags,
             obj_file=ofile,
             description=f"Compile cgo Fortran source: {fortran_file}",
-            golang_subsystem=golang_subsystem,
+            golang_env_aware=golang_env_aware,
         )
         compile_process_gets.append(Get(ProcessResult, Process, compile_process))
 
@@ -856,7 +853,7 @@ async def cgo_compile_request(
         pkg_name=request.pkg_name,
         goroot=goroot,
         import_go_path=os.path.join(obj_dir_path, "_cgo_import.go"),
-        golang_subsystem=golang_subsystem,
+        golang_env_aware=golang_env_aware,
         use_cxx_linker=bool(request.cxx_files),
     )
     if dynimport_result.dyn_out_go:
