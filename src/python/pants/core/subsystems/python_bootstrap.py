@@ -118,25 +118,29 @@ async def _expand_interpreter_search_paths(
 
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
 
-    has_standard_path_token, has_local_path_token = _contains_asdf_path_tokens(
+    has_asdf_standard_path_token, has_asdf_local_path_token = _contains_asdf_path_tokens(
         interpreter_search_paths
     )
 
-    asdf_paths = await Get(
-        AsdfToolPathsResult,
-        AsdfToolPathsRequest(
-            tool_name="python",
-            tool_description="Python interpreters",
-            resolve_standard=has_standard_path_token,
-            resolve_local=has_local_path_token,
-            paths_option_name="[python-bootstrap].search_path",
-        ),
-    )
+    if has_asdf_standard_path_token or has_asdf_local_path_token:
+        # `AsdfToolPathsResult` is uncacheable, so don't request it unless we actually need it.
+        asdf_paths = await Get(
+            AsdfToolPathsResult,
+            AsdfToolPathsRequest(
+                tool_name="python",
+                tool_description="Python interpreters",
+                resolve_standard=has_asdf_standard_path_token,
+                resolve_local=has_asdf_local_path_token,
+                paths_option_name="[python-bootstrap].search_path",
+            ),
+        )
 
-    asdf_standard_tool_paths, asdf_local_tool_paths = (
-        asdf_paths.standard_tool_paths,
-        asdf_paths.local_tool_paths,
-    )
+        asdf_standard_tool_paths, asdf_local_tool_paths = (
+            asdf_paths.standard_tool_paths,
+            asdf_paths.local_tool_paths,
+        )
+    else:
+        asdf_local_tool_paths, asdf_standard_tool_paths = (), ()
 
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
