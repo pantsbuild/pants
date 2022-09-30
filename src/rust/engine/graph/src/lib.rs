@@ -277,6 +277,12 @@ impl<N: Node> InnerGraph<N> {
       dirtied: transitive_ids.len(),
     };
 
+    // If there were no roots, then nothing will be invalidated. Return early to avoid scanning all
+    // edges in `retain_edges`.
+    if root_ids.is_empty() {
+      return invalidation_result;
+    }
+
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
