@@ -14,6 +14,8 @@ from pants.backend.python.dependency_inference.rules import (
     PythonImportDependenciesInferenceFieldSet,
     ResolvedParsedPythonDependencies,
     ResolvedParsedPythonDependenciesRequest,
+    UnownedImportsPossibleOwners,
+    UnownedImportsPossibleOwnersRequest,
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -42,6 +44,7 @@ class PythonSourceAnalysis:
     fs: PythonImportDependenciesInferenceFieldSet
     identified: ParsedPythonDependencies
     resolved: ResolvedParsedPythonDependencies
+    possible_owners: UnownedImportsPossibleOwners
 
 
 @rule
@@ -64,7 +67,14 @@ async def dump_python_source_analysis_single(
         ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve),
     )
 
-    return PythonSourceAnalysis(fs, parsed_dependencies, resolved_dependencies)
+    imports_to_other_owners = await Get(
+        UnownedImportsPossibleOwners,
+        UnownedImportsPossibleOwnersRequest(resolved_dependencies.unowned, resolve),
+    )
+
+    return PythonSourceAnalysis(
+        fs, parsed_dependencies, resolved_dependencies, imports_to_other_owners
+    )
 
 
 @goal_rule
