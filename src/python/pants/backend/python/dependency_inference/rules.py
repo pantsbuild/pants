@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Iterator, Optional
+from typing import DefaultDict, Dict, Iterable, Iterator, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -261,7 +261,7 @@ def _get_imports_info(
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
-) -> tuple[set[Address], set[str]]:
+) -> tuple[frozenset[Address], frozenset[str]]:
     inferred_deps: set[Address] = set()
     unowned_imports: set[str] = set()
 
@@ -284,7 +284,41 @@ def _get_imports_info(
         ):
             unowned_imports.add(imp)
 
-    return inferred_deps, unowned_imports
+    return frozenset(inferred_deps), frozenset(unowned_imports)
+
+
+@dataclass(frozen=True)
+class UnownedImportsPossibleOwnersRequest:
+    unowned_imports: frozenset[str]
+    resolve: str
+
+
+@dataclass(frozen=True)
+class UnownedImportsPossibleOwners:
+    value: Dict[str, list[tuple[Address, ResolveName]]]
+
+
+@rule
+async def find_other_owners_for_unowned_imports(
+    req: UnownedImportsPossibleOwnersRequest,
+    python_setup: PythonSetup,
+) -> UnownedImportsPossibleOwners:
+    other_owners_from_other_resolves = await MultiGet(
+        Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
+        for imported_module in req.unowned_imports
+    )
+    other_owners_as_targets = await MultiGet(
+        Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
+        for owners in other_owners_from_other_resolves
+    )
+
+    imports_to_other_owners: DefaultDict[str, list[tuple[Address, ResolveName]]] = defaultdict(list)
+    for imported_module, targets in zip(req.unowned_imports, other_owners_as_targets):
+        for t in targets:
+            other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
+            if other_owner_resolve != req.resolve:
+                imports_to_other_owners[imported_module].append((t.address, other_owner_resolve))
+    return UnownedImportsPossibleOwners(imports_to_other_owners)
 
 
 @rule_helper
@@ -292,7 +326,7 @@ async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
     python_setup: PythonSetup,
-    unowned_imports: Iterable[str],
+    unowned_imports: frozenset[str],
     parsed_imports: ParsedPythonImports,
     resolve: str,
 ) -> None:
@@ -301,25 +335,12 @@ async def _handle_unowned_imports(
 
     other_resolves_snippet = ""
     if len(python_setup.resolves) > 1:
-        other_owners_from_other_resolves = await MultiGet(
-            Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
-            for imported_module in unowned_imports
-        )
-        other_owners_as_targets = await MultiGet(
-            Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
-            for owners in other_owners_from_other_resolves
-        )
-
-        imports_to_other_owners: DefaultDict[str, list[tuple[Address, ResolveName]]] = defaultdict(
-            list
-        )
-        for imported_module, targets in zip(unowned_imports, other_owners_as_targets):
-            for t in targets:
-                other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
-                if other_owner_resolve != resolve:
-                    imports_to_other_owners[imported_module].append(
-                        (t.address, other_owner_resolve)
-                    )
+        imports_to_other_owners = (
+            await Get(
+                UnownedImportsPossibleOwners,
+                UnownedImportsPossibleOwnersRequest(unowned_imports, resolve),
+            )
+        ).value
 
         if imports_to_other_owners:
             other_resolves_lines = []
@@ -403,9 +424,9 @@ class ResolvedParsedPythonDependenciesRequest:
 
 @dataclass(frozen=True)
 class ResolvedParsedPythonDependencies:
-    imports: set[Address]
-    unowned: set[str]
-    assets: set[Address]
+    imports: frozenset[Address]
+    unowned: frozenset[str]
+    assets: frozenset[Address]
     explicit: ExplicitlyProvidedDependencies
 
 
@@ -437,12 +458,12 @@ async def _exec_resolve_parsed_deps(
             explicitly_provided_deps=explicitly_provided_deps,
         )
     else:
-        import_deps, unowned_imports = set(), set()
+        import_deps, unowned_imports = frozenset(), frozenset()
 
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
         assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
-        asset_deps = set(
+        asset_deps = frozenset(
             _get_inferred_asset_deps(
                 request.field_set.address,
                 request.field_set.source.file_path,
@@ -452,7 +473,7 @@ async def _exec_resolve_parsed_deps(
             )
         )
     else:
-        asset_deps = set()
+        asset_deps = frozenset()
 
     return ResolvedParsedPythonDependencies(
         imports=import_deps,
@@ -599,6 +620,7 @@ def import_rules():
     return [
         _exec_parse_deps,
         _exec_resolve_parsed_deps,
+        find_other_owners_for_unowned_imports,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),
