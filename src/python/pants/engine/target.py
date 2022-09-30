@@ -2610,6 +2610,13 @@ class ExplicitlyProvidedDependencies:
         )
         return list(remaining_after_ignores)[0] if len(remaining_after_ignores) == 1 else None
 
+    def serialisable(self):
+        return {
+            "address": str(self.address),
+            "includes": tuple(str(i) for i in self.includes),
+            "ignores": tuple(str(i) for i in self.ignores),
+        }
+
 
 FS = TypeVar("FS", bound="FieldSet")
 

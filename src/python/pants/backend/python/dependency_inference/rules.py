@@ -408,6 +408,14 @@ class ResolvedParsedPythonDependencies:
     assets: set[Address]
     explicit: ExplicitlyProvidedDependencies
 
+    def serialisable(self):
+        return {
+            "imports": tuple(str(i) for i in self.imports),
+            "unowned": tuple(self.unowned),
+            "assets": tuple(str(i) for i in self.assets),
+            "explicit": self.explicit.serialisable(),
+        }
+
 
 @rule
 async def _exec_resolve_parsed_deps(
