@@ -123,7 +123,9 @@ class MockTestRequest(TestRequest):
         pass
 
     @classmethod
-    def test_result(cls, description: str, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
+    def test_result(
+        cls, partition_description: str, field_sets: Iterable[MockTestFieldSet]
+    ) -> TestResult:
         addresses = [field_set.address for field_set in field_sets]
         return TestResult(
             exit_code=cls.exit_code(addresses),
@@ -136,7 +138,7 @@ class MockTestRequest(TestRequest):
             result_metadata=None
             if cls.skipped(addresses)
             else ProcessResultMetadata(999, "ran_locally", 0),
-            description=description,
+            partition_description=partition_description,
         )
 
 
@@ -380,7 +382,7 @@ def _assert_test_summary(
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            description="//:dummy_address",
+            partition_description="//:dummy_address",
             output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
         ),
@@ -477,12 +479,12 @@ def test_sort_results() -> None:
         output_setting=ShowOutput.ALL,
         result_metadata=ProcessResultMetadata(999, "dummy", 0),
     )
-    skip1 = create_test_result(exit_code=None, description="t1")
-    skip2 = create_test_result(exit_code=None, description="t2")
-    success1 = create_test_result(exit_code=0, description="t1")
-    success2 = create_test_result(exit_code=0, description="t2")
-    fail1 = create_test_result(exit_code=1, description="t1")
-    fail2 = create_test_result(exit_code=1, description="t2")
+    skip1 = create_test_result(exit_code=None, partition_description="t1")
+    skip2 = create_test_result(exit_code=None, partition_description="t2")
+    success1 = create_test_result(exit_code=0, partition_description="t1")
+    success2 = create_test_result(exit_code=0, partition_description="t2")
+    fail1 = create_test_result(exit_code=1, partition_description="t1")
+    fail2 = create_test_result(exit_code=1, partition_description="t2")
     assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
         skip1,
         skip2,
@@ -511,7 +513,7 @@ def assert_streaming_output(
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         result_metadata=result_metadata,
-        description="demo_test",
+        partition_description="demo_test",
     )
     assert result.level() == expected_level
     assert result.message() == expected_message

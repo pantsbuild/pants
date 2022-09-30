@@ -199,7 +199,7 @@ async def run_junit_test(
         process_result,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
-        description=partition.description,
+        partition_description=partition.description,
     )
 
 

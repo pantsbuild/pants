@@ -173,7 +173,7 @@ async def run_helm_unittest(
         process_result,
         output_setting=test_subsystem.output,
         xml_results=xml_results,
-        description=partition.description,
+        partition_description=partition.description,
     )
 
 

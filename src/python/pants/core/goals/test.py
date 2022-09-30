@@ -70,7 +70,7 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
-    description: str
+    partition_description: str
 
     coverage_data: CoverageData | None = None
     # TODO: Rename this to `reports`. There is no guarantee that every language will produce
@@ -85,7 +85,7 @@ class TestResult(EngineAwareReturnType):
     __test__ = False
 
     @classmethod
-    def skip(cls, description: str, output_setting: ShowOutput) -> TestResult:
+    def skip(cls, partition_description: str, output_setting: ShowOutput) -> TestResult:
         return cls(
             exit_code=None,
             stdout="",
@@ -93,7 +93,7 @@ class TestResult(EngineAwareReturnType):
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=output_setting,
-            description=description,
+            partition_description=partition_description,
             extra_output_prefix=None,
             result_metadata=None,
         )
@@ -104,7 +104,7 @@ class TestResult(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output_setting: ShowOutput,
         *,
-        description: str,
+        partition_description: str,
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
@@ -118,7 +118,7 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=process_result.stderr_digest,
             output_setting=output_setting,
             result_metadata=process_result.metadata,
-            description=description,
+            partition_description=partition_description,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
@@ -135,7 +135,7 @@ class TestResult(EngineAwareReturnType):
         if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
-            return self.description < other.description
+            return self.partition_description < other.partition_description
         if self.skipped or self.exit_code is None:
             return True
         if other.skipped or other.exit_code is None:
@@ -157,7 +157,7 @@ class TestResult(EngineAwareReturnType):
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        message = self.description
+        message = self.partition_description
         if self.skipped:
             message += " skipped."
         elif self.exit_code == 0:
@@ -183,7 +183,7 @@ class TestResult(EngineAwareReturnType):
         return f"{message}{output}"
 
     def metadata(self) -> dict[str, Any]:
-        return {"description": self.description}
+        return {"partition_description": self.partition_description}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -876,7 +876,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
     suffix = f" {elapsed_print}{source_print}"
-    return f"{sigil} {result.description} {status}{suffix}."
+    return f"{sigil} {result.partition_description} {status}{suffix}."
 
 
 @dataclass(frozen=True)

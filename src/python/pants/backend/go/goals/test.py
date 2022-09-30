@@ -202,7 +202,7 @@ async def run_go_tests(
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=test_subsystem.output,
             result_metadata=None,
-            description=partition.description,
+            partition_description=partition.description,
         )
 
     if maybe_pkg_analysis.analysis is None:
@@ -448,7 +448,7 @@ async def run_go_tests(
         process_result=result,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
-        description=partition.description,
+        partition_description=partition.description,
     )
 
 
