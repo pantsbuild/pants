@@ -318,7 +318,7 @@ async def find_other_owners_for_unowned_imports(
             other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
             if other_owner_resolve != req.resolve:
                 imports_to_other_owners[imported_module].append((t.address, other_owner_resolve))
-    return UnownedImportsPossibleOwners(imports_to_other_owners)
+    return UnownedImportsPossibleOwners(dict(imports_to_other_owners))
 
 
 @rule_helper
