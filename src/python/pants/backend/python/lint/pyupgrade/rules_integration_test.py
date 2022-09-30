@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (PyUpgradeRequest,)),
+            QueryRule(FmtResult, (PyUpgradeRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -73,7 +73,9 @@ def run_pyupgrade(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            PyUpgradeRequest(field_sets, snapshot=input_sources.snapshot),
+            PyUpgradeRequest.SubPartition(
+                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -106,7 +108,6 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_pyupgrade(rule_runner, [tgt])
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"f.py": PY_36_FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
@@ -142,11 +143,3 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
         rule_runner, {"some_file_name.py": PY_38_FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_pyupgrade(rule_runner, [tgt], extra_args=["--pyupgrade-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

@@ -50,14 +50,14 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -475,14 +475,9 @@ class Target:
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
-    @final
-    @memoized_classproperty
-    def _plugin_field_cls(cls) -> type:
-        @union
-        class PluginField:
-            pass
-
-        return PluginField
+    @distinct_union_type_per_subclass
+    class PluginField:
+        pass
 
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
@@ -521,7 +516,7 @@ class Target:
             cls = classes.pop()
             classes.extend(cls.__bases__)
             if issubclass(cls, Target):
-                result.update(union_membership.get(cls._plugin_field_cls))
+                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
 
         return tuple(result)
 
@@ -699,7 +694,7 @@ class Target:
         `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
         citizen. Plugins can use this new field like any other.
         """
-        return UnionRule(cls._plugin_field_cls, field)
+        return UnionRule(cls.PluginField, field)
 
     def validate(self) -> None:
         """Validate the target, such as checking for mutually exclusive fields.

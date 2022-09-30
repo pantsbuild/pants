@@ -640,6 +640,9 @@ class SchedulerSession:
     def cancel(self) -> None:
         self.py_session.cancel()
 
+    def wait_for_tail_tasks(self, timeout: float) -> None:
+        native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
+
 
 def register_rules(
     rule_index: RuleIndex, union_membership: UnionMembership, query_inputs_filter: Sequence[type]

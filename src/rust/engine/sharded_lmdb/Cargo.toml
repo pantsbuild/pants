@@ -16,4 +16,4 @@ tempfile = "3"
 
 [dev-dependencies]
 parking_lot = "0.12"
-tokio = { version = "1.16", features = ["macros"] }
+tokio = { version = "1.21", features = ["macros"] }

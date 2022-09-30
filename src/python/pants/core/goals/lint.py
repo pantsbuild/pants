@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -24,43 +22,35 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import Specs
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
 from pants.core.goals.style_request import (
-    StyleRequest,
     determine_specified_tool_names,
     only_option_help,
     style_batch_size_help,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, Snapshot, SpecsPaths, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.build_files import BuildFileOptions
-from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
-from pants.engine.target import FieldSet, FilteredTargets, SourcesField
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
+from pants.engine.target import FieldSet, FilteredTargets
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
-_SR = TypeVar("_SR", bound=StyleRequest)
 _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 _PartitionElementT = TypeVar("_PartitionElementT")
-_GoalSubsystemT = TypeVar("_GoalSubsystemT", bound=GoalSubsystem)
 
 
 @dataclass(frozen=True)
@@ -202,6 +192,7 @@ class LintRequest:
     name: ClassVar[str]
     is_formatter: ClassVar[bool] = False
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     # NB: Not frozen so `fmt` can subclass
     @frozen_after_init
     @dataclass(unsafe_hash=True)
@@ -209,18 +200,6 @@ class LintRequest:
     class SubPartition(Generic[_PartitionElementT]):
         elements: Tuple[_PartitionElementT, ...]
         key: Any
-
-    _SubPartitionBase = SubPartition
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def SubPartition(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class SubPartition(cls._SubPartitionBase):
-                pass
-
-            return SubPartition
 
     @final
     @classmethod
@@ -238,6 +217,7 @@ class LintTargetsRequest(LintRequest):
 
     field_set_type: ClassVar[type[FieldSet]]
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     @runtime_ignore_subscripts
     class PartitionRequest(Generic[_FieldSetT]):
@@ -250,18 +230,6 @@ class LintTargetsRequest(LintRequest):
 
         field_sets: tuple[_FieldSetT, ...]
 
-    _PartitionRequestBase = PartitionRequest
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def PartitionRequest(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class PartitionRequest(cls._PartitionRequestBase):
-                pass
-
-            return PartitionRequest
-
     @classmethod
     def _get_registration_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_registration_rules()
@@ -271,6 +239,7 @@ class LintTargetsRequest(LintRequest):
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     class PartitionRequest:
         """Returns a unique `PartitionRequest` type per calling type.
@@ -280,19 +249,7 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
             2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
         """
 
-        file_paths: tuple[str, ...]
-
-    _PartitionRequestBase = PartitionRequest
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def PartitionRequest(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class PartitionRequest(cls._PartitionRequestBase):
-                pass
-
-            return PartitionRequest
+        files: tuple[str, ...]
 
     @classmethod
     def _get_registration_rules(cls) -> Iterable[UnionRule]:
@@ -312,13 +269,7 @@ class LintSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return bool(
-            {
-                LintRequest,
-                FmtTargetsRequest,
-                _FmtBuildFilesRequest,
-            }.intersection(union_membership.union_rules.keys())
-        )
+        return LintRequest in union_membership
 
     only = StrListOption(
         help=only_option_help("lint", "linter", "flake8", "shellcheck"),
@@ -376,23 +327,29 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
     return 0
 
 
+_CoreRequestType = TypeVar("_CoreRequestType", bound=LintRequest)
+_TargetPartitioner = TypeVar("_TargetPartitioner", bound=LintTargetsRequest.PartitionRequest)
+_FilePartitioner = TypeVar("_FilePartitioner", bound=LintFilesRequest.PartitionRequest)
+
+
 @rule_helper
 async def _get_partitions_by_request_type(
-    core_request_types: Iterable[type[LintRequest]],
-    target_partitioners: Iterable[type[LintTargetsRequest.PartitionRequest]],
-    file_partitioners: Iterable[type[LintFilesRequest.PartitionRequest]],
-    subsystem: _GoalSubsystemT,
+    core_request_types: Iterable[type[_CoreRequestType]],
+    target_partitioners: Iterable[type[_TargetPartitioner]],
+    file_partitioners: Iterable[type[_FilePartitioner]],
+    subsystem: GoalSubsystem,
     specs: Specs,
-    specified_names: Iterable[str],
     # NB: Because the rule parser code will collect `Get`s from caller's scope, these allows the
     # caller to customize the specific `Get`.
-    make_targets_partition_request_get: Callable[
-        [LintTargetsRequest.PartitionRequest], Get[Partitions]
-    ],
-    make_files_partition_request_get: Callable[
-        [LintFilesRequest.PartitionRequest], Get[Partitions]
-    ],
-) -> dict[type[LintRequest], list[Partitions]]:
+    make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
+    make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
+) -> dict[type[_CoreRequestType], list[Partitions]]:
+    specified_names = determine_specified_tool_names(
+        subsystem.name,
+        subsystem.only,  # type: ignore[attr-defined]
+        core_request_types,
+    )
+
     filtered_core_request_types = [
         request_type for request_type in core_request_types if request_type.name in specified_names
     ]
@@ -433,13 +390,13 @@ async def _get_partitions_by_request_type(
                 if field_set_type.is_applicable(target)
             )
             return make_targets_partition_request_get(
-                partition_targets_type.PartitionRequest(field_sets)
+                partition_targets_type.PartitionRequest(field_sets)  # type: ignore[arg-type]
             )
         else:
             assert partition_request_type in file_partitioners
             partition_files_type = cast(LintFilesRequest, request_type)
             return make_files_partition_request_get(
-                partition_files_type.PartitionRequest(specs_paths.files)
+                partition_files_type.PartitionRequest(specs_paths.files)  # type: ignore[arg-type]
             )
 
     all_partitions = await MultiGet(
@@ -457,7 +414,6 @@ async def lint(
     console: Console,
     workspace: Workspace,
     specs: Specs,
-    build_file_options: BuildFileOptions,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
@@ -465,28 +421,23 @@ async def lint(
     lint_request_types = union_membership.get(LintRequest)
     target_partitioners = union_membership.get(LintTargetsRequest.PartitionRequest)
     file_partitioners = union_membership.get(LintFilesRequest.PartitionRequest)
-    fmt_target_request_types = cast(
-        "Iterable[type[FmtTargetsRequest]]", union_membership.get(FmtTargetsRequest)
-    )
-    fmt_build_request_types = cast(
-        "Iterable[type[_FmtBuildFilesRequest]]", union_membership.get(_FmtBuildFilesRequest)
-    )
-    specified_names = determine_specified_tool_names(
-        lint_subsystem.name,
-        lint_subsystem.only,
-        [*lint_request_types, *fmt_target_request_types, *fmt_build_request_types],
-    )
 
     partitions_by_request_type = await _get_partitions_by_request_type(
-        lint_request_types,
+        [
+            request_type
+            for request_type in lint_request_types
+            if not (request_type.is_formatter and lint_subsystem.skip_formatters)
+        ],
         target_partitioners,
         file_partitioners,
         lint_subsystem,
         specs,
-        specified_names,
         lambda request_type: Get(Partitions, LintTargetsRequest.PartitionRequest, request_type),
         lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
     )
+
+    if not partitions_by_request_type:
+        return Lint(exit_code=0)
 
     def batch(
         iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
@@ -510,111 +461,24 @@ async def lint(
         for request_type, partitions_list in partitions_by_request_type.items()
     }
 
-    lint_subpartitions = [
+    subpartitions = [
         request_type.SubPartition(elements, key)
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, key in batch
     ]
 
-    # NOTE: Fmt support has been prefactored to be isolated from core "lint" support as a follow-up
-    # change will remove this in entirety. Therefore, this has some duplication/suboptimal code.
-    fmt_target_request_types = [
-        request_type
-        for request_type in fmt_target_request_types
-        if request_type.name in specified_names
-    ]
-    fmt_build_request_types = [
-        request_type
-        for request_type in fmt_build_request_types
-        if request_type.name in specified_names
-    ]
+    all_batch_results = await MultiGet(
+        Get(LintResult, LintRequest.SubPartition, request) for request in subpartitions
+    )
 
-    def batch_by_type(
-        request_types: Iterable[type[_SR]],
-    ) -> tuple[tuple[type[_SR], tuple[FieldSet, ...]], ...]:
-        def key(fs: FieldSet) -> str:
-            return fs.address.spec
-
-        return tuple(
-            (request_type, tuple(field_set_batch))
-            for request_type in request_types
-            for field_set_batch in partition_sequentially(
-                (
-                    request_type.field_set_type.create(target)
-                    for target in targets
-                    if request_type.field_set_type.is_applicable(target)
-                ),
-                key=key,
-                size_target=lint_subsystem.batch_size,
-                size_max=4 * lint_subsystem.batch_size,
-            )
-        )
-
-    fmt_target_requests: Iterable[FmtTargetsRequest] = ()
-    fmt_build_requests: Iterable[_FmtBuildFilesRequest] = ()
-    if not lint_subsystem.skip_formatters:
-        _get_targets = Get(
-            FilteredTargets,
-            Specs,
-            specs if fmt_target_request_types else Specs.empty(),
-        )
-        _get_specs_paths = Get(
-            SpecsPaths, Specs, specs if fmt_build_request_types else Specs.empty()
-        )
-
-        targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
-        specified_build_files = FilespecMatcher(
-            includes=[os.path.join("**", p) for p in build_file_options.patterns],
-            excludes=build_file_options.ignores,
-        ).matches(specs_paths.files)
-        batched_fmt_target_request_pairs = batch_by_type(fmt_target_request_types)
-        all_fmt_source_batches = await MultiGet(
-            Get(
-                SourceFiles,
-                SourceFilesRequest(
-                    cast(
-                        SourcesField,
-                        getattr(field_set, "sources", getattr(field_set, "source", None)),
-                    )
-                    for field_set in batch
-                ),
-            )
-            for _, batch in batched_fmt_target_request_pairs
-        )
-        fmt_target_requests = (
-            request_type(
-                batch,
-                snapshot=source_files_snapshot.snapshot,
-            )
-            for (request_type, batch), source_files_snapshot in zip(
-                batched_fmt_target_request_pairs, all_fmt_source_batches
-            )
-        )
-
-        build_file_batch_snapshots = await MultiGet(
-            Get(Snapshot, PathGlobs(paths_batch))
-            for paths_batch in partition_sequentially(
-                specified_build_files,
-                key=lambda x: str(x),
-                size_target=lint_subsystem.batch_size,
-                size_max=4 * lint_subsystem.batch_size,
-            )
-        )
-        fmt_build_requests = (
-            fmt_build_request_type(snapshot)
-            for fmt_build_request_type in fmt_build_request_types
-            for snapshot in build_file_batch_snapshots
-        )
-
-    all_requests = [
-        *(Get(LintResult, LintRequest.SubPartition, request) for request in lint_subpartitions),
-        *(Get(LintResult, FmtTargetsRequest, request) for request in fmt_target_requests),
-        *(Get(LintResult, _FmtBuildFilesRequest, request) for request in fmt_build_requests),
-    ]
-    all_batch_results = await MultiGet(all_requests)
+    core_request_types_by_subpartition_type = {
+        request_type.SubPartition: request_type for request_type in lint_request_types
+    }
 
     formatter_failed = any(
-        result.exit_code for result in all_batch_results[len(lint_subpartitions) :]
+        result.exit_code
+        for subpartition, result in zip(subpartitions, all_batch_results)
+        if core_request_types_by_subpartition_type[type(subpartition)].is_formatter
     )
 
     results_by_tool = defaultdict(list)
@@ -634,16 +498,6 @@ async def lint(
         formatter_failed,
     )
     return Lint(_get_error_code(all_batch_results))
-
-
-@rule
-async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
-    return LintResult(
-        1 if fmt_result.did_change else 0,
-        fmt_result.stdout,
-        fmt_result.stderr,
-        linter_name=fmt_result.formatter_name,
-    )
 
 
 def rules():

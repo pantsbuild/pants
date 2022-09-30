@@ -18,10 +18,9 @@ class OptionsInitializerTest(unittest.TestCase):
         )
 
         env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(options_bootstrapper)
         with self.assertRaises(ExecutionError):
-            OptionsInitializer(options_bootstrapper).build_config_and_options(
-                options_bootstrapper, env, raise_=True
-            )
+            initializer.build_config(options_bootstrapper, env)
 
     def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
@@ -31,8 +30,9 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
         env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(ob)
         with self.assertRaises(ExecutionError) as exc:
-            OptionsInitializer(ob).build_config_and_options(ob, env, raise_=True)
+            initializer.build_config(ob, env)
         self.assertIn(
             "The `--no-watch-filesystem` option may not be set if `--pantsd` or `--loop` is set.",
             str(exc.exception),

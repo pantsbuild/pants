@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (AutoflakeRequest,)),
+            QueryRule(FmtResult, (AutoflakeRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -63,7 +63,9 @@ def run_autoflake(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            AutoflakeRequest(field_sets, snapshot=input_sources.snapshot),
+            AutoflakeRequest.SubPartition(
+                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -114,14 +116,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_autoflake(rule_runner, [tgt], extra_args=["--autoflake-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:

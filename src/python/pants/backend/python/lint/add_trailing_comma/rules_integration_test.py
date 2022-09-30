@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (AddTrailingCommaRequest,)),
+            QueryRule(FmtResult, (AddTrailingCommaRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -67,7 +67,9 @@ def run_add_trailing_comma(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            AddTrailingCommaRequest(field_sets, snapshot=input_sources.snapshot),
+            AddTrailingCommaRequest.SubPartition(
+                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -120,16 +122,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner, {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
     )
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_add_trailing_comma(
-        rule_runner, [tgt], extra_args=["--add-trailing-comma-skip"]
-    )
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -15,7 +15,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -36,24 +35,32 @@ class ShfmtRequest(FmtTargetsRequest):
     name = Shfmt.options_scope
 
 
+@rule
+async def partition_shfmt(request: ShfmtRequest.PartitionRequest, shfmt: Shfmt) -> Partitions:
+    return (
+        Partitions()
+        if shfmt.skip
+        else Partitions.single_partition(
+            field_set.sources.file_path for field_set in request.field_sets
+        )
+    )
+
+
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> FmtResult:
-    if shfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def shfmt_fmt(
+    request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform
+) -> FmtResult:
+    snapshot = await ShfmtRequest.SubPartition.get_snapshot(request)
 
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
     )
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, shfmt.config_request(request.snapshot.dirs)
-    )
+    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shfmt.config_request(snapshot.dirs))
     downloaded_shfmt, config_files = await MultiGet(download_shfmt_get, config_files_get)
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (request.snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)
-        ),
+        MergeDigests((snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)),
     )
 
     argv = [
@@ -61,7 +68,7 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> 
         "-l",
         "-w",
         *shfmt.args,
-        *request.snapshot.files,
+        *snapshot.files,
     ]
 
     result = await Get(
@@ -69,17 +76,17 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> 
         Process(
             argv=argv,
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=snapshot.files,
+            description=f"Run shfmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=ShfmtRequest.name)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, ShfmtRequest),
+        *ShfmtRequest.registration_rules(),
     ]

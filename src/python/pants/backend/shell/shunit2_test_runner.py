@@ -36,7 +36,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.addresses import Address
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -149,10 +148,9 @@ async def determine_shunit2_shell(
             )
         tgt_shell = parse_result
 
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     path_request = BinaryPathRequest(
         binary_name=tgt_shell.name,
-        search_path=shell_setup.executable_search_path(env),
+        search_path=shell_setup.executable_search_path,
         test=tgt_shell.binary_path_test,
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
@@ -176,14 +174,13 @@ async def setup_shunit2_for_target(
         "https://raw.githubusercontent.com/kward/shunit2/b9102bb763cc603b3115ed30a5648bf950548097/shunit2",
         FileDigest("1f11477b7948150d1ca50cdd41d89be4ed2acd137e26d2e0fe23966d0e272cc5", 40987),
     )
-    shunit2_script, transitive_targets, built_package_dependencies, env = await MultiGet(
+    shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
         Get(Digest, DownloadFile, shunit2_download_file),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
         Get(
             BuiltPackageDependencies,
             BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
         ),
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
     )
 
     dependencies_source_files_request = Get(
@@ -227,7 +224,7 @@ async def setup_shunit2_for_target(
     )
 
     env_dict = {
-        "PATH": create_path_env_var(shell_setup.executable_search_path(env)),
+        "PATH": create_path_env_var(shell_setup.executable_search_path),
         "SHUNIT_COLOR": "always" if global_options.colors else "none",
         **test_extra_env.env,
     }

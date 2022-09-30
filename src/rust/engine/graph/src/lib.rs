@@ -380,11 +380,11 @@ impl<N: Node> InnerGraph<N> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
-  fn live_internal<'g>(
-    &'g self,
+  fn live_internal(
+    &self,
     entryids: Vec<EntryId>,
     context: N::Context,
-  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> + '_ {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
