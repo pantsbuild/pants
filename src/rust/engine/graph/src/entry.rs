@@ -122,10 +122,12 @@ impl<N: Node> EntryResult<N> {
   /// If the value is in a Clean state, mark it Dirty.
   fn dirty(&mut self) {
     match self {
-      EntryResult::Clean(v) | EntryResult::UncacheableDependencies(v, _) => {
+      EntryResult::Clean(v)
+      | EntryResult::UncacheableDependencies(v, _)
+      | EntryResult::Uncacheable(v, _) => {
         *self = EntryResult::Dirty(v.clone());
       }
-      EntryResult::Dirty(_) | EntryResult::Uncacheable(_, _) => {}
+      EntryResult::Dirty(_) => {}
     }
   }
 
