@@ -261,7 +261,10 @@ async def run_tests_with_shunit2(
     partition: Shunit2Request.SubPartition[Shunit2FieldSet],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    assert len(partition.elements) == 1, "Shunit2 partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Shunit2 partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
@@ -276,7 +279,10 @@ async def run_tests_with_shunit2(
 async def setup_shunit2_debug_test(
     partition: Shunit2Request.SubPartition[Shunit2FieldSet],
 ) -> TestDebugRequest:
-    assert len(partition.elements) == 1, "Shunit2 partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Shunit2 partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     setup = await Get(TestSetup, TestSetupRequest(partition.elements[0]))
     return TestDebugRequest(
         InteractiveProcess.from_process(

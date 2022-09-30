@@ -90,7 +90,10 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    assert len(partition.elements) == 1, "Helm Unittest partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Helm Unittest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     field_set = partition.elements[0]
     direct_dep_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),

@@ -394,7 +394,10 @@ async def run_python_test(
     partition: PytestRequest.SubPartition[PythonTestFieldSet],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
@@ -438,7 +441,10 @@ async def run_python_test(
 async def debug_python_test(
     partition: PytestRequest.SubPartition[PythonTestFieldSet],
 ) -> TestDebugRequest:
-    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     field_set = partition.elements[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
@@ -455,7 +461,10 @@ async def debugpy_python_test(
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
-    assert len(partition.elements) == 1, "Pytest partitions must contain exactly 1 file"
+    if len(partition.elements) != 1:
+        raise AssertionError(
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+        )
     field_set = partition.elements[0]
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
 

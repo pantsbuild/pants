@@ -705,9 +705,10 @@ async def get_environment(partition: TestRequest.SubPartition) -> EnvironmentNam
         for field_set in partition.elements
     )
     unique_environments = len({name.val for name in environment_names_per_element})
-    assert (
-        unique_environments == 1
-    ), f"Test partition {partition.key} contains elements from {unique_environments} environments; exactly 1 environment is expected"
+    if unique_environments != 1:
+        raise AssertionError(
+            f"Test partition {partition.description} contains elements from {unique_environments} environments; exactly 1 environment is expected"
+        )
     return environment_names_per_element[0]
 
 
