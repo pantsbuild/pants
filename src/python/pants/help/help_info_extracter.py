@@ -479,7 +479,7 @@ class HelpInfoExtracter:
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
                         build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type._plugin_field_cls, field_type)
+                            UnionRule(target_type.PluginField, field_type)
                         )
                         if build_configuration is not None
                         else None

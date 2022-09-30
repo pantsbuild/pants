@@ -96,7 +96,7 @@ def test_register_plugin_options() -> None:
     )
     Electrical.register_options_on_scope(
         options,
-        UnionMembership({Electrical._plugin_option_cls: [LampPlugin, Blender]}),
+        UnionMembership({Electrical.PluginOption: [LampPlugin, Blender]}),
     )
 
     electrical_subsystem = Electrical(options.for_scope(Electrical.options_scope))

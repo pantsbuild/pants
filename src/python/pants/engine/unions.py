@@ -5,14 +5,29 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, Mapping, TypeVar, cast
+from typing import Any, Callable, DefaultDict, Generic, Iterable, Mapping, TypeVar, cast, overload
 
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_method
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
+_T = TypeVar("_T", bound=type)
 
-def union(cls: type | None = None, *, in_scope_types: list[type] | None = None):
+
+@overload
+def union(cls: _T, *, in_scope_types: None = None) -> _T:
+    ...
+
+
+@overload
+def union(cls: None = None, *, in_scope_types: list[type]) -> Callable[[_T], _T]:
+    ...
+
+
+def union(
+    cls: _T | None = None, *, in_scope_types: list[type] | None = None
+) -> Callable[[_T], _T] | _T:
     """A class decorator to allow a class to be a union base in the engine's mechanism for
     polymorphism.
 
@@ -33,20 +48,15 @@ def union(cls: type | None = None, *, in_scope_types: list[type] | None = None):
     See https://www.pantsbuild.org/docs/rules-api-unions.
     """
 
-    def decorator(cls):
+    def decorator(cls: _T) -> _T:
         assert isinstance(cls, type)
-        cls._is_union_for = cls
+        setattr(cls, "_is_union_for", cls)
         # TODO: this should involve an explicit interface soon, rather than one being implicitly
         # created with only the provided Param.
-        cls._union_in_scope_types = tuple(in_scope_types) if in_scope_types else tuple()
+        setattr(cls, "_union_in_scope_types", tuple(in_scope_types) if in_scope_types else tuple())
         return cls
 
-    if isinstance(cls, type):
-        # This was a decorator call, ex: `@union`.
-        return decorator(cls)
-    else:
-        # This was a factory call, ex: `@union(..)`.
-        return decorator
+    return decorator if cls is None else decorator(cls)
 
 
 def is_union(input_type: type) -> bool:
@@ -88,9 +98,6 @@ class UnionRule:
                     "switch the first and second arguments to `UnionRule()`?"
                 )
             raise ValueError(msg)
-
-
-_T = TypeVar("_T", bound=type)
 
 
 @frozen_after_init
@@ -147,3 +154,68 @@ class UnionMembership:
     def has_members(self, union_type: type) -> bool:
         """Check whether the union has an implementation or not."""
         return bool(self.union_rules.get(union_type))
+
+
+@dataclass(frozen=True)
+class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
+    _class: _T
+    _in_scope_types: list[type] | None
+
+    @memoized_method
+    def _make_type_copy(self, objtype: type) -> _T:
+        cls = self._class
+
+        nu_type = cast(
+            _T,
+            type(
+                cls.__name__,
+                cls.__bases__,
+                # NB: Override `__qualname__` so the attribute path is easily identifiable
+                dict(cls.__dict__, __qualname__=f"{objtype.__qualname__}.{cls.__name__}"),
+            ),
+        )
+        return union(in_scope_types=self._in_scope_types)(nu_type)  # type: ignore[arg-type]
+
+    def __get__(self, obj: object | None, objtype: Any) -> _T:
+        if objtype is None:
+            objtype = type(obj)
+        return self._make_type_copy(objtype)
+
+
+@overload
+def distinct_union_type_per_subclass(cls: _T, *, in_scope_types: None = None) -> _T:
+    ...
+
+
+@overload
+def distinct_union_type_per_subclass(
+    cls: None = None, *, in_scope_types: list[type]
+) -> Callable[[_T], _T]:
+    ...
+
+
+def distinct_union_type_per_subclass(
+    cls: _T | None = None, *, in_scope_types: list[type] | None = None
+) -> _T | Callable[[_T], _T]:
+    """Makes the decorated inner-class have a distinct, yet identical, union type per subclass.
+
+    >>> class Foo:
+    ...   @distinct_union_type_per_subclass
+    ...   class Bar(cls):
+    ...      pass
+    ...
+    >>> class Oof(Foo):
+    ...   pass
+    ...
+    >>> Foo.Bar is not Oof.Bar
+    True
+
+    NOTE: In order to make identical class types, this should be used first of all decorators.
+    NOTE: This works by making a "copy" of the class for each subclass. YMMV on how well this
+        interacts with other decorators.
+    """
+
+    def decorator(cls: type):
+        return _DistinctUnionTypePerSubclassGetter(cls, in_scope_types)
+
+    return decorator if cls is None else decorator(cls)
