@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import dataclasses
 import json
 from dataclasses import dataclass
 
@@ -31,25 +30,17 @@ class ParsedPythonImportInfo:
 class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
     """All the discovered imports from a Python source file mapped to the relevant info."""
 
-    def serialisable(self):
-        return {k: dataclasses.asdict(v) for k, v in self.items()}
-
 
 class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     """All the discovered possible assets from a Python source file."""
 
     # N.B. Don't set `sort_input`, as the input is already sorted
-    def serialisable(self):
-        return tuple(self)
 
 
 @dataclass(frozen=True)
 class ParsedPythonDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
-
-    def serialisable(self):
-        return {"imports": self.imports.serialisable(), "assets": self.assets.serialisable()}
 
 
 @dataclass(frozen=True)

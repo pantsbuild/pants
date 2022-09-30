@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable, List
 
+from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonDependencies,
 )
@@ -41,16 +42,6 @@ class PythonSourceAnalysis:
     fs: PythonImportDependenciesInferenceFieldSet
     identified: ParsedPythonDependencies
     resolved: ResolvedParsedPythonDependencies
-
-    def serialisable(self):
-        return {
-            "address": str(self.fs.address),
-            "identified": {
-                "imports": self.identified.imports.serialisable(),
-                "assets": self.identified.assets.serialisable(),
-            },
-            "resolved": self.resolved.serialisable(),
-        }
 
 
 @rule
@@ -95,10 +86,8 @@ async def dump_python_source_analysis(
         )
         for fs in source_field_sets
     )
-    marshalled = [
-        analysis.serialisable() for (fs, analysis) in zip(source_field_sets, source_analysis)
-    ]
-    console.print_stdout(json.dumps(marshalled))
+
+    console.print_stdout(json.dumps(source_analysis, cls=_PeekJsonEncoder))
     return DumpPythonSourceAnalysis(exit_code=0)
 
 
