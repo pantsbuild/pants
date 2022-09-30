@@ -195,6 +195,7 @@ class FallibleFirstPartyPkgAnalysis:
 @dataclass(frozen=True)
 class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
+    extra_build_tags: tuple[str, ...] = ()
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -269,6 +270,10 @@ async def analyze_first_party_package(
         HydrateSourcesRequest(wrapped_target.target[GoPackageSourcesField]),
     )
 
+    extra_build_tags_env = {}
+    if request.extra_build_tags:
+        extra_build_tags_env = {"EXTRA_BUILD_TAGS": ",".join(request.extra_build_tags)}
+
     input_digest = await Get(Digest, MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]))
     result = await Get(
         FallibleProcessResult,
@@ -277,7 +282,10 @@ async def analyze_first_party_package(
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={
+                "CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0",
+                **extra_build_tags_env,
+            },
         ),
     )
     return FallibleFirstPartyPkgAnalysis.from_process_result(
