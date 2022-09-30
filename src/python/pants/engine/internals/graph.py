@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import functools
 import itertools
+import json
 import logging
 import os.path
 from dataclasses import dataclass
@@ -684,29 +685,39 @@ async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTarget
     coarsened_targets: dict[Address, CoarsenedTarget] = {}
     root_coarsened_targets = []
     root_addresses_set = set(request.roots)
-    for component in components:
-        component = sorted(component)
-        component_set = set(component)
+    try:
+        for component in components:
+            component = sorted(component)
+            component_set = set(component)
 
-        # For each member of the component, include the CoarsenedTarget for each of its external
-        # dependencies.
-        coarsened_target = CoarsenedTarget(
-            (addresses_to_targets[a] for a in component),
-            (
-                coarsened_targets[d]
-                for a in component
-                for d in dependency_mapping.mapping[a]
-                if d not in component_set
-            ),
+            # For each member of the component, include the CoarsenedTarget for each of its external
+            # dependencies.
+            coarsened_target = CoarsenedTarget(
+                (addresses_to_targets[a] for a in component),
+                (
+                    coarsened_targets[d]
+                    for a in component
+                    for d in dependency_mapping.mapping[a]
+                    if d not in component_set
+                ),
+            )
+
+            # Add to the coarsened_targets mapping under each of the component's Addresses.
+            for address in component:
+                coarsened_targets[address] = coarsened_target
+
+            # If any of the input Addresses was a member of this component, it is a root.
+            if component_set & root_addresses_set:
+                root_coarsened_targets.append(coarsened_target)
+    except KeyError:
+        # TODO: This output is intended to help uncover a non-deterministic error reported in
+        # https://github.com/pantsbuild/pants/issues/17047.
+        mapping_str = json.dumps(
+            {str(a): [str(d) for d in deps] for a, deps in dependency_mapping.mapping.items()}
         )
-
-        # Add to the coarsened_targets mapping under each of the component's Addresses.
-        for address in component:
-            coarsened_targets[address] = coarsened_target
-
-        # If any of the input Addresses was a member of this component, it is a root.
-        if component_set & root_addresses_set:
-            root_coarsened_targets.append(coarsened_target)
+        components_str = json.dumps([[str(a) for a in component] for component in components])
+        logger.warning(f"For {request}:\nMapping:\n{mapping_str}\nComponents:\n{components_str}")
+        raise
     return CoarsenedTargets(tuple(root_coarsened_targets))
 
 
