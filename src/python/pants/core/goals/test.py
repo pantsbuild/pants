@@ -237,17 +237,17 @@ class Partition(Generic[_FieldSetT]):
 class Partitions(FrozenDict[str, Partition[_FieldSetT]]):
     """A mapping from <partition key> to <partition>.
 
-    When implementing a test-runner, one of your rules will return this type, taking in a
-    `PartitionRequest` specific to your runner.
+    When implementing a test-runner, one of your rules will take in a `PartitionRequest`
+    specific to your runner and return this type.
 
-    The return likely will fit into one of:
-        - Returning no empty partitions, if your tool is being skipped.
-        - Returning a singleton partition per input, if your tool can only run tests
-            from within one input per process.
-        - Returning partitions containing a variable number of inputs, if your tool
-            supports processing inputs in batches.
-
-    NOTE: The partition may be divided further into multiple sub-partitions.
+    The return will fit into one of:
+        - Returning empty partitions, if your tool is being skipped.
+        - Returning a singleton partition per input, to test one input per process.
+            This option will give the most fine-grained caching of test results, potentially
+            at the expense of performance on cache misses.
+        - Returning partitions containing multiple elements, to test multiple inputs per process.
+            This approach can make your tests more performant by sharing expensive setup/
+            teardown logic across many inputs, but results won't be cached as effectively.
     """
 
     @classmethod
@@ -262,7 +262,7 @@ class Partitions(FrozenDict[str, Partition[_FieldSetT]]):
 class TestRequest:
     """Base class for plugin types wanting to be run as part of `test`.
 
-    Plugins should define a new type which subclasses `TestReqest`, and set the appropriate class
+    Plugins should define a new type which subclasses `TestRequest`, and set the appropriate class
     variables. E.g.
         class SuperTesterRequest(TestRequest):
                 name = SuperTesterSubsystem.options_scope
@@ -318,7 +318,6 @@ class TestRequest:
             ]
     """
 
-    name: ClassVar[str]
     field_set_type: ClassVar[type[TestFieldSet]]
 
     # Prevent this class from being detected by pytest as a test class.
