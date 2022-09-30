@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Iterator
+from typing import DefaultDict, Iterable, Iterator, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -394,6 +394,74 @@ async def _exec_parse_deps(
     return ExecParseDepsResponse(resp)
 
 
+@dataclass(frozen=True)
+class ResolvedParsedPythonDependenciesRequest:
+    field_set: PythonImportDependenciesInferenceFieldSet
+    parsed_dependencies: ParsedPythonDependencies
+    resolve: Optional[str]
+
+
+@dataclass(frozen=True)
+class ResolvedParsedPythonDependencies:
+    imports: set[Address]
+    unowned: set[str]
+    assets: set[Address]
+    explicit: ExplicitlyProvidedDependencies
+
+
+@rule
+async def _exec_resolve_parsed_deps(
+    request: ResolvedParsedPythonDependenciesRequest,
+    python_infer_subsystem: PythonInferSubsystem,
+) -> ResolvedParsedPythonDependencies:
+    parsed_imports = request.parsed_dependencies.imports
+    parsed_assets = request.parsed_dependencies.assets
+    if not python_infer_subsystem.imports:
+        parsed_imports = ParsedPythonImports([])
+
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    )
+
+    if parsed_imports:
+        import_deps, unowned_imports = _get_imports_info(
+            address=request.field_set.address,
+            owners_per_import=await MultiGet(
+                Get(
+                    PythonModuleOwners,
+                    PythonModuleOwnersRequest(imported_module, resolve=request.resolve),
+                )
+                for imported_module in parsed_imports
+            ),
+            parsed_imports=parsed_imports,
+            explicitly_provided_deps=explicitly_provided_deps,
+        )
+    else:
+        import_deps, unowned_imports = set(), set()
+
+    if parsed_assets:
+        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
+        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        asset_deps = set(
+            _get_inferred_asset_deps(
+                request.field_set.address,
+                request.field_set.source.file_path,
+                assets_by_path,
+                parsed_assets,
+                explicitly_provided_deps,
+            )
+        )
+    else:
+        asset_deps = set()
+
+    return ResolvedParsedPythonDependencies(
+        imports=import_deps,
+        unowned=unowned_imports,
+        assets=asset_deps,
+        explicit=explicitly_provided_deps,
+    )
+
+
 @rule(desc="Inferring Python dependencies by analyzing source")
 async def infer_python_dependencies_via_source(
     request: InferPythonImportDependencies,
@@ -411,52 +479,21 @@ async def infer_python_dependencies_via_source(
         )
     ).value
 
-    address = request.field_set.address
-
-    inferred_deps: set[Address] = set()
-    unowned_imports: set[str] = set()
-    parsed_imports = parsed_dependencies.imports
-    parsed_assets = parsed_dependencies.assets
-    if not python_infer_subsystem.imports:
-        parsed_imports = ParsedPythonImports([])
-
-    explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
-    )
-
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
-    if parsed_imports:
-        import_deps, unowned_imports = _get_imports_info(
-            address=address,
-            owners_per_import=await MultiGet(
-                Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
-                for imported_module in parsed_imports
-            ),
-            parsed_imports=parsed_imports,
-            explicitly_provided_deps=explicitly_provided_deps,
-        )
-        inferred_deps.update(import_deps)
+    resolved_dependencies = await Get(
+        ResolvedParsedPythonDependencies,
+        ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
+    )
 
-    if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
-        inferred_deps.update(
-            _get_inferred_asset_deps(
-                address,
-                request.field_set.source.file_path,
-                assets_by_path,
-                parsed_assets,
-                explicitly_provided_deps,
-            )
-        )
+    inferred_deps = resolved_dependencies.imports | resolved_dependencies.assets
 
     _ = await _handle_unowned_imports(
-        address,
+        request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
-        unowned_imports,
-        parsed_imports,
+        resolved_dependencies.unowned,
+        parsed_dependencies.imports,
         resolve=resolve,
     )
 
@@ -561,6 +598,7 @@ async def infer_python_conftest_dependencies(
 def import_rules():
     return [
         _exec_parse_deps,
+        _exec_resolve_parsed_deps,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),
