@@ -67,7 +67,7 @@ python_tests(
 )
 ```
 
-> 🚧 How to use the `pytest-xdist` plugin
+> 📘 Tip: Using the `pytest-xdist` plugin
 >
 > Pants' default concurrency will run each test target in parallel. If you want to additionally parallelize _within_  each of your targets, you can do so by enabling built-in support for the `pytest-xdist` plugin:
 >
@@ -78,13 +78,13 @@ python_tests(
 >
 > This will cause Pants to pass `-n <concurrency>` when running `pytest`.
 >
-> By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded concurrency value per target:
+> By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded upper limit on the concurrency per target:
 >
 > ```python BUILD
 > python_test(name="tests", source="tests.py", xdist_concurrency=4)
 > ```
 >
-> To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`.
+> To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`. This can be necessary for tests that are not safe to run in parallel.
 >
 > When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values to avoid collisions between parallel tests (i.e. by using `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
 >
