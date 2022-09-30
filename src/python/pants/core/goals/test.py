@@ -10,7 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Iterable, Optional, Tuple, TypeVar, cast
+from typing import Any, ClassVar, Generic, Iterable, Optional, Tuple, TypeVar, cast
 
 from typing_extensions import final
 
@@ -50,12 +50,11 @@ from pants.engine.target import (
     ValidNumbers,
     parse_shard_spec,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import runtime_ignore_subscripts
 from pants.util.strutil import softwrap
 
@@ -325,6 +324,7 @@ class TestRequest:
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     @runtime_ignore_subscripts
     class PartitionRequest(Generic[_FieldSetT]):
@@ -337,33 +337,13 @@ class TestRequest:
 
         field_sets: tuple[_FieldSetT, ...]
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     @runtime_ignore_subscripts
     class SubPartition(Generic[_FieldSetT]):
         elements: Tuple[_FieldSetT, ...]
         key: str
         description: str
-
-    _PartitionRequestBase = PartitionRequest
-    _SubPartitionBase = SubPartition
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def PartitionRequest(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class PartitionRequest(cls._PartitionRequestBase):
-                pass
-
-            return PartitionRequest
-
-        @memoized_classproperty
-        def SubPartition(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class SubPartition(cls._SubPartitionBase):
-                pass
-
-            return SubPartition
 
     @final
     @classmethod
