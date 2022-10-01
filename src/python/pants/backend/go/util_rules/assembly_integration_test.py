@@ -113,7 +113,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg")
+                go_package(name="pkg", sources=["*.go", "*.s"])
                 go_binary(name="bin")
                 """
             ),
