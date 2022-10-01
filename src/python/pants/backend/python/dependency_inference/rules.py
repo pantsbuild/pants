@@ -424,17 +424,12 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@dataclass(frozen=True)
-class ExecParseDepsResponse:
-    value: ParsedPythonDependencies
-
-
 @rule
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
-) -> ExecParseDepsResponse:
+) -> ParsedPythonDependencies:
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
         [field_set.interpreter_constraints], python_setup
     )
@@ -449,7 +444,7 @@ async def _exec_parse_deps(
             assets_min_slashes=python_infer_subsystem.assets_min_slashes,
         ),
     )
-    return ExecParseDepsResponse(resp)
+    return resp
 
 
 @dataclass(frozen=True)
@@ -528,13 +523,11 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = (
-        await Get(
-            ExecParseDepsResponse,
-            PythonImportDependenciesInferenceFieldSet,
-            request.field_set,
-        )
-    ).value
+    parsed_dependencies = await Get(
+        ParsedPythonDependencies,
+        PythonImportDependenciesInferenceFieldSet,
+        request.field_set,
+    )
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
