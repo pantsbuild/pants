@@ -838,7 +838,14 @@ impl<N: Node> Entry<N> {
 
   pub(crate) fn format(&self, context: &N::Context) -> String {
     let state = match self.peek(context) {
-      Some(ref nr) => format!("{:?}", nr),
+      Some(ref nr) => {
+        let item = format!("{:?}", nr);
+        if item.len() <= 1024 {
+          item
+        } else {
+          item.chars().take(1024).collect()
+        }
+      }
       None => "<None>".to_string(),
     };
     format!("{} == {}", self.node, state).replace('"', "\\\"")
