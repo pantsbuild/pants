@@ -461,8 +461,7 @@ class ResolvedParsedPythonDependenciesRequest:
 
 @dataclass(frozen=True)
 class ResolvedParsedPythonDependencies:
-    imports: frozenset[Address]
-    unowned: frozenset[str]
+    resolve_results: dict[str, ImportResolveResult]
     assets: frozenset[Address]
     explicit: ExplicitlyProvidedDependencies
 
@@ -495,9 +494,8 @@ async def _exec_resolve_parsed_deps(
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )
-        import_deps, unowned_imports = _collect_imports_info(resolve_results)
     else:
-        import_deps, unowned_imports = frozenset(), frozenset()
+        resolve_results = {}
 
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
@@ -515,8 +513,7 @@ async def _exec_resolve_parsed_deps(
         asset_deps = frozenset()
 
     return ResolvedParsedPythonDependencies(
-        imports=import_deps,
-        unowned=unowned_imports,
+        resolve_results=resolve_results,
         assets=asset_deps,
         explicit=explicitly_provided_deps,
     )
@@ -545,14 +542,15 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependencies,
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
+    import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
-    inferred_deps = resolved_dependencies.imports | resolved_dependencies.assets
+    inferred_deps = import_deps | resolved_dependencies.assets
 
     _ = await _handle_unowned_imports(
         request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
-        resolved_dependencies.unowned,
+        unowned_imports,
         parsed_dependencies.imports,
         resolve=resolve,
     )
