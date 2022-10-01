@@ -242,8 +242,6 @@ impl Core {
       named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
-      // TODO(#16767): Allow users to specify this via an option.
-      docker::ImagePullPolicy::OnlyIfLatestOrMissing,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
       matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))

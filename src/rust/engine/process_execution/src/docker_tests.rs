@@ -14,7 +14,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::{ImagePullPolicy, SANDBOX_BASE_PATH_IN_CONTAINER};
+use super::docker::{SANDBOX_BASE_PATH_IN_CONTAINER};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -739,7 +739,6 @@ async fn run_command_via_docker_in_dir(
     named_caches,
     immutable_inputs,
     cleanup,
-    ImagePullPolicy::IfMissing,
   )?;
   let result: Result<_, ProcessError> = async {
     let original = runner.run(Context::default(), workunit, req.into()).await?;
