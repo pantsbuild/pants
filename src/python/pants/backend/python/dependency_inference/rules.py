@@ -309,6 +309,11 @@ def _get_imports_info(
 def _collect_imports_info(
     resolve_result: dict[str, ImportResolveResult]
 ) -> tuple[frozenset[Address], frozenset[str]]:
+    """
+    Collect import resolution results into:
+      - imports (direct and disambiguated)
+      - unowned
+    """
 
     return frozenset(
         addr
@@ -326,8 +331,9 @@ def _collect_imports_info(
 
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
+    """A request to find possible owners for several imports originating in a resolve"""
     unowned_imports: frozenset[str]
-    resolve: str
+    original_resolve: str
 
 
 @dataclass(frozen=True)
@@ -353,7 +359,7 @@ async def find_other_owners_for_unowned_imports(
     for imported_module, targets in zip(req.unowned_imports, other_owners_as_targets):
         for t in targets:
             other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
-            if other_owner_resolve != req.resolve:
+            if other_owner_resolve != req.original_resolve:
                 imports_to_other_owners[imported_module].append((t.address, other_owner_resolve))
     return UnownedImportsPossibleOwners(dict(imports_to_other_owners))
 
