@@ -152,7 +152,7 @@ class GoPackageSourcesField(MultipleSourcesField):
         ".go",
         ".s",
         ".S",
-        ".sx"
+        ".sx",
         ".c",
         ".h",
         ".hh",
