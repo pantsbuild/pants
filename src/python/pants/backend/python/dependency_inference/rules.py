@@ -267,7 +267,7 @@ class ImportOwnerStatus(Enum):
 @dataclass()
 class ImportResolveResult:
     status: ImportOwnerStatus
-    address: Optional[Address] = None
+    address: tuple[Address, ...] = ()
 
 
 def _get_imports_info(
@@ -281,7 +281,7 @@ def _get_imports_info(
     for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
         if owners.unambiguous:
             resolve_result[imp] = ImportResolveResult(
-                ImportOwnerStatus.unambiguous, owners.unambiguous[0]
+                ImportOwnerStatus.unambiguous, owners.unambiguous
             )
             continue
 
@@ -294,7 +294,7 @@ def _get_imports_info(
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
             resolve_result[imp] = ImportResolveResult(
-                ImportOwnerStatus.disambiguated, maybe_disambiguated
+                ImportOwnerStatus.disambiguated, (maybe_disambiguated,)
             )
         elif imp.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
             resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unownable)
@@ -304,8 +304,9 @@ def _get_imports_info(
             resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unowned)
 
     return frozenset(
-        dep.address
+        addr
         for dep in resolve_result.values()
+        for addr in dep.address
         if (
             dep.status == ImportOwnerStatus.unambiguous
             or dep.status == ImportOwnerStatus.disambiguated
