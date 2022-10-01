@@ -17,6 +17,7 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.rules import (
     ExecParseDepsRequest,
     ExecParseDepsResponse,
+    ImportResolveResult,
     PythonImportDependenciesInferenceFieldSet,
     ResolvedParsedPythonDependencies,
     ResolvedParsedPythonDependenciesRequest,
@@ -91,12 +92,14 @@ async def dump_python_source_analysis_single(
 class ImportAnalysis:
     name: str
     reference: Union[ParsedPythonImportInfo, ParsedPythonAssetPaths]
-    resolved: Any
+    resolved: ImportResolveResult
     possible_resolve: Optional[list[tuple[Address, ResolveName]]]
 
 
 def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
     out = []
+
+    resolved_results = raw.resolved.resolve_results
 
     for name, info in raw.identified.imports.items():
         possible_resolve = raw.possible_owners.value.get(name)
@@ -105,7 +108,7 @@ def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
             ImportAnalysis(
                 name=name,
                 reference=info,
-                resolved=...,
+                resolved=resolved_results[name],
                 possible_resolve=possible_resolve,
             )
         )
