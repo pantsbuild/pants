@@ -256,17 +256,35 @@ def _get_inferred_asset_deps(
                 yield maybe_disambiguated
 
 
+class ImportOwnerStatus(Enum):
+    unambiguous = "unambiguous"
+    disambiguated = "ambiguous"
+    unowned = "unowned"
+    weak_ignore = "weak_ignore"
+    unownable = "unownable"
+
+
+@dataclass()
+class ImportResolveResult:
+    status: ImportOwnerStatus
+    address: Optional[Address] = None
+
+
 def _get_imports_info(
     address: Address,
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> tuple[frozenset[Address], frozenset[str]]:
-    inferred_deps: set[Address] = set()
-    unowned_imports: set[str] = set()
+    resolve_result: dict[str, ImportResolveResult] = {}
 
-    for owners, imp in zip(owners_per_import, parsed_imports):
-        inferred_deps.update(owners.unambiguous)
+    for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
+        if owners.unambiguous:
+            resolve_result[imp] = ImportResolveResult(
+                ImportOwnerStatus.unambiguous, owners.unambiguous[0]
+            )
+            continue
+
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
@@ -275,16 +293,27 @@ def _get_imports_info(
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
-            inferred_deps.add(maybe_disambiguated)
+            resolve_result[imp] = ImportResolveResult(
+                ImportOwnerStatus.disambiguated, maybe_disambiguated
+            )
+        elif imp.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
+            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unownable)
+        elif parsed_imports[imp].weak:
+            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.weak_ignore)
+        else:
+            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unowned)
 
+    return frozenset(
+        dep.address
+        for dep in resolve_result.values()
         if (
-            not owners.unambiguous
-            and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
-            and not parsed_imports[imp].weak
-        ):
-            unowned_imports.add(imp)
-
-    return frozenset(inferred_deps), frozenset(unowned_imports)
+            dep.status == ImportOwnerStatus.unambiguous
+            or dep.status == ImportOwnerStatus.disambiguated
+        )
+        and dep.address
+    ), frozenset(
+        imp for imp, dep in resolve_result.items() if dep.status == ImportOwnerStatus.unowned
+    )
 
 
 @dataclass(frozen=True)
@@ -445,15 +474,16 @@ async def _exec_resolve_parsed_deps(
     )
 
     if parsed_imports:
+        owners_per_import = await MultiGet(
+            Get(
+                PythonModuleOwners,
+                PythonModuleOwnersRequest(imported_module, resolve=request.resolve),
+            )
+            for imported_module in parsed_imports
+        )
         import_deps, unowned_imports = _get_imports_info(
             address=request.field_set.address,
-            owners_per_import=await MultiGet(
-                Get(
-                    PythonModuleOwners,
-                    PythonModuleOwnersRequest(imported_module, resolve=request.resolve),
-                )
-                for imported_module in parsed_imports
-            ),
+            owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )

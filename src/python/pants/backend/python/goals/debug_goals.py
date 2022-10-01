@@ -1,12 +1,18 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, Optional, Union
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
+from pants.backend.python.dependency_inference.module_mapper import ResolveName
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ParsedPythonAssetPaths,
     ParsedPythonDependencies,
+    ParsedPythonImportInfo,
 )
 from pants.backend.python.dependency_inference.rules import (
     ExecParseDepsRequest,
@@ -19,6 +25,7 @@ from pants.backend.python.dependency_inference.rules import (
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -77,6 +84,32 @@ async def dump_python_source_analysis_single(
     )
 
 
+@dataclass(frozen=True)
+class ImportAnalysis:
+    name: str
+    reference: Union[ParsedPythonImportInfo, ParsedPythonAssetPaths]
+    resolved: Any
+    possible_resolve: Optional[list[tuple[Address, ResolveName]]]
+
+
+def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
+    out = []
+
+    for name, info in raw.identified.imports.items():
+        possible_resolve = raw.possible_owners.value.get(name)
+
+        out.append(
+            ImportAnalysis(
+                name=name,
+                reference=info,
+                resolved=...,
+                possible_resolve=possible_resolve,
+            )
+        )
+
+    return out
+
+
 @goal_rule
 async def dump_python_source_analysis(
     targets: Targets,
@@ -97,7 +130,10 @@ async def dump_python_source_analysis(
         for fs in source_field_sets
     )
 
-    console.print_stdout(json.dumps(source_analysis, cls=_PeekJsonEncoder))
+    collected = [collect_analysis(a) for a in source_analysis]
+
+    # console.print_stdout(json.dumps(source_analysis, cls=_PeekJsonEncoder))
+    console.print_stdout(json.dumps(collected, cls=_PeekJsonEncoder))
     return DumpPythonSourceAnalysis(exit_code=0)
 
 
