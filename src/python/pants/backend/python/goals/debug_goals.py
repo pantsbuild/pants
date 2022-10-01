@@ -136,7 +136,7 @@ async def dump_python_source_analysis(
         for fs in source_field_sets
     )
 
-    collected = [collect_analysis(a) for a in source_analysis]
+    collected = {str(a.fs.address): collect_analysis(a) for a in source_analysis}
 
     # console.print_stdout(json.dumps(source_analysis, cls=_PeekJsonEncoder))
     console.print_stdout(json.dumps(collected, cls=_PeekJsonEncoder))
