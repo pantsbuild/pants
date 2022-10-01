@@ -309,10 +309,10 @@ def _get_imports_info(
 def _collect_imports_info(
     resolve_result: dict[str, ImportResolveResult]
 ) -> tuple[frozenset[Address], frozenset[str]]:
-    """
-    Collect import resolution results into:
-      - imports (direct and disambiguated)
-      - unowned
+    """Collect import resolution results into:
+
+    - imports (direct and disambiguated)
+    - unowned
     """
 
     return frozenset(
@@ -331,7 +331,8 @@ def _collect_imports_info(
 
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
-    """A request to find possible owners for several imports originating in a resolve"""
+    """A request to find possible owners for several imports originating in a resolve."""
+
     unowned_imports: frozenset[str]
     original_resolve: str
 
@@ -424,23 +425,16 @@ async def _handle_unowned_imports(
 
 
 @dataclass(frozen=True)
-class ExecParseDepsRequest:
-    field_set: PythonImportDependenciesInferenceFieldSet
-
-
-@dataclass(frozen=True)
 class ExecParseDepsResponse:
     value: ParsedPythonDependencies
 
 
 @rule
 async def _exec_parse_deps(
-    req: ExecParseDepsRequest,
+    field_set: PythonImportDependenciesInferenceFieldSet,
     python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> ExecParseDepsResponse:
-    field_set = req.field_set
-
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
         [field_set.interpreter_constraints], python_setup
     )
@@ -537,8 +531,8 @@ async def infer_python_dependencies_via_source(
     parsed_dependencies = (
         await Get(
             ExecParseDepsResponse,
-            ExecParseDepsRequest,
-            ExecParseDepsRequest(request.field_set),
+            PythonImportDependenciesInferenceFieldSet,
+            request.field_set,
         )
     ).value
 

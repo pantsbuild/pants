@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Union
+from typing import List, Optional, Union
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.module_mapper import ResolveName
@@ -15,7 +15,6 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
     ParsedPythonImportInfo,
 )
 from pants.backend.python.dependency_inference.rules import (
-    ExecParseDepsRequest,
     ExecParseDepsResponse,
     ImportResolveResult,
     PythonImportDependenciesInferenceFieldSet,
@@ -46,7 +45,9 @@ class DumpPythonSourceAnalysis(Goal):
 
 @dataclass(frozen=True)
 class PythonSourceAnalysis:
-    """Information on the inferred imports for a Python file, including all raw intermediate results"""
+    """Information on the inferred imports for a Python file, including all raw intermediate
+    results."""
+
     fs: PythonImportDependenciesInferenceFieldSet
     identified: ParsedPythonDependencies
     resolved: ResolvedParsedPythonDependencies
@@ -58,13 +59,13 @@ async def dump_python_source_analysis_single(
     fs: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
 ) -> PythonSourceAnalysis:
-    """Infer the dependencies for a single python fieldset, keeping all the intermediate results"""
+    """Infer the dependencies for a single python fieldset, keeping all the intermediate results."""
 
     parsed_dependencies = (
         await Get(
             ExecParseDepsResponse,
-            ExecParseDepsRequest,
-            ExecParseDepsRequest(fs),
+            PythonImportDependenciesInferenceFieldSet,
+            fs,
         )
     ).value
 
@@ -89,7 +90,8 @@ async def dump_python_source_analysis_single(
 
 @dataclass(frozen=True)
 class ImportAnalysis:
-    """Information on the inferred imports for a Python file"""
+    """Information on the inferred imports for a Python file."""
+
     name: str
     reference: Union[ParsedPythonImportInfo, ParsedPythonAssetPaths]
     resolved: ImportResolveResult
@@ -97,7 +99,7 @@ class ImportAnalysis:
 
 
 def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
-    """Collect raw analysis and present it in a helpful per-import format"""
+    """Collect raw analysis and present it in a helpful per-import format."""
     out = []
 
     resolved_results = raw.resolved.resolve_results
