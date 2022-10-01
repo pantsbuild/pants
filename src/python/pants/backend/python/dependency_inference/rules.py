@@ -275,7 +275,7 @@ def _get_imports_info(
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
-) -> tuple[frozenset[Address], frozenset[str]]:
+) -> dict[str, ImportResolveResult]:
     resolve_result: dict[str, ImportResolveResult] = {}
 
     for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
@@ -302,6 +302,13 @@ def _get_imports_info(
             resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.weak_ignore)
         else:
             resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unowned)
+
+    return resolve_result
+
+
+def _collect_imports_info(
+    resolve_result: dict[str, ImportResolveResult]
+) -> tuple[frozenset[Address], frozenset[str]]:
 
     return frozenset(
         addr
@@ -482,12 +489,13 @@ async def _exec_resolve_parsed_deps(
             )
             for imported_module in parsed_imports
         )
-        import_deps, unowned_imports = _get_imports_info(
+        resolve_results = _get_imports_info(
             address=request.field_set.address,
             owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )
+        import_deps, unowned_imports = _collect_imports_info(resolve_results)
     else:
         import_deps, unowned_imports = frozenset(), frozenset()
 
