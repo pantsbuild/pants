@@ -67,19 +67,21 @@ async def _find_go_mod_targets(
 
 
 @rule_helper
-async def _find_cgo_sources(path: str, all_owned_sources: AllOwnedSources) -> list[str]:
+async def _find_cgo_sources(
+    path: str, all_owned_sources: AllOwnedSources
+) -> tuple[list[str], list[str]]:
     all_files_in_package = await Get(Paths, PathGlobs([str(PurePath(path, "*"))]))
     ext_to_files: dict[str, set[str]] = defaultdict(set)
     for file_path in all_files_in_package.files:
-        file_name = PurePath(file_path).name
         for ext in GoPackageSourcesField.expected_file_extensions:
             if ext == ".go":
                 continue
-            if file_name.endswith(ext):
-                ext_to_files[ext].add(file_name)
+            if file_path.endswith(ext):
+                ext_to_files[ext].add(file_path)
 
     wildcard_globs: list[str] = []
     files_to_add: list[str] = []
+    triggering_files: list[str] = []
 
     for ext, files in ext_to_files.items():
         wildcard = True
@@ -87,12 +89,15 @@ async def _find_cgo_sources(path: str, all_owned_sources: AllOwnedSources) -> li
             if file in all_owned_sources:
                 wildcard = False
 
+        base_files = sorted([PurePath(f).name for f in files])
+        triggering_files.extend(base_files)
+
         if wildcard:
             wildcard_globs.append(f"*{ext}")
         else:
-            files_to_add.extend(files)
+            files_to_add.extend(base_files)
 
-    return [*wildcard_globs, *sorted(files_to_add)]
+    return [*wildcard_globs, *sorted(files_to_add)], sorted(triggering_files)
 
 
 @rule_helper
@@ -112,7 +117,7 @@ async def _find_go_package_targets(
         if not has_go_mod_ancestor(dirname, all_go_mod_dirs):
             continue
 
-        cgo_sources = await _find_cgo_sources(dirname, all_owned_sources)
+        cgo_sources, triggering_cgo_files = await _find_cgo_sources(dirname, all_owned_sources)
         kwargs = {}
         if cgo_sources:
             kwargs = {"sources": ("*.go", *cgo_sources)}
@@ -123,7 +128,7 @@ async def _find_go_package_targets(
                 path=dirname,
                 name=None,
                 kwargs=kwargs,
-                triggering_sources=[*filenames, *cgo_sources],
+                triggering_sources=[*filenames, *triggering_cgo_files],
             )
         )
 

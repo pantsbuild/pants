@@ -117,6 +117,37 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_cgo_sources(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/go.mod": "",
+            "foo/main.go": "",
+            "foo/native.c": "",
+            "foo/another.c": "",
+            "foo/native.h": "",
+            "foo/assembly.s": "",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeGoTargetsRequest(("foo",)),
+            AllOwnedSources(["foo/go.mod"]),
+        ],
+    )
+    assert putative_targets == PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path="foo",
+                name=None,
+                kwargs={"sources": ("*.go", "*.c", "*.s", "*.h")},
+                triggering_sources=["main.go", "another.c", "assembly.s", "native.c", "native.h"],
+            ),
+        ]
+    )
+
+
 def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
