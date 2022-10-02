@@ -554,11 +554,9 @@ async def infer_python_dependencies_via_source(
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
-    inferred_deps = import_deps | {
-        address
-        for addresses in resolved_dependencies.assets.values()
-        for address in addresses.address
-    }
+    asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
+
+    inferred_deps = import_deps | asset_deps
 
     _ = await _handle_unowned_imports(
         request.field_set.address,

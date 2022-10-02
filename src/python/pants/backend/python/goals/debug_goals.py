@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.module_mapper import ResolveName
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonAssetPaths,
     ParsedPythonDependencies,
     ParsedPythonImportInfo,
 )
@@ -90,21 +89,29 @@ class ImportAnalysis:
     """Information on the inferred imports for a Python file."""
 
     name: str
-    reference: Union[ParsedPythonImportInfo, ParsedPythonAssetPaths]
+    reference: Union[ParsedPythonImportInfo, str]
     resolved: ImportResolveResult
     possible_resolve: Optional[list[tuple[Address, ResolveName]]]
 
 
-def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
+@dataclass(frozen=True)
+class CollectedImportAnalysis:
+    """Collected information on all Python files."""
+
+    imports: list[ImportAnalysis]
+    assets: list[ImportAnalysis]
+
+
+def collect_analysis(raw: PythonSourceAnalysis) -> CollectedImportAnalysis:
     """Collect raw analysis and present it in a helpful per-import format."""
-    out = []
+    imports = []
 
     resolved_results = raw.resolved.resolve_results
 
     for name, info in raw.identified.imports.items():
         possible_resolve = raw.possible_owners.value.get(name)
 
-        out.append(
+        imports.append(
             ImportAnalysis(
                 name=name,
                 reference=info,
@@ -113,7 +120,22 @@ def collect_analysis(raw: PythonSourceAnalysis) -> List[ImportAnalysis]:
             )
         )
 
-    return out
+    assets = []
+    resolved_assets = raw.resolved.assets
+
+    for name in raw.identified.assets:
+        possible_resolve = raw.possible_owners.value.get(name)
+
+        assets.append(
+            ImportAnalysis(
+                name=name,
+                reference=name,  # currently assets don't keep track of their line numbers
+                resolved=resolved_assets[name],
+                possible_resolve=possible_resolve,
+            )
+        )
+
+    return CollectedImportAnalysis(imports, assets)
 
 
 @goal_rule
