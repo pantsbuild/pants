@@ -258,6 +258,8 @@ def _get_inferred_asset_deps(
                 resolve_results[filepath] = ImportResolveResult(
                     ImportOwnerStatus.disambiguated, (maybe_disambiguated,)
                 )
+        else:
+            resolve_results[filepath] = ImportResolveResult(ImportOwnerStatus.unowned)
 
     return resolve_results
 
