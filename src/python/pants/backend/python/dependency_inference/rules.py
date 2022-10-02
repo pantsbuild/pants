@@ -247,6 +247,12 @@ def _get_inferred_asset_deps(
 
         if inferred_tgts:
             possible_addresses = tuple(tgt.address for tgt in inferred_tgts)
+            if len(possible_addresses) == 1:
+                resolve_results[filepath] = ImportResolveResult(
+                    ImportOwnerStatus.unambiguous, possible_addresses
+                )
+                continue
+
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 possible_addresses,
                 address,
@@ -266,7 +272,8 @@ def _get_inferred_asset_deps(
 
 class ImportOwnerStatus(Enum):
     unambiguous = "unambiguous"
-    disambiguated = "ambiguous"
+    disambiguated = "disambiguated"
+    ambiguous = "ambiguous"
     unowned = "unowned"
     weak_ignore = "weak_ignore"
     unownable = "unownable"
