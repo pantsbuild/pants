@@ -10,7 +10,6 @@ use async_trait::async_trait;
 
 use petgraph::stable_graph;
 
-use crate::entry::Entry;
 use crate::Graph;
 
 // 2^32 Nodes ought to be more than enough for anyone!
@@ -67,21 +66,6 @@ pub trait NodeError: Clone + Debug + Eq + Send + Sync {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
-}
-
-///
-/// A trait used to visualize Nodes in either DOT/GraphViz format.
-///
-pub trait NodeVisualizer<N: Node> {
-  ///
-  /// Returns a GraphViz color scheme name for this visualizer.
-  ///
-  fn color_scheme(&self) -> &str;
-
-  ///
-  /// Returns a GraphViz color name/id within Self::color_scheme for the given Entry.
-  ///
-  fn color(&mut self, entry: &Entry<N>, context: &N::Context) -> String;
 }
 
 ///
