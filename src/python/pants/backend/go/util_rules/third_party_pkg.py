@@ -344,7 +344,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_allowed else "0"},
         ),
     )
 

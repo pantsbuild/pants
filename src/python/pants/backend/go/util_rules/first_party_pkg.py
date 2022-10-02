@@ -283,7 +283,7 @@ async def analyze_first_party_package(
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
             env={
-                "CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0",
+                "CGO_ENABLED": "1" if golang_subsystem.cgo_allowed else "0",
                 **extra_build_tags_env,
             },
         ),
