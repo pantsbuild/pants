@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, Iterator, Optional
+from typing import DefaultDict, Dict, Iterable, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -222,7 +222,9 @@ def _get_inferred_asset_deps(
     assets_by_path: AllAssetTargetsByPath,
     assets: ParsedPythonAssetPaths,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
-) -> Iterator[Address]:
+) -> dict[str, ImportResolveResult]:
+    resolve_results: dict[str, ImportResolveResult] = {}
+
     for filepath in assets:
         # NB: Resources in Python's ecosystem are loaded relative to a package, so we only try and
         # query for a resource relative to requesting module's path
@@ -253,7 +255,11 @@ def _get_inferred_asset_deps(
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(possible_addresses)
             if maybe_disambiguated:
-                yield maybe_disambiguated
+                resolve_results[filepath] = ImportResolveResult(
+                    ImportOwnerStatus.disambiguated, (maybe_disambiguated,)
+                )
+
+    return resolve_results
 
 
 class ImportOwnerStatus(Enum):
@@ -457,7 +463,7 @@ class ResolvedParsedPythonDependenciesRequest:
 @dataclass(frozen=True)
 class ResolvedParsedPythonDependencies:
     resolve_results: dict[str, ImportResolveResult]
-    assets: frozenset[Address]
+    assets: dict[str, ImportResolveResult]
     explicit: ExplicitlyProvidedDependencies
 
 
@@ -497,17 +503,15 @@ async def resolve_parsed_dependencies(
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
         assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
-        asset_deps = frozenset(
-            _get_inferred_asset_deps(
-                request.field_set.address,
-                request.field_set.source.file_path,
-                assets_by_path,
-                parsed_assets,
-                explicitly_provided_deps,
-            )
+        asset_deps = _get_inferred_asset_deps(
+            request.field_set.address,
+            request.field_set.source.file_path,
+            assets_by_path,
+            parsed_assets,
+            explicitly_provided_deps,
         )
     else:
-        asset_deps = frozenset()
+        asset_deps = {}
 
     return ResolvedParsedPythonDependencies(
         resolve_results=resolve_results,
@@ -539,7 +543,11 @@ async def infer_python_dependencies_via_source(
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
-    inferred_deps = import_deps | resolved_dependencies.assets
+    inferred_deps = import_deps | {
+        address
+        for addresses in resolved_dependencies.assets.values()
+        for address in addresses.address
+    }
 
     _ = await _handle_unowned_imports(
         request.field_set.address,
