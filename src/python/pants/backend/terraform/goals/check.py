@@ -26,7 +26,7 @@ class TerraformValidateSubsystem(Subsystem):
 
 class TerraformCheckRequest(CheckRequest):
     field_set_type = TerraformFieldSet
-    name = TerraformValidateSubsystem.options_scope
+    tool_name = TerraformValidateSubsystem.options_scope
 
 
 @rule
@@ -34,7 +34,7 @@ async def terraform_check(
     request: TerraformCheckRequest, subsystem: TerraformValidateSubsystem
 ) -> CheckResults:
     if subsystem.skip:
-        return CheckResults([], checker_name=request.name)
+        return CheckResults([], checker_name=request.tool_name)
 
     source_files = await Get(
         SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])

@@ -18,7 +18,7 @@ from pants.util.strutil import softwrap
 
 def test_determine_specified_tool_names() -> None:
     class StyleReq:
-        name = "my-tool"
+        tool_name = "my-tool"
 
     with pytest.raises(ValueError) as exc:
         determine_specified_tool_names(
