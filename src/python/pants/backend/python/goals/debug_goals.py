@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Optional, Union
+from enum import Enum
+from typing import Any, Optional, Union
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.module_mapper import ResolveName
@@ -30,11 +31,23 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
+from pants.option.option_types import EnumOption
+
+
+class AnalysisFlavor(Enum):
+    raw_dependency_inference = "raw_dependency_inference"
+    dependency_inference = "dependency_inference"
 
 
 class DumpPythonSourceAnalysisSubsystem(GoalSubsystem):
     name = "python-dump-source-analysis"
     help = "Dump source analysis for python_source targets."
+
+    flavor = EnumOption(
+        "--analysis-flavor",
+        default=AnalysisFlavor.dependency_inference,
+        help="What type of information should be returned",
+    )
 
 
 class DumpPythonSourceAnalysis(Goal):
@@ -140,6 +153,7 @@ def collect_analysis(raw: PythonSourceAnalysis) -> CollectedImportAnalysis:
 
 @goal_rule
 async def dump_python_source_analysis(
+    request: DumpPythonSourceAnalysisSubsystem,
     targets: Targets,
     console: Console,
 ) -> DumpPythonSourceAnalysis:
@@ -158,10 +172,13 @@ async def dump_python_source_analysis(
         for fs in source_field_sets
     )
 
-    collected = {str(a.fs.address): collect_analysis(a) for a in source_analysis}
+    output: Any
+    if request.flavor == AnalysisFlavor.raw_dependency_inference:
+        output = source_analysis
+    else:
+        output = {str(a.fs.address): collect_analysis(a) for a in source_analysis}
 
-    # console.print_stdout(json.dumps(source_analysis, cls=_PeekJsonEncoder))
-    console.print_stdout(json.dumps(collected, cls=_PeekJsonEncoder))
+    console.print_stdout(json.dumps(output, cls=_PeekJsonEncoder))
     return DumpPythonSourceAnalysis(exit_code=0)
 
 
