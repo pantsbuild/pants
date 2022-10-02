@@ -71,7 +71,7 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(
         [
-            "--golang-cgo-enabled",
+            "--golang-cgo-allowed",
             "--golang-minimum-expected-version=1.16",
             "--go-test-args=-v -bench=.",
         ],
@@ -230,7 +230,7 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
 
     rule_runner.set_options(
         args=[
-            "--golang-cgo-enabled",
+            "--golang-cgo-allowed",
             f"--golang-cgo-tool-search-paths=['{str(gxx_path.parent)}']",
             f"--golang-cgo-gxx-binary-name={gxx_path.name}",
         ],
@@ -331,7 +331,7 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
 
     rule_runner.set_options(
         args=[
-            "--golang-cgo-enabled",
+            "--golang-cgo-allowed",
             f"--golang-cgo-tool-search-paths=['{str(gcc_path.parent)}']",
             f"--golang-cgo-gcc-binary-name={gcc_path.name}",
         ],
@@ -434,7 +434,7 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
 
     rule_runner.set_options(
         args=[
-            "--golang-cgo-enabled",
+            "--golang-cgo-allowed",
             f"--golang-cgo-tool-search-paths=['{str(gcc_path.parent)}', '{str(fortran_path.parent)}']",
             f"--golang-cgo-gcc-binary-name={gcc_path.name}",
             f"--golang-cgo-fortran-binary-name={fortran_path.name}",
