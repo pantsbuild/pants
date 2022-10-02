@@ -34,7 +34,7 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtTargetsRequest):
     field_set_type = TerraformFieldSet
-    name = TfFmtSubsystem.options_scope
+    tool_name = TfFmtSubsystem.options_scope
 
 
 @rule
@@ -71,7 +71,7 @@ async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -
 
     output = await Get(Snapshot, Digest, result.output_digest)
 
-    return FmtResult.create(result, snapshot, output, formatter_name=TffmtRequest.name)
+    return FmtResult.create(result, snapshot, output, formatter_name=TffmtRequest.tool_name)
 
 
 def rules():

@@ -31,7 +31,7 @@ class DocformatterFieldSet(FieldSet):
 
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    name = Docformatter.options_scope
+    tool_name = Docformatter.options_scope
 
 
 @rule
@@ -70,7 +70,7 @@ async def docformatter_fmt(
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, formatter_name=DocformatterRequest.name
+        result, snapshot, output_snapshot, formatter_name=DocformatterRequest.tool_name
     )
 
 

@@ -32,7 +32,7 @@ class PrettierFmtFieldSet(FieldSet):
 
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
-    name = Prettier.options_scope
+    tool_name = Prettier.options_scope
 
 
 @rule
@@ -90,7 +90,7 @@ async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prett
         snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=PrettierFmtRequest.name,
+        formatter_name=PrettierFmtRequest.tool_name,
     )
 
 

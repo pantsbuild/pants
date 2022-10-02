@@ -62,7 +62,7 @@ async def terraform_check(
             )
         )
 
-    return CheckResults(check_results, checker_name=request.name)
+    return CheckResults(check_results, checker_name=request.tool_name)
 
 
 def rules():

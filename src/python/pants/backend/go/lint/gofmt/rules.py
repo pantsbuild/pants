@@ -35,7 +35,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
-    name = GofmtSubsystem.options_scope
+    tool_name = GofmtSubsystem.options_scope
 
 
 @rule
@@ -70,7 +70,9 @@ async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtRe
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=GofmtRequest.name)
+    return FmtResult.create(
+        result, snapshot, output_snapshot, formatter_name=GofmtRequest.tool_name
+    )
 
 
 def rules():

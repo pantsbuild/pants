@@ -35,7 +35,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
-    name = Yapf.options_scope
+    tool_name = Yapf.options_scope
 
 
 @rule_helper
@@ -70,7 +70,7 @@ async def _run_yapf(
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=YapfRequest.name)
+    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=YapfRequest.tool_name)
 
 
 @rule

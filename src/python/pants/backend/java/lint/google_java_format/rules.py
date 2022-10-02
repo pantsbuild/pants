@@ -38,7 +38,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    name = GoogleJavaFormatSubsystem.options_scope
+    tool_name = GoogleJavaFormatSubsystem.options_scope
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -115,7 +115,7 @@ async def google_java_format_fmt(
         snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=GoogleJavaFormatRequest.name,
+        formatter_name=GoogleJavaFormatRequest.tool_name,
     )
 
 

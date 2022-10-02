@@ -32,7 +32,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FmtTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    name = PyUpgrade.options_scope
+    tool_name = PyUpgrade.options_scope
 
 
 @rule
@@ -66,7 +66,9 @@ async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpg
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=PyUpgradeRequest.name)
+    return FmtResult.create(
+        result, snapshot, output_snapshot, formatter_name=PyUpgradeRequest.tool_name
+    )
 
 
 def rules():

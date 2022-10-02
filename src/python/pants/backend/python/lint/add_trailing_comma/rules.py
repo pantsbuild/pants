@@ -31,7 +31,7 @@ class AddTrailingCommaFieldSet(FieldSet):
 
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
-    name = AddTrailingComma.options_scope
+    tool_name = AddTrailingComma.options_scope
 
 
 @rule
@@ -75,7 +75,7 @@ async def add_trailing_comma_fmt(
         snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=AddTrailingCommaRequest.name,
+        formatter_name=AddTrailingCommaRequest.tool_name,
     )
 
 

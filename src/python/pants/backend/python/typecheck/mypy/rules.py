@@ -70,7 +70,7 @@ class MyPyPartitions(Collection[MyPyPartition]):
 
 class MyPyRequest(CheckRequest):
     field_set_type = MyPyFieldSet
-    name = MyPy.options_scope
+    tool_name = MyPy.options_scope
 
 
 @rule_helper
@@ -379,13 +379,13 @@ async def mypy_determine_partitions(
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> CheckResults:
     if mypy.skip:
-        return CheckResults([], checker_name=request.name)
+        return CheckResults([], checker_name=request.tool_name)
 
     partitions = await Get(MyPyPartitions, MyPyRequest, request)
     partitioned_results = await MultiGet(
         Get(CheckResult, MyPyPartition, partition) for partition in partitions
     )
-    return CheckResults(partitioned_results, checker_name=request.name)
+    return CheckResults(partitioned_results, checker_name=request.tool_name)
 
 
 def rules():

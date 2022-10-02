@@ -40,7 +40,7 @@ class BufFieldSet(FieldSet):
 
 class BufFormatRequest(FmtTargetsRequest):
     field_set_type = BufFieldSet
-    name = "buf-format"
+    tool_name = "buf-format"
 
 
 @rule
@@ -99,7 +99,9 @@ async def run_buf_format(
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=BufFormatRequest.name)
+    return FmtResult.create(
+        result, snapshot, output_snapshot, formatter_name=BufFormatRequest.tool_name
+    )
 
 
 def rules():
