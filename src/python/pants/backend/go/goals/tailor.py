@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -13,6 +14,7 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoModTarget,
+    GoPackageSourcesField,
     GoPackageTarget,
 )
 from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
@@ -65,6 +67,35 @@ async def _find_go_mod_targets(
 
 
 @rule_helper
+async def _find_cgo_sources(path: str, all_owned_sources: AllOwnedSources) -> list[str]:
+    all_files_in_package = await Get(Paths, PathGlobs([str(PurePath(path, "*"))]))
+    ext_to_files: dict[str, set[str]] = defaultdict(set)
+    for file_path in all_files_in_package.files:
+        file_name = PurePath(file_path).name
+        for ext in GoPackageSourcesField.expected_file_extensions:
+            if ext == ".go":
+                continue
+            if file_name.endswith(ext):
+                ext_to_files[ext].add(file_name)
+
+    wildcard_globs: list[str] = []
+    files_to_add: list[str] = []
+
+    for ext, files in ext_to_files.items():
+        wildcard = True
+        for file in files:
+            if file in all_owned_sources:
+                wildcard = False
+
+        if wildcard:
+            wildcard_globs.append(f"*{ext}")
+        else:
+            files_to_add.extend(files)
+
+    return [*wildcard_globs, *sorted(files_to_add)]
+
+
+@rule_helper
 async def _find_go_package_targets(
     request: PutativeGoTargetsRequest, all_go_mod_dirs: set[str], all_owned_sources: AllOwnedSources
 ) -> list[PutativeTarget]:
@@ -81,12 +112,18 @@ async def _find_go_package_targets(
         if not has_go_mod_ancestor(dirname, all_go_mod_dirs):
             continue
 
+        cgo_sources = await _find_cgo_sources(dirname, all_owned_sources)
+        kwargs = {}
+        if cgo_sources:
+            kwargs = {"sources": ("*.go", *cgo_sources)}
+
         putative_targets.append(
             PutativeTarget.for_target_type(
                 GoPackageTarget,
                 path=dirname,
                 name=None,
-                triggering_sources=sorted(filenames),
+                kwargs=kwargs,
+                triggering_sources=[*filenames, *cgo_sources],
             )
         )
 
