@@ -81,6 +81,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Fatin H
 + Fedor Korotkov
 + Fiona Condone
++ Flo
 + Florian Leibert
 + Fredrik Ekholdt
 + Gabriel Gonzalez
