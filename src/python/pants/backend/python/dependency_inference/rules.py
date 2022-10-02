@@ -462,10 +462,12 @@ class ResolvedParsedPythonDependencies:
 
 
 @rule
-async def _exec_resolve_parsed_deps(
+async def resolve_parsed_dependencies(
     request: ResolvedParsedPythonDependenciesRequest,
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ResolvedParsedPythonDependencies:
+    """Find the owning targets for the parsed dependencies."""
+
     parsed_imports = request.parsed_dependencies.imports
     parsed_assets = request.parsed_dependencies.assets
     if not python_infer_subsystem.imports:
@@ -649,7 +651,7 @@ async def infer_python_conftest_dependencies(
 def import_rules():
     return [
         _exec_parse_deps,
-        _exec_resolve_parsed_deps,
+        resolve_parsed_dependencies,
         find_other_owners_for_unowned_imports,
         infer_python_dependencies_via_source,
         *pex.rules(),
