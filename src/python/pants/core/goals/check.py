@@ -6,34 +6,35 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, cast
+from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
 
 import colors
 
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
-from pants.core.goals.style_request import (
-    StyleRequest,
+from pants.core.goals.multi_tool_goal_helper import (
+    OnlyOption,
     determine_specified_tool_names,
-    only_option_help,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
-from pants.engine.target import FilteredTargets
+from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+_FS = TypeVar("_FS", bound=FieldSet)
 
 
 @dataclass(frozen=True)
@@ -137,12 +138,28 @@ class CheckResults(EngineAwareReturnType):
         return False
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 @union(in_scope_types=[EnvironmentName])
-class CheckRequest(StyleRequest):
-    """A union for StyleRequests that should be type-checkable.
+class CheckRequest(Generic[_FS], EngineAwareParameter):
+    """A union for targets that should be checked.
 
-    Subclass and install a member of this type to provide a linter.
+    Subclass and install a member of this type to provide a checker.
     """
+
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
+    tool_name: ClassVar[str]
+
+    field_sets: Collection[_FS]
+
+    def __init__(self, field_sets: Iterable[_FS]) -> None:
+        self.field_sets = Collection[_FS](field_sets)
+
+    def debug_hint(self) -> str:
+        return self.tool_name
+
+    def metadata(self) -> dict[str, Any]:
+        return {"addresses": [fs.address.spec for fs in self.field_sets]}
 
 
 class CheckSubsystem(GoalSubsystem):
@@ -153,9 +170,7 @@ class CheckSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return CheckRequest in union_membership
 
-    only = StrListOption(
-        help=only_option_help("check", "checkers", "mypy", "javac"),
-    )
+    only = OnlyOption("checkers", "mypy", "javac")
 
 
 class Check(Goal):
@@ -171,7 +186,7 @@ async def check(
     union_membership: UnionMembership,
     check_subsystem: CheckSubsystem,
 ) -> Check:
-    request_types = cast("Iterable[type[StyleRequest]]", union_membership[CheckRequest])
+    request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
     specified_names = determine_specified_tool_names("check", check_subsystem.only, request_types)
 
     requests = tuple(
@@ -179,7 +194,7 @@ async def check(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.name in specified_names
+                request_type.tool_name in specified_names
                 and request_type.field_set_type.is_applicable(target)
             )
         )

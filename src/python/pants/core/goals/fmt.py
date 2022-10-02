@@ -14,7 +14,7 @@ from pants.base.specs import Specs
 from pants.core.goals.lint import LintFilesRequest, LintRequest, LintResult, LintTargetsRequest
 from pants.core.goals.lint import Partitions as LintPartitions
 from pants.core.goals.lint import _get_partitions_by_request_type
-from pants.core.goals.style_request import only_option_help, style_batch_size_help
+from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -24,7 +24,6 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
-from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
@@ -180,14 +179,8 @@ class FmtSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return FmtRequest in union_membership
 
-    only = StrListOption(
-        help=only_option_help("fmt", "formatter", "isort", "shfmt"),
-    )
-    batch_size = IntOption(
-        advanced=True,
-        default=128,
-        help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
-    )
+    only = OnlyOption("formatter", "isort", "shfmt")
+    batch_size = BatchSizeOption(uppercase="Formatter", lowercase="formatter")
 
 
 class Fmt(Goal):

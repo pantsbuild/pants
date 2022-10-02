@@ -22,10 +22,10 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import Specs
-from pants.core.goals.style_request import (
+from pants.core.goals.multi_tool_goal_helper import (
+    BatchSizeOption,
+    OnlyOption,
     determine_specified_tool_names,
-    only_option_help,
-    style_batch_size_help,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -38,7 +38,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
-from pants.option.option_types import BoolOption, IntOption, StrListOption
+from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -189,7 +189,7 @@ class LintRequest:
         `LintTargetsRequest.PartitionRequest`/`LintFilesRequest.PartitionRequest`.
     """
 
-    name: ClassVar[str]
+    tool_name: ClassVar[str]
     is_formatter: ClassVar[bool] = False
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -271,9 +271,7 @@ class LintSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return LintRequest in union_membership
 
-    only = StrListOption(
-        help=only_option_help("lint", "linter", "flake8", "shellcheck"),
-    )
+    only = OnlyOption("linter", "flake8", "shellcheck")
     skip_formatters = BoolOption(
         default=False,
         help=softwrap(
@@ -286,11 +284,7 @@ class LintSubsystem(GoalSubsystem):
             """
         ),
     )
-    batch_size = IntOption(
-        advanced=True,
-        default=128,
-        help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
-    )
+    batch_size = BatchSizeOption(uppercase="Linter", lowercase="linter")
 
 
 class Lint(Goal):
@@ -351,7 +345,9 @@ async def _get_partitions_by_request_type(
     )
 
     filtered_core_request_types = [
-        request_type for request_type in core_request_types if request_type.name in specified_names
+        request_type
+        for request_type in core_request_types
+        if request_type.tool_name in specified_names
     ]
     if not filtered_core_request_types:
         return {}

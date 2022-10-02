@@ -58,7 +58,7 @@ class FortranFieldSet(FieldSet):
 
 class FortranFmtRequest(FmtTargetsRequest):
     field_set_type = FortranFieldSet
-    name = "FortranConditionallyDidChange"
+    tool_name = "FortranConditionallyDidChange"
 
 
 @rule
@@ -75,7 +75,7 @@ async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
     )
     return FmtResult(
-        input=input, output=output, stdout="", stderr="", formatter_name=FortranFmtRequest.name
+        input=input, output=output, stdout="", stderr="", formatter_name=FortranFmtRequest.tool_name
     )
 
 
@@ -97,7 +97,7 @@ class SmalltalkFieldSet(FieldSet):
 
 class SmalltalkNoopRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    name = "SmalltalkDidNotChange"
+    tool_name = "SmalltalkDidNotChange"
 
 
 @rule
@@ -114,13 +114,13 @@ async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResul
         output=snapshot,
         stdout="",
         stderr="",
-        formatter_name=SmalltalkNoopRequest.name,
+        formatter_name=SmalltalkNoopRequest.tool_name,
     )
 
 
 class SmalltalkSkipRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    name = "SmalltalkSkipped"
+    tool_name = "SmalltalkSkipped"
 
 
 @rule
@@ -136,7 +136,7 @@ async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FmtResul
 class BrickyBuildFileFormatter(FmtFilesRequest):
     """Ensures all non-comment lines only consist of the word 'brick'."""
 
-    name = "BrickyBobby"
+    tool_name = "BrickyBobby"
 
 
 @rule
@@ -170,7 +170,7 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> Fmt
         output=output_snapshot,
         stdout="",
         stderr="",
-        formatter_name=BrickyBuildFileFormatter.name,
+        formatter_name=BrickyBuildFileFormatter.tool_name,
     )
 
 
@@ -330,7 +330,7 @@ def test_only() -> None:
     stderr = run_fmt(
         rule_runner,
         target_specs=["::"],
-        only=[SmalltalkNoopRequest.name],
+        only=[SmalltalkNoopRequest.tool_name],
     )
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
 
