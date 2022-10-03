@@ -75,8 +75,7 @@ class GoGenerateGoalSubsystem(GoalSubsystem):
     )
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-        # TODO(#17077): Rename this back to just `env_vars`.
-        generate_env_vars = StrListOption(
+        env_vars = StrListOption(
             default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
             help=softwrap(
                 """
