@@ -11,8 +11,8 @@ from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, Envi
 
 @dataclass(frozen=True)
 class EnvironmentName(EngineAwareParameter):
-    """The normalized name for an environment, from `[environments-preview].names`, after applying
-    things like the __local__ matcher.
+    """The normalized name for an environment, from `[environments].names`, after applying things
+    like the __local__ matcher.
 
     Note that we have this type, rather than only `EnvironmentTarget`, for a more efficient rule
     graph. This node impacts the equality of many downstream nodes, so we want its identity to only

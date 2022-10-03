@@ -41,7 +41,7 @@ from pants.util.strutil import softwrap
 
 
 class EnvironmentsSubsystem(Subsystem):
-    options_scope = "environments-preview"
+    options_scope = "environments"
     help = softwrap(
         """
         A highly experimental subsystem to allow setting environment variables and executable
@@ -54,7 +54,7 @@ class EnvironmentsSubsystem(Subsystem):
             """
             A mapping of logical names to addresses to environment targets. For example:
 
-                [environments-preview.names]
+                [environments.names]
                 linux_local = "//:linux_env"
                 macos_local = "//:macos_env"
                 centos6 = "//:centos6_docker_env"
@@ -104,7 +104,7 @@ class CompatiblePlatformsField(StringSequenceField):
         This is used for Pants to automatically determine which environment target to use for
         the user's machine when the environment is set to the special value
         `{LOCAL_ENVIRONMENT_MATCHER}`. Currently, there cannot be more than one environment target
-        registered in `[environments-preview].names` for a particular platform. If there is no
+        registered in `[environments].names` for a particular platform. If there is no
         environment target for a certain platform, Pants will use the options system instead to
         determine environment variables and executable search paths.
         """
@@ -117,7 +117,7 @@ class LocalFallbackEnvironmentField(FallbackEnvironmentField):
         The environment to fallback to when this local environment cannot be used because the
         field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
 
-        Must be an environment name from the option `[environments-preview].names`, the
+        Must be an environment name from the option `[environments].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
         Python value `None` to error when this specific local environment cannot be used.
 
@@ -205,7 +205,7 @@ class DockerFallbackEnvironmentField(FallbackEnvironmentField):
         field `{DockerPlatformField.alias}` is not compatible with the local host's CPU
         architecture (this is only an issue when the local host is Linux; macOS is fine).
 
-        Must be an environment name from the option `[environments-preview].names`, the
+        Must be an environment name from the option `[environments].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
         Python value `None` to error when this specific Docker environment cannot be used.
         """
@@ -259,7 +259,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
         The environment to fallback to when remote execution is disabled via the global option
         `--remote-execution`.
 
-        Must be an environment name from the option `[environments-preview].names`, the
+        Must be an environment name from the option `[environments].names`, the
         special string `{LOCAL_ENVIRONMENT_MATCHER}` to use the relevant local environment, or the
         Python value `None` to error when remote execution is disabled.
 
@@ -326,7 +326,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 
 @dataclass(frozen=True)
 class ChosenLocalEnvironmentName:
-    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
+    """Which environment name from `[environments].names` that __local__ resolves to."""
 
     val: str | None
 
@@ -338,7 +338,7 @@ class EnvironmentTarget:
 
 @dataclass(frozen=True)
 class EnvironmentNameRequest(EngineAwareParameter):
-    f"""Normalize the value into a name from `[environments-preview].names`, such as by
+    f"""Normalize the value into a name from `[environments].names`, such as by
     applying {LOCAL_ENVIRONMENT_MATCHER}."""
 
     raw_value: str
@@ -419,32 +419,32 @@ async def determine_local_environment(
     raise AmbiguousEnvironmentError(
         softwrap(
             f"""
-            Multiple `_local_environment` targets from `[environments-preview].names`
+            Multiple `local_environment` targets from `[environments].names`
             are compatible with the current platform `{platform.value}`, so it is ambiguous
             which to use:
             {sorted(tgt.address.spec for _name, tgt in compatible_name_and_targets)}
 
             To fix, either adjust the `{CompatiblePlatformsField.alias}` field from those
             targets so that only one includes the value `{platform.value}`, or change
-            `[environments-preview].names` so that it does not define some of those targets.
+            `[environments].names` so that it does not define some of those targets.
 
             It is often useful to still keep the same `local_environment` target definitions in
             BUILD files; instead, do not give a name to each of them in
-            `[environments-preview].names` to avoid ambiguity. Then, you can override which target
-            a particular name points to by overriding `[environments-preview].names`. For example,
+            `[environments].names` to avoid ambiguity. Then, you can override which target
+            a particular name points to by overriding `[environments].names`. For example,
             you could set this in `pants.toml`:
 
-                [environments-preview.names]
+                [environments.names]
                 linux = "//:linux_env"
                 macos = "//:macos_local_env"
 
             Then, for CI, override what the name `macos` points to by setting this in
             `pants.ci.toml`:
 
-                [environments-preview.names.add]
+                [environments.names.add]
                 macos = "//:macos_ci_env"
 
-            Locally, you can override `[environments-preview].names` like this by using a
+            Locally, you can override `[environments].names` like this by using a
             `.pants.rc` file, for example.
             """
         )
@@ -484,7 +484,7 @@ async def resolve_environment_name(
                 {request.description_of_origin}.
 
                 The value must either be `{LOCAL_ENVIRONMENT_MATCHER}` or a name from the option
-                `[environments-preview].names`: {sorted(environments_subsystem.names.keys())}
+                `[environments].names`: {sorted(environments_subsystem.names.keys())}
                 """
             )
         )
@@ -594,7 +594,7 @@ async def get_target_for_environment_name(
                 """
             )
         )
-    _description_of_origin = "the option [environments-preview].names"
+    _description_of_origin = "the option [environments].names"
     address = await Get(
         Address,
         AddressInput,
@@ -616,7 +616,7 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 Expected to use the address to a `_local_environment`, `_docker_environment`, or
-                `_remote_environment` target in the option `[environments-preview].names`, but the name
+                `_remote_environment` target in the option `[environments].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """

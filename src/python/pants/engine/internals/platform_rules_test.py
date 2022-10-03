@@ -150,7 +150,7 @@ def test_docker_complete_env_vars() -> None:
             )
         }
     )
-    rule_runner.set_options(["--environments-preview-names={'docker': '//:docker'}"])
+    rule_runner.set_options(["--environments-names={'docker': '//:docker'}"])
     result = dict(rule_runner.request(CompleteEnvironmentVars, []))
 
     # HOSTNAME is not deterministic across machines, so we don't care about the value.
