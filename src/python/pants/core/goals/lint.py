@@ -7,7 +7,6 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -39,13 +38,12 @@ from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
@@ -195,6 +193,7 @@ class LintRequest:
     name: ClassVar[str]
     is_formatter: ClassVar[bool] = False
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     # NB: Not frozen so `fmt` can subclass
     @frozen_after_init
     @dataclass(unsafe_hash=True)
@@ -202,18 +201,6 @@ class LintRequest:
     class SubPartition(Generic[_PartitionElementT]):
         elements: Tuple[_PartitionElementT, ...]
         key: Any
-
-    _SubPartitionBase = SubPartition
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def SubPartition(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class SubPartition(cls._SubPartitionBase):
-                pass
-
-            return SubPartition
 
     @final
     @classmethod
@@ -231,6 +218,7 @@ class LintTargetsRequest(LintRequest):
 
     field_set_type: ClassVar[type[FieldSet]]
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     @runtime_ignore_subscripts
     class PartitionRequest(Generic[_FieldSetT]):
@@ -243,18 +231,6 @@ class LintTargetsRequest(LintRequest):
 
         field_sets: tuple[_FieldSetT, ...]
 
-    _PartitionRequestBase = PartitionRequest
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def PartitionRequest(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class PartitionRequest(cls._PartitionRequestBase):
-                pass
-
-            return PartitionRequest
-
     @classmethod
     def _get_registration_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_registration_rules()
@@ -264,6 +240,7 @@ class LintTargetsRequest(LintRequest):
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
     class PartitionRequest:
         """Returns a unique `PartitionRequest` type per calling type.
@@ -274,18 +251,6 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
         """
 
         files: tuple[str, ...]
-
-    _PartitionRequestBase = PartitionRequest
-
-    if not TYPE_CHECKING:
-
-        @memoized_classproperty
-        def PartitionRequest(cls):
-            @union(in_scope_types=[EnvironmentName])
-            class PartitionRequest(cls._PartitionRequestBase):
-                pass
-
-            return PartitionRequest
 
     @classmethod
     def _get_registration_rules(cls) -> Iterable[UnionRule]:

@@ -51,6 +51,7 @@ class LocalPantsRunner:
 
     options: Options
     options_bootstrapper: OptionsBootstrapper
+    session_end_tasks_timeout: float
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
@@ -167,6 +168,7 @@ class LocalPantsRunner:
         return cls(
             options=options,
             options_bootstrapper=options_bootstrapper,
+            session_end_tasks_timeout=global_bootstrap_options.session_end_tasks_timeout,
             build_config=build_config,
             run_tracker=run_tracker,
             specs=specs,
@@ -275,6 +277,9 @@ class LocalPantsRunner:
             try:
                 engine_result = self._run_inner()
             finally:
+                self.graph_session.scheduler_session.wait_for_tail_tasks(
+                    self.session_end_tasks_timeout
+                )
                 metrics = self.graph_session.scheduler_session.metrics()
                 self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                 self.run_tracker.end_run(engine_result)

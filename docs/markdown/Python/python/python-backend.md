@@ -63,7 +63,7 @@ Created project/BUILD:
 >
 > ```toml
 > [python-bootstrap]
-> search_paths = [
+> search_path = [
 >     # This will use all interpreters in `$(pyenv root)/versions`.
 >     "<PYENV>",
 >      # Brew usually installs Python here.

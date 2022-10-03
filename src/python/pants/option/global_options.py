@@ -1306,6 +1306,16 @@ class BootstrapOptions:
         ),
         advanced=True,
     )
+    session_end_tasks_timeout = FloatOption(
+        default=3.0,
+        help=softwrap(
+            """
+            The time in seconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
+    )
     remote_execution = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
         help=softwrap(
@@ -1701,6 +1711,22 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    docker_execution = BoolOption(
+        default=True,
+        advanced=True,
+        help=softwrap(
+            """
+            If true, `docker_environment` targets can be used to run builds inside a Docker
+            container.
+
+            If false, anytime a `docker_environment` target is used, Pants will instead fallback to
+            whatever the target's `fallback_environment` field is set to.
+
+            This can be useful, for example, if you want to always use Docker locally, but disable
+            it in CI, or vice versa.
+            """
+        ),
+    )
     remote_execution_extra_platform_properties = StrListOption(
         advanced=True,
         help=softwrap(

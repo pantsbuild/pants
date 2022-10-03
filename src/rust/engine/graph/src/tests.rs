@@ -100,6 +100,53 @@ async fn invalidate_and_rerun() {
 }
 
 #[tokio::test]
+async fn invalidate_uncacheable() {
+  let graph = empty_graph();
+
+  // Create three nodes, with the middle node as uncacheable.
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+  );
+
+  // Clear the bottom Node, which dirties the middle and upper node.
+  assert_eq!(
+    graph.invalidate_from_roots(true, |n| n.id == 0),
+    InvalidationResult {
+      cleared: 1,
+      dirtied: 2
+    }
+  );
+
+  // Re-request in the same session with new salt, and validate that all three re-run.
+  let context = context.with_salt(1);
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(2)
+    ]
+  );
+}
+
+#[tokio::test]
 async fn invalidate_with_changed_dependencies() {
   let graph = empty_graph();
   let context = TContext::new(graph.clone());

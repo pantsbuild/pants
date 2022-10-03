@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -37,7 +37,7 @@ use process_execution::{
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
-use graph::{Entry, Node, NodeError, NodeVisualizer};
+use graph::{Node, NodeError};
 use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
@@ -448,6 +448,7 @@ impl ExecuteProcess {
       context.session.workunit_store(),
       context.session.build_id().to_string(),
       context.session.run_id(),
+      context.session.tail_tasks(),
     );
 
     let res = command_runner
@@ -1220,32 +1221,6 @@ impl From<Task> for NodeKey {
   }
 }
 
-#[derive(Default)]
-pub struct Visualizer {
-  viz_colors: HashMap<String, String>,
-}
-
-impl NodeVisualizer<NodeKey> for Visualizer {
-  fn color_scheme(&self) -> &str {
-    "set312"
-  }
-
-  fn color(&mut self, entry: &Entry<NodeKey>, context: &<NodeKey as Node>::Context) -> String {
-    let max_colors = 12;
-    match entry.peek(context) {
-      None => "white".to_string(),
-      Some(_) => {
-        let viz_colors_len = self.viz_colors.len();
-        self
-          .viz_colors
-          .entry(entry.node().product_str())
-          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
-          .clone()
-      }
-    }
-  }
-}
-
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
@@ -1265,22 +1240,6 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  fn product_str(&self) -> String {
-    match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
-      &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => format!("{}", s.product),
-      &NodeKey::SessionValues(_) => "SessionValues".to_string(),
-      &NodeKey::RunId(_) => "RunId".to_string(),
-      &NodeKey::Task(ref t) => format!("{}", t.task.product),
-      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::Paths(..) => "Paths".to_string(),
-      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
-      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
-      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-    }
-  }
-
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),

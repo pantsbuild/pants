@@ -18,6 +18,7 @@ def run_generic_test(
     execution_mode: Optional[PexExecutionMode] = None,
     include_tools: bool = False,
     layout: Optional[PexLayout] = None,
+    venv_site_packages_copies: bool = False,
 ) -> Callable[..., PantsResult]:
     sources = {
         "src_root1/project/app.py": dedent(
@@ -44,6 +45,7 @@ def run_generic_test(
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
               layout={layout.value if layout is not None else None!r},
+              venv_site_packages_copies={venv_site_packages_copies!r},
             )
             """
         ),

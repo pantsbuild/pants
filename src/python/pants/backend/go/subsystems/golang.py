@@ -6,10 +6,9 @@ from __future__ import annotations
 import logging
 import os
 
-from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
@@ -23,24 +22,139 @@ class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
 
-    _go_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+
+        depends_on_env_vars = ("PATH",)
+
+        _go_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                A list of paths to search for Go.
+
+                Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
+                Earlier entries will be searched first.
+
+                The following special strings are supported:
+
+                * `<PATH>`, the contents of the PATH environment variable
+                * `<ASDF>`, all Go versions currently configured by ASDF \
+                    `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
+                * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+                """
+            ),
+        )
+        _subprocess_env_vars = StrListOption(
+            default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+            help=softwrap(
+                """
+            Environment variables to set when invoking the `go` tool.
+            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+            or just `ENV_VAR` to copy the value from Pants's own environment.
             """
-            A list of paths to search for Go.
+            ),
+            advanced=True,
+        )
 
-            Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
-            Earlier entries will be searched first.
+        _cgo_tool_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                A list of paths to search for tools needed by CGo (e.g., gcc, g++).
 
-            The following special strings are supported:
+                Specify absolute paths to directories with tools needed by CGo , e.g. `/usr/bin`.
+                Earlier entries will be searched first.
 
-              * `<PATH>`, the contents of the PATH environment variable
-              * `<ASDF>`, all Go versions currently configured by ASDF \
-                  `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-              * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
-            """
-        ),
-    )
+                The following special strings are supported:
+
+                * `<PATH>`, the contents of the PATH environment variable
+                """
+            ),
+        )
+
+        cgo_gcc_binary_name = StrOption(
+            default="gcc",
+            advanced=True,
+            help="Name of the tool to use to compile C code included via CGo in a Go package.",
+        )
+
+        cgo_gxx_binary_name = StrOption(
+            default="g++",
+            advanced=True,
+            help="Name of the tool to use to compile C++ code included via CGo in a Go package.",
+        )
+
+        cgo_fortran_binary_name = StrOption(
+            default="gfortran",
+            advanced=True,
+            help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
+        )
+
+        cgo_c_flags = StrListOption(
+            default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+            advanced=True,
+            help=softwrap(
+                """
+                Compiler options used when compiling C code when Cgo is enabled. Equivalent to setting the
+                CGO_CFLAGS environment variable when invoking `go`.
+                """
+            ),
+        )
+
+        cgo_cxx_flags = StrListOption(
+            default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+            advanced=True,
+            help=softwrap(
+                """
+                Compiler options used when compiling C++ code when Cgo is enabled. Equivalent to setting the
+                CGO_CXXFLAGS environment variable when invoking `go`.
+                """
+            ),
+        )
+
+        cgo_fortran_flags = StrListOption(
+            default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+            advanced=True,
+            help=softwrap(
+                """
+                Compiler options used when compiling Fortran code when Cgo is enabled. Equivalent to setting the
+                CGO_FFLAGS environment variable when invoking `go`.
+                """
+            ),
+        )
+
+        cgo_linker_flags = StrListOption(
+            default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
+            advanced=True,
+            help=softwrap(
+                """
+                Compiler options used when linking native code when Cgo is enabled. Equivalent to setting the
+                CGO_LDFLAGS environment variable when invoking `go`.
+                """
+            ),
+        )
+
+        @property
+        def raw_go_search_paths(self) -> tuple[str, ...]:
+            return tuple(self._go_search_paths)
+
+        @property
+        def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._subprocess_env_vars)))
+
+        @memoized_property
+        def cgo_tool_search_paths(self) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._cgo_tool_search_paths:
+                    if entry == "<PATH>":
+                        path = self.env_vars.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))
+
     minimum_expected_version = StrOption(
         default="1.17",
         help=softwrap(
@@ -57,18 +171,6 @@ class GolangSubsystem(Subsystem):
             """
         ),
     )
-    _subprocess_env_vars = StrListOption(
-        default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
-        help=softwrap(
-            """
-            Environment variables to set when invoking the `go` tool.
-            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
-            or just `ENV_VAR` to copy the value from Pants's own environment.
-            """
-        ),
-        advanced=True,
-    )
-
     tailor_go_mod_targets = BoolOption(
         default=True,
         help=softwrap(
@@ -105,91 +207,13 @@ class GolangSubsystem(Subsystem):
         default=False,
         help=softwrap(
             """\
-            Enable Cgos support, which allows Go and C code to interact. This option must be enabled for any
+            Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
             packages making use of Cgo to actually be compiled with Cgo support.
 
             TODO: Future Pants changes may also require enabling Cgo via fields on relevant Go targets.
             See https://github.com/pantsbuild/pants/issues/16833.
 
             See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
-            """
-        ),
-    )
-
-    _cgo_tool_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            A list of paths to search for tools needed by CGo (e.g., gcc, g++).
-
-            Specify absolute paths to directories with tools needed by CGo , e.g. `/usr/bin`.
-            Earlier entries will be searched first.
-
-            The following special strings are supported:
-
-              * `<PATH>`, the contents of the PATH environment variable
-            """
-        ),
-    )
-
-    cgo_gcc_binary_name = StrOption(
-        default="gcc",
-        advanced=True,
-        help="Name of the tool to use to compile C code included via CGo in a Go package.",
-    )
-
-    cgo_gxx_binary_name = StrOption(
-        default="g++",
-        advanced=True,
-        help="Name of the tool to use to compile C++ code included via CGo in a Go package.",
-    )
-
-    cgo_fortran_binary_name = StrOption(
-        default="gfortran",
-        advanced=True,
-        help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
-    )
-
-    cgo_c_flags = StrListOption(
-        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
-        advanced=True,
-        help=softwrap(
-            """
-            Compiler options used when compiling C code when Cgo is enabled. Equivalent to setting the
-            CGO_CFLAGS environment variable when invoking `go`.
-            """
-        ),
-    )
-
-    cgo_cxx_flags = StrListOption(
-        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
-        advanced=True,
-        help=softwrap(
-            """
-            Compiler options used when compiling C++ code when Cgo is enabled. Equivalent to setting the
-            CGO_CXXFLAGS environment variable when invoking `go`.
-            """
-        ),
-    )
-
-    cgo_fortran_flags = StrListOption(
-        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
-        advanced=True,
-        help=softwrap(
-            """
-            Compiler options used when compiling Fortran code when Cgo is enabled. Equivalent to setting the
-            CGO_FFLAGS environment variable when invoking `go`.
-            """
-        ),
-    )
-
-    cgo_linker_flags = StrListOption(
-        default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
-        advanced=True,
-        help=softwrap(
-            """
-            Compiler options used when linking native code when Cgo is enabled. Equivalent to setting the
-            CGO_LDFLAGS environment variable when invoking `go`.
             """
         ),
     )
@@ -218,24 +242,3 @@ class GolangSubsystem(Subsystem):
         ),
         advanced=True,
     )
-
-    @property
-    def raw_go_search_paths(self) -> tuple[str, ...]:
-        return tuple(self._go_search_paths)
-
-    @property
-    def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self._subprocess_env_vars)))
-
-    @memoized_method
-    def cgo_tool_search_paths(self, env: EnvironmentVars) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._cgo_tool_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
-
-        return tuple(OrderedSet(iter_path_entries()))

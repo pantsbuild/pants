@@ -35,7 +35,7 @@ _HELM_K8S_PARSER_PACKAGE = "pants.backend.helm.subsystems"
 
 class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-k8s-parser"
-    help = "Used to perform modifications to the final output produced by Helm charts when they've been fully rendered."
+    help = "Analyses K8S manifests rendered by Helm."
 
     default_version = "hikaru==0.11.0b"
 
@@ -130,7 +130,7 @@ async def parse_kube_manifest(
             tool.pex,
             argv=[request.file.path],
             input_digest=file_digest,
-            description=f"Parsing Kubernetes manifest {request.file.path}",
+            description=f"Analyzing Kubernetes manifest {request.file.path}",
             level=LogLevel.DEBUG,
         ),
     )
@@ -153,9 +153,6 @@ async def parse_kube_manifest(
             image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
 
         return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
-    elif result.exit_code == 2:
-        # Unrecognised YAML manifests, we complete with an empty list of image references
-        return ParsedKubeManifest(filename=request.file.path, found_image_refs=())
     else:
         parser_error = result.stderr.decode("utf-8")
         raise Exception(
