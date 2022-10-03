@@ -40,15 +40,15 @@ pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::ne
 pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
 
 /// `CommandRunner` that executes processes using a local Docker client.
-pub struct CommandRunner {
+pub struct CommandRunner<'a> {
   store: Store,
   executor: Executor,
-  docker: &'static DockerOnceCell,
+  docker: &'a DockerOnceCell,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  container_cache: ContainerCache,
+  container_cache: ContainerCache<'a>,
 }
 
 #[derive(Clone)]
@@ -285,12 +285,12 @@ async fn pull_image(
   Ok(())
 }
 
-impl CommandRunner {
+impl<'a> CommandRunner<'a> {
   pub fn new(
     store: Store,
     executor: Executor,
-    docker: &'static DockerOnceCell,
-    image_pull_cache: &'static ImagePullCache,
+    docker: &'a DockerOnceCell,
+    image_pull_cache: &'a ImagePullCache,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
@@ -317,7 +317,7 @@ impl CommandRunner {
   }
 }
 
-impl fmt::Debug for CommandRunner {
+impl fmt::Debug for CommandRunner<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("docker::CommandRunner")
       .finish_non_exhaustive()
@@ -325,7 +325,7 @@ impl fmt::Debug for CommandRunner {
 }
 
 #[async_trait]
-impl super::CommandRunner for CommandRunner {
+impl<'a> super::CommandRunner for CommandRunner<'a> {
   async fn run(
     &self,
     context: Context,
@@ -440,7 +440,7 @@ impl super::CommandRunner for CommandRunner {
 }
 
 #[async_trait]
-impl CapturedWorkdir for CommandRunner {
+impl<'a> CapturedWorkdir for CommandRunner<'a> {
   type WorkdirToken = String;
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
@@ -558,9 +558,9 @@ impl CapturedWorkdir for CommandRunner {
 
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
-struct ContainerCache {
-  docker: &'static DockerOnceCell,
-  image_pull_cache: &'static ImagePullCache,
+struct ContainerCache<'a> {
+  docker: &'a DockerOnceCell,
+  image_pull_cache: &'a ImagePullCache,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
@@ -571,10 +571,10 @@ struct ContainerCache {
   containers: Mutex<BTreeMap<(String, Platform), Arc<OnceCell<String>>>>,
 }
 
-impl ContainerCache {
+impl<'a> ContainerCache<'a> {
   pub fn new(
-    docker: &'static DockerOnceCell,
-    image_pull_cache: &'static ImagePullCache,
+    docker: &'a DockerOnceCell,
+    image_pull_cache: &'a ImagePullCache,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
@@ -629,7 +629,7 @@ impl ContainerCache {
     image: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
-    image_pull_cache: &'static ImagePullCache,
+    image_pull_cache: ImagePullCache,
     work_dir_base: String,
     named_caches_base_dir: String,
     immutable_inputs_base_dir: String,
@@ -741,7 +741,7 @@ impl ContainerCache {
           image.to_string(),
           *platform,
           image_pull_scope,
-          self.image_pull_cache,
+          self.image_pull_cache.clone(),
           work_dir_base,
           named_caches_base_dir,
           immutable_inputs_base_dir,
