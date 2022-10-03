@@ -433,7 +433,7 @@ async def run_python_test(
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
-        extra_output_prefix=partition.key,
+        extra_output_prefix=partition.extra_output_prefix,
     )
 
 

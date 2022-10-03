@@ -117,7 +117,7 @@ def test_multiple_go_mod_support(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("foo"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestFoo" in result.stdout
@@ -125,7 +125,7 @@ def test_multiple_go_mod_support(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("bar"))
     field_set = GoTestFieldSet.create(tgt)
     result = rule_runner.request(
-        TestResult, [GoTestRequest.SubPartition((field_set,), "", tgt.address.spec)]
+        TestResult, [GoTestRequest.SubPartition((field_set,), tgt.address.spec)]
     )
     assert result.exit_code == 0
     assert "PASS: TestBar" in result.stdout

@@ -279,5 +279,5 @@ def run_scalatest_test(
     )
     field_set = ScalatestTestFieldSet.create(tgt)
     return rule_runner.request(
-        TestResult, [ScalatestRequest.SubPartition((field_set,), "", tgt.address.spec)]
+        TestResult, [ScalatestRequest.SubPartition((field_set,), tgt.address.spec)]
     )

@@ -643,5 +643,5 @@ def run_junit_test(
     )
     field_set = JunitTestFieldSet.create(tgt)
     return rule_runner.request(
-        TestResult, [JunitRequest.SubPartition((field_set,), "", tgt.address.spec)]
+        TestResult, [JunitRequest.SubPartition((field_set,), tgt.address.spec)]
     )

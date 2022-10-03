@@ -719,7 +719,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
     )
     field_set = PythonTestFieldSet.create(tgt)
-    inputs = [PytestRequest.SubPartition((field_set,), "", tgt.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), tgt.address.spec)]
     request = rule_runner.request(TestDebugAdapterRequest, inputs)
     assert request.process is not None
     assert request.process.process.argv == (

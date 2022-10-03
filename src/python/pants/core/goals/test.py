@@ -231,10 +231,11 @@ _FieldSetT = TypeVar("_FieldSetT", bound=TestFieldSet)
 class Partition(Generic[_FieldSetT]):
     field_sets: tuple[_FieldSetT, ...]
     description: str
+    extra_output_prefix: str | None = None
 
 
 @runtime_ignore_subscripts
-class Partitions(FrozenDict[str, Partition[_FieldSetT]]):
+class Partitions(FrozenDict[Any, Partition[_FieldSetT]]):
     """A mapping from <partition key> to <partition>.
 
     When implementing a test-runner, one of your rules will take in a `PartitionRequest`
@@ -254,7 +255,17 @@ class Partitions(FrozenDict[str, Partition[_FieldSetT]]):
     def partition_per_input(cls, elements: Iterable[_FieldSetT]) -> Partitions[_FieldSetT]:
         """Helper constructor for implementations that have a partition per input."""
         return Partitions(
-            [(e.address.path_safe_spec, Partition((e,), e.address.spec)) for e in elements]
+            [
+                (
+                    e.address,
+                    Partition(
+                        field_sets=(e,),
+                        description=e.address.spec,
+                        extra_output_prefix=e.address.path_safe_spec,
+                    ),
+                )
+                for e in elements
+            ]
         )
 
 
@@ -341,8 +352,8 @@ class TestRequest:
     @runtime_ignore_subscripts
     class SubPartition(Generic[_FieldSetT]):
         field_sets: Tuple[_FieldSetT, ...]
-        key: str
         description: str
+        extra_output_prefix: str | None = None
 
     @final
     @classmethod
