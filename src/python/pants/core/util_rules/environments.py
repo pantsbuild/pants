@@ -131,13 +131,13 @@ class LocalFallbackEnvironmentField(FallbackEnvironmentField):
 
 
 class LocalEnvironmentTarget(Target):
-    alias = "_local_environment"
+    alias = "local_environment"
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         """
         Configuration of environment variables and search paths for running Pants locally.
 
-        TODO(#7735): Explain how this gets used once we allow targets to set environment.
+        When `[environments].names` is set, 
         """
     )
 
@@ -615,7 +615,7 @@ async def get_target_for_environment_name(
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `_local_environment`, `_docker_environment`, or
+                Expected to use the address to a `local_environment`, `_docker_environment`, or
                 `_remote_environment` target in the option `[environments].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
