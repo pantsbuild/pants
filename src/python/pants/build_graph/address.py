@@ -369,6 +369,7 @@ class Address(EngineAwareParameter):
         parameters: Mapping[str, str] | None = None,
         generated_name: str | None = None,
         relative_file_path: str | None = None,
+        _original_address: Address | None = None,
     ) -> None:
         """
         :param spec_path: The path from the build root to the directory containing the BUILD file
@@ -383,11 +384,22 @@ class Address(EngineAwareParameter):
         :param relative_file_path: The relative path from the spec_path to an addressed file,
           if any. Because files must always be located below targets that apply metadata to
           them, this will always be relative.
+        :param _original_address: Used internally by the Address class when creating a generator
+          address for the original target address in order to support going back
+          (lossless conversion).
         """
+        # Support providing a relative_file_path in the target name as "<filename>:<target_name>".
+        if target_name and not relative_file_path and ":" in target_name:
+            relative_file_path, target_name = target_name.rsplit(":", 1)
+            self._is_explicit_file_target = True
+        else:
+            self._is_explicit_file_target = False
+
         self.spec_path = spec_path
         self.parameters = FrozenDict(parameters) if parameters else FrozenDict()
         self.generated_name = generated_name
         self._relative_file_path = relative_file_path
+        self._original_address = _original_address
         if generated_name:
             if relative_file_path:
                 raise AssertionError(
@@ -427,7 +439,9 @@ class Address(EngineAwareParameter):
 
     @property
     def is_generated_target(self) -> bool:
-        return self.generated_name is not None or self.is_file_target
+        return self.generated_name is not None or (
+            self.is_file_target and not self._is_explicit_file_target
+        )
 
     @property
     def is_file_target(self) -> bool:
@@ -456,6 +470,10 @@ class Address(EngineAwareParameter):
         if self._target_name is None:
             return os.path.basename(self.spec_path)
         return self._target_name
+
+    @property
+    def atom_file_target_name(self) -> str | None:
+        return f"{self._relative_file_path}:{self.target_name}"
 
     @property
     def parameters_repr(self) -> str:
@@ -538,7 +556,10 @@ class Address(EngineAwareParameter):
         Otherwise, return self unmodified.
         """
         if self.is_generated_target or self.is_parametrized:
-            return self.__class__(self.spec_path, target_name=self._target_name)
+            # Preserve the original address to make this a potentially loss-less operation.
+            return self.__class__(
+                self.spec_path, target_name=self._target_name, _original_address=self
+            )
         return self
 
     def create_generated(self, generated_name: str) -> Address:

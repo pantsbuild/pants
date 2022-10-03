@@ -146,11 +146,23 @@ class AddressFamily:
 
     def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
         assert address.spec_path == self.namespace
-        entry = self.name_to_target_adaptors.get(address.target_name)
-        if entry is None:
-            return None
-        _, target_adaptor = entry
-        return target_adaptor
+        for name in (address.target_name, address.atom_file_target_name):
+            if not name:
+                continue
+            entry = self.name_to_target_adaptors.get(name)
+            if entry:
+                _, target_adaptor = entry
+                return target_adaptor
+
+        if (
+            address._original_address is not None
+            and address._original_address.spec_path == self.namespace
+        ):
+            # In case of a atom file target defined in a BUILD file, there may be no target
+            # generator for it.
+            return self.get_target_adaptor(address._original_address)
+
+        return None
 
     def __hash__(self):
         return hash((self.namespace, self.defaults))

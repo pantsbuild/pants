@@ -145,6 +145,26 @@ def test_address_family_create_multiple() -> None:
     } == dict(address_family.addresses_to_target_adaptors.items())
 
 
+def test_address_family_create_file_target() -> None:
+    address_family = AddressFamily.create(
+        "name/space",
+        [
+            AddressMap(
+                "name/space/0",
+                {
+                    "demo.py:lib": TargetAdaptor(type_alias="thing", name="demo.py:lib"),
+                },
+            )
+        ],
+    )
+    assert "name/space" == address_family.namespace
+    assert {
+        Address("name/space", target_name="lib", relative_file_path="demo.py"): TargetAdaptor(
+            type_alias="thing", name="demo.py:lib"
+        ),
+    } == dict(address_family.addresses_to_target_adaptors.items())
+
+
 def test_address_family_create_empty() -> None:
     # Case where directory exists but is empty.
     address_family = AddressFamily.create("name/space", [])

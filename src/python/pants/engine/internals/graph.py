@@ -201,6 +201,7 @@ async def resolve_target_parametrizations(
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> _TargetParametrizations:
     address = request.address
+
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
         address, registered_target_types, description_of_origin=request.description_of_origin
     )
