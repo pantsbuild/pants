@@ -16,11 +16,11 @@ def rule_runner() -> RuleRunner:
 
 
 def test_resolve_image_id(rule_runner: RuleRunner) -> None:
-    subprocess.check_call(["docker", "pull", "busybox:1"])
-    inspect_output = subprocess.check_output(["docker", "image", "inspect", "busybox:1"])
-    image_id = json.loads(inspect_output)[0]["Id"]
-
     image_result = rule_runner.request(
         DockerResolveImageResult, [DockerResolveImageRequest("busybox:1")]
     )
-    assert image_result.image_id == image_id
+
+    inspect_output = subprocess.check_output(["docker", "image", "inspect", "busybox:1"])
+    expected_image_id = json.loads(inspect_output)[0]["Id"]
+
+    assert image_result.image_id == expected_image_id

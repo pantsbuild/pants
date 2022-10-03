@@ -139,7 +139,7 @@ impl ImagePullCache {
     }
   }
 
-  async fn pull_image(
+  pub async fn pull_image(
     &self,
     docker: &Docker,
     image: &str,
