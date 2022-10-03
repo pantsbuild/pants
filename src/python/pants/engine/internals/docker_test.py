@@ -8,7 +8,7 @@ import pytest
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner, logging
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
@@ -19,7 +19,8 @@ def rule_runner() -> RuleRunner:
 def test_resolve_image_id(rule_runner: RuleRunner) -> None:
     platform = Platform.create_for_localhost()
     image_result = rule_runner.request(
-        DockerResolveImageResult, [DockerResolveImageRequest(image_name="busybox:1", platform=platform.name)]
+        DockerResolveImageResult,
+        [DockerResolveImageRequest(image_name="busybox:1", platform=platform.name)],
     )
 
     inspect_output = subprocess.check_output(["docker", "image", "inspect", "busybox:1"])
