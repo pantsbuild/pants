@@ -736,8 +736,8 @@ impl ContainerCache {
   }
 
   pub async fn shutdown(&self) -> Result<(), String> {
-    // Skip shutting down if Docker was never initialized in the first place.
-    if !DOCKER.initialized() {
+    // Skip shutting down if Docker was never used in the first place.
+    if self.containers.lock().is_empty() {
       return Ok(());
     }
 
