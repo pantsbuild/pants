@@ -194,6 +194,9 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         [tgt],
         extra_args=[
             "--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3",
+            # N.B.: Needed to workaround break cause by the 5.0.0 release as documented here:
+            # https://github.com/python/importlib_metadata/issues/406
+            "--flake8-extra-requirements=importlib-metadata==4.13.0",
             "--flake8-lockfile=<none>",
         ],
     )
