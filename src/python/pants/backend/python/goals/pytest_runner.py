@@ -394,11 +394,11 @@ async def run_python_test(
     partition: PytestRequest.SubPartition[PythonTestFieldSet],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -441,11 +441,11 @@ async def run_python_test(
 async def debug_python_test(
     partition: PytestRequest.SubPartition[PythonTestFieldSet],
 ) -> TestDebugRequest:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(
@@ -461,11 +461,11 @@ async def debugpy_python_test(
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Pytest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Pytest partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
 
     setup = await Get(

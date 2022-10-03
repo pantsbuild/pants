@@ -182,11 +182,11 @@ async def run_scalatest_test(
     test_subsystem: TestSubsystem,
     partition: ScalatestRequest.SubPartition[ScalatestTestFieldSet],
 ) -> TestResult:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Scalatest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Scalatest partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -208,11 +208,11 @@ async def run_scalatest_test(
 async def setup_scalatest_debug_request(
     partition: ScalatestRequest.SubPartition[ScalatestTestFieldSet],
 ) -> TestDebugRequest:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Scalatest partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Scalatest partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(

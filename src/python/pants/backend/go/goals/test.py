@@ -182,11 +182,11 @@ async def run_go_tests(
     test_extra_env: TestExtraEnv,
     goroot: GoRoot,
 ) -> TestResult:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"Go test partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"Go test partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
         Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),

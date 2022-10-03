@@ -340,7 +340,7 @@ class TestRequest:
     @dataclass(frozen=True)
     @runtime_ignore_subscripts
     class SubPartition(Generic[_FieldSetT]):
-        elements: Tuple[_FieldSetT, ...]
+        field_sets: Tuple[_FieldSetT, ...]
         key: str
         description: str
 
@@ -701,7 +701,7 @@ async def get_environment(partition: TestRequest.SubPartition) -> EnvironmentNam
             EnvironmentNameRequest,
             EnvironmentNameRequest.from_field_set(field_set),
         )
-        for field_set in partition.elements
+        for field_set in partition.field_sets
     )
     unique_environments = len({name.val for name in environment_names_per_element})
     if unique_environments != 1:

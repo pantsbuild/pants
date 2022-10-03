@@ -178,7 +178,7 @@ def mock_test_partition(request: MockTestRequest.SubPartition, _: EnvironmentNam
     request_type = {cls.SubPartition: cls for cls in MockTestRequest.__subclasses__()}[
         type(request)
     ]
-    return request_type.test_result(request.description, request.elements)
+    return request_type.test_result(request.description, request.field_sets)
 
 
 @pytest.fixture

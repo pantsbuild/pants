@@ -181,11 +181,11 @@ async def run_junit_test(
     test_subsystem: TestSubsystem,
     partition: JunitRequest.SubPartition[JunitTestFieldSet],
 ) -> TestResult:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"JUnit partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"JUnit partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -207,11 +207,11 @@ async def run_junit_test(
 async def setup_junit_debug_request(
     partition: JunitRequest.SubPartition[JunitTestFieldSet],
 ) -> TestDebugRequest:
-    if len(partition.elements) != 1:
+    if len(partition.field_sets) != 1:
         raise AssertionError(
-            f"JUnit partitions must contain exactly 1 file, but got {len(partition.elements)}"
+            f"JUnit partitions must contain exactly 1 file, but got {len(partition.field_sets)}"
         )
-    field_set = partition.elements[0]
+    field_set = partition.field_sets[0]
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
