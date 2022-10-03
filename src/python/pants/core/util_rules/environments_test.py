@@ -208,9 +208,9 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
                     name='local-fallback', compatible_platforms=[], fallback_environment='local'
                 )
                 docker_environment(name='docker', image="centos6:latest")
-                _remote_environment(name='remote-no-fallback')
-                _remote_environment(name='remote-fallback', fallback_environment="docker")
-                _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
+                remote_environment(name='remote-no-fallback')
+                remote_environment(name='remote-fallback', fallback_environment="docker")
+                remote_environment(name='remote-bad-fallback', fallback_environment="fake")
                 """
             )
         }
@@ -366,9 +366,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "local_environment(name='env')"})
-    rule_runner.set_options(
-        ["--environments-names={'env': '//:env', 'bad-address': '//:fake'}"]
-    )
+    rule_runner.set_options(["--environments-names={'env': '//:env', 'bad-address': '//:fake'}"])
 
     def get_tgt(v: str | None) -> EnvironmentTarget:
         return rule_runner.request(EnvironmentTarget, [EnvironmentName(v)])

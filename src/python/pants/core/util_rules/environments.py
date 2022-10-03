@@ -272,7 +272,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
 
 
 class RemoteEnvironmentTarget(Target):
-    alias = "_remote_environment"
+    alias = "remote_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RemotePlatformField,
@@ -287,7 +287,7 @@ class RemoteEnvironmentTarget(Target):
         Note that you must also configure remote execution with the global options like
         `remote_execution` and `remote_execution_address`.
 
-        Often, it is only necessary to have a single `_remote_environment` target for your
+        Often, it is only necessary to have a single `remote_environment` target for your
         repository, but it can be useful to have >1 so that you can set different
         `extra_platform_properties`. For example, with some servers, you could use this to
         configure a different Docker image per environment.
@@ -616,7 +616,7 @@ async def get_target_for_environment_name(
             softwrap(
                 f"""
                 Expected to use the address to a `local_environment`, `docker_environment`, or
-                `_remote_environment` target in the option `[environments].names`, but the name
+                `remote_environment` target in the option `[environments].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.
                 """
