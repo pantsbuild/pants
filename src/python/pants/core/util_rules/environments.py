@@ -213,7 +213,7 @@ class DockerFallbackEnvironmentField(FallbackEnvironmentField):
 
 
 class DockerEnvironmentTarget(Target):
-    alias = "_docker_environment"
+    alias = "docker_environment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerImageField,
@@ -615,7 +615,7 @@ async def get_target_for_environment_name(
         raise ValueError(
             softwrap(
                 f"""
-                Expected to use the address to a `local_environment`, `_docker_environment`, or
+                Expected to use the address to a `local_environment`, `docker_environment`, or
                 `_remote_environment` target in the option `[environments].names`, but the name
                 `{env_name.val}` was set to the target {address.spec} with the target type
                 `{tgt.alias}`.

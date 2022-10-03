@@ -148,7 +148,7 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
                 local_environment(name='e1')
                 local_environment(name='e2')
                 local_environment(name='no-name')
-                _docker_environment(name='docker', image="centos6:latest")
+                docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
@@ -172,7 +172,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
                 local_environment(name='e1')
                 local_environment(name='e2')
                 local_environment(name='not-compatible', compatible_platforms=[])
-                _docker_environment(name='docker', docker_image="centos6:latest")
+                docker_environment(name='docker', docker_image="centos6:latest")
                 """
             )
         }
@@ -207,7 +207,7 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
                 local_environment(
                     name='local-fallback', compatible_platforms=[], fallback_environment='local'
                 )
-                _docker_environment(name='docker', image="centos6:latest")
+                docker_environment(name='docker', image="centos6:latest")
                 _remote_environment(name='remote-no-fallback')
                 _remote_environment(name='remote-fallback', fallback_environment="docker")
                 _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
