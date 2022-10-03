@@ -473,7 +473,9 @@ class Address(EngineAwareParameter):
 
     @property
     def atom_file_target_name(self) -> str | None:
-        return f"{self._relative_file_path}:{self.target_name}"
+        if self.is_file_target:
+            return f"{self._relative_file_path}:{self.target_name}"
+        return None
 
     @property
     def parameters_repr(self) -> str:
