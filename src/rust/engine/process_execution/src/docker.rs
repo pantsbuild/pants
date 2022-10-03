@@ -14,11 +14,11 @@ use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use log::Level;
 use nails::execution::ExitCode;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
-use once_cell::sync::Lazy;
 
 use crate::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
@@ -559,7 +559,6 @@ struct ContainerCache {
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
-  image_pull_cache: ImagePullCache,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
@@ -614,14 +613,12 @@ impl ContainerCache {
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
-      image_pull_cache: ImagePullCache::new(),
       containers: Mutex::default(),
     })
   }
 
   async fn make_container(
     docker: Docker,
-    image_pull_cache: &ImagePullCache,
     image: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
@@ -630,7 +627,7 @@ impl ContainerCache {
     immutable_inputs_base_dir: String,
   ) -> Result<String, String> {
     // Pull the image
-    image_pull_cache
+    IMAGE_PULL_CACHE
       .pull_image(
         &docker,
         &image,
@@ -733,7 +730,6 @@ impl ContainerCache {
       .get_or_try_init(async move {
         Self::make_container(
           docker,
-          &self.image_pull_cache,
           image.to_string(),
           *platform,
           image_pull_scope,

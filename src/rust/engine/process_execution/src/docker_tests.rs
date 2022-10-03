@@ -14,7 +14,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::{SANDBOX_BASE_PATH_IN_CONTAINER};
+use super::docker::SANDBOX_BASE_PATH_IN_CONTAINER;
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
