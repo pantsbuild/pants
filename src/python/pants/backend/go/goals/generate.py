@@ -75,8 +75,7 @@ class GoGenerateGoalSubsystem(GoalSubsystem):
     )
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-        # TODO(#17077): Rename this back to just `env_vars`.
-        generate_env_vars = StrListOption(
+        env_vars = StrListOption(
             default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
             help=softwrap(
                 """
@@ -291,7 +290,7 @@ async def run_go_package_generators(
             FallibleFirstPartyPkgAnalysis,
             FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
         ),
-        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.generate_env_vars)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
     )
     if not fallible_analysis.analysis:
         raise ValueError(f"Analysis failure for {request.address}: {fallible_analysis.stderr}")

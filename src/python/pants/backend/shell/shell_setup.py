@@ -32,7 +32,7 @@ class ShellSetup(Subsystem):
     )
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-        depends_on_env_vars = ("PATH",)
+        env_vars_used_by_options = ("PATH",)
 
         _executable_search_path = StrListOption(
             default=["<PATH>"],
@@ -53,7 +53,7 @@ class ShellSetup(Subsystem):
             def iter_path_entries():
                 for entry in self._executable_search_path:
                     if entry == "<PATH>":
-                        path = self.env_vars.get("PATH")
+                        path = self._options_env.get("PATH")
                         if path:
                             yield from path.split(os.pathsep)
                     else:
