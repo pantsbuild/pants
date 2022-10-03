@@ -57,21 +57,19 @@ async def partition_tffmt(
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -> FmtResult:
     directory = cast(str, request.key)
-    snapshot = await TffmtRequest.SubPartition.get_snapshot(request)
-
     result = await Get(
         ProcessResult,
         TerraformProcess(
             args=("fmt", directory),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run `terraform fmt` on {pluralize(len(request.files), 'file')}.",
         ),
     )
 
     output = await Get(Snapshot, Digest, result.output_digest)
 
-    return FmtResult.create(result, snapshot, output, formatter_name=TffmtRequest.name)
+    return FmtResult.create(result, request.snapshot, output, formatter_name=TffmtRequest.name)
 
 
 def rules():

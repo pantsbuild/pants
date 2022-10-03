@@ -53,24 +53,25 @@ async def partition_gofmt(
 
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtResult:
-    snapshot = await GofmtRequest.SubPartition.get_snapshot(request)
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
-        *snapshot.files,
+        *request.files,
     )
     result = await Get(
         ProcessResult,
         Process(
             argv=argv,
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run gofmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=GofmtRequest.name)
+    return FmtResult.create(
+        result, request.snapshot, output_snapshot, formatter_name=GofmtRequest.name
+    )
 
 
 def rules():

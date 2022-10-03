@@ -32,8 +32,9 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsPaths, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets
@@ -461,8 +462,18 @@ async def lint(
         for request_type, partitions_list in partitions_by_request_type.items()
     }
 
+    formatter_snapshots = await MultiGet(
+        Get(Snapshot, PathGlobs(elements))
+        for request_type, batch in lint_batches_by_request_type.items()
+        for elements, _ in batch
+        if request_type.is_formatter
+    )
+    snapshots_iter = iter(formatter_snapshots)
+
     subpartitions = [
-        request_type.SubPartition(elements, key)
+        request_type.SubPartition(
+            elements, key, **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {}
+        )
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, key in batch
     ]

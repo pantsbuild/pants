@@ -52,13 +52,12 @@ async def partition_clangformat(
 async def clangformat_fmt(
     request: ClangFormatRequest.SubPartition, clangformat: ClangFormat
 ) -> FmtResult:
-    snapshot = await ClangFormatRequest.SubPartition.get_snapshot(request)
 
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
-        clangformat.config_request(snapshot.dirs),
+        clangformat.config_request(request.snapshot.dirs),
     )
 
     clangformat_pex, config_files = await MultiGet(
@@ -70,7 +69,7 @@ async def clangformat_fmt(
         Digest,
         MergeDigests(
             [
-                snapshot.digest,
+                request.snapshot.digest,
                 config_files.snapshot.digest,
                 clangformat_pex.digest,
             ]
@@ -87,10 +86,10 @@ async def clangformat_fmt(
                 "-i",  # In-place edits
                 "--Werror",  # Formatting warnings as errors
                 *clangformat.args,  # User-added arguments
-                *snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run clang-format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -98,7 +97,7 @@ async def clangformat_fmt(
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        snapshot,
+        request.snapshot,
         output_snapshot,
         formatter_name=ClangFormatRequest.name,
         strip_chroot_path=True,
