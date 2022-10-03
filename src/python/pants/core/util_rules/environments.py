@@ -135,9 +135,16 @@ class LocalEnvironmentTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         """
-        Configuration of environment variables and search paths for running Pants locally.
+        Configuration of environment-sensitive options, such as environment variables and search
+        paths when Pants runs subprocesses locally.
 
-        When `[environments].names` is set, 
+        To use this environment, map this target's address with a memorable name in
+        `[environments].names`. You can then consume this environment by specifying the name in
+        the `environment` field defined on other targets.
+
+        Only one `local_environment` may be defined in `[environments].names` per platform, and
+        when `{LOCAL_ENVIRONMENT_MATCHER}` is specified as the environment, the
+        `local_environment` that matches the current platform (if defined) will be selected.
         """
     )
 
@@ -222,10 +229,13 @@ class DockerEnvironmentTarget(Target):
     )
     help = softwrap(
         """
-        Configuration of a Docker image used for building your code, including the environment
-        variables and search paths used by Pants.
+        Configuration of a Docker environment used for building your code, including the Docker
+        image, along with environment-sensitive options, which include environment variables and
+        search paths, used by Pants to execute processes in this Docker environment.
 
-        TODO(#7735): Explain how this gets used once we allow targets to set environment.
+        To use this environment, map this target's address with a memorable name in
+        `[environments].names`. You can then consume this environment by specifying the name in
+        the `environment` field defined on other targets.
         """
     )
 
@@ -282,10 +292,15 @@ class RemoteEnvironmentTarget(Target):
     help = softwrap(
         """
         Configuration of a remote execution environment used for building your code, including the
-        environment variables and search paths used by Pants.
+        environment-sensitive options, which include environment variables and
+        search paths, used by Pants to execute processes in this remote environment.
 
         Note that you must also configure remote execution with the global options like
         `remote_execution` and `remote_execution_address`.
+
+        To use this environment, map this target's address with a memorable name in
+        `[environments].names`. You can then consume this environment by specifying the name in
+        the `environment` field defined on other targets.
 
         Often, it is only necessary to have a single `remote_environment` target for your
         repository, but it can be useful to have >1 so that you can set different
