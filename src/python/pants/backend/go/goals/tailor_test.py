@@ -105,7 +105,7 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
                 GoPackageTarget,
                 path="unowned",
                 name=None,
-                triggering_sources=["f.go", "f1.go"],
+                triggering_sources=["f1.go", "f.go"],
             ),
             PutativeTarget.for_target_type(
                 GoPackageTarget,
