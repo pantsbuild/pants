@@ -15,6 +15,7 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use super::docker::SANDBOX_BASE_PATH_IN_CONTAINER;
+use crate::docker::{DockerOnceCell, ImagePullCache, DOCKER};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -732,9 +733,13 @@ async fn run_command_via_docker_in_dir(
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
+  let docker = DockerOnceCell::new();
+  let image_pull_cache = ImagePullCache::new();
   let runner = crate::docker::CommandRunner::new(
     store.clone(),
     executor.clone(),
+    &docker,
+    &image_pull_cache,
     dir.clone(),
     named_caches,
     immutable_inputs,

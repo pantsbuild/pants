@@ -290,13 +290,19 @@ impl CommandRunner {
     store: Store,
     executor: Executor,
     docker: &'static DockerOnceCell,
+    image_pull_cache: &'static ImagePullCache,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let container_cache =
-      ContainerCache::new(docker, &work_dir_base, &named_caches, &immutable_inputs)?;
+    let container_cache = ContainerCache::new(
+      docker,
+      image_pull_cache,
+      &work_dir_base,
+      &named_caches,
+      &immutable_inputs,
+    )?;
 
     Ok(CommandRunner {
       store,
@@ -554,6 +560,7 @@ impl CapturedWorkdir for CommandRunner {
 /// within those cached containers.
 struct ContainerCache {
   docker: &'static DockerOnceCell,
+  image_pull_cache: &'static ImagePullCache,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
@@ -567,6 +574,7 @@ struct ContainerCache {
 impl ContainerCache {
   pub fn new(
     docker: &'static DockerOnceCell,
+    image_pull_cache: &'static ImagePullCache,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
@@ -608,6 +616,7 @@ impl ContainerCache {
 
     Ok(Self {
       docker,
+      image_pull_cache,
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
@@ -620,12 +629,13 @@ impl ContainerCache {
     image: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
+    image_pull_cache: &'static ImagePullCache,
     work_dir_base: String,
     named_caches_base_dir: String,
     immutable_inputs_base_dir: String,
   ) -> Result<String, String> {
-    // Pull the image
-    IMAGE_PULL_CACHE
+    // Pull the image.
+    image_pull_cache
       .pull_image(
         &docker,
         &image,
@@ -731,6 +741,7 @@ impl ContainerCache {
           image.to_string(),
           *platform,
           image_pull_scope,
+          self.image_pull_cache,
           work_dir_base,
           named_caches_base_dir,
           immutable_inputs_base_dir,

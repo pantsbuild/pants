@@ -26,7 +26,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
-use process_execution::docker::DOCKER;
+use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
@@ -240,6 +240,7 @@ impl Core {
       local_runner_store.clone(),
       executor.clone(),
       &DOCKER,
+      &IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
       named_caches.clone(),
       immutable_inputs.clone(),
