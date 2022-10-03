@@ -8,7 +8,7 @@ from pants.engine.platform import Platform
 @dataclass(frozen=True)
 class DockerResolveImageRequest:
     image_name: str
-    platform: Platform
+    platform: str
 
 
 @dataclass(frozen=True)
