@@ -36,9 +36,11 @@ pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutab
 /// Process-wide image pull cache.
 pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
 
+/// Process-wide Docker connection.
+pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
+
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner {
-  docker: DockerOnceCell,
   store: Store,
   executor: Executor,
   work_dir_base: PathBuf,
@@ -291,17 +293,9 @@ impl CommandRunner {
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let docker = DockerOnceCell::new();
-
-    let container_cache = ContainerCache::new(
-      docker.clone(),
-      &work_dir_base,
-      &named_caches,
-      &immutable_inputs,
-    )?;
+    let container_cache = ContainerCache::new(&work_dir_base, &named_caches, &immutable_inputs)?;
 
     Ok(CommandRunner {
-      docker,
       store,
       executor,
       work_dir_base,
@@ -447,7 +441,7 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
-    let docker = self.docker.get().await?;
+    let docker = DOCKER.get().await?;
 
     let env = req
       .env
@@ -555,7 +549,6 @@ impl CapturedWorkdir for CommandRunner {
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
 struct ContainerCache {
-  docker: DockerOnceCell,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
@@ -568,7 +561,6 @@ struct ContainerCache {
 
 impl ContainerCache {
   pub fn new(
-    docker: DockerOnceCell,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
@@ -609,7 +601,6 @@ impl ContainerCache {
       })?;
 
     Ok(Self {
-      docker,
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
@@ -710,7 +701,7 @@ impl ContainerCache {
     platform: &Platform,
     build_generation: &str,
   ) -> Result<String, String> {
-    let docker = self.docker.get().await?;
+    let docker = DOCKER.get().await?;
     let docker = docker.clone();
 
     let container_id_cell = {
@@ -746,11 +737,11 @@ impl ContainerCache {
 
   pub async fn shutdown(&self) -> Result<(), String> {
     // Skip shutting down if Docker was never initialized in the first place.
-    if !self.docker.initialized() {
+    if !DOCKER.initialized() {
       return Ok(());
     }
 
-    let docker = match self.docker.get().await {
+    let docker = match DOCKER.get().await {
       Ok(d) => d,
       Err(err) => {
         return Err(format!(
