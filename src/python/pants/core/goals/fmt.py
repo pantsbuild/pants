@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, Sequence, Tuple, Type, TypeVar
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import LintFilesRequest, LintRequest, LintResult, LintTargetsRequest
