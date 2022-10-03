@@ -43,6 +43,7 @@ pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
 pub struct CommandRunner {
   store: Store,
   executor: Executor,
+  docker: &'static DockerOnceCell,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
@@ -288,16 +289,19 @@ impl CommandRunner {
   pub fn new(
     store: Store,
     executor: Executor,
+    docker: &'static DockerOnceCell,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let container_cache = ContainerCache::new(&work_dir_base, &named_caches, &immutable_inputs)?;
+    let container_cache =
+      ContainerCache::new(docker, &work_dir_base, &named_caches, &immutable_inputs)?;
 
     Ok(CommandRunner {
       store,
       executor,
+      docker,
       work_dir_base,
       named_caches,
       immutable_inputs,
@@ -441,7 +445,7 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
-    let docker = DOCKER.get().await?;
+    let docker = self.docker.get().await?;
 
     let env = req
       .env
@@ -549,6 +553,7 @@ impl CapturedWorkdir for CommandRunner {
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
 struct ContainerCache {
+  docker: &'static DockerOnceCell,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
@@ -561,6 +566,7 @@ struct ContainerCache {
 
 impl ContainerCache {
   pub fn new(
+    docker: &'static DockerOnceCell,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
@@ -601,6 +607,7 @@ impl ContainerCache {
       })?;
 
     Ok(Self {
+      docker,
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
@@ -701,7 +708,7 @@ impl ContainerCache {
     platform: &Platform,
     build_generation: &str,
   ) -> Result<String, String> {
-    let docker = DOCKER.get().await?;
+    let docker = self.docker.get().await?;
     let docker = docker.clone();
 
     let container_id_cell = {
@@ -741,7 +748,7 @@ impl ContainerCache {
       return Ok(());
     }
 
-    let docker = match DOCKER.get().await {
+    let docker = match self.docker.get().await {
       Ok(d) => d,
       Err(err) => {
         return Err(format!(

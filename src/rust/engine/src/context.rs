@@ -26,6 +26,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::docker::DOCKER;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
@@ -238,6 +239,7 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
+      &DOCKER,
       local_execution_root_dir.to_path_buf(),
       named_caches.clone(),
       immutable_inputs.clone(),
