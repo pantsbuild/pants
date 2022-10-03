@@ -43,13 +43,18 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   /// If a node's output is cacheable based solely on properties of the node, and not the output,
   /// return true.
   ///
+  /// Nodes which are not cacheable will be recomputed once (at least, in case of dirtying) per
+  /// RunId.
+  ///
   /// This property must remain stable for the entire lifetime of a particular Node, but a Node
   /// may change its cacheability for a particular output value using `cacheable_item`.
   ///
   fn cacheable(&self) -> bool;
 
+  ///
   /// A Node may want to compute cacheability differently based on properties of the Node's item.
   /// The output of this method will be and'd with `cacheable` to compute overall cacheability.
+  ///
   fn cacheable_item(&self, _item: &Self::Item) -> bool {
     self.cacheable()
   }
