@@ -290,7 +290,7 @@ async def run_go_package_generators(
             FallibleFirstPartyPkgAnalysis,
             FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
         ),
-        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.generate_env_vars)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
     )
     if not fallible_analysis.analysis:
         raise ValueError(f"Analysis failure for {request.address}: {fallible_analysis.stderr}")
