@@ -77,12 +77,20 @@ LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
 class EnvironmentField(StringField):
-    alias = "_environment"
+    alias = "environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
     help = softwrap(
         """
-        TODO(#7735): fill this in.
+        Specify which environment target to consume environment-sensitive options from.
+
+        Once environments are defined in `[environments].names`, you can specify the environment
+        for this target by its name. Any fields that are defined in that environment will override
+        the values from options set by `pants.toml`, command line values, or environment variables.
+
+        You can specify multiple valid environments by using `parametrize`. If the default is
+        specified, Pants will fall back to the `local_environment` defined for the current
+        platform, or no environment if no such environment exists.
         """
     )
 
