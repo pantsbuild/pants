@@ -612,6 +612,18 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class PexVenvSitePackagesCopies(BoolField):
+    alias = "venv_site_packages_copies"
+    default = False
+    help = softwrap(
+        """
+        If execution_mode is venv, populate the venv site packages using hard links or copies of resolved PEX dependencies instead of symlinks.
+
+        This can be used to work around problems with tools or libraries that are confused by symlinked source files.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -629,6 +641,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeRequirementsField,
     PexIncludeSourcesField,
     PexIncludeToolsField,
+    PexVenvSitePackagesCopies,
     RestartableField,
 )
 

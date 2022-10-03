@@ -439,6 +439,7 @@ class SchedulerSession:
             # TODO: This increment-and-get is racey.
             name = f"graph.{self._scheduler._visualize_run_count:03d}.dot"
             self._scheduler._visualize_run_count += 1
+            logger.info(f"Visualizing graph as {name}")
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
     def teardown_dynamic_ui(self) -> None:

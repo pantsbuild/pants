@@ -8,6 +8,8 @@ import os
 from dataclasses import dataclass
 from pathlib import PurePath
 
+import chevron
+
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.test import CoverageData
@@ -224,7 +226,9 @@ package main
 import (
     "testing"
 
-@IMPORTS@
+{{#imports}}
+    _cover{{i}} "{{import_path}}"
+{{/imports}}
 )
 
 var (
@@ -255,12 +259,14 @@ func coverRegisterFile(fileName string, counter []uint32, pos []uint32, numStmts
 }
 
 func init() {
-@REGISTRATIONS@
+{{#registrations}}
+    coverRegisterFile("{{file_id}}", _cover{{i}}.{{cover_var}}.Count[:], _cover{{i}}.{{cover_var}}.Pos[:], _cover{{i}}.{{cover_var}}.NumStmt[:])
+{{/registrations}}
 }
 
 func registerCover() {
     testing.RegisterCover(testing.Cover{
-        Mode: "@COVER_MODE@",
+        Mode: "{{cover_mode}}",
         Counters: coverCounters,
         Blocks: coverBlocks,
         CoveredPackages: "",
@@ -273,23 +279,23 @@ func registerCover() {
 async def generate_go_coverage_setup_code(
     request: GenerateCoverageSetupCodeRequest,
 ) -> GenerateCoverageSetupCodeResult:
-    imports_partial = "".join(
-        [f'    _cover{i} "{pkg.import_path}"\n' for i, pkg in enumerate(request.packages)]
-    ).rstrip()
-
-    registrations_partial = "".join(
-        [
-            f'    coverRegisterFile("{m.file_id}", _cover{i}.{m.cover_var}.Count[:], '
-            f"_cover{i}.{m.cover_var}.Pos[:], _cover{i}.{m.cover_var}.NumStmt[:])\n"
-            for i, pkg in enumerate(request.packages)
-            for m in pkg.cover_file_metadatas
-        ]
-    ).rstrip()
-
-    content = (
-        COVERAGE_SETUP_CODE.replace("@IMPORTS@", imports_partial)
-        .replace("@REGISTRATIONS@", registrations_partial)
-        .replace("@COVER_MODE@", request.cover_mode.value)
+    content = chevron.render(
+        template=COVERAGE_SETUP_CODE,
+        data={
+            "imports": [
+                {"i": i, "import_path": pkg.import_path} for i, pkg in enumerate(request.packages)
+            ],
+            "registrations": [
+                {
+                    "i": i,
+                    "file_id": m.file_id,
+                    "cover_var": m.cover_var,
+                }
+                for i, pkg in enumerate(request.packages)
+                for m in pkg.cover_file_metadatas
+            ],
+            "cover_mode": request.cover_mode.value,
+        },
     )
 
     digest = await Get(

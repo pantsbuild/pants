@@ -427,6 +427,11 @@ func main() {
 	// TODO: Consider allowing caller to set build tags or platform? Setting platform GOOS/GOARCH will be
 	// necessary for multi-platform support.
 	buildContext := &build.Default
+	extraBuildTagsEnv := os.Getenv("EXTRA_BUILD_TAGS")
+	if extraBuildTagsEnv != "" {
+		extraBuildTags := strings.Split(extraBuildTagsEnv, ",")
+		buildContext.BuildTags = append(buildContext.BuildTags, extraBuildTags...)
+	}
 
 	for _, arg := range os.Args[1:] {
 		pkg, err := analyzePackage(arg, buildContext)

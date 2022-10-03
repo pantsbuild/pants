@@ -20,8 +20,8 @@ def main(args: list[str]):
             # Hikaru fails with a `RuntimeError` when it finds a K8S manifest for an
             # API version and kind that doesn't understand.
             #
-            # We use this exit code to notify the Pants rule that this file needs to be ignored.
-            sys.exit(2)
+            # We exit the process early without giving any ouput.
+            sys.exit(0)
 
     for idx, doc in enumerate(parsed_docs):
         entries = doc.find_by_name("image")

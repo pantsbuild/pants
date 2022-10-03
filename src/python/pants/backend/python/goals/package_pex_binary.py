@@ -24,6 +24,7 @@ from pants.backend.python.target_types import (
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
+    PexVenvSitePackagesCopies,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -72,6 +73,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     include_requirements: PexIncludeRequirementsField
     include_sources: PexIncludeSourcesField
     include_tools: PexIncludeToolsField
+    venv_site_packages_copies: PexVenvSitePackagesCopies
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -95,6 +97,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.extend(("--venv", "prepend"))
         if self.include_tools.value is True:
             args.append("--include-tools")
+        if self.venv_site_packages_copies.value is True:
+            args.append("--venv-site-packages-copies")
         return tuple(args)
 
 
