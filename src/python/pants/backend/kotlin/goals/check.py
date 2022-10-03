@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class KotlincCheckRequest(CheckRequest):
     field_set_type = KotlinFieldSet
-    name = "kotlinc"
+    tool_name = "kotlinc"
 
 
 @rule(desc="Check compilation for Kotlin", level=LogLevel.DEBUG)
