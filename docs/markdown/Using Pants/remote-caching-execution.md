@@ -8,7 +8,7 @@ updatedAt: "2021-03-19T21:39:51.235Z"
 Overview
 ========
 
-Ordinarily, Pants executes processes locally on the system on which it is run and also caches the results of those processes locally as well. Besides this "local execution" mode of operation, Pants also supports two distributed modes of operation:
+By default, Pants executes processes in a local [environment](doc:environments) on the system on which it is run, and caches the results of those processes locally as well. Besides this "local execution" mode of operation, Pants also supports two distributed modes of operation:
 
 1. "Remote caching" where Pants store results from local process execution in a remote cache and also consumes results from that remote cache; and
 
