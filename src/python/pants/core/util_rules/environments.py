@@ -61,7 +61,7 @@ class EnvironmentsSubsystem(Subsystem):
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
-            To use an environment for a given target, specify the name in the `environment` field
+            To use an environment for a given target, specify the name in the `_environment` field
             on that target. Pants will consume the environment target at the address mapped from
             that name.
 
@@ -150,7 +150,7 @@ class LocalEnvironmentTarget(Target):
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `environment` field defined on other targets.
+        the `_environment` field defined on other targets.
 
         Only one `local_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_ENVIRONMENT_MATCHER}` is specified as the environment, the
@@ -245,7 +245,7 @@ class DockerEnvironmentTarget(Target):
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `environment` field defined on other targets.
+        the `_environment` field defined on other targets.
         """
     )
 
@@ -310,7 +310,7 @@ class RemoteEnvironmentTarget(Target):
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `environment` field defined on other targets.
+        the `_environment` field defined on other targets.
 
         Often, it is only necessary to have a single `remote_environment` target for your
         repository, but it can be useful to have >1 so that you can set different
@@ -466,7 +466,7 @@ async def determine_local_environment(
             Then, for CI, override what the name `macos` points to by setting this in
             `pants.ci.toml`:
 
-                [environments.names.add]
+                [environments-preview.names.add]
                 macos = "//:macos_ci_env"
 
             Locally, you can override `[environments-preview].names` like this by using a
