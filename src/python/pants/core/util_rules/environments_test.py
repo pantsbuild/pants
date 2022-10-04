@@ -154,7 +154,7 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
         }
     )
     rule_runner.set_options(
-        ["--environments-names={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
+        ["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2', 'docker': '//:docker'}"]
     )
     result = rule_runner.request(AllEnvironmentTargets, [])
     assert {i: j.address for (i, j) in result.items()} == {
@@ -185,15 +185,15 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
     # If `--names` is not set, do not choose an environment.
     assert get_env().val is None
 
-    rule_runner.set_options(["--environments-names={'e': '//:e1'}"])
+    rule_runner.set_options(["--environments-preview-names={'e': '//:e1'}"])
     assert get_env().val.address == Address("", target_name="e1")  # type: ignore[union-attr]
 
     # If `--names` is set, but no compatible platforms, do not choose an environment.
-    rule_runner.set_options(["--environments-names={'e': '//:not-compatible'}"])
+    rule_runner.set_options(["--environments-preview-names={'e': '//:not-compatible'}"])
     assert get_env().val is None
 
     # Error if >1 compatible targets.
-    rule_runner.set_options(["--environments-names={'e1': '//:e1', 'e2': '//:e2'}"])
+    rule_runner.set_options(["--environments-preview-names={'e1': '//:e1', 'e2': '//:e2'}"])
     with engine_error(AmbiguousEnvironmentError):
         get_env()
 
@@ -228,7 +228,7 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
         get_name("local")
 
     env_names_arg = (
-        "--environments-names={"
+        "--environments-preview-names={"
         + "'local': '//:local', "
         + "'local-fallback': '//:local-fallback', "
         + "'docker': '//:docker', "
@@ -366,7 +366,9 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "local_environment(name='env')"})
-    rule_runner.set_options(["--environments-names={'env': '//:env', 'bad-address': '//:fake'}"])
+    rule_runner.set_options(
+        ["--environments-preview-names={'env': '//:env', 'bad-address': '//:fake'}"]
+    )
 
     def get_tgt(v: str | None) -> EnvironmentTarget:
         return rule_runner.request(EnvironmentTarget, [EnvironmentName(v)])

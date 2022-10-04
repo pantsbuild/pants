@@ -25,7 +25,7 @@ def test_unrecognized_build_file_symbols_during_bootstrap() -> None:
     with setup_tmpdir({"BUILD": build_file}) as tmpdir:
         args = [
             "--backend-packages=pants.backend.shell",
-            f"--environments-names={{'env': '{tmpdir}:env'}}",
+            f"--environments-preview-names={{'env': '{tmpdir}:env'}}",
             "--plugins=ansicolors",
         ]
         run_pants([*args, "list", tmpdir]).assert_success()
