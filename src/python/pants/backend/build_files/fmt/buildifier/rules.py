@@ -18,7 +18,7 @@ from pants.util.strutil import pluralize
 
 
 class BuildifierRequest(FmtFilesRequest):
-    name = "buildifier"
+    tool_name = "buildifier"
 
 
 @rule
@@ -61,7 +61,7 @@ async def buildfier_fmt(
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=BuildifierRequest.name
+        result, request.snapshot, output_snapshot, formatter_name=BuildifierRequest.tool_name
     )
 
 

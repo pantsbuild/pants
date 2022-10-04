@@ -43,7 +43,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    name = ScalafmtSubsystem.options_scope
+    tool_name = ScalafmtSubsystem.options_scope
 
 
 class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -204,7 +204,7 @@ async def scalafmt_fmt(
         result,
         request.snapshot,
         output_snapshot,
-        formatter_name=ScalafmtRequest.name,
+        formatter_name=ScalafmtRequest.tool_name,
     )
 
 

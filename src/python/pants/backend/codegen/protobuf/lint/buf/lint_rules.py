@@ -35,7 +35,7 @@ class BufFieldSet(FieldSet):
 
 class BufLintRequest(LintTargetsRequest):
     field_set_type = BufFieldSet
-    name = "buf-lint"
+    tool_name = "buf-lint"
 
 
 @rule
@@ -103,7 +103,9 @@ async def run_buf(
             level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(process_result, linter_name=BufLintRequest.name)
+    return LintResult.from_fallible_process_result(
+        process_result, linter_name=BufLintRequest.tool_name
+    )
 
 
 def rules():

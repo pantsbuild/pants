@@ -38,7 +38,7 @@ class KtlintFieldSet(FieldSet):
 
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
-    name = KtlintSubsystem.options_scope
+    tool_name = KtlintSubsystem.options_scope
 
 
 class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -98,7 +98,7 @@ async def ktlint_fmt(
         request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=KtlintRequest.name,
+        formatter_name=KtlintRequest.tool_name,
     )
 
 
