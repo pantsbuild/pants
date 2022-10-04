@@ -42,27 +42,26 @@ async def partition_build_files(
 async def buildfier_fmt(
     request: BuildifierRequest.SubPartition, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
-    snapshot = await BuildifierRequest.SubPartition.get_snapshot(request)
     buildifier_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, buildifier.get_request(platform)
     )
     input_digest = await Get(
         Digest,
-        MergeDigests((snapshot.digest, buildifier_tool.digest)),
+        MergeDigests((request.snapshot.digest, buildifier_tool.digest)),
     )
     result = await Get(
         ProcessResult,
         Process(
-            argv=[buildifier_tool.exe, "-type=build", *snapshot.files],
+            argv=[buildifier_tool.exe, "-type=build", *request.files],
             input_digest=input_digest,
-            output_files=snapshot.files,
-            description=f"Run buildifier on {pluralize(len(snapshot.files), 'file')}.",
+            output_files=request.files,
+            description=f"Run buildifier on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, formatter_name=BuildifierRequest.tool_name
+        result, request.snapshot, output_snapshot, formatter_name=BuildifierRequest.tool_name
     )
 
 

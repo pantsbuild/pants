@@ -50,17 +50,19 @@ async def partition_shfmt(request: ShfmtRequest.PartitionRequest, shfmt: Shfmt) 
 async def shfmt_fmt(
     request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform
 ) -> FmtResult:
-    snapshot = await ShfmtRequest.SubPartition.get_snapshot(request)
-
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, shfmt.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, shfmt.config_request(request.snapshot.dirs)
+    )
     downloaded_shfmt, config_files = await MultiGet(download_shfmt_get, config_files_get)
 
     input_digest = await Get(
         Digest,
-        MergeDigests((snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)),
+        MergeDigests(
+            (request.snapshot.digest, downloaded_shfmt.digest, config_files.snapshot.digest)
+        ),
     )
 
     argv = [
@@ -68,7 +70,7 @@ async def shfmt_fmt(
         "-l",
         "-w",
         *shfmt.args,
-        *snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -76,14 +78,14 @@ async def shfmt_fmt(
         Process(
             argv=argv,
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run shfmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, formatter_name=ShfmtRequest.tool_name
+        result, request.snapshot, output_snapshot, formatter_name=ShfmtRequest.tool_name
     )
 
 

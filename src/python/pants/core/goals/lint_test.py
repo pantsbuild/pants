@@ -25,7 +25,8 @@ from pants.core.goals.lint import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
-from pants.engine.fs import SpecsPaths, Workspace
+from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -127,6 +128,9 @@ def mock_target_partitioner(
 ) -> Partitions[MockLinterFieldSet]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
+
+    if type(request) in {SuccessfulFormatter.PartitionRequest, FailingFormatter.PartitionRequest}:
+        return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
 
     return Partitions.single_partition(request.field_sets)
 
@@ -259,6 +263,11 @@ def run_lint_rule(
                     output_type=SpecsPaths,
                     input_types=(Specs,),
                     mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
+                ),
+                MockGet(
+                    output_type=Snapshot,
+                    input_types=(PathGlobs,),
+                    mock=lambda _: EMPTY_SNAPSHOT,
                 ),
             ],
             union_membership=union_membership,

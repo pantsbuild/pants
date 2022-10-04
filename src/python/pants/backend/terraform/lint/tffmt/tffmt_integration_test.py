@@ -147,7 +147,7 @@ def run_tffmt(
             TffmtRequest.SubPartition(
                 files,
                 key=key,
-                _snapshot=input_sources.snapshot,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )

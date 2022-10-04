@@ -24,7 +24,7 @@ class GolangSubsystem(Subsystem):
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
 
-        depends_on_env_vars = ("PATH",)
+        env_vars_used_by_options = ("PATH",)
 
         _go_search_paths = StrListOption(
             default=["<PATH>"],
@@ -147,7 +147,7 @@ class GolangSubsystem(Subsystem):
             def iter_path_entries():
                 for entry in self._cgo_tool_search_paths:
                     if entry == "<PATH>":
-                        path = self.env_vars.get("PATH")
+                        path = self._options_env.get("PATH")
                         if path:
                             yield from path.split(os.pathsep)
                     else:

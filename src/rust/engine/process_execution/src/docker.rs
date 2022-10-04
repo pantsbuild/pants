@@ -14,6 +14,7 @@ use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use log::Level;
 use nails::execution::ExitCode;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use store::Store;
 use task_executor::Executor;
@@ -32,20 +33,26 @@ pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
 pub(crate) const NAMED_CACHES_BASE_PATH_IN_CONTAINER: &str = "/pants-named-caches";
 pub(crate) const IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER: &str = "/pants-immutable-inputs";
 
+/// Process-wide image pull cache.
+pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::new);
+
+/// Process-wide Docker connection.
+pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
+
 /// `CommandRunner` that executes processes using a local Docker client.
-pub struct CommandRunner {
-  docker: DockerOnceCell,
+pub struct CommandRunner<'a> {
   store: Store,
   executor: Executor,
+  docker: &'a DockerOnceCell,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  container_cache: ContainerCache,
+  container_cache: ContainerCache<'a>,
 }
 
 #[derive(Clone)]
-struct DockerOnceCell {
+pub struct DockerOnceCell {
   cell: Arc<OnceCell<Docker>>,
 }
 
@@ -91,24 +98,30 @@ impl DockerOnceCell {
   }
 }
 
-#[derive(Default)]
-struct ImagePullCacheInner {
-  /// Maps an image name to a `OnceCell` used to debounce image pull attempts made during this
-  /// particular run.
-  cache: BTreeMap<String, Arc<OnceCell<()>>>,
+/// Represents a "scope" during which images will not be pulled again. This is usually associated
+/// with a single `build_id` for a Pants session.
+#[derive(Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ImagePullScope(Arc<String>);
 
-  /// Stores the current "build generation" during which this command runner will not attempt
-  /// to pull an image again. This is populated from `build_id` field on `Context`. `cache`
-  /// will be cleared when the generation changes.
-  generation: String,
+impl ImagePullScope {
+  pub fn new(build_id: &str) -> Self {
+    Self(Arc::new(build_id.to_string()))
+  }
 }
 
-struct ImagePullCache {
-  /// Image pull cache and current build generation ID.
-  inner: Mutex<ImagePullCacheInner>,
+#[derive(Default)]
+struct ImagePullCacheInner {
+  /// Map an "image pull scope" (usually a build ID) to another map which is used to debounce
+  /// image pull attempts made during that scope. The inner map goes from image name to a
+  /// `OnceCell` which ensures that only one pull for that image occurs at a time within the
+  /// relevant image pull scope.
+  cache: BTreeMap<ImagePullScope, BTreeMap<String, Arc<OnceCell<()>>>>,
+}
 
-  /// Policy to use when deciding whether to pull an image or not.
-  image_pull_policy: ImagePullPolicy,
+#[derive(Clone)]
+pub struct ImagePullCache {
+  /// Image pull cache and current build generation ID.
+  inner: Arc<Mutex<ImagePullCacheInner>>,
 }
 
 fn docker_platform_identifier(platform: &Platform) -> &'static str {
@@ -121,38 +134,39 @@ fn docker_platform_identifier(platform: &Platform) -> &'static str {
 }
 
 impl ImagePullCache {
-  pub fn new(image_pull_policy: ImagePullPolicy) -> Self {
+  pub fn new() -> Self {
     Self {
-      inner: Mutex::default(),
-      image_pull_policy,
+      inner: Arc::default(),
     }
   }
 
-  async fn pull_image(
+  pub async fn pull_image(
     &self,
     docker: &Docker,
     image: &str,
     platform: &Platform,
-    build_generation: &str,
+    image_pull_scope: ImagePullScope,
+    image_pull_policy: ImagePullPolicy,
   ) -> Result<(), String> {
     let image_cell = {
       let mut inner = self.inner.lock();
 
-      if build_generation != inner.generation {
-        inner.cache.clear();
-        inner.generation = build_generation.to_string();
-      }
-
-      let cell = inner
+      let scope = inner
         .cache
+        .entry(image_pull_scope)
+        .or_insert_with(BTreeMap::default);
+
+      let cell = scope
         .entry(image.to_string())
         .or_insert_with(|| Arc::new(OnceCell::new()));
+
       cell.clone()
     };
 
     image_cell
-      .get_or_try_init(pull_image(docker, image, platform, self.image_pull_policy))
+      .get_or_try_init(pull_image(docker, image, platform, image_pull_policy))
       .await?;
+
     Ok(())
   }
 }
@@ -271,30 +285,29 @@ async fn pull_image(
   Ok(())
 }
 
-impl CommandRunner {
+impl<'a> CommandRunner<'a> {
   pub fn new(
     store: Store,
     executor: Executor,
+    docker: &'a DockerOnceCell,
+    image_pull_cache: &'a ImagePullCache,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
-    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
-    let docker = DockerOnceCell::new();
-
     let container_cache = ContainerCache::new(
-      docker.clone(),
+      docker,
+      image_pull_cache,
       &work_dir_base,
       &named_caches,
       &immutable_inputs,
-      image_pull_policy,
     )?;
 
     Ok(CommandRunner {
-      docker,
       store,
       executor,
+      docker,
       work_dir_base,
       named_caches,
       immutable_inputs,
@@ -304,7 +317,7 @@ impl CommandRunner {
   }
 }
 
-impl fmt::Debug for CommandRunner {
+impl fmt::Debug for CommandRunner<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("docker::CommandRunner")
       .finish_non_exhaustive()
@@ -312,7 +325,7 @@ impl fmt::Debug for CommandRunner {
 }
 
 #[async_trait]
-impl super::CommandRunner for CommandRunner {
+impl<'a> super::CommandRunner for CommandRunner<'a> {
   async fn run(
     &self,
     context: Context,
@@ -427,7 +440,7 @@ impl super::CommandRunner for CommandRunner {
 }
 
 #[async_trait]
-impl CapturedWorkdir for CommandRunner {
+impl<'a> CapturedWorkdir for CommandRunner<'a> {
   type WorkdirToken = String;
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
@@ -545,12 +558,12 @@ impl CapturedWorkdir for CommandRunner {
 
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
-struct ContainerCache {
-  docker: DockerOnceCell,
+struct ContainerCache<'a> {
+  docker: &'a DockerOnceCell,
+  image_pull_cache: &'a ImagePullCache,
   work_dir_base: String,
   named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
-  image_pull_cache: ImagePullCache,
   /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
   /// multiple tasks trying to access an initializing container do not try to start multiple
   /// containers.
@@ -558,13 +571,13 @@ struct ContainerCache {
   containers: Mutex<BTreeMap<(String, Platform), Arc<OnceCell<String>>>>,
 }
 
-impl ContainerCache {
+impl<'a> ContainerCache<'a> {
   pub fn new(
-    docker: DockerOnceCell,
+    docker: &'a DockerOnceCell,
+    image_pull_cache: &'a ImagePullCache,
     work_dir_base: &Path,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
-    image_pull_policy: ImagePullPolicy,
   ) -> Result<Self, String> {
     let work_dir_base = work_dir_base
       .to_path_buf()
@@ -603,27 +616,33 @@ impl ContainerCache {
 
     Ok(Self {
       docker,
+      image_pull_cache,
       work_dir_base,
       named_caches_base_dir,
       immutable_inputs_base_dir,
-      image_pull_cache: ImagePullCache::new(image_pull_policy),
       containers: Mutex::default(),
     })
   }
 
   async fn make_container(
     docker: Docker,
-    image_pull_cache: &ImagePullCache,
     image: String,
     platform: Platform,
-    build_generation: &str,
+    image_pull_scope: ImagePullScope,
+    image_pull_cache: ImagePullCache,
     work_dir_base: String,
     named_caches_base_dir: String,
     immutable_inputs_base_dir: String,
   ) -> Result<String, String> {
-    // Pull the image
+    // Pull the image.
     image_pull_cache
-      .pull_image(&docker, &image, &platform, build_generation)
+      .pull_image(
+        &docker,
+        &image,
+        &platform,
+        image_pull_scope,
+        ImagePullPolicy::OnlyIfLatestOrMissing,
+      )
       .await?;
 
     let config = bollard::container::Config {
@@ -713,15 +732,16 @@ impl ContainerCache {
     let work_dir_base = self.work_dir_base.clone();
     let named_caches_base_dir = self.named_caches_base_dir.clone();
     let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
+    let image_pull_scope = ImagePullScope::new(build_generation);
 
     let container_id = container_id_cell
       .get_or_try_init(async move {
         Self::make_container(
           docker,
-          &self.image_pull_cache,
           image.to_string(),
           *platform,
-          build_generation,
+          image_pull_scope,
+          self.image_pull_cache.clone(),
           work_dir_base,
           named_caches_base_dir,
           immutable_inputs_base_dir,
@@ -734,8 +754,8 @@ impl ContainerCache {
   }
 
   pub async fn shutdown(&self) -> Result<(), String> {
-    // Skip shutting down if Docker was never initialized in the first place.
-    if !self.docker.initialized() {
+    // Skip shutting down if Docker was never used in the first place.
+    if self.containers.lock().is_empty() {
       return Ok(());
     }
 

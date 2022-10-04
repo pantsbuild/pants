@@ -60,7 +60,6 @@ async def partition_buf(
 async def run_buf_format(
     request: BufFormatRequest.SubPartition, buf: BufSubsystem, platform: Platform
 ) -> FmtResult:
-    snapshot = await BufFormatRequest.SubPartition.get_snapshot(request)
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
@@ -76,7 +75,7 @@ async def run_buf_format(
 
     input_digest = await Get(
         Digest,
-        MergeDigests((snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
+        MergeDigests((request.snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
     )
 
     argv = [
@@ -85,14 +84,14 @@ async def run_buf_format(
         "-w",
         *buf.format_args,
         "--path",
-        ",".join(snapshot.files),
+        ",".join(request.files),
     ]
     result = await Get(
         ProcessResult,
         Process(
             argv=argv,
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
             env={"PATH": binary_shims.bin_directory},
@@ -100,7 +99,7 @@ async def run_buf_format(
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, snapshot, output_snapshot, formatter_name=BufFormatRequest.tool_name
+        result, request.snapshot, output_snapshot, formatter_name=BufFormatRequest.tool_name
     )
 
 

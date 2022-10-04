@@ -62,7 +62,6 @@ async def partition_ktlint(
 async def ktlint_fmt(
     request: KtlintRequest.SubPartition, tool: KtlintSubsystem, jdk: InternalJdk
 ) -> FmtResult:
-    snapshot = await KtlintRequest.SubPartition.get_snapshot(request)
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
@@ -74,7 +73,7 @@ async def ktlint_fmt(
     args = [
         "com.pinterest.ktlint.Main",
         "-F",
-        *snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -83,11 +82,11 @@ async def ktlint_fmt(
             jdk=jdk,
             argv=args,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            input_digest=snapshot.digest,
+            input_digest=request.snapshot.digest,
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run Ktlint on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -96,7 +95,7 @@ async def ktlint_fmt(
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        snapshot,
+        request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
         formatter_name=KtlintRequest.tool_name,
