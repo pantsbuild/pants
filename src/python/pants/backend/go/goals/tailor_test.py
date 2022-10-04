@@ -136,6 +136,9 @@ def test_cgo_sources(rule_runner: RuleRunner) -> None:
             "foo/another.c": "",
             "foo/native.h": "",
             "foo/assembly.s": "",
+            "c_only/native.c": "",
+            "c_only/assembly.s": "",
+            "c_only/header.h": "",
         }
     )
     putative_targets = rule_runner.request(
