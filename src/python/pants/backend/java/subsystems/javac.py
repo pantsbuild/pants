@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption
 from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,6 @@ class JavacSubsystem(Subsystem):
     name = "javac"
     help = "The javac Java source compiler."
 
-    skip = SkipOption("check")
     args = ArgsListOption(example="-g -deprecation")
 
     tailor_source_targets = BoolOption(

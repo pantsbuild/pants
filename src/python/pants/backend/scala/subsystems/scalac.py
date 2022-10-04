@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.option.option_types import ArgsListOption, DictOption, SkipOption
+from pants.option.option_types import ArgsListOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -21,7 +21,6 @@ class Scalac(Subsystem):
         "scalac_plugins.default.lockfile.txt",
     )
 
-    skip = SkipOption("check")
     args = ArgsListOption(example="-encoding UTF-8")
 
     # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option

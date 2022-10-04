@@ -14,7 +14,6 @@ from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
     DictOption,
-    SkipOption,
     StrListOption,
     StrOption,
 )
@@ -137,7 +136,6 @@ class HelmSubsystem(TemplatedExternalTool):
         advanced=True,
     )
 
-    skip = SkipOption("lint")
     args = ArgsListOption(
         example="--dry-run",
         passthrough=True,
