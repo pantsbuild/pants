@@ -32,7 +32,11 @@ class ScalacCheckRequest(CheckRequest):
 async def scalac_check(
     request: ScalacCheckRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
+    scalac: Scalac,
 ) -> CheckResults:
+    if scalac.skip:
+        return CheckResults([], checker_name=request.name)
+
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
     )

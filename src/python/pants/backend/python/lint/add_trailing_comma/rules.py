@@ -51,7 +51,6 @@ async def partition(
 async def add_trailing_comma_fmt(
     request: AddTrailingCommaRequest.SubPartition, add_trailing_comma: AddTrailingComma
 ) -> FmtResult:
-    snapshot = await AddTrailingCommaRequest.SubPartition.get_snapshot(request)
     add_trailing_comma_pex = await Get(VenvPex, PexRequest, add_trailing_comma.to_pex_request())
 
     result = await Get(
@@ -61,10 +60,10 @@ async def add_trailing_comma_fmt(
             argv=(
                 "--exit-zero-even-if-changed",
                 *add_trailing_comma.args,
-                *snapshot.files,
+                *request.files,
             ),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run add-trailing-comma on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -72,7 +71,7 @@ async def add_trailing_comma_fmt(
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
         result,
-        snapshot,
+        request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
         formatter_name=AddTrailingCommaRequest.name,

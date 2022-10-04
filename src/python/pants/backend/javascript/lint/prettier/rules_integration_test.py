@@ -103,7 +103,7 @@ def run_prettier(
         FmtResult,
         [
             PrettierFmtRequest.SubPartition(
-                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+                input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
     )

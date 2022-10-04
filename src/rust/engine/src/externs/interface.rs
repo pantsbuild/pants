@@ -195,6 +195,8 @@ impl PyTypes {
     interactive_process: &PyType,
     interactive_process_result: &PyType,
     engine_aware_parameter: &PyType,
+    docker_resolve_image_request: &PyType,
+    docker_resolve_image_result: &PyType,
     py: Python,
   ) -> Self {
     Self(RefCell::new(Some(Types {
@@ -227,6 +229,8 @@ impl PyTypes {
       interactive_process: TypeId::new(interactive_process),
       interactive_process_result: TypeId::new(interactive_process_result),
       engine_aware_parameter: TypeId::new(engine_aware_parameter),
+      docker_resolve_image_request: TypeId::new(docker_resolve_image_request),
+      docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
     })))
   }
 }

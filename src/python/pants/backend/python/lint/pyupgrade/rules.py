@@ -50,23 +50,23 @@ async def partition_pyupgrade(
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
 async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpgrade) -> FmtResult:
-    snapshot = await PyUpgradeRequest.SubPartition.get_snapshot(request)
-
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
             pyupgrade_pex,
-            argv=(*pyupgrade.args, *snapshot.files),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            argv=(*pyupgrade.args, *request.files),
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=PyUpgradeRequest.name)
+    return FmtResult.create(
+        result, request.snapshot, output_snapshot, formatter_name=PyUpgradeRequest.name
+    )
 
 
 def rules():

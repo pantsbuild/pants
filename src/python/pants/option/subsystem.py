@@ -86,14 +86,19 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         To consume environment-sensitive options, inject the `EnvironmentAware` inner class into
         your rule.
+
+        Optionally, it is possible to specify environment variables that are required when
+        post-processing raw values provided by users (e.g. `<PATH>` special strings) by specifying
+        `env_vars_used_by_options`, and consuming `_options_env` in your post-processing property.
+        These environment variables will be requested at construction time.
         """
 
         subsystem: ClassVar[type[Subsystem]]
-        depends_on_env_vars: ClassVar[tuple[str, ...]] = ()
+        env_vars_used_by_options: ClassVar[tuple[str, ...]] = ()
 
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
-        env_vars: EnvironmentVars = EnvironmentVars()
+        _options_env: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
@@ -309,7 +314,9 @@ async def _construct_env_aware(
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
 
-    if t.depends_on_env_vars:
-        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.depends_on_env_vars))
+    if t.env_vars_used_by_options:
+        t._options_env = await Get(
+            EnvironmentVars, EnvironmentVarsRequest(t.env_vars_used_by_options)
+        )
 
     return t
