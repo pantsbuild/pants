@@ -26,6 +26,7 @@ from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolatio
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentName, EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests, Snapshot
@@ -289,9 +290,19 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     )
 
     # Package binary dependencies for build context.
-    embedded_pkgs = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+    environment_names_per_field_set = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
         for field_set in embedded_pkgs_per_target.field_sets
+    )
+    embedded_pkgs = await MultiGet(
+        Get(BuiltPackage, {field_set: PackageFieldSet, environment_name: EnvironmentName})
+        for field_set, environment_name in zip(
+            embedded_pkgs_per_target.field_sets, environment_names_per_field_set
+        )
         # Exclude docker images, unless build_upstream_images is true.
         if (
             request.build_upstream_images

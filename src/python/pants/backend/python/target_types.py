@@ -643,6 +643,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
     RestartableField,
+    EnvironmentField,
 )
 
 
