@@ -35,7 +35,7 @@ async def javac_check(
     javac_subsystem: JavacSubsystem,
 ) -> CheckResults:
     if javac_subsystem.skip:
-        return CheckResults([], checker_name=request.name)
+        return CheckResults([], checker_name=request.tool_name)
 
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
