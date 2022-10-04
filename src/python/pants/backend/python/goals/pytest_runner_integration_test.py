@@ -120,7 +120,7 @@ def run_pytest(
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     test_result = rule_runner.request(TestResult, inputs)
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
@@ -139,7 +139,7 @@ def run_pytest_noninteractive(
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     return rule_runner.request(TestResult, inputs)
 
 
@@ -152,7 +152,7 @@ def run_pytest_interactive(
 ) -> InteractiveProcessResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     field_set = PythonTestFieldSet.create(test_target)
-    inputs = [PytestRequest.SubPartition((field_set,), "", test_target.address.spec)]
+    inputs = [PytestRequest.SubPartition((field_set,), test_target.address.spec)]
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     with mock_console(rule_runner.options_bootstrapper):
         return rule_runner.run_interactive_process(debug_request.process)
@@ -450,7 +450,10 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
     assert result.extra_output is not None
     digest_contents = rule_runner.request(DigestContents, [result.extra_output.digest])
     paths = {dc.path for dc in digest_contents}
-    assert {"assets/style.css", "report.html"} == paths
+    assert {
+        "tests.python.pants_test.tests.py/assets/style.css",
+        "tests.python.pants_test.tests.py/report.html",
+    } == paths
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:

@@ -78,8 +78,6 @@ class TestResult(EngineAwareReturnType):
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
-    # Path prefix to use for the extra output above when materializing it into the final dist dir.
-    extra_output_prefix: str | None = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -94,7 +92,6 @@ class TestResult(EngineAwareReturnType):
             stderr_digest=EMPTY_FILE_DIGEST,
             output_setting=output_setting,
             partition_description=partition_description,
-            extra_output_prefix=None,
             result_metadata=None,
         )
 
@@ -108,7 +105,6 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
-        extra_output_prefix: str | None = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
@@ -122,7 +118,6 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
-            extra_output_prefix=extra_output_prefix,
         )
 
     @property
@@ -231,7 +226,10 @@ _FieldSetT = TypeVar("_FieldSetT", bound=TestFieldSet)
 class Partition(Generic[_FieldSetT]):
     field_sets: tuple[_FieldSetT, ...]
     description: str
-    extra_output_prefix: str | None = None
+
+    @classmethod
+    def singleton(cls, field_set: _FieldSetT) -> Partition[_FieldSetT]:
+        return Partition(field_sets=(field_set,), description=field_set.address.spec)
 
 
 @runtime_ignore_subscripts
@@ -254,19 +252,7 @@ class Partitions(FrozenDict[Any, Partition[_FieldSetT]]):
     @classmethod
     def partition_per_input(cls, elements: Iterable[_FieldSetT]) -> Partitions[_FieldSetT]:
         """Helper constructor for implementations that have a partition per input."""
-        return Partitions(
-            [
-                (
-                    e.address,
-                    Partition(
-                        field_sets=(e,),
-                        description=e.address.spec,
-                        extra_output_prefix=e.address.path_safe_spec,
-                    ),
-                )
-                for e in elements
-            ]
-        )
+        return Partitions((e.address, Partition.singleton(e)) for e in elements)
 
 
 @union
@@ -353,7 +339,6 @@ class TestRequest:
     class SubPartition(Generic[_FieldSetT]):
         field_sets: Tuple[_FieldSetT, ...]
         description: str
-        extra_output_prefix: str | None = None
 
     @final
     @classmethod
@@ -761,10 +746,10 @@ async def run_tests(
     )
 
     subpartitions = [
-        request_type.SubPartition(partition.field_sets, key, partition.description)
+        request_type.SubPartition(partition.field_sets, partition.description)
         for request_type, partitions_list in partitions_by_request_type.items()
         for partitions in partitions_list
-        for key, partition in partitions.items()
+        for partition in partitions.values()
     ]
 
     if test_subsystem.debug or test_subsystem.debug_adapter:
@@ -791,10 +776,10 @@ async def run_tests(
 
         console.print_stderr(_format_test_summary(result, run_id, console))
 
-        if result.extra_output_prefix and result.extra_output and result.extra_output.files:
+        if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.extra_output_prefix),
+                path_prefix=str(distdir.relpath / "test"),
             )
 
     if test_subsystem.report:

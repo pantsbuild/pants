@@ -57,6 +57,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -425,6 +426,9 @@ async def run_python_test(
     extra_output_snapshot = await Get(
         Snapshot, RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR)
     )
+    extra_output_snapshot = await Get(
+        Snapshot, AddPrefix(extra_output_snapshot.digest, field_set.address.path_safe_spec)
+    )
 
     return TestResult.from_fallible_process_result(
         result,
@@ -433,7 +437,6 @@ async def run_python_test(
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
-        extra_output_prefix=partition.extra_output_prefix,
     )
 
 
