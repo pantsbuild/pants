@@ -38,11 +38,7 @@ class HelmLintRequest(LintTargetsRequest):
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-    helm: HelmSubsystem,
 ) -> Partitions[HelmLintFieldSet]:
-    if helm.skip:
-        return Partitions()
-
     field_sets = tuple(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
