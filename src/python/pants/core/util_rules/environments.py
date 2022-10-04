@@ -627,7 +627,7 @@ async def get_target_for_environment_name(
 
 
 @rule_helper
-async def _maybe_add_docker_image_id(image_name: str, platform: Platform) -> str:
+async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
     # If the image name appears to be just an image ID, just return it as-is.
     if image_name.startswith("sha256:"):
         return image_name
@@ -637,7 +637,9 @@ async def _maybe_add_docker_image_id(image_name: str, platform: Platform) -> str
         image_name_part, _, maybe_image_id = image_name.rpartition("@")
         if not maybe_image_id.startswith("sha256:"):
             raise ValueError(
-                f"Docker image `{image_name}` contains an image ID component, but it does not appear to be a image SHA-256 hash."
+                f"The Docker image `{image_name}` from the field {DockerImageField.alias} "
+                f"for the target {address} contains what appears to be an image ID component, "
+                "but does not appear to be the expected SHA-256 hash for an image."
             )
         return image_name
 
@@ -670,6 +672,12 @@ async def extract_process_config_from_environment(
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
+
+        # If a docker image name is provided, convert to an image ID so caching works properly.
+        # TODO(17104): Append image ID instead to the image name.
+        if docker_image is not None:
+            docker_image = await _maybe_add_docker_image_id(docker_image, platform, tgt.val.address)
+
         remote_execution = tgt.val.has_field(RemotePlatformField)
         if remote_execution:
             raw_remote_execution_extra_platform_properties = tgt.val[
@@ -689,10 +697,6 @@ async def extract_process_config_from_environment(
                 )
         else:
             raw_remote_execution_extra_platform_properties = ()
-
-    # If a docker image name is present, ensure that an image ID is present in the image name.
-    if docker_image is not None:
-        docker_image = await _maybe_add_docker_image_id(docker_image, platform)
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
