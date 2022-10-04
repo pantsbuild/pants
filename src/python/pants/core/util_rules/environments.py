@@ -167,8 +167,9 @@ class DockerImageField(StringField):
         """
         The docker image ID to use when this environment is loaded, e.g. `centos6:latest`.
 
-        TODO: expectations about what are valid IDs, e.g. if they must come from DockerHub vs other
-        registries.
+        This image ID may be any image identifier that the local Docker installation can accept.
+        This includes image names with or without tags, or image names with an immutable digest.
+
         """
     )
 
