@@ -14,7 +14,6 @@ What is a maintainer?
 [Maintainers are the core group of trusted people with a long-term interest in Pants, who have made regular contributions for some time, and plan to continue to do so](doc:the-pants-community#maintainers). Maintainers are entrusted to make decisions on the future and direction of Pants. In doing so, it is their responsibility to uphold the health, culture, and quality of the project.
 
 We do not expect a minimum commitment of time from Maintainers, nor do we expect maintainers to contribute in specific ways, rather, we expect them to act in a way that makes Pants better whenever they interact with the project and our community.
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 What do maintainers do?
 -----------------------
