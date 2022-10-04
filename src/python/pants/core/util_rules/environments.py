@@ -650,7 +650,7 @@ async def _maybe_add_docker_image_id(image_name: str, platform: Platform) -> str
         ),
     )
 
-    # TODO: Consider appending the correct image ID to the existing image name so error messages about the
+    # TODO(17104): Consider appending the correct image ID to the existing image name so error messages about the
     # image have context for the user. Note: The image ID used for a "repo digest" (tag and image ID) is not
     # the same as just the image's ID.
     return resolve_result.image_id

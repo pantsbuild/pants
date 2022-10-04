@@ -89,6 +89,7 @@ def test_extract_process_config_from_environment() -> None:
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
         if expected_docker_image is not None:
+            # TODO(17104): Account for any prepended image name here once implemented.
             assert result.docker_image == "sha256:abc123"
         else:
             assert result.docker_image is None
