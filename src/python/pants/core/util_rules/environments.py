@@ -83,16 +83,16 @@ class EnvironmentField(StringField):
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
     help = softwrap(
-        """
+        f"""
         Specify which environment target to consume environment-sensitive options from.
 
         Once environments are defined in `[environments-preview].names`, you can specify the environment
         for this target by its name. Any fields that are defined in that environment will override
         the values from options set by `pants.toml`, command line values, or environment variables.
 
-        You can specify multiple valid environments by using `parametrize`. If the default is
-        specified, Pants will fall back to the `local_environment` defined for the current
-        platform, or no environment if no such environment exists.
+        You can specify multiple valid environments by using `parametrize`. If
+        {LOCAL_ENVIRONMENT_MATCHER} specified, Pants will fall back to the `local_environment`
+        defined for the current platform, or no environment if no such environment exists.
         """
     )
 
@@ -165,10 +165,11 @@ class DockerImageField(StringField):
     value: str
     help = softwrap(
         """
-        The docker image ID to use when this environment is loaded, e.g. `centos6:latest`.
+        The docker image ID to use when this environment is loaded.
 
-        This image ID may be any image identifier that the local Docker installation can accept.
-        This includes image names with or without tags, or image names with an immutable digest.
+        This value may be any image identifier that the local Docker installation can accept.
+        This includes image names with or without tags (e.g. `centos6` or `centos6:latest`), or
+        image names with an immutable digest (e.g. `centos@sha256:<some_sha256_value>`).
 
         """
     )
