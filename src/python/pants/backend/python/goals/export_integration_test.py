@@ -29,6 +29,7 @@ class _ToolConfig:
     version: str
     experimental: bool = False
     backend_prefix: str | None = "lint"
+    takes_ics: bool = True
 
     @property
     def package(self) -> str:
@@ -38,16 +39,16 @@ class _ToolConfig:
 EXPORTED_TOOLS: List[_ToolConfig] = [
     _ToolConfig(name="add-trailing-comma", version="2.2.3", experimental=True),
     _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
-    _ToolConfig(name="bandit", version="1.6.2"),
+    _ToolConfig(name="bandit", version="1.6.2", takes_ics=False),
     _ToolConfig(name="black", version="22.3.0"),
     _ToolConfig(name="docformatter", version="1.3.1"),
-    _ToolConfig(name="flake8", version="4.0.1"),
+    _ToolConfig(name="flake8", version="4.0.1", takes_ics=False),
     _ToolConfig(name="isort", version="5.10.1"),
-    _ToolConfig(name="pylint", version="2.13.1"),
+    _ToolConfig(name="pylint", version="2.13.1", takes_ics=False),
     _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
     _ToolConfig(name="yapf", version="0.32.0"),
     _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
-    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None),
+    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None, takes_ics=False),
 ]
 
 
@@ -70,6 +71,8 @@ def build_config(tmpdir: str) -> Mapping:
             "version": f"{tool_config.name}=={tool_config.version}",
             "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
         }
+        if tool_config.takes_ics:
+            cfg[tool_config.name]["interpreter_constraints"] = (f"=={platform.python_version()}",)
 
         if not tool_config.backend_prefix:
             continue
@@ -110,6 +113,7 @@ def test_export() -> None:
 
         # NOTE: Not every tool implements --version so this is the best we can do.
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+
         expected_tool_dir = os.path.join(
             lib_dir, f"{tool_config.package}-{tool_config.version}.dist-info"
         )

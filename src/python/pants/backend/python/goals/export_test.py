@@ -72,14 +72,14 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
         )
         all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 
-        for result in all_results:
-            assert len(result.post_processing_cmds) == 2
+        for result, resolve in zip(all_results, ["a", "b"] if enable_resolves else [""]):
+            assert len(result.post_processing_cmds) == 4
 
             ppc0 = result.post_processing_cmds[0]
             assert ppc0.argv[1:] == (
                 # The first arg is the full path to the python interpreter, which we
                 # don't easily know here, so we ignore it in this comparison.
-                os.path.join("{digest_root}", ".", "pex"),
+                os.path.join("{digest_root}", f".{resolve}.tmp", ".", "pex"),
                 os.path.join("{digest_root}", "requirements.pex"),
                 "venv",
                 "--pip",
@@ -92,10 +92,26 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
             ppc1 = result.post_processing_cmds[1]
             assert ppc1.argv == (
                 "rm",
-                "-f",
-                os.path.join("{digest_root}", ".", "pex"),
+                "-rf",
+                os.path.join("{digest_root}", f".{resolve}.tmp"),
             )
             assert ppc1.extra_env == FrozenDict()
+
+            ppc2 = result.post_processing_cmds[2]
+            assert ppc2.argv == (
+                "rm",
+                "-f",
+                os.path.join("{digest_root}", "requirements.pex_bin_python_shim.sh"),
+            )
+            assert ppc2.extra_env == FrozenDict()
+
+            ppc3 = result.post_processing_cmds[3]
+            assert ppc3.argv == (
+                "rm",
+                "-f",
+                os.path.join("{digest_root}", "requirements.pex_pex_shim.sh"),
+            )
+            assert ppc3.extra_env == FrozenDict()
 
         return all_results
 
