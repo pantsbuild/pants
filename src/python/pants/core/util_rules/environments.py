@@ -12,6 +12,7 @@ from typing import Any, Callable, ClassVar, Iterable, Optional, Tuple, Type, Uni
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName as EnvironmentName
+from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
 from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
@@ -625,8 +626,38 @@ async def get_target_for_environment_name(
     return EnvironmentTarget(tgt)
 
 
+@rule_helper
+async def _maybe_add_docker_image_id(image_name: str, platform: Platform) -> str:
+    # If the image name appears to be just an image ID, just return it as-is.
+    if image_name.startswith("sha256:"):
+        return image_name
+
+    # If the image name contains an appended image ID, then use it.
+    if "@" in image_name:
+        image_name_part, _, maybe_image_id = image_name.rpartition("@")
+        if not maybe_image_id.startswith("sha256:"):
+            raise ValueError(
+                f"Docker image `{image_name}` contains an image ID component, but it does not appear to be a image SHA-256 hash."
+            )
+        return image_name
+
+    # Otherwise, resolve the image name to an image ID and append the applicable component to the image name.
+    resolve_result = await Get(
+        DockerResolveImageResult,
+        DockerResolveImageRequest(
+            image_name=image_name,
+            platform=platform.name,
+        ),
+    )
+
+    # TODO: Consider appending the correct image ID to the existing image name so error messages about the
+    # image have context for the user. Note: The image ID used for a "repo digest" (tag and image ID) is not
+    # the same as just the image's ID.
+    return resolve_result.image_id
+
+
 @rule
-def extract_process_config_from_environment(
+async def extract_process_config_from_environment(
     tgt: EnvironmentTarget, platform: Platform, global_options: GlobalOptions
 ) -> ProcessConfigFromEnvironment:
     if tgt.val is None:
@@ -658,6 +689,10 @@ def extract_process_config_from_environment(
                 )
         else:
             raw_remote_execution_extra_platform_properties = ()
+
+    # If a docker image name is present, ensure that an image ID is present in the image name.
+    if docker_image is not None:
+        docker_image = await _maybe_add_docker_image_id(docker_image, platform)
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
