@@ -31,7 +31,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FmtTargetsRequest):
     field_set_type = AutoflakeFieldSet
-    name = Autoflake.options_scope
+    tool_name = Autoflake.options_scope
 
 
 @rule
@@ -70,7 +70,7 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
         request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=AutoflakeRequest.name,
+        formatter_name=AutoflakeRequest.tool_name,
     )
 
 

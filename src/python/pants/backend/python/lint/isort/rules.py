@@ -34,7 +34,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    name = Isort.options_scope
+    tool_name = Isort.options_scope
 
 
 def generate_argv(
@@ -107,7 +107,7 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
         request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=IsortRequest.name,
+        formatter_name=IsortRequest.tool_name,
     )
 
 

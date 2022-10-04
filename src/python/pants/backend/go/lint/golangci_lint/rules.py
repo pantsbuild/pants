@@ -48,7 +48,7 @@ class GolangciLintFieldSet(FieldSet):
 
 class GolangciLintRequest(LintTargetsRequest):
     field_set_type = GolangciLintFieldSet
-    name = GolangciLint.options_scope
+    tool_name = GolangciLint.options_scope
 
 
 @rule

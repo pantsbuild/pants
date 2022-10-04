@@ -32,7 +32,7 @@ class ClangFormatFmtFieldSet(FieldSet):
 
 class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
-    name = ClangFormat.options_scope
+    tool_name = ClangFormat.options_scope
 
 
 @rule
@@ -99,7 +99,7 @@ async def clangformat_fmt(
         result,
         request.snapshot,
         output_snapshot,
-        formatter_name=ClangFormatRequest.name,
+        formatter_name=ClangFormatRequest.tool_name,
         strip_chroot_path=True,
     )
 

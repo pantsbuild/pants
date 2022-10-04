@@ -22,7 +22,7 @@ from pants.util.strutil import pluralize, softwrap
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    name = Black.options_scope
+    tool_name = Black.options_scope
 
 
 @rule_helper
@@ -70,7 +70,7 @@ async def _run_black(
         request.snapshot,
         output_snapshot,
         strip_chroot_path=True,
-        formatter_name=BlackRequest.name,
+        formatter_name=BlackRequest.tool_name,
     )
 
 

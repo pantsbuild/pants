@@ -69,11 +69,11 @@ class MockLintTargetsRequest(MockLintRequest, LintTargetsRequest):
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
         addresses = [field_set.address for field_set in field_sets]
-        return LintResult(cls.exit_code(addresses), "", "", cls.name)
+        return LintResult(cls.exit_code(addresses), "", "", cls.tool_name)
 
 
 class SuccessfulRequest(MockLintTargetsRequest):
-    name = "SuccessfulLinter"
+    tool_name = "SuccessfulLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -81,7 +81,7 @@ class SuccessfulRequest(MockLintTargetsRequest):
 
 
 class FailingRequest(MockLintTargetsRequest):
-    name = "FailingLinter"
+    tool_name = "FailingLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -89,7 +89,7 @@ class FailingRequest(MockLintTargetsRequest):
 
 
 class ConditionallySucceedsRequest(MockLintTargetsRequest):
-    name = "ConditionallySucceedsLinter"
+    tool_name = "ConditionallySucceedsLinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -99,7 +99,7 @@ class ConditionallySucceedsRequest(MockLintTargetsRequest):
 
 
 class SkippedRequest(MockLintTargetsRequest):
-    name = "SkippedLinter"
+    tool_name = "SkippedLinter"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -116,7 +116,7 @@ class InvalidFieldSet(MockLinterFieldSet):
 
 class InvalidRequest(MockLintTargetsRequest):
     field_set_type = InvalidFieldSet
-    name = "InvalidLinter"
+    tool_name = "InvalidLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -136,11 +136,11 @@ def mock_target_partitioner(
 
 
 class MockFilesRequest(MockLintRequest, LintFilesRequest):
-    name = "FilesLinter"
+    tool_name = "FilesLinter"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
+        return LintResult(0, "", "", cls.tool_name)
 
 
 def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
@@ -166,27 +166,27 @@ class MockFmtRequest(MockLintRequest, FmtTargetsRequest):
 
 
 class SuccessfulFormatter(MockFmtRequest):
-    name = "SuccessfulFormatter"
+    tool_name = "SuccessfulFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
+        return LintResult(0, "", "", cls.tool_name)
 
 
 class FailingFormatter(MockFmtRequest):
-    name = "FailingFormatter"
+    tool_name = "FailingFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
-        return LintResult(1, "", "", cls.name)
+        return LintResult(1, "", "", cls.tool_name)
 
 
 class BuildFileFormatter(MockLintRequest, FmtFilesRequest):
-    name = "BobTheBUILDer"
+    tool_name = "BobTheBUILDer"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
+        return LintResult(0, "", "", cls.tool_name)
 
 
 @pytest.fixture
@@ -332,10 +332,10 @@ def test_summary(rule_runner: RuleRunner) -> None:
         lint_request_types=request_types,
         targets=targets,
         only=[
-            FailingRequest.name,
-            MockFilesRequest.name,
-            FailingFormatter.name,
-            BuildFileFormatter.name,
+            FailingRequest.tool_name,
+            MockFilesRequest.tool_name,
+            FailingFormatter.tool_name,
+            BuildFileFormatter.tool_name,
         ],
     )
     assert stderr == dedent(

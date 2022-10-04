@@ -256,7 +256,7 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    name = RegexLintSubsystem.options_scope
+    tool_name = RegexLintSubsystem.options_scope
 
 
 @rule
