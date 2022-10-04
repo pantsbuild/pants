@@ -61,7 +61,9 @@ class EnvironmentsSubsystem(Subsystem):
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
-            TODO(#7735): explain how names are used once they are consumed.
+            To use an environment for a given target, specify the name in the `environment` field
+            on that target. Pants will consume the environment target at the address mapped from
+            that name.
 
             Pants will ignore any environment targets that are not given a name via this option.
             """
