@@ -42,7 +42,7 @@ async def partition(
         Partitions()
         if add_trailing_comma.skip
         else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
+            field_set.source.file_path for field_set in request.field_sets
         )
     )
 
