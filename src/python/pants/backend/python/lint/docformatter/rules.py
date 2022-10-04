@@ -31,7 +31,7 @@ class DocformatterFieldSet(FieldSet):
 
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    tool_name = Docformatter.options_scope
+    tool_subsystem = Docformatter
 
 
 @rule

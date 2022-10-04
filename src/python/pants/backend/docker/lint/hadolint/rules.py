@@ -33,7 +33,7 @@ class HadolintFieldSet(FieldSet):
 
 class HadolintRequest(LintTargetsRequest):
     field_set_type = HadolintFieldSet
-    tool_name = Hadolint.options_scope
+    tool_subsystem = Hadolint
 
 
 def generate_argv(

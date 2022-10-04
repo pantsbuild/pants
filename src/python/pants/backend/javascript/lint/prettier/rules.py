@@ -32,7 +32,7 @@ class PrettierFmtFieldSet(FieldSet):
 
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
-    tool_name = Prettier.options_scope
+    tool_subsystem = Prettier
 
 
 @rule

@@ -40,7 +40,7 @@ class GoVetFieldSet(FieldSet):
 
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
-    tool_name = GoVetSubsystem.options_scope
+    tool_subsystem = GoVetSubsystem
 
 
 @rule

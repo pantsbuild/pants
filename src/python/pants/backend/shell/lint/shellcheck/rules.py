@@ -33,7 +33,7 @@ class ShellcheckFieldSet(FieldSet):
 
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
-    tool_name = Shellcheck.options_scope
+    tool_subsystem = Shellcheck
 
 
 @rule

@@ -32,7 +32,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    tool_name = Shfmt.options_scope
+    tool_subsystem = Shfmt
 
 
 @rule

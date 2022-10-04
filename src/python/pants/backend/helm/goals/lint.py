@@ -32,7 +32,7 @@ class HelmLintFieldSet(HelmChartFieldSet):
 
 class HelmLintRequest(LintTargetsRequest):
     field_set_type = HelmLintFieldSet
-    tool_name = HelmSubsystem.options_scope
+    tool_subsystem = HelmSubsystem  # type: ignore[assignment]
 
 
 @rule

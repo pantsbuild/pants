@@ -35,7 +35,7 @@ class GofmtFieldSet(FieldSet):
 
 class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
-    tool_name = GofmtSubsystem.options_scope
+    tool_subsystem = GofmtSubsystem
 
 
 @rule

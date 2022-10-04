@@ -31,7 +31,7 @@ class AutoflakeFieldSet(FieldSet):
 
 class AutoflakeRequest(FmtTargetsRequest):
     field_set_type = AutoflakeFieldSet
-    tool_name = Autoflake.options_scope
+    tool_subsystem = Autoflake
 
 
 @rule

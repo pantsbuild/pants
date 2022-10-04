@@ -32,7 +32,7 @@ class ClangFormatFmtFieldSet(FieldSet):
 
 class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
-    tool_name = ClangFormat.options_scope
+    tool_subsystem = ClangFormat
 
 
 @rule

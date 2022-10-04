@@ -31,7 +31,7 @@ class AddTrailingCommaFieldSet(FieldSet):
 
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
-    tool_name = AddTrailingComma.options_scope
+    tool_subsystem = AddTrailingComma
 
 
 @rule

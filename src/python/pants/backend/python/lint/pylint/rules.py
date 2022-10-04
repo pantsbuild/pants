@@ -53,7 +53,7 @@ class PartitionKey:
 
 class PylintRequest(LintTargetsRequest):
     field_set_type = PylintFieldSet
-    tool_name = Pylint.options_scope
+    tool_subsystem = Pylint
 
 
 def generate_argv(field_sets: tuple[PylintFieldSet, ...], pylint: Pylint) -> Tuple[str, ...]:

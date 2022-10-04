@@ -38,7 +38,7 @@ class KtlintFieldSet(FieldSet):
 
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
-    tool_name = KtlintSubsystem.options_scope
+    tool_subsystem = KtlintSubsystem
 
 
 class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):

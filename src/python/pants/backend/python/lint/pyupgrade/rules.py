@@ -32,7 +32,7 @@ class PyUpgradeFieldSet(FieldSet):
 
 class PyUpgradeRequest(FmtTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    tool_name = PyUpgrade.options_scope
+    tool_subsystem = PyUpgrade
 
 
 @rule
