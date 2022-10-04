@@ -79,7 +79,7 @@ LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
 class EnvironmentField(StringField):
-    alias = "environment"
+    alias = "_environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
     help = softwrap(
@@ -144,7 +144,7 @@ class LocalEnvironmentTarget(Target):
     alias = "local_environment"
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
-        """
+        f"""
         Configuration of environment-sensitive options, such as environment variables and search
         paths when Pants runs subprocesses locally.
 
