@@ -53,7 +53,13 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"unowned/go.mod": "", "owned/go.mod": "", "owned/BUILD": "go_mod()"})
+    rule_runner.write_files(
+        {
+            "unowned/go.mod": "module pantsbuild.org/unowned\n",
+            "owned/go.mod": "module pantsbuild.org/owned\n",
+            "owned/BUILD": "go_mod()",
+        }
+    )
     putative_targets = rule_runner.request(
         PutativeTargets,
         [PutativeGoTargetsRequest(("unowned", "owned")), AllOwnedSources(["owned/go.mod"])],
@@ -70,12 +76,13 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
 def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "unowned/go.mod": "",
+            "unowned/go.mod": "module pantsbuild.org/unowned\n",
             "unowned/f.go": "",
             "unowned/f1.go": "",
-            "owned/go.mod": "",
+            "unowned/BUILD": "go_mod(name='mod')",
+            "owned/go.mod": "module pantsbuild.org/owned\n",
             "owned/f.go": "",
-            "owned/BUILD": "go_package()",
+            "owned/BUILD": "go_package()\ngo_mod(name='mod')\n",
             # Any `.go` files under a `testdata` or `vendor` folder should be ignored.
             "unowned/testdata/f.go": "",
             "unowned/testdata/subdir/f.go": "",
@@ -107,7 +114,7 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
                 GoPackageTarget,
                 path="unowned",
                 name=None,
-                triggering_sources=["f1.go", "f.go"],
+                triggering_sources=["f.go", "f1.go"],
             ),
             PutativeTarget.for_target_type(
                 GoPackageTarget,
@@ -122,7 +129,8 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
 def test_cgo_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "foo/go.mod": "",
+            "foo/BUILD": "go_mod()",
+            "foo/go.mod": "module pantsbuild.org/example\n",
             "foo/main.go": "",
             "foo/native.c": "",
             "foo/another.c": "",
@@ -153,18 +161,19 @@ def test_cgo_sources(rule_runner: RuleRunner) -> None:
 def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "missing_binary_tgt/go.mod": "",
+            "missing_binary_tgt/go.mod": "module pantsbuild.org/missing_binary_tgt\n",
             "missing_binary_tgt/app.go": "package main",
-            "missing_binary_tgt/BUILD": "go_package()",
-            "tgt_already_exists/go.mod": "",
+            "missing_binary_tgt/BUILD": "go_package()\ngo_mod(name='mod')\n",
+            "tgt_already_exists/go.mod": "module pantsbuild.org/tgt_already_exists\n",
             "tgt_already_exists/app.go": "package main",
-            "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()",
-            "missing_pkg_and_binary_tgt/go.mod": "",
+            "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()\ngo_mod(name='mod')\n",
+            "missing_pkg_and_binary_tgt/go.mod": "module pantsbuild.org/missing_pkg_and_binary_tgt\n",
             "missing_pkg_and_binary_tgt/app.go": "package main",
-            "main_set_to_different_dir/go.mod": "",
+            "missing_pkg_and_binary_tgt/BUILD": "go_mod(name='mod')\n",
+            "main_set_to_different_dir/go.mod": "module pantsbuild.org/main_set_to_different_dir\n",
             "main_set_to_different_dir/subdir/app.go": "package main",
             "main_set_to_different_dir/subdir/BUILD": "go_package()",
-            "main_set_to_different_dir/BUILD": "go_binary(main='main_set_to_different_dir/subdir')",
+            "main_set_to_different_dir/BUILD": "go_binary(main='main_set_to_different_dir/subdir')\ngo_mod(name='mod')",
             "no_go_mod/app.go": "package main",
         }
     )

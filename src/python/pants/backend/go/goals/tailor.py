@@ -137,7 +137,7 @@ async def find_putative_go_package_target(
             path=request.dir_path,
             name=None,
             kwargs=kwargs,
-            triggering_sources=[*request.files, *triggering_cgo_files],
+            triggering_sources=[*sorted(request.files), *triggering_cgo_files],
         )
     )
 
