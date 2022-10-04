@@ -24,6 +24,7 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import rules as core_tailor_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_tailor_rules(),
+            *core_tailor_rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
@@ -226,8 +228,8 @@ def test_has_package_main() -> None:
 
 
 def test_has_go_mod_ancestor() -> None:
-    assert has_go_mod_ancestor("dir/subdir", {"dir/subdir"}) is True
-    assert has_go_mod_ancestor("dir/subdir", {"dir/subdir/child"}) is False
-    assert has_go_mod_ancestor("dir/subdir", {"dir/another"}) is False
-    assert has_go_mod_ancestor("dir/subdir", {""}) is True
-    assert has_go_mod_ancestor("dir/subdir", {"another", "dir/another", "dir"}) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/subdir"})) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/subdir/child"})) is False
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/another"})) is False
+    assert has_go_mod_ancestor("dir/subdir", frozenset({""})) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"another", "dir/another", "dir"})) is True
