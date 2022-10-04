@@ -170,7 +170,6 @@ class DockerImageField(StringField):
         This value may be any image identifier that the local Docker installation can accept.
         This includes image names with or without tags (e.g. `centos6` or `centos6:latest`), or
         image names with an immutable digest (e.g. `centos@sha256:<some_sha256_value>`).
-
         """
     )
 
