@@ -33,6 +33,7 @@ from pants.core.util_rules.environments import (
     extract_process_config_from_environment,
     resolve_environment_name,
 )
+from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions
@@ -77,10 +78,20 @@ def test_extract_process_config_from_environment() -> None:
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
             rule_args=[EnvironmentTarget(env_tgt), Platform.linux_arm64, global_options],
+            mock_gets=[
+                MockGet(
+                    output_type=DockerResolveImageResult,
+                    input_types=(DockerResolveImageRequest,),
+                    mock=lambda req: DockerResolveImageResult("sha256:abc123"),
+                )
+            ],
         )
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
-        assert result.docker_image == expected_docker_image
+        if expected_docker_image is not None:
+            assert result.docker_image == "sha256:abc123"
+        else:
+            assert result.docker_image is None
         assert result.remote_execution_extra_platform_properties == (
             expected_remote_execution_extra_platform_properties or []
         )
