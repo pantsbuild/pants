@@ -35,6 +35,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, SingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
 SMALLTALK_FILE = FileContent("formatted.st", b"y := self size + super size.')\n")
@@ -58,7 +59,10 @@ class FortranFieldSet(FieldSet):
 
 class FortranFmtRequest(FmtTargetsRequest):
     field_set_type = FortranFieldSet
-    tool_name = "FortranConditionallyDidChange"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FortranConditionallyDidChange"
 
 
 @rule
@@ -97,7 +101,10 @@ class SmalltalkFieldSet(FieldSet):
 
 class SmalltalkNoopRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    tool_name = "SmalltalkDidNotChange"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SmalltalkDidNotChange"
 
 
 @rule
@@ -119,7 +126,10 @@ async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResul
 
 class SmalltalkSkipRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    tool_name = "SmalltalkSkipped"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SmalltalkSkipped"
 
 
 @rule
@@ -135,7 +145,9 @@ async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FmtResul
 class BrickyBuildFileFormatter(FmtFilesRequest):
     """Ensures all non-comment lines only consist of the word 'brick'."""
 
-    tool_name = "BrickyBobby"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BrickyBobby"
 
 
 @rule

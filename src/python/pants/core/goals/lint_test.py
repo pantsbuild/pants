@@ -32,6 +32,7 @@ from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 _LintRequestT = TypeVar("_LintRequestT", bound=LintRequest)
 
@@ -73,7 +74,9 @@ class MockLintTargetsRequest(MockLintRequest, LintTargetsRequest):
 
 
 class SuccessfulRequest(MockLintTargetsRequest):
-    tool_name = "SuccessfulLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -81,7 +84,9 @@ class SuccessfulRequest(MockLintTargetsRequest):
 
 
 class FailingRequest(MockLintTargetsRequest):
-    tool_name = "FailingLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -89,7 +94,9 @@ class FailingRequest(MockLintTargetsRequest):
 
 
 class ConditionallySucceedsRequest(MockLintTargetsRequest):
-    tool_name = "ConditionallySucceedsLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ConditionallySucceedsLinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -99,7 +106,9 @@ class ConditionallySucceedsRequest(MockLintTargetsRequest):
 
 
 class SkippedRequest(MockLintTargetsRequest):
-    tool_name = "SkippedLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SkippedLinter"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -116,7 +125,10 @@ class InvalidFieldSet(MockLinterFieldSet):
 
 class InvalidRequest(MockLintTargetsRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidLinter"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "InvalidLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -136,7 +148,9 @@ def mock_target_partitioner(
 
 
 class MockFilesRequest(MockLintRequest, LintFilesRequest):
-    tool_name = "FilesLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FilesLinter"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
@@ -166,7 +180,9 @@ class MockFmtRequest(MockLintRequest, FmtTargetsRequest):
 
 
 class SuccessfulFormatter(MockFmtRequest):
-    tool_name = "SuccessfulFormatter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -174,7 +190,9 @@ class SuccessfulFormatter(MockFmtRequest):
 
 
 class FailingFormatter(MockFmtRequest):
-    tool_name = "FailingFormatter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -182,7 +200,9 @@ class FailingFormatter(MockFmtRequest):
 
 
 class BuildFileFormatter(MockLintRequest, FmtFilesRequest):
-    tool_name = "BobTheBUILDer"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BobTheBUILDer"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
