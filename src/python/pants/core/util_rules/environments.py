@@ -91,7 +91,7 @@ class EnvironmentField(StringField):
         the values from options set by `pants.toml`, command line values, or environment variables.
 
         You can specify multiple valid environments by using `parametrize`. If
-        {LOCAL_ENVIRONMENT_MATCHER} specified, Pants will fall back to the `local_environment`
+        `{LOCAL_ENVIRONMENT_MATCHER}` is specified, Pants will fall back to the `local_environment`
         defined for the current platform, or no environment if no such environment exists.
         """
     )
