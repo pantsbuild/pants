@@ -12,9 +12,8 @@ from typing import DefaultDict, Iterable, cast
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
     ExportError,
@@ -28,8 +27,8 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import ProcessResult
+from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import bin_name
@@ -78,9 +77,74 @@ class ExportPythonTool(EngineAwareParameter):
         return self.resolve_name
 
 
+@rule_helper
+async def _do_export(
+    requirements_pex: Pex,
+    pex_pex: PexPEX,
+    dest: str,
+    resolve_name: str,
+    qualify_path_with_python_version: bool,
+) -> ExportResult:
+    if requirements_pex.python is None:
+        # An internal-only pex will always have the `python` field set.
+        # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
+        raise ExportError(f"The PEX to be exported for {resolve_name} must be internal_only.")
+
+    # Get the full python version (including patch #).
+    res = await Get(
+        ProcessResult,
+        PexProcess(
+            pex=requirements_pex,
+            description="Get interpreter version",
+            argv=[
+                "-c",
+                "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
+            ],
+            extra_env={"PEX_INTERPRETER": "1"},
+        ),
+    )
+    py_version = res.stdout.strip().decode()
+
+    # NOTE: We add a unique prefix to the pex_pex path to avoid conflicts when multiple
+    # venvs are concurrently exporting. Without this prefix all the invocations write
+    # the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of the pex_pex
+    # path in one export will delete the binary out from under the others.
+    pex_pex_dir = f".{resolve_name}.tmp"
+    pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
+    pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, requirements_pex.digest]))
+
+    description = f"for {resolve_name} " if resolve_name else ""
+    return ExportResult(
+        f"virtualenv {description}(using Python {py_version})",
+        dest,
+        digest=merged_digest,
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    requirements_pex.python.path,
+                    os.path.join(pex_pex_dest, pex_pex.exe),
+                    os.path.join("{digest_root}", requirements_pex.name),
+                    "venv",
+                    "--pip",
+                    "--collisions-ok",
+                    "--remove=all",
+                    f"{{digest_root}}/{py_version if qualify_path_with_python_version else ''}",
+                ],
+                {"PEX_MODULE": "pex.tools"},
+            ),
+            # Remove the PEX pex, to avoid confusion.
+            PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
+        ],
+    )
+
+
 @rule
-async def export_virtualenv(
-    request: _ExportVenvRequest, python_setup: PythonSetup, pex_pex: PexPEX
+async def export_virtualenv_for_targets(
+    request: _ExportVenvRequest,
+    python_setup: PythonSetup,
+    pex_pex: PexPEX,
 ) -> ExportResult:
     if request.resolve:
         interpreter_constraints = InterpreterConstraints(
@@ -93,6 +157,8 @@ async def export_virtualenv(
             request.root_python_targets, python_setup
         ) or InterpreterConstraints(python_setup.interpreter_constraints)
 
+    # Note that a pex created from a RequirementsPexRequest has packed layout, which should lead
+    # to the best performance in this use case.
     requirements_pex = await Get(
         Pex,
         RequirementsPexRequest(
@@ -101,99 +167,40 @@ async def export_virtualenv(
         ),
     )
 
-    # Note that an internal-only pex will always have the `python` field set.
-    # See the build_pex() rule in pex.py.
-    interpreter = cast(PythonExecutable, requirements_pex.python)
-
-    # Get the full python version (including patch #), so we can use it as the venv name.
-    res = await Get(
-        ProcessResult,
-        Process(
-            description="Get interpreter version",
-            argv=[
-                interpreter.path,
-                "-c",
-                "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
-            ],
-        ),
-    )
-    py_version = res.stdout.strip().decode()
-
     dest = (
         os.path.join("python", "virtualenvs", path_safe(request.resolve))
         if request.resolve
         else os.path.join("python", "virtualenv")
     )
 
-    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
-    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
-    maybe_resolve_str = f"for the resolve '{request.resolve}' " if request.resolve else ""
-    return ExportResult(
-        f"virtualenv {maybe_resolve_str}(using Python {py_version})",
+    export_result = await _do_export(
+        requirements_pex,
+        pex_pex,
         dest,
-        digest=merged_digest,
-        post_processing_cmds=[
-            PostProcessingCommand(
-                [
-                    interpreter.path,
-                    pex_pex_path,
-                    os.path.join("{digest_root}", requirements_pex.name),
-                    "venv",
-                    "--pip",
-                    "--collisions-ok",
-                    "--remove=all",
-                    f"{{digest_root}}/{py_version}",
-                ],
-                {"PEX_MODULE": "pex.tools"},
-            ),
-            PostProcessingCommand(["rm", "-f", pex_pex_path]),
-        ],
+        request.resolve or "",
+        qualify_path_with_python_version=True,
     )
+    return export_result
 
 
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
     assert request.pex_request is not None
 
-    # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
-    dest = os.path.join("python", "virtualenvs", "tools")
+    # TODO: It seems unnecessary to qualify with "tools", since the tool resolve names don't collide
+    #  with user resolve names.  We should get rid of this via a deprecation cycle.
+    dest = os.path.join("python", "virtualenvs", "tools", request.resolve_name)
     pex = await Get(Pex, PexRequest, request.pex_request)
-    if not request.pex_request.internal_only:
-        raise ExportError(f"The PexRequest for {request.resolve_name} must be internal_only.")
-
-    # Note that an internal-only pex will always have the `python` field set.
-    # See the build_pex() rule in pex.py.
-    interpreter = cast(PythonExecutable, pex.python)
-
-    # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
-    # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
-    # invocations write the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of
-    # the pex_pex path in one export will delete the binary out from under the others.
-    pex_pex_dir = f".{request.resolve_name}.tmp"
-    pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
-    pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
-
-    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, pex.digest]))
-    return ExportResult(
-        f"virtualenv for the tool '{request.resolve_name}'",
+    export_result = await _do_export(
+        pex,
+        pex_pex,
         dest,
-        digest=merged_digest,
-        post_processing_cmds=[
-            PostProcessingCommand(
-                [
-                    interpreter.path,
-                    os.path.join(pex_pex_dest, pex_pex.exe),
-                    os.path.join("{digest_root}", pex.name),
-                    "venv",
-                    "--collisions-ok",
-                    "--remove=all",
-                    f"{{digest_root}}/{request.resolve_name}",
-                ],
-                {"PEX_MODULE": "pex.tools"},
-            ),
-            PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
-        ],
+        request.resolve_name,
+        # TODO: It is pretty ad-hoc that we do add the interpreter version for resolves but not for tools.
+        #  We should pick one and deprecate the other.
+        qualify_path_with_python_version=False,
     )
+    return export_result
 
 
 @rule

@@ -43,7 +43,7 @@ class ExportRequest:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PostProcessingCommand:
-    """A command to run as a local processe after an exported digest is materialized."""
+    """A command to run as a local process after an exported digest is materialized."""
 
     # Values in the argv tuple can contain the format specifier "{digest_root}", which will be
     # substituted with the (absolute) path to the location under distdir in which the
@@ -71,11 +71,6 @@ class ExportResult:
     # Materialize this digest.
     digest: Digest
     # Run these commands as local processes after the digest is materialized.
-    # Values in each args string tuple can contain the format specifier "{digest_root}", which
-    # will be substituted with the (absolute) path to the location under distdir in which the
-    # digest is materialized.
-    # Each command will be run with an environment consistent of just PATH, set to the Pants
-    # process's own PATH env var.
     post_processing_cmds: tuple[PostProcessingCommand, ...]
 
     def __init__(
