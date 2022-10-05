@@ -199,12 +199,15 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         [tgt],
         extra_args=[
             "--flake8-extra-requirements=flake8-bandit==3.0.0",
+            # N.B.: Needed to workaround break cause by the 5.0.0 release as documented here:
+            # https://github.com/python/importlib_metadata/issues/406
+            "--flake8-extra-requirements=importlib-metadata==4.13.0",
             "--flake8-lockfile=<none>",
             "--flake8-extra-files=['.bandit']",
         ],
     )
     assert len(result) == 1
-    assert result[0].exit_code == 0
+    assert result[0].exit_code == 0, result[0].stderr
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
