@@ -80,11 +80,11 @@ class Subsystem(metaclass=_SubsystemMeta):
     class EnvironmentAware(metaclass=ABCMeta):
         """A separate container for options that may be redefined by the runtime environment.
 
-        To define environment-sensitive options, create an inner class in the `Subsystem` called
+        To define environment-aware options, create an inner class in the `Subsystem` called
         `EnvironmentAware`. Option fields share their scope with their enclosing `Subsystem`,
         and the values of fields will default to the values set through Pants' configuration.
 
-        To consume environment-sensitive options, inject the `EnvironmentAware` inner class into
+        To consume environment-aware options, inject the `EnvironmentAware` inner class into
         your rule.
 
         Optionally, it is possible to specify environment variables that are required when
