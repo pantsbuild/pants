@@ -193,9 +193,9 @@ async def go_export_cgo_codegen(
     workspace: Workspace,
     golang_subsystem: GolangSubsystem,
 ) -> GoExportCgoCodegen:
-    if not golang_subsystem.cgo_allowed:
+    if not golang_subsystem.cgo_enabled:
         raise ValueError(
-            "Nothing to export since cgo is disabled, which is set by the option [golang].cgo_allowed"
+            "Nothing to export since cgo is disabled, which is set by the option [golang].cgo_enabled"
         )
 
     go_package_targets = [tgt for tgt in targets if tgt.has_field(GoPackageSourcesField)]

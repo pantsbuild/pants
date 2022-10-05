@@ -52,7 +52,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[GoModTarget],
     )
-    rule_runner.set_options(["--golang-cgo-allowed"], env_inherit={"PATH"})
+    rule_runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
     return rule_runner
 
 

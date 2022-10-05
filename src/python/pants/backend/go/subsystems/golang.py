@@ -202,7 +202,7 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
 
-    cgo_allowed = BoolOption(
+    cgo_enabled = BoolOption(
         default=True,
         help=softwrap(
             """\
