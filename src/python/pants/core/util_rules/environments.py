@@ -7,7 +7,7 @@ import dataclasses
 import logging
 import shlex
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Optional, Tuple, Type, Union, cast
+from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -718,6 +718,10 @@ def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterab
     return field_rules
 
 
+def option_field_name_for(flag_names: Sequence[str]) -> str:
+    return flag_names[0][2:].replace("-", "_")
+
+
 def _add_option_field_for(
     env_aware_t: type[Subsystem.EnvironmentAware],
     option: OptionsInfo,
@@ -725,7 +729,7 @@ def _add_option_field_for(
     option_type: type = option.flag_options["type"]
     scope = env_aware_t.subsystem.options_scope
 
-    snake_name = option.flag_names[0][2:].replace("-", "_")
+    snake_name = option_field_name_for(option.flag_names)
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...

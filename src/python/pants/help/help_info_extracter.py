@@ -27,6 +27,7 @@ from typing import (
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
@@ -79,7 +80,8 @@ class OptionHelpInfo:
                             scope context (e.g., [--baz, --no-baz, --qux])
     env_var: The environment variable that set's the option.
     config_key: The config key for this option (in the section named for its scope).
-
+    target_field_name: The name for the field that overrides this option in `local_environment`,
+                       `remote_environment`, or `docker_environment`.
     typ: The type of the option.
     default: The value of this option if no flags are specified (derived from config and env vars).
     help: The help message registered for this option.
@@ -96,6 +98,7 @@ class OptionHelpInfo:
     unscoped_cmd_line_args: tuple[str, ...]
     env_var: str
     config_key: str
+    target_field_name: str
     typ: type
     default: Any
     help: str
@@ -872,6 +875,8 @@ class HelpInfoExtracter:
         # Global options have three env var variants. The last one is the most human-friendly.
         env_var = Parser.get_env_var_names(self._scope, dest)[-1]
 
+        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
+
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
@@ -879,6 +884,7 @@ class HelpInfoExtracter:
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             env_var=env_var,
             config_key=dest,
+            target_field_name=target_field_name,
             typ=typ,
             default=default,
             help=help_msg,

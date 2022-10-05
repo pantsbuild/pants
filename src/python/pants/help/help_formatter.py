@@ -104,7 +104,8 @@ class HelpFormatter(MaybeColor):
         arg_lines.append(self.maybe_magenta(f"  {ohi.config_key}"))
         arg_lines.append(
             self.maybe_orange(
-                "  Can be overriden by `local_environment`, `docker_environment`, or `remote_environment` targets."
+                f"  Can be overriden by field `{ohi.target_field_name}` on `local_environment`, "
+                "`docker_environment`, or `remote_environment` targets."
             )
         )
 
