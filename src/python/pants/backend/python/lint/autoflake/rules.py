@@ -8,7 +8,8 @@ from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
@@ -32,17 +33,6 @@ class AutoflakeFieldSet(FieldSet):
 class AutoflakeRequest(FmtTargetsRequest):
     field_set_type = AutoflakeFieldSet
     tool_subsystem = Autoflake
-
-
-@rule
-async def partition(request: AutoflakeRequest.PartitionRequest, autoflake: Autoflake) -> Partitions:
-    return (
-        Partitions()
-        if autoflake.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
@@ -77,6 +67,8 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
 def rules():
     return [
         *collect_rules(),
-        *AutoflakeRequest.registration_rules(),
+        *AutoflakeRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
         *pex.rules(),
     ]

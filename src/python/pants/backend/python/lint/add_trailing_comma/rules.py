@@ -8,7 +8,8 @@ from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingCo
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
@@ -32,19 +33,6 @@ class AddTrailingCommaFieldSet(FieldSet):
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
     tool_subsystem = AddTrailingComma
-
-
-@rule
-async def partition(
-    request: AddTrailingCommaRequest.PartitionRequest, add_trailing_comma: AddTrailingComma
-) -> Partitions:
-    return (
-        Partitions()
-        if add_trailing_comma.skip
-        else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with add-trailing-comma", level=LogLevel.DEBUG)
@@ -81,6 +69,8 @@ async def add_trailing_comma_fmt(
 def rules():
     return [
         *collect_rules(),
-        *AddTrailingCommaRequest.registration_rules(),
+        *AddTrailingCommaRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
         *pex.rules(),
     ]

@@ -11,7 +11,8 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
@@ -78,17 +79,6 @@ async def _run_yapf(
     )
 
 
-@rule
-async def partition_yapf(request: YapfRequest.PartitionRequest, yapf: Yapf) -> Partitions:
-    return (
-        Partitions()
-        if yapf.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
-
-
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
 async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
     return await _run_yapf(request, yapf)
@@ -97,6 +87,6 @@ async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        *YapfRequest.registration_rules(),
+        *YapfRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

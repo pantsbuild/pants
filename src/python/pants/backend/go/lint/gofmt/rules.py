@@ -11,7 +11,8 @@ from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
@@ -36,19 +37,6 @@ class GofmtFieldSet(FieldSet):
 class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
     tool_subsystem = GofmtSubsystem
-
-
-@rule
-async def partition_gofmt(
-    request: GofmtRequest.PartitionRequest, gofmt: GofmtSubsystem
-) -> Partitions:
-    return (
-        Partitions()
-        if gofmt.skip
-        else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with gofmt")
@@ -78,5 +66,5 @@ def rules():
     return [
         *collect_rules(),
         *goroot.rules(),
-        *GofmtRequest.registration_rules(),
+        *GofmtRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

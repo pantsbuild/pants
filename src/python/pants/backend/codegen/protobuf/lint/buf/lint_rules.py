@@ -8,7 +8,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
 )
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType, Partitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -114,4 +114,9 @@ async def run_buf(
 
 
 def rules():
-    return [*collect_rules(), *BufLintRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *BufLintRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
+    ]

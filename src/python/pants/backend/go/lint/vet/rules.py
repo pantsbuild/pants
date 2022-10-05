@@ -16,7 +16,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -41,15 +41,6 @@ class GoVetFieldSet(FieldSet):
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
     tool_subsystem = GoVetSubsystem
-
-
-@rule
-async def partition_go_vet(
-    request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
-) -> Partitions[GoVetFieldSet]:
-    return (
-        Partitions() if go_vet_subsystem.skip else Partitions.single_partition(request.field_sets)
-    )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -93,5 +84,5 @@ async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintR
 def rules():
     return [
         *collect_rules(),
-        *GoVetRequest.registration_rules(),
+        *GoVetRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]
