@@ -81,7 +81,8 @@ class OptionHelpInfo:
     env_var: The environment variable that set's the option.
     config_key: The config key for this option (in the section named for its scope).
     target_field_name: The name for the field that overrides this option in `local_environment`,
-                       `remote_environment`, or `docker_environment`.
+                       `remote_environment`, or `docker_environment`, if the option is environment-
+                       aware, else `None`.
     typ: The type of the option.
     default: The value of this option if no flags are specified (derived from config and env vars).
     help: The help message registered for this option.
@@ -98,7 +99,7 @@ class OptionHelpInfo:
     unscoped_cmd_line_args: tuple[str, ...]
     env_var: str
     config_key: str
-    target_field_name: str
+    target_field_name: str | None
     typ: type
     default: Any
     help: str
@@ -876,6 +877,7 @@ class HelpInfoExtracter:
         env_var = Parser.get_env_var_names(self._scope, dest)[-1]
 
         target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
+        environment_aware = kwargs.get("environment_aware") is True
 
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
@@ -884,7 +886,7 @@ class HelpInfoExtracter:
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             env_var=env_var,
             config_key=dest,
-            target_field_name=target_field_name,
+            target_field_name=target_field_name if environment_aware else None,
             typ=typ,
             default=default,
             help=help_msg,
