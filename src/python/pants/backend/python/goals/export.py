@@ -152,6 +152,8 @@ async def export_virtualenv_for_targets(
             request.root_python_targets, python_setup
         ) or InterpreterConstraints(python_setup.interpreter_constraints)
 
+    # Note that a pex created from a RequirementsPexRequest has packed layout, which should lead
+    # to the best performance in this use case.
     requirements_pex = await Get(
         Pex,
         RequirementsPexRequest(
