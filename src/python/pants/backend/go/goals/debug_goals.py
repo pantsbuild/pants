@@ -16,6 +16,7 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import first_party_pkg, third_party_pkg
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -64,12 +65,15 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
         elif target.has_field(GoThirdPartyPackageDependenciesField):
             import_path = target[GoImportPathField].value
             go_mod_address = target.address.maybe_convert_to_target_generator()
-            go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+            go_mod_info, build_opts = await MultiGet(
+                Get(GoModInfo, GoModInfoRequest(go_mod_address)),
+                Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_address)),
+            )
             third_party_analysis_gets.append(
                 Get(
                     ThirdPartyPkgAnalysis,
                     ThirdPartyPkgAnalysisRequest(
-                        import_path, go_mod_info.digest, go_mod_info.mod_path
+                        import_path, go_mod_info.digest, go_mod_info.mod_path, build_opts=build_opts
                     ),
                 )
             )

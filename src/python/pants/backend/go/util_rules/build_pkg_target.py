@@ -14,6 +14,8 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
+from pants.backend.go.util_rules import build_opts
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -66,6 +68,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     `__pkg__.a` files."""
 
     address: Address
+    build_opts: GoBuildOptions
     is_main: bool = False
     for_tests: bool = False
     for_xtests: bool = False
@@ -132,7 +135,8 @@ def maybe_get_codegen_request_type(
 # (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
 @rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
 async def setup_build_go_package_target_request(
-    request: BuildGoPackageTargetRequest, union_membership: UnionMembership
+    request: BuildGoPackageTargetRequest,
+    union_membership: UnionMembership,
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(
         WrappedTarget,
@@ -150,7 +154,10 @@ async def setup_build_go_package_target_request(
     embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
-            Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(target.address)),
+            Get(
+                FallibleFirstPartyPkgAnalysis,
+                FirstPartyPkgAnalysisRequest(target.address, build_opts=request.build_opts),
+            ),
             Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(target.address)),
         )
         if _maybe_first_party_pkg_analysis.analysis is None:
@@ -232,7 +239,12 @@ async def setup_build_go_package_target_request(
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgAnalysis,
-            ThirdPartyPkgAnalysisRequest(import_path, _go_mod_info.digest, _go_mod_info.mod_path),
+            ThirdPartyPkgAnalysisRequest(
+                import_path,
+                _go_mod_info.digest,
+                _go_mod_info.mod_path,
+                build_opts=request.build_opts,
+            ),
         )
 
         # We error if trying to _build_ a package with issues (vs. only generating the target and
@@ -313,7 +325,10 @@ async def setup_build_go_package_target_request(
 
     pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
     maybe_pkg_direct_dependencies = await MultiGet(
-        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(address))
+        Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(address, build_opts=request.build_opts),
+        )
         for address in pkg_dependency_addresses
     )
 
@@ -332,7 +347,9 @@ async def setup_build_go_package_target_request(
     ):
         maybe_base_pkg_dep = await Get(
             FallibleBuildGoPackageRequest,
-            BuildGoPackageTargetRequest(request.address, for_tests=True),
+            BuildGoPackageTargetRequest(
+                request.address, for_tests=True, build_opts=request.build_opts
+            ),
         )
         if maybe_base_pkg_dep.request is None:
             return dataclasses.replace(
@@ -346,6 +363,7 @@ async def setup_build_go_package_target_request(
         import_path="main" if request.is_main else import_path,
         pkg_name=pkg_name,
         dir_path=dir_path,
+        build_opts=request.build_opts,
         go_files=go_file_names,
         s_files=s_files,
         cgo_files=cgo_files,
@@ -377,4 +395,7 @@ def required_build_go_package_request(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *build_opts.rules(),
+    )

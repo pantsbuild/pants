@@ -209,9 +209,6 @@ class GolangSubsystem(Subsystem):
             Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
             packages making use of Cgo to actually be compiled with Cgo support.
 
-            TODO: Future Pants changes may also require enabling Cgo via fields on relevant Go targets.
-            See https://github.com/pantsbuild/pants/issues/16833.
-
             See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
             """
         ),

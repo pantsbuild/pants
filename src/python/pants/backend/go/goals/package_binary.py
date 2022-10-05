@@ -6,6 +6,7 @@ from pathlib import PurePath
 
 from pants.backend.go.target_types import GoBinaryMainPackageField, GoBinaryTarget, GoPackageTarget
 from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
@@ -22,7 +23,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -38,7 +39,10 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
-    main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+    main_pkg, build_opts = await MultiGet(
+        Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
+    )
     main_pkg_analysis = await Get(
         FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(main_pkg.address)
     )
@@ -53,8 +57,10 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             f"{GoBinaryTarget.address} target `{field_set.address}` but uses package name `{analysis.name}` "
             "instead of `main`. Go requires that main packages actually use `main` as the package name."
         )
+
     built_package = await Get(
-        BuiltGoPackage, BuildGoPackageTargetRequest(main_pkg.address, is_main=True)
+        BuiltGoPackage,
+        BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts),
     )
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
     import_config = await Get(

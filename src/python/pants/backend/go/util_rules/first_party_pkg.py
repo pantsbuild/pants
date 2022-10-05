@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
@@ -199,6 +199,7 @@ class FallibleFirstPartyPkgAnalysis:
 class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
     extra_build_tags: tuple[str, ...] = ()
+    build_opts: GoBuildOptions | None = None
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -254,7 +255,6 @@ async def compute_first_party_package_import_path(
 async def analyze_first_party_package(
     request: FirstPartyPkgAnalysisRequest,
     analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(
@@ -277,6 +277,8 @@ async def analyze_first_party_package(
     if request.extra_build_tags:
         extra_build_tags_env = {"EXTRA_BUILD_TAGS": ",".join(request.extra_build_tags)}
 
+    build_opts = request.build_opts if request.build_opts is not None else GoBuildOptions()
+
     input_digest = await Get(Digest, MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]))
     result = await Get(
         FallibleProcessResult,
@@ -286,7 +288,7 @@ async def analyze_first_party_package(
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
             env={
-                "CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0",
+                "CGO_ENABLED": "1" if build_opts.cgo_enabled else "0",
                 **extra_build_tags_env,
             },
         ),

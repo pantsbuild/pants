@@ -13,6 +13,7 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyCompilationRequest,
     FallibleAssemblyCompilationResult,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageRequest,
@@ -53,6 +54,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         pkg_name: str,
         digest: Digest,
         dir_path: str,
+        build_opts: GoBuildOptions,
         go_files: tuple[str, ...],
         s_files: tuple[str, ...],
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
@@ -78,6 +80,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.pkg_name = pkg_name
         self.digest = digest
         self.dir_path = dir_path
+        self.build_opts = build_opts
         self.go_files = go_files
         self.s_files = s_files
         self.direct_dependencies = direct_dependencies
@@ -98,6 +101,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.pkg_name,
                 self.digest,
                 self.dir_path,
+                self.build_opts,
                 self.go_files,
                 self.s_files,
                 self.direct_dependencies,
@@ -124,6 +128,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"pkg_name={self.pkg_name}, "
             f"digest={self.digest}, "
             f"dir_path={self.dir_path}, "
+            f"build_opts={self.build_opts}, "
             f"go_files={self.go_files}, "
             f"s_files={self.s_files}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
@@ -153,6 +158,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.pkg_name == other.pkg_name
             and self.digest == other.digest
             and self.dir_path == other.dir_path
+            and self.build_opts == other.build_opts
             and self.go_files == other.go_files
             and self.s_files == other.s_files
             and self.minimum_go_version == other.minimum_go_version
