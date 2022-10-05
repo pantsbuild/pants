@@ -4,17 +4,13 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 3,
+//   "version": 2,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<3.10,>=3.7"
 //   ],
 //   "generated_with_requirements": [
 //     "lambdex==0.1.6"
-//   ],
-//   "manylinux": "manylinux2014",
-//   "requirement_constraints": [],
-//   "only_binary": [],
-//   "no_binary": []
+//   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
