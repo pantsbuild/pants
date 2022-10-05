@@ -7,7 +7,6 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
@@ -275,10 +274,14 @@ class Subsystem(metaclass=_SubsystemMeta):
         """
         register = options.registration_function_for_subsystem(cls)
         plugin_option_containers = union_membership.get(cls.PluginOption)
-        for options_info in chain(
-            collect_options_info(cls),
-            collect_options_info(cls.EnvironmentAware),
-            *(collect_options_info(container) for container in plugin_option_containers),
+        for options_info in collect_options_info(cls):
+            register(*options_info.flag_names, **options_info.flag_options)
+        for options_info in collect_options_info(cls.EnvironmentAware):
+            register(*options_info.flag_names, environment_aware=True, **options_info.flag_options)
+        for options_info in (
+            option
+            for container in plugin_option_containers
+            for option in collect_options_info(container)
         ):
             register(*options_info.flag_names, **options_info.flag_options)
 

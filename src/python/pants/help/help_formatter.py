@@ -102,6 +102,11 @@ class HelpFormatter(MaybeColor):
         arg_lines = [f"  {self.maybe_magenta(args)}" for args in ohi.display_args]
         arg_lines.append(self.maybe_magenta(f"  {ohi.env_var}"))
         arg_lines.append(self.maybe_magenta(f"  {ohi.config_key}"))
+        arg_lines.append(
+            self.maybe_orange(
+                "  Can be overriden by `local_environment`, `docker_environment`, or `remote_environment` targets."
+            )
+        )
 
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
