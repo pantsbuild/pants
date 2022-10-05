@@ -12,7 +12,7 @@ from typing import DefaultDict, Iterable, cast
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess, Pex, PexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
@@ -79,7 +79,7 @@ class ExportPythonTool(EngineAwareParameter):
 
 @rule_helper
 async def _do_export(
-    venv_pex: VenvPex,
+    requirements_pex: Pex,
     pex_pex: PexPEX,
     dest: str,
     resolve_name: str,
@@ -88,8 +88,8 @@ async def _do_export(
     # Get the path to the interpreter, and the full python version (including patch #).
     res = await Get(
         ProcessResult,
-        VenvPexProcess(
-            venv_pex=venv_pex,
+        PexProcess(
+            pex=requirements_pex,
             description="Get interpreter path and version",
             argv=[
                 "-c",
@@ -108,7 +108,7 @@ async def _do_export(
     pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
     pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
 
-    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, venv_pex.digest]))
+    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, requirements_pex.digest]))
 
     description = f"for {resolve_name} " if resolve_name else ""
     return ExportResult(
@@ -120,7 +120,7 @@ async def _do_export(
                 [
                     interpreter_path,
                     os.path.join(pex_pex_dest, pex_pex.exe),
-                    os.path.join("{digest_root}", venv_pex.pex_filename),
+                    os.path.join("{digest_root}", requirements_pex.name),
                     "venv",
                     "--pip",
                     "--collisions-ok",
@@ -131,11 +131,6 @@ async def _do_export(
             ),
             # Remove the PEX pex, to avoid confusion.
             PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
-            # Remove the venv pex shims, to avoid confusion.
-            PostProcessingCommand(
-                ["rm", "-f", os.path.join("{digest_root}", venv_pex.python.path)]
-            ),
-            PostProcessingCommand(["rm", "-f", os.path.join("{digest_root}", venv_pex.pex.path)]),
         ],
     )
 
@@ -158,7 +153,7 @@ async def export_virtualenv_for_targets(
         ) or InterpreterConstraints(python_setup.interpreter_constraints)
 
     requirements_pex = await Get(
-        VenvPex,
+        Pex,
         RequirementsPexRequest(
             (tgt.address for tgt in request.root_python_targets),
             hardcoded_interpreter_constraints=interpreter_constraints,
@@ -190,7 +185,7 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
     # TODO: It seems unnecessary to qualify with "tools", since the tool resolve names don't collide
     #  with user resolve names.  We should get rid of this via a deprecation cycle.
     dest = os.path.join("python", "virtualenvs", "tools", request.resolve_name)
-    pex = await Get(VenvPex, PexRequest, request.pex_request)
+    pex = await Get(Pex, PexRequest, request.pex_request)
     export_result = await _do_export(
         pex,
         pex_pex,

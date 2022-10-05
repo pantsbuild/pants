@@ -73,7 +73,7 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
         all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 
         for result, resolve in zip(all_results, ["a", "b"] if enable_resolves else [""]):
-            assert len(result.post_processing_cmds) == 4
+            assert len(result.post_processing_cmds) == 2
 
             ppc0 = result.post_processing_cmds[0]
             assert ppc0.argv[1:] == (
@@ -96,22 +96,6 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
                 os.path.join("{digest_root}", f".{resolve}.tmp"),
             )
             assert ppc1.extra_env == FrozenDict()
-
-            ppc2 = result.post_processing_cmds[2]
-            assert ppc2.argv == (
-                "rm",
-                "-f",
-                os.path.join("{digest_root}", "requirements.pex_bin_python_shim.sh"),
-            )
-            assert ppc2.extra_env == FrozenDict()
-
-            ppc3 = result.post_processing_cmds[3]
-            assert ppc3.argv == (
-                "rm",
-                "-f",
-                os.path.join("{digest_root}", "requirements.pex_pex_shim.sh"),
-            )
-            assert ppc3.extra_env == FrozenDict()
 
         return all_results
 
