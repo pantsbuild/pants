@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
@@ -81,6 +83,26 @@ class Goal:
 
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
+
+    """Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
+
+    All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, so that
+    goals in plugins never need to experience this migration.
+      see https://github.com/pantsbuild/pants/issues/17129
+
+    TODO: Expand this, fill out the plugin migration guide, and deprecate setting `False` before landing.
+    """
+    environment_migrated: ClassVar[bool] = False
+
+    @classmethod
+    def _get_environment_migrated(cls) -> bool:
+        deprecated_conditional(
+            lambda: not cls.environment_migrated,
+            "2.17.0.dev0",
+            f"Not setting `Goal.environment_migrated=True` for `Goal` `{cls.name}`",
+            hint=f"See {doc_url('plugin-upgrade-guide')}\n",
+        )
+        return cls.environment_migrated
 
     @final
     @classproperty

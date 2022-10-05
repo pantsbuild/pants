@@ -34,6 +34,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
 
 class Dependencies(Goal):
     subsystem_cls = DependenciesSubsystem
+    environment_migrated = True
 
 
 @goal_rule

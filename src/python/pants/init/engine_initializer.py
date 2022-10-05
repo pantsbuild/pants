@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Mapping, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -157,8 +157,8 @@ class EngineInitializer:
         """Raised when a goal cannot be mapped to an @rule."""
 
     @staticmethod
-    def _make_goal_map_from_rules(rules):
-        goal_map = {}
+    def _make_goal_map_from_rules(rules) -> Mapping[str, type[Goal]]:
+        goal_map: dict[str, type[Goal]] = {}
         for r in rules:
             output_type = getattr(r, "output_type", None)
             if not output_type or not issubclass(output_type, Goal):
@@ -286,12 +286,20 @@ class EngineInitializer:
             )
         )
 
+        environment_migrated_goal_param_types = [
+            t for t in GraphSession.goal_param_types if t != EnvironmentName
+        ]
         rules = FrozenOrderedSet(
             (
                 *rules,
                 # Install queries for each Goal.
                 *(
-                    QueryRule(goal_type, GraphSession.goal_param_types)
+                    QueryRule(
+                        goal_type,
+                        environment_migrated_goal_param_types
+                        if goal_type._get_environment_migrated()
+                        else GraphSession.goal_param_types,
+                    )
                     for goal_type in goal_map.values()
                 ),
                 # Install queries for each request/response pair used by the BSP support.
