@@ -294,8 +294,7 @@ After Setup (see below), and after IntelliJ has finished indexing your code, you
 # A "group" named `default`.
 # Multiple groups are supported: consider creating a group per project or team.
 [groups.default]
-addresses = 
-[  
+addresses = [  
   "src/jvm::",  
   "tests/jvm::",  
 ]
