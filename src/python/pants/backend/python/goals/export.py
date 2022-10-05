@@ -85,20 +85,25 @@ async def _do_export(
     resolve_name: str,
     qualify_path_with_python_version: bool,
 ) -> ExportResult:
-    # Get the path to the interpreter, and the full python version (including patch #).
+    if requirements_pex.python is None:
+        # An internal-only pex will always have the `python` field set.
+        # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
+        raise ExportError(f"The PEX to be exported for {resolve_name} must be internal_only.")
+
+    # Get the full python version (including patch #).
     res = await Get(
         ProcessResult,
         PexProcess(
             pex=requirements_pex,
-            description="Get interpreter path and version",
+            description="Get interpreter version",
             argv=[
                 "-c",
-                "import sys; print(sys.executable); print('.'.join(str(x) for x in sys.version_info[0:3]))",
+                "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
             ],
             extra_env={"PEX_INTERPRETER": "1"},
         ),
     )
-    interpreter_path, py_version = res.stdout.strip().decode().split("\n")
+    py_version = res.stdout.strip().decode()
 
     # NOTE: We add a unique prefix to the pex_pex path to avoid conflicts when multiple
     # venvs are concurrently exporting. Without this prefix all the invocations write
@@ -118,7 +123,7 @@ async def _do_export(
         post_processing_cmds=[
             PostProcessingCommand(
                 [
-                    interpreter_path,
+                    requirements_pex.python.path,
                     os.path.join(pex_pex_dest, pex_pex.exe),
                     os.path.join("{digest_root}", requirements_pex.name),
                     "venv",
@@ -181,8 +186,6 @@ async def export_virtualenv_for_targets(
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
     assert request.pex_request is not None
-    if not request.pex_request.internal_only:
-        raise ExportError(f"The PexRequest for {request.resolve_name} must be internal_only.")
 
     # TODO: It seems unnecessary to qualify with "tools", since the tool resolve names don't collide
     #  with user resolve names.  We should get rid of this via a deprecation cycle.

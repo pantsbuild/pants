@@ -55,7 +55,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
@@ -502,7 +501,7 @@ async def _setup_pex_requirements(
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
-    request: PexRequest, python_setup: PythonSetup, platform: Platform, pex_subsystem: PexSubsystem
+    request: PexRequest, python_setup: PythonSetup, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
     argv = [
