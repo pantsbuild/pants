@@ -141,7 +141,7 @@ def test_docker_complete_env_vars() -> None:
         {
             "BUILD": dedent(
                 """\
-                _docker_environment(
+                docker_environment(
                     name='docker',
                     image='centos@sha256:a1801b843b1bfaf77c501e7a6d3f709401a1e0c83863037fa3aab063a7fdb9dc',
                     platform='linux_x86_64',

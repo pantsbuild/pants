@@ -10,7 +10,7 @@ files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 python_test_utils(name="test_utils")
 
 # Used for experimenting with the new Docker support.
-_docker_environment(
+docker_environment(
     name="docker_env",
     image="python:3.9",
 )

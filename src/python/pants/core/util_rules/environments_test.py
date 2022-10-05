@@ -33,6 +33,7 @@ from pants.core.util_rules.environments import (
     extract_process_config_from_environment,
     resolve_environment_name,
 )
+from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions
@@ -77,10 +78,21 @@ def test_extract_process_config_from_environment() -> None:
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
             rule_args=[EnvironmentTarget(env_tgt), Platform.linux_arm64, global_options],
+            mock_gets=[
+                MockGet(
+                    output_type=DockerResolveImageResult,
+                    input_types=(DockerResolveImageRequest,),
+                    mock=lambda req: DockerResolveImageResult("sha256:abc123"),
+                )
+            ],
         )
         assert result.platform == Platform.linux_arm64.value
         assert result.remote_execution is expected_remote_execution
-        assert result.docker_image == expected_docker_image
+        if expected_docker_image is not None:
+            # TODO(17104): Account for any prepended image name here once implemented.
+            assert result.docker_image == "sha256:abc123"
+        else:
+            assert result.docker_image is None
         assert result.remote_execution_extra_platform_properties == (
             expected_remote_execution_extra_platform_properties or []
         )
@@ -145,10 +157,10 @@ def test_all_environments(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                _local_environment(name='e1')
-                _local_environment(name='e2')
-                _local_environment(name='no-name')
-                _docker_environment(name='docker', image="centos6:latest")
+                local_environment(name='e1')
+                local_environment(name='e2')
+                local_environment(name='no-name')
+                docker_environment(name='docker', image="centos6:latest")
                 """
             )
         }
@@ -169,10 +181,10 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                _local_environment(name='e1')
-                _local_environment(name='e2')
-                _local_environment(name='not-compatible', compatible_platforms=[])
-                _docker_environment(name='docker', docker_image="centos6:latest")
+                local_environment(name='e1')
+                local_environment(name='e2')
+                local_environment(name='not-compatible', compatible_platforms=[])
+                docker_environment(name='docker', docker_image="centos6:latest")
                 """
             )
         }
@@ -203,14 +215,14 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                _local_environment(name='local')
-                _local_environment(
+                local_environment(name='local')
+                local_environment(
                     name='local-fallback', compatible_platforms=[], fallback_environment='local'
                 )
-                _docker_environment(name='docker', image="centos6:latest")
-                _remote_environment(name='remote-no-fallback')
-                _remote_environment(name='remote-fallback', fallback_environment="docker")
-                _remote_environment(name='remote-bad-fallback', fallback_environment="fake")
+                docker_environment(name='docker', image="centos6:latest")
+                remote_environment(name='remote-no-fallback')
+                remote_environment(name='remote-fallback', fallback_environment="docker")
+                remote_environment(name='remote-bad-fallback', fallback_environment="fake")
                 """
             )
         }
@@ -365,7 +377,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
 
 
 def test_resolve_environment_tgt(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": "_local_environment(name='env')"})
+    rule_runner.write_files({"BUILD": "local_environment(name='env')"})
     rule_runner.set_options(
         ["--environments-preview-names={'env': '//:env', 'bad-address': '//:fake'}"]
     )

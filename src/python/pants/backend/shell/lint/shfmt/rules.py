@@ -32,7 +32,7 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    name = Shfmt.options_scope
+    tool_name = Shfmt.options_scope
 
 
 @rule
@@ -85,7 +85,7 @@ async def shfmt_fmt(
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=ShfmtRequest.name
+        result, request.snapshot, output_snapshot, formatter_name=ShfmtRequest.tool_name
     )
 
 

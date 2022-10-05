@@ -26,6 +26,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
@@ -238,12 +239,12 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
+      &DOCKER,
+      &IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
       named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
-      // TODO(#16767): Allow users to specify this via an option.
-      docker::ImagePullPolicy::OnlyIfLatestOrMissing,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
       matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
