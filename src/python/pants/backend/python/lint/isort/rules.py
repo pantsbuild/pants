@@ -34,7 +34,7 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    tool_name = Isort.options_scope
+    tool_subsystem = Isort
 
 
 def generate_argv(

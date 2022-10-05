@@ -28,7 +28,7 @@ from pants.util.strutil import pluralize
 
 class Flake8Request(LintTargetsRequest):
     field_set_type = Flake8FieldSet
-    tool_name = Flake8.options_scope
+    tool_subsystem = Flake8
 
 
 def generate_argv(source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:

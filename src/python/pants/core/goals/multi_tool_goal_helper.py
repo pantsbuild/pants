@@ -11,10 +11,15 @@ from typing_extensions import Protocol
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
-from pants.option.option_types import IntOption, StrListOption
+from pants.option.option_types import IntOption, SkipOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class SkippableSubsystem(Protocol):
+    options_scope: str
+    skip: SkipOption
 
 
 class OnlyOption(StrListOption):

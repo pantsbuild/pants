@@ -23,6 +23,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
@@ -40,7 +41,11 @@ class BufFieldSet(FieldSet):
 
 class BufFormatRequest(FmtTargetsRequest):
     field_set_type = BufFieldSet
-    tool_name = "buf-format"
+    tool_subsystem = BufSubsystem  # type: ignore[assignment]
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "buf-format"
 
 
 @rule

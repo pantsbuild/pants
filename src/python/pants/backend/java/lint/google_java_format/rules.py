@@ -38,7 +38,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    tool_name = GoogleJavaFormatSubsystem.options_scope
+    tool_subsystem = GoogleJavaFormatSubsystem
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):

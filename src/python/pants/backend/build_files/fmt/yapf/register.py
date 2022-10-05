@@ -14,7 +14,7 @@ from pants.util.logging import LogLevel
 
 
 class YapfRequest(FmtFilesRequest):
-    tool_name = "yapf"
+    tool_subsystem = Yapf
 
 
 @rule

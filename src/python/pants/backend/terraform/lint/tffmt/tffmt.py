@@ -34,7 +34,7 @@ class TfFmtSubsystem(Subsystem):
 
 class TffmtRequest(FmtTargetsRequest):
     field_set_type = TerraformFieldSet
-    tool_name = TfFmtSubsystem.options_scope
+    tool_subsystem = TfFmtSubsystem
 
 
 @rule

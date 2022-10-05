@@ -25,6 +25,7 @@ from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
+    SkippableSubsystem,
     determine_specified_tool_names,
     write_reports,
 )
@@ -44,7 +45,7 @@ from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import classproperty, frozen_after_init, runtime_ignore_subscripts
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -190,8 +191,12 @@ class LintRequest:
         `LintTargetsRequest.PartitionRequest`/`LintFilesRequest.PartitionRequest`.
     """
 
-    tool_name: ClassVar[str]
+    tool_subsystem: ClassVar[type[SkippableSubsystem]]
     is_formatter: ClassVar[bool] = False
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     # NB: Not frozen so `fmt` can subclass

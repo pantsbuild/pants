@@ -14,7 +14,7 @@ from pants.util.logging import LogLevel
 
 
 class BlackRequest(FmtFilesRequest):
-    tool_name = "black"
+    tool_subsystem = Black
 
 
 @rule

@@ -18,7 +18,7 @@ from pants.util.strutil import pluralize
 
 
 class BuildifierRequest(FmtFilesRequest):
-    tool_name = "buildifier"
+    tool_subsystem = Buildifier
 
 
 @rule

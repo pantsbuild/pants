@@ -22,7 +22,7 @@ from pants.util.strutil import pluralize
 
 class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
-    tool_name = Bandit.options_scope
+    tool_subsystem = Bandit
 
 
 def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:

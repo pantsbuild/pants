@@ -13,7 +13,7 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.option_types import DictOption, EnumOption
+from pants.option.option_types import DictOption, EnumOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -72,6 +72,7 @@ class ValidationConfig:
 
 class RegexLintSubsystem(Subsystem):
     options_scope = "regex-lint"
+    name = "regex-lint"
     help = softwrap(
         """
         Lint your code using regex patterns, e.g. to check for copyright headers.
@@ -82,6 +83,7 @@ class RegexLintSubsystem(Subsystem):
         """
     )
 
+    skip = SkipOption("lint")
     _config = DictOption[Any](
         help=softwrap(
             """
@@ -254,7 +256,7 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    tool_name = RegexLintSubsystem.options_scope
+    tool_subsystem = RegexLintSubsystem
 
 
 @rule

@@ -22,7 +22,7 @@ from pants.util.strutil import pluralize, softwrap
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    tool_name = Black.options_scope
+    tool_subsystem = Black
 
 
 @rule_helper

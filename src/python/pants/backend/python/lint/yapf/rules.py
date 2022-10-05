@@ -35,7 +35,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
-    tool_name = Yapf.options_scope
+    tool_subsystem = Yapf
 
 
 @rule_helper
