@@ -195,7 +195,7 @@ class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
                 )
             )
 
-        yield from collect_rules(locals())
+        return collect_rules(locals())
 
     @classmethod
     def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
