@@ -12,6 +12,9 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterable, List, Type
 
+import pytest
+
+from pants.build_graph.address import Address
 from pants.core.goals.fmt import (
     Fmt,
     FmtFilesRequest,
@@ -21,6 +24,7 @@ from pants.core.goals.fmt import (
     Partitions,
 )
 from pants.core.goals.fmt import rules as fmt_rules
+from pants.core.goals.lint import PartitionerType
 from pants.core.util_rules import source_files
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -31,8 +35,10 @@ from pants.engine.fs import (
     FileContent,
     Snapshot,
 )
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, SingleSourceField, Target
+from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField, Target
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
@@ -417,6 +423,82 @@ def test_message_lists_files() -> None:
         formatter_name="formatter",
     )
     assert result.message() == "formatter made changes.\n  added.ext\n  removed.ext"
+
+
+@dataclass(frozen=True)
+class KitchenSingleUtensilFieldSet(FieldSet):
+    required_fields = (FortranSource,)
+
+    utensil: SingleSourceField
+
+
+@dataclass(frozen=True)
+class KitchenMultipleUtensilsFieldSet(FieldSet):
+    required_fields = (FortranSource,)
+
+    utensils: MultipleSourcesField
+
+
+@pytest.mark.parametrize(
+    "kitchen_field_set_type, field_sets",
+    [
+        (
+            KitchenSingleUtensilFieldSet,
+            (
+                KitchenSingleUtensilFieldSet(
+                    Address("//:bowl"), SingleSourceField("bowl.utensil", Address(""))
+                ),
+                KitchenSingleUtensilFieldSet(
+                    Address("//:knife"), SingleSourceField("knife.utensil", Address(""))
+                ),
+            ),
+        ),
+        (
+            KitchenMultipleUtensilsFieldSet,
+            (
+                KitchenMultipleUtensilsFieldSet(
+                    Address("//:utensils"),
+                    MultipleSourcesField(["*.utensil"], Address("")),
+                ),
+            ),
+        ),
+    ],
+)
+def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets) -> None:
+    class KitchenSubsystem(Subsystem):
+        options_scope = "kitchen"
+        help = "a cookbook might help"
+        name = "The Kitchen"
+        skip = SkipOption("lint")
+
+    class FmtKitchenRequest(FmtTargetsRequest):
+        field_set_type = kitchen_field_set_type
+        tool_subsystem = KitchenSubsystem
+
+    rules = [
+        *FmtKitchenRequest._get_registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
+        QueryRule(Partitions, [FmtKitchenRequest.PartitionRequest]),
+    ]
+    rule_runner = RuleRunner(rules=rules)
+    print(rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""}))
+    partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions(
+        [
+            (
+                None,
+                (
+                    "bowl.utensil",
+                    "knife.utensil",
+                ),
+            )
+        ]
+    )
+
+    rule_runner.set_options(["--kitchen-skip"])
+    partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([])
 
 
 def test_streaming_output_changed(caplog) -> None:
