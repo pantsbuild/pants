@@ -40,6 +40,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
+
 
 class EnvironmentsSubsystem(Subsystem):
     options_scope = "environments-preview"
@@ -686,15 +688,24 @@ async def _maybe_add_docker_image_id(image_name: str, platform: Platform, addres
 
 @rule
 async def extract_process_config_from_environment(
-    tgt: EnvironmentTarget, platform: Platform, global_options: GlobalOptions
+    tgt: EnvironmentTarget,
+    platform: Platform,
+    global_options: GlobalOptions,
+    environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessConfigFromEnvironment:
-    if tgt.val is None:
-        docker_image = None
-        remote_execution = global_options.remote_execution
+    docker_image = None
+    remote_execution = False
+    raw_remote_execution_extra_platform_properties = ()
+
+    # If the environments mechanism is not used, fall back to legacy behavior of
+    # `--remote-execution` being a global toggle.
+    if not environments_subsystem.names and global_options.remote_execution:
+        remote_execution = True
         raw_remote_execution_extra_platform_properties = (
-            global_options.remote_execution_extra_platform_properties if remote_execution else ()
+            global_options.remote_execution_extra_platform_properties
         )
-    else:
+
+    elif tgt.val is not None:
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
@@ -710,7 +721,7 @@ async def extract_process_config_from_environment(
                 RemoteExtraPlatformPropertiesField
             ].value
             if global_options.remote_execution_extra_platform_properties:
-                logging.warning(
+                logger.warning(
                     softwrap(
                         f"""\
                         The option `[GLOBAL].remote_execution_extra_platform_properties` is set, but
@@ -721,8 +732,6 @@ async def extract_process_config_from_environment(
                         """
                     )
                 )
-        else:
-            raw_remote_execution_extra_platform_properties = ()
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
