@@ -30,4 +30,4 @@ class SpectralSubsystem(TemplatedExternalTool):
     }
 
     skip = SkipOption("lint")
-    args = ArgsListOption(example="--error-format json")
+    args = ArgsListOption(example="--fail-severity=warn")
