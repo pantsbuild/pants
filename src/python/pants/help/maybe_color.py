@@ -3,7 +3,11 @@
 
 from typing import List
 
-from colors import cyan, green, magenta, red, yellow
+from colors import color, cyan, green, magenta, red, yellow
+
+
+def _orange(s: str):
+    return color(s, "orange")
 
 
 class MaybeColor:
@@ -14,6 +18,7 @@ class MaybeColor:
         noop = lambda x: x
         self.maybe_cyan = cyan if color else noop
         self.maybe_green = green if color else noop
+        self.maybe_orange = _orange if color else noop
         self.maybe_red = red if color else noop
         self.maybe_magenta = magenta if color else noop
         self.maybe_yellow = yellow if color else noop

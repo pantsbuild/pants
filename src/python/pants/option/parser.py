@@ -366,6 +366,7 @@ class Parser:
         "mutually_exclusive_group",
         "daemon",
         "passthrough",
+        "environment_aware",
     }
 
     _allowed_member_types = {
