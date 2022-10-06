@@ -695,7 +695,7 @@ async def extract_process_config_from_environment(
 ) -> ProcessConfigFromEnvironment:
     docker_image = None
     remote_execution = False
-    raw_remote_execution_extra_platform_properties = ()
+    raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
 
     # If the environments mechanism is not used, fall back to legacy behavior of
     # `--remote-execution` being a global toggle.
