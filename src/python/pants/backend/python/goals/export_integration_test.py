@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Mapping, MutableMapping
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 SOURCES = {
@@ -52,7 +54,7 @@ EXPORTED_TOOLS: List[_ToolConfig] = [
 ]
 
 
-def build_config(tmpdir: str) -> Mapping:
+def build_config(tmpdir: str, symlink_python_virtualenv: bool) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
             "backend_packages": ["pants.backend.python"],
@@ -65,6 +67,7 @@ def build_config(tmpdir: str) -> Mapping:
                 "b": f"{tmpdir}/3rdparty/b.lock",
             },
         },
+        "export": {"symlink_python_virtualenv": symlink_python_virtualenv},
     }
     for tool_config in EXPORTED_TOOLS:
         cfg[tool_config.name] = {
@@ -87,10 +90,12 @@ def build_config(tmpdir: str) -> Mapping:
     return cfg
 
 
-def test_export() -> None:
+@pytest.mark.parametrize("symlink_python_virtualenv", [False, True])
+def test_export(symlink_python_virtualenv: bool) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
         run_pants(
-            ["generate-lockfiles", "export", f"{tmpdir}/::"], config=build_config(tmpdir)
+            ["generate-lockfiles", "export", f"{tmpdir}/::"],
+            config=build_config(tmpdir, symlink_python_virtualenv),
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
@@ -109,6 +114,8 @@ def test_export() -> None:
 
     for tool_config in EXPORTED_TOOLS:
         export_dir = os.path.join(export_prefix, "tools", tool_config.name)
+        if symlink_python_virtualenv:
+            export_dir = os.path.join(export_dir, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
 
         # NOTE: Not every tool implements --version so this is the best we can do.
