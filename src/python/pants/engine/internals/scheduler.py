@@ -643,6 +643,8 @@ def register_rules(
             tasks,
             rule.func,
             rule.output_type,
+            rule.input_selectors,
+            rule.masked_types,
             side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
             engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
             cacheable=rule.cacheable,
@@ -650,9 +652,6 @@ def register_rules(
             desc=rule.desc or "",
             level=rule.level.level,
         )
-
-        for selector in rule.input_selectors:
-            native_engine.tasks_add_select(tasks, selector)
 
         for the_get in rule.input_gets:
             unions = [t for t in the_get.input_types if is_union(t)]

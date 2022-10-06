@@ -199,12 +199,13 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls,
             input_selectors=(),
-            func=partial_construct_subsystem,
             input_gets=(
                 AwaitableConstraints(
                     output_type=ScopedOptions, input_types=(Scope,), is_effect=False
                 ),
             ),
+            masked_types=(),
+            func=partial_construct_subsystem,
             canonical_name=name,
         )
 
@@ -228,7 +229,6 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
-            func=inner,
             input_gets=(
                 AwaitableConstraints(
                     output_type=EnvironmentVars,
@@ -236,6 +236,8 @@ class Subsystem(metaclass=_SubsystemMeta):
                     is_effect=False,
                 ),
             ),
+            masked_types=(),
+            func=inner,
             canonical_name=name,
         )
 

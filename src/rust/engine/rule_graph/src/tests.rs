@@ -87,6 +87,39 @@ fn ambiguity() {
 }
 
 #[test]
+fn masked_params() {
+  // The middle rule masks "e", so even though the query provides it, construction should fail.
+  let rules = indexset![
+    Rule::new(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new("b").provided_params(vec!["c"])]
+    ),
+    Rule::new(
+      "b",
+      "b_from_c",
+      vec![
+        DependencyKey::new("c"),
+        DependencyKey::new("c").provided_params(vec!["d"])
+      ],
+    )
+    .masked_params(vec!["e"]),
+    Rule::new(
+      "c",
+      "c_from_d",
+      vec![DependencyKey::new("d"), DependencyKey::new("e")],
+    ),
+  ];
+  let queries = indexset![Query::new("a", vec!["e"])];
+
+  let res = RuleGraph::new(rules, queries).err().unwrap();
+  assert!(res.contains(
+    "Encountered 1 rule graph error:\n  \
+     Rule `b_from_c(2) -> b (for c+e)` masked the parameter type `e`, but it"
+  ));
+}
+
+#[test]
 fn nested_single() {
   let rules = indexset![
     Rule::new(
@@ -943,6 +976,7 @@ struct Rule {
   product: &'static str,
   name: &'static str,
   dependency_keys: Vec<DependencyKey<&'static str>>,
+  masked_params: Vec<&'static str>,
 }
 
 impl Rule {
@@ -955,7 +989,13 @@ impl Rule {
       product,
       name,
       dependency_keys,
+      masked_params: vec![],
     }
+  }
+
+  fn masked_params(mut self, masked_params: Vec<&'static str>) -> Self {
+    self.masked_params = masked_params;
+    self
   }
 }
 
@@ -968,6 +1008,10 @@ impl super::Rule for Rule {
 
   fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
     self.dependency_keys.iter().collect()
+  }
+
+  fn masked_params(&self) -> Vec<Self::TypeId> {
+    self.masked_params.clone()
   }
 
   fn require_reachable(&self) -> bool {

@@ -1122,6 +1122,39 @@ impl<R: Rule> Builder<R> {
       for edge_to_delete in edges_to_delete {
         graph[edge_to_delete].mark_deleted(EdgePrunedReason::SmallerParamSetAvailable);
       }
+
+      // Validate masked params.
+      if let Node::Rule(rule) = &graph[node_id].0.node {
+        for masked_param in rule.masked_params() {
+          if graph[node_id].0.in_set.contains(&masked_param) {
+            let in_set = params_str(&graph[node_id].0.in_set);
+            let dependencies = graph
+              .edges_directed(node_id, Direction::Outgoing)
+              .filter(|edge_ref| {
+                !edge_ref.weight().is_deleted()
+                  && !edge_ref.weight().0.provides(&masked_param)
+                  && graph[edge_ref.target()].0.in_set.contains(&masked_param)
+              })
+              .map(|edge_ref| {
+                let dep_id = edge_ref.target();
+                format!(
+                  "{} for {}",
+                  graph[dep_id].0.node,
+                  params_str(&graph[dep_id].0.in_set)
+                )
+              })
+              .collect::<Vec<_>>()
+              .join("\n  ");
+            errored
+              .entry(node_id)
+              .or_insert_with(Vec::new)
+              .push(format!(
+                "Rule `{rule} (for {in_set})` masked the parameter type `{masked_param}`, but \
+                  it was required by some dependencies:\n  {dependencies}"
+              ));
+          }
+        }
+      }
     }
 
     if errored.is_empty() {
@@ -1507,22 +1540,17 @@ impl<R: Rule> Builder<R> {
         continue;
       }
 
-      // Compute the out_set for this combination: any Params that are consumed here are removed
+      // Compute the out_set for this combination. Any Params that are consumed here are removed
       // from the out_set that Rule dependencies will be allowed to consume. Params that weren't
       // present in the out_set were already filtered near the top of this method.
       let out_set = {
-        let consumed_by_params = combination
-          .iter()
-          .filter_map(|(_, dependency_id, _)| match graph[*dependency_id].0.node {
-            Node::Param(p) => Some(p),
-            _ => None,
-          })
-          .collect::<ParamTypes<_>>();
-
+        let mut out_set = out_set.clone();
+        for (_, dependency_id, _) in &combination {
+          if let Node::Param(p) = graph[*dependency_id].0.node {
+            out_set.remove(&p);
+          }
+        }
         out_set
-          .difference(&consumed_by_params)
-          .cloned()
-          .collect::<ParamTypes<R::TypeId>>()
       };
 
       // We can eliminate this candidate if any dependencies have minimal in_sets which contain

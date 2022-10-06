@@ -287,6 +287,8 @@ def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
     return_type: type,
+    arg_types: Sequence[type],
+    masked_types: Sequence[type],
     side_effecting: bool,
     engine_aware_return_type: bool,
     cacheable: bool,
@@ -299,7 +301,6 @@ def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None:
 def tasks_add_get_union(
     tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
 ) -> None: ...
-def tasks_add_select(tasks: PyTasks, selector: type) -> None: ...
 def tasks_add_query(tasks: PyTasks, output_type: type, input_types: Sequence[type]) -> None: ...
 def execution_add_root_select(
     scheduler: PyScheduler,
