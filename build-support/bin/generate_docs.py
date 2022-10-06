@@ -251,6 +251,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
         "pants.backend.experimental.openapi",
+        "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.autoflake",
