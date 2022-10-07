@@ -40,6 +40,7 @@ class GoogleJavaFormatFieldSet(FieldSet):
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
     tool_subsystem = GoogleJavaFormatSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -116,6 +117,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *GoogleJavaFormatRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *GoogleJavaFormatRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

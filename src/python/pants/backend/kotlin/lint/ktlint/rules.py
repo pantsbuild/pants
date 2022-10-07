@@ -40,6 +40,7 @@ class KtlintFieldSet(FieldSet):
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
     tool_subsystem = KtlintSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -101,6 +102,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *KtlintRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *KtlintRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]

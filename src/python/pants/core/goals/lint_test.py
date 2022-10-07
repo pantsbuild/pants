@@ -401,9 +401,10 @@ def test_default_single_partition_partitioner() -> None:
     class LintKitchenRequest(LintTargetsRequest):
         field_set_type = MockLinterFieldSet
         tool_subsystem = KitchenSubsystem
+        partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [
-        *LintKitchenRequest._get_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *LintKitchenRequest._get_rules(),
         QueryRule(Partitions, [LintKitchenRequest.PartitionRequest]),
     ]
     rule_runner = RuleRunner(rules=rules)

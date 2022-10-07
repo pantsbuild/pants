@@ -33,6 +33,7 @@ class DocformatterFieldSet(FieldSet):
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
     tool_subsystem = Docformatter
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
@@ -64,6 +65,6 @@ async def docformatter_fmt(
 def rules():
     return [
         *collect_rules(),
-        *DocformatterRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *DocformatterRequest.rules(),
         *pex.rules(),
     ]

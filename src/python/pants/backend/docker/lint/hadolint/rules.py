@@ -34,6 +34,7 @@ class HadolintFieldSet(FieldSet):
 class HadolintRequest(LintTargetsRequest):
     field_set_type = HadolintFieldSet
     tool_subsystem = Hadolint
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -102,5 +103,5 @@ async def run_hadolint(
 def rules():
     return [
         *collect_rules(),
-        *HadolintRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *HadolintRequest.rules(),
     ]

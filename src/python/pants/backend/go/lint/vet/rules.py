@@ -41,6 +41,7 @@ class GoVetFieldSet(FieldSet):
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
     tool_subsystem = GoVetSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(level=LogLevel.DEBUG)
@@ -84,5 +85,5 @@ async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintR
 def rules():
     return [
         *collect_rules(),
-        *GoVetRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *GoVetRequest.rules(),
     ]

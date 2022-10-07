@@ -37,6 +37,7 @@ class YapfFieldSet(FieldSet):
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
     tool_subsystem = Yapf
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule_helper
@@ -87,6 +88,6 @@ async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        *YapfRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *YapfRequest.rules(),
         *pex.rules(),
     ]

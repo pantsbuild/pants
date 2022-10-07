@@ -33,6 +33,7 @@ class AddTrailingCommaFieldSet(FieldSet):
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
     tool_subsystem = AddTrailingComma
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with add-trailing-comma", level=LogLevel.DEBUG)
@@ -69,6 +70,6 @@ async def add_trailing_comma_fmt(
 def rules():
     return [
         *collect_rules(),
-        *AddTrailingCommaRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *AddTrailingCommaRequest.rules(),
         *pex.rules(),
     ]

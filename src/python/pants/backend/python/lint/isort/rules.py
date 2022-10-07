@@ -36,6 +36,7 @@ class IsortFieldSet(FieldSet):
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
     tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -104,6 +105,6 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
 def rules():
     return [
         *collect_rules(),
-        *IsortRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *IsortRequest.rules(),
         *pex.rules(),
     ]

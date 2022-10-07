@@ -34,6 +34,7 @@ class ShellcheckFieldSet(FieldSet):
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
     tool_subsystem = Shellcheck
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
@@ -105,5 +106,5 @@ async def run_shellcheck(
 def rules():
     return [
         *collect_rules(),
-        *ShellcheckRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *ShellcheckRequest.rules(),
     ]
