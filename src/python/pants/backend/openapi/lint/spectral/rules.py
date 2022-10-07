@@ -9,7 +9,7 @@ from pants.backend.openapi.target_types import (
     OpenApiDocumentField,
     OpenApiSourceField,
 )
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
@@ -41,13 +41,6 @@ class SpectralRequest(LintTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
         return "spectral"
-
-
-@rule
-async def partition_spectral(
-    request: SpectralRequest.PartitionRequest[SpectralFieldSet], spectral: SpectralSubsystem
-) -> Partitions[SpectralFieldSet]:
-    return Partitions() if spectral.skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with Spectral", level=LogLevel.DEBUG)
@@ -125,4 +118,10 @@ async def run_spectral(
 
 
 def rules():
-    return [*collect_rules(), *SpectralRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *SpectralRequest.registration_rules(),
+        *SpectralRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
+    ]
