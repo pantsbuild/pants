@@ -118,19 +118,6 @@ async def run_spectral(
             level=LogLevel.DEBUG,
         ),
     )
-    print(
-        [
-            downloaded_spectral.exe,
-            "lint",
-            "--display-only-failures",
-            "--ruleset",
-            ".spectral.yaml",
-            *spectral.args,
-            *target_sources.snapshot.files,
-        ]
-    )
-    print(process_result.stdout)
-    print(process_result.stderr)
 
     return LintResult.from_fallible_process_result(
         process_result, linter_name=SpectralRequest.tool_name
