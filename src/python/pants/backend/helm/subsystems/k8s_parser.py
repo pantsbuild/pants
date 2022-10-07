@@ -36,7 +36,7 @@ _HELM_K8S_PARSER_PACKAGE = "pants.backend.helm.subsystems"
 
 class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-k8s-parser"
-    help = "Used to perform modifications to the final output produced by Helm charts when they've been fully rendered."
+    help = "Analyses K8S manifests rendered by Helm."
 
     default_version = "hikaru==0.11.0b"
 
