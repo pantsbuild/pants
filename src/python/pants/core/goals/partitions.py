@@ -51,14 +51,14 @@ PartitionElementT = TypeVar("PartitionElementT")
 class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
     """A mapping from <partition key> to <partition>.
 
-    When implementing a linter, one of your rules will return this type, taking in a
-    `PartitionRequest` specific to your linter.
+    When implementing a plugin, one of your rules will return this type, taking in a
+    `PartitionRequest` specific to your plugin.
 
     The return likely will fit into one of:
         - Returning an empty partition: E.g. if your tool is being skipped.
         - Returning one partition. The partition may contain all of the inputs
-            (as will likely be the case for target linters) or a subset (which will likely be the
-            case for targetless linters).
+            (as will likely be the case for target-based plugins) or a subset (which will likely be the
+            case for targetless plugins).
         - Returning >1 partition. This might be the case if you can't run
             the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
             and files ABC with Py2.
@@ -91,8 +91,6 @@ class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
 class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
     """Returns a unique type per calling type.
 
-    Subclasses should re-export in their plugin request base type: `PartitionRequest = PartitionFieldSetsRequest`.
-
     This serves us 2 purposes:
         1. `<Core Defined Plugin Type>.PartitionRequest` is the unique type used as a union base for plugin registration.
         2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
@@ -105,10 +103,8 @@ class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
 class _PartitionFilesRequestBase:
     """Returns a unique type per calling type.
 
-    Subclasses should re-export in their plugin request base type: `PartitionRequest = PartitionFilesRequest`.
-
     This serves us 2 purposes:
-        1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
+        1. `<Core Defined Plugin Type>.PartitionRequest` is the unique type used as a union base for plugin registration.
         2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
     """
 
