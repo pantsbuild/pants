@@ -17,32 +17,21 @@ In your CI's config file, we recommend caching these directories:
 
 
 - `$HOME/.cache/pants/setup`<br>
-  This is the Pants bootstrap directory. Cache this against the version, as specified
-  in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml)
-  repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
+  This is the Pants bootstrap directory. Cache this against the version, as specified in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
 - `$HOME/.cache/pants/named_caches`<br>
-  Caches used by some underlying tools.  Cache this against the inputs to those tools.
-  For the `pants.backend.python` backend, named caches are used by PEX, and therefore
-  its inputs are your lockfiles. Again, see [pantsbuild/example-python]([pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml))
-  for an example.
+  Caches used by some underlying tools.  Cache this against the inputs to those tools. For the `pants.backend.python` backend, named caches are used by PEX, and therefore its inputs are your lockfiles. Again, see [pantsbuild/example-python]([pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml)) for an example.
 
-If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service,
-then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`.
-This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')`
-on GitHub Actions.
+If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service, then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`. This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')` on GitHub Actions.
 
-Computing such a coarse hash, and saving and restoring large directories, can be unwieldy.
-So this may be impractical and slow on medium and large repos.
+Computing such a coarse hash, and saving and restoring large directories, can be unwieldy. So this may be impractical and slow on medium and large repos.
 
-A [remote cache service](doc:remote-caching-execution) integrates with Pants's fine-grained
-invalidation and avoids these problems, and is recommended for the best CI performance.
+A [remote cache service](doc:remote-caching-execution) integrates with Pants's fine-grained invalidation and avoids these problems, and is recommended for the best CI performance.
 
 See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) for how to change these cache locations.
 
 > 📘 Nuking the cache when too big
 > 
-> In CI, the cache must be uploaded and downloaded every run. This takes time, so there is a tradeoff where too
-> large a cache will slow down your CI.
+> In CI, the cache must be uploaded and downloaded every run. This takes time, so there is a tradeoff where too large a cache will slow down your CI.
 > 
 > You can use this script to nuke the cache when it gets too big:
 > 
@@ -76,8 +65,7 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 
 > 👍 Remote caching
 > 
-> Rather than storing your cache with your CI provider, remote caching stores the cache in the cloud,
-> using gRPC and the open-source Remote Execution API for low-latency and fine-grained caching.
+> Rather than storing your cache with your CI provider, remote caching stores the cache in the cloud, using gRPC and the open-source Remote Execution API for low-latency and fine-grained caching.
 > 
 > This brings several benefits over local caching:
 > 
@@ -91,9 +79,7 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 Recommended commands
 --------------------
 
-With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism.
-See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). 
-(This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
+With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
 
 ### Approach #1: only run over changed files
 
@@ -136,12 +122,8 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 > 
 > GitLab's merge pipelines make a shallow clone by default, which only contains recent commits for the feature branch being merged. That severely limits `--changed-since`. There are two possible workarounds:
 > 
-> 1. Clone the entire repository by going to "CI / CD" settings and erase the number from the  
->    "Git shallow clone" field of the "General pipelines" section. Don't forget to "Save  
->    changes". This has the advantage of cloning everything, which also is the biggest  
->    long-term disadvantage.
-> 2. A more targeted and hence light-weight intervention leaves the shallow clone setting  
->    at its default value and instead fetches the `main` branch as well:
+> 1. Clone the entire repository by going to "CI / CD" settings and erase the number from the "Git shallow clone" field of the "General pipelines" section. Don't forget to "Save changes". This has the advantage of cloning everything, which also is the biggest long-term disadvantage.
+> 2. A more targeted and hence light-weight intervention leaves the shallow clone setting at its default value and instead fetches the `main` branch as well:
 > 
 >    ```
 >    git branch -a 
@@ -150,8 +132,7 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 >    git branch -a 
 >    ```
 > 
->    The `git branch` commands are only included to print out all available branches before  
->    and after fetching `origin/main`.
+>    The `git branch` commands are only included to print out all available branches before and after fetching `origin/main`.
 
 ### Approach #2: run over everything
 
