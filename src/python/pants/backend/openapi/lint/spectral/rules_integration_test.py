@@ -57,7 +57,7 @@ def run_spectral(
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.openapi.lint.spectral",
+            "--backend-packages=pants.backend.experimental.openapi.lint.spectral",
             *(extra_args or ()),
         ],
         env_inherit={"PATH"},
