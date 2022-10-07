@@ -36,6 +36,7 @@ class SpectralFieldSet(FieldSet):
 class SpectralRequest(LintTargetsRequest):
     field_set_type = SpectralFieldSet
     tool_subsystem = SpectralSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Lint with Spectral", level=LogLevel.DEBUG)
@@ -115,7 +116,5 @@ async def run_spectral(
 def rules():
     return [
         *collect_rules(),
-        *SpectralRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *SpectralRequest.rules(),
     ]
