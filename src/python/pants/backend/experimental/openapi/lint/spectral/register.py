@@ -6,4 +6,4 @@ from pants.backend.openapi.lint.spectral import skip_field
 
 
 def rules():
-    return [*spectral_rules.rules(), *skip_field.rules()]
+    return (*spectral_rules.rules(), *skip_field.rules())
