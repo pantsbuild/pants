@@ -62,7 +62,7 @@ class EnvironmentsSubsystem(Subsystem):
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
-            To use an environment for a given target, specify the name in the `_environment` field
+            To use an environment for a given target, specify the name in the `environment` field
             on that target. Pants will consume the environment target at the address mapped from
             that name.
 
@@ -80,7 +80,7 @@ LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
 class EnvironmentField(StringField):
-    alias = "_environment"
+    alias = "environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
     help = softwrap(
@@ -146,17 +146,22 @@ class LocalEnvironmentTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         f"""
-        Configuration of environment-sensitive options, such as environment variables and search
-        paths when Pants runs subprocesses locally.
+        Configuration of a local execution environment for specific platforms.
+
+        Environment configuration includes the platforms the environment is compatible with, and
+        optionally a fallback environment, along with environment-aware options (such as
+        environment variables and search paths) used by Pants to execute processes in this
+        environment.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
 
         Only one `local_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_ENVIRONMENT_MATCHER}` is specified as the environment, the
         `local_environment` that matches the current platform (if defined) will be selected.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -171,6 +176,10 @@ class DockerImageField(StringField):
         This value may be any image identifier that the local Docker installation can accept.
         This includes image names with or without tags (e.g. `centos6` or `centos6:latest`), or
         image names with an immutable digest (e.g. `centos@sha256:<some_sha256_value>`).
+
+        The choice of image ID can affect the reproducibility of builds. Consider using an
+        immutable digest if reproducibility is needed, but regularly ensure that the image
+        is free of relevant bugs or security vulnerabilities.
         """
     )
 
@@ -241,14 +250,17 @@ class DockerEnvironmentTarget(Target):
     )
     help = softwrap(
         """
-        Configuration of a Docker environment used for building your code, including the Docker
-        image, along with environment-sensitive options, which include environment variables and
-        search paths, used by Pants to execute processes in this Docker environment.
+        Configuration of a Docker environment used for building your code.
+
+        Environment configuration includes both Docker-specific information (including the image
+        and platform choice), as well as environment-aware options (such as environment variables
+        and search paths) used by Pants to execute processes in this Docker environment.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -303,22 +315,25 @@ class RemoteEnvironmentTarget(Target):
     )
     help = softwrap(
         """
-        Configuration of a remote execution environment used for building your code, including the
-        environment-sensitive options, which include environment variables and
-        search paths, used by Pants to execute processes in this remote environment.
+        Configuration of a remote execution environment used for building your code.
+
+        Environment configuration includes platform properties and a fallback environment, as well
+        as environment-aware options (such as environment variables and search paths) used by Pants
+        to execute processes in this remote environment.
 
         Note that you must also configure remote execution with the global options like
         `remote_execution` and `remote_execution_address`.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
 
         Often, it is only necessary to have a single `remote_environment` target for your
         repository, but it can be useful to have >1 so that you can set different
         `extra_platform_properties`. For example, with some servers, you could use this to
         configure a different Docker image per environment.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
