@@ -442,15 +442,15 @@ impl<R: Rule> Builder<R> {
               graph.add_edge(node_id, *params.get(&p).unwrap(), dependency_key.clone());
             }
             Node::Reentry(query, in_scope_params) => {
-              // A Reentry node currently can _not_ consume any provided params from its dependee.
-              // This can be revisited in future.
+              let out_set = {
+                let mut out_set = out_set.clone();
+                out_set.extend(dependency_key.provided_params.iter().cloned());
+                out_set
+              };
               let reentry_id = reentries
                 .entry((query.clone(), in_scope_params.clone(), out_set.clone()))
                 .or_insert_with(|| {
-                  graph.add_node((
-                    Node::Reentry(query.clone(), in_scope_params),
-                    out_set.clone(),
-                  ))
+                  graph.add_node((Node::Reentry(query.clone(), in_scope_params), out_set))
                 });
               graph.add_edge(node_id, *reentry_id, dependency_key.clone());
               to_visit.push(*reentry_id);

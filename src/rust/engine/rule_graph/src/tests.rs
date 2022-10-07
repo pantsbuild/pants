@@ -305,6 +305,31 @@ fn in_scope_computed() {
 }
 
 #[test]
+fn in_scope_provided() {
+  let _logger = env_logger::try_init();
+  let rules = indexset![
+    Rule::new(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new("b")
+        .provided_params(vec!["c", "d"])
+        .in_scope_params(vec!["d"])]
+    ),
+    Rule::new(
+      "b",
+      "b_from_c",
+      vec![DependencyKey::new("c"), DependencyKey::new("d")],
+    ),
+  ];
+
+  // Valid when the `in_scope` param can be computed or is a singleton.
+  let queries = indexset![Query::new("a", vec![])];
+  let graph = RuleGraph::new(rules.clone(), queries).unwrap();
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![], "a").unwrap();
+}
+
+#[test]
 fn ambiguous_cycle() {
   let _logger = env_logger::try_init();
   let rules = indexset![
