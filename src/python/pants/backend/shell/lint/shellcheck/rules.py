@@ -105,7 +105,5 @@ async def run_shellcheck(
 def rules():
     return [
         *collect_rules(),
-        *ShellcheckRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *ShellcheckRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

@@ -64,8 +64,6 @@ async def docformatter_fmt(
 def rules():
     return [
         *collect_rules(),
-        *DocformatterRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *DocformatterRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

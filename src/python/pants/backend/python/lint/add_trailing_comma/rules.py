@@ -69,8 +69,6 @@ async def add_trailing_comma_fmt(
 def rules():
     return [
         *collect_rules(),
-        *AddTrailingCommaRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *AddTrailingCommaRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

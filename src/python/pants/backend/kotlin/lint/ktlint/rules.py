@@ -101,8 +101,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *KtlintRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *KtlintRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]

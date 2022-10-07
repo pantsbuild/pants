@@ -68,5 +68,5 @@ async def buildfier_fmt(
 def rules():
     return [
         *collect_rules(),
-        *BuildifierRequest.registration_rules(),
+        *BuildifierRequest.rules(),
     ]

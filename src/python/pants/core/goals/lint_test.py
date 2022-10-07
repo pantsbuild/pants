@@ -403,9 +403,7 @@ def test_default_single_partition_partitioner() -> None:
         tool_subsystem = KitchenSubsystem
 
     rules = [
-        *LintKitchenRequest._get_registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *LintKitchenRequest._get_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         QueryRule(Partitions, [LintKitchenRequest.PartitionRequest]),
     ]
     rule_runner = RuleRunner(rules=rules)

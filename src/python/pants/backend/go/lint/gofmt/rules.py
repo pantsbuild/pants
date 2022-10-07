@@ -66,5 +66,5 @@ def rules():
     return [
         *collect_rules(),
         *goroot.rules(),
-        *GofmtRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *GofmtRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

@@ -84,5 +84,5 @@ async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintR
 def rules():
     return [
         *collect_rules(),
-        *GoVetRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *GoVetRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

@@ -104,6 +104,6 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
 def rules():
     return [
         *collect_rules(),
-        *IsortRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *IsortRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

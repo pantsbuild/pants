@@ -143,8 +143,8 @@ class FmtRequest(LintRequest):
             return self.elements
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+    def _get_rules(cls, *, partitioner_type: PartitionerType) -> Iterable[UnionRule]:
+        yield from super()._get_rules(partitioner_type=partitioner_type)
         yield UnionRule(FmtRequest, cls)
         yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
 
@@ -198,25 +198,25 @@ class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
         return collect_rules(locals())
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
+    def _get_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
         if partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
             yield from cls._default_single_partition_partitioner_rules
             partitioner_type = PartitionerType.CUSTOM
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from super()._get_rules(partitioner_type=partitioner_type)
         yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
 class FmtFilesRequest(FmtRequest, LintFilesRequest):
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
+    def _get_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
         if partitioner_type is not PartitionerType.CUSTOM:
             raise ValueError(
                 "Pants does not provide default partitioners for `FmtFilesRequest`."
                 + " You will need to provide your own partitioner rule."
             )
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from super()._get_rules(partitioner_type=partitioner_type)
         yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 

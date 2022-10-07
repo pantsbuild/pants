@@ -43,6 +43,6 @@ async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        *YapfRequest.registration_rules(),
+        *YapfRequest.rules(),
         *yapf_subsystem.rules(),
     ]

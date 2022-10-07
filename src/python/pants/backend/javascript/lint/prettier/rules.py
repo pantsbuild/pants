@@ -84,7 +84,5 @@ async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prett
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *PrettierFmtRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *PrettierFmtRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     )

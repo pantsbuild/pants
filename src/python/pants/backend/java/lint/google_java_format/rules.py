@@ -116,8 +116,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *GoogleJavaFormatRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *GoogleJavaFormatRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

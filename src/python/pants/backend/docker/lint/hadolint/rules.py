@@ -102,7 +102,5 @@ async def run_hadolint(
 def rules():
     return [
         *collect_rules(),
-        *HadolintRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *HadolintRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

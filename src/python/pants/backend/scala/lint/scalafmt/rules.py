@@ -219,6 +219,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        *ScalafmtRequest.registration_rules(),
+        *ScalafmtRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

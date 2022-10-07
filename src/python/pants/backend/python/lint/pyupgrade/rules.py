@@ -60,8 +60,6 @@ async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpg
 def rules():
     return [
         *collect_rules(),
-        *PyUpgradeRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *PyUpgradeRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

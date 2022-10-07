@@ -82,5 +82,5 @@ async def shfmt_fmt(
 def rules():
     return [
         *collect_rules(),
-        *ShfmtRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *ShfmtRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
     ]

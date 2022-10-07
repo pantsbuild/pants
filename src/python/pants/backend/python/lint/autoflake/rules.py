@@ -67,8 +67,6 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
 def rules():
     return [
         *collect_rules(),
-        *AutoflakeRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *AutoflakeRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]

@@ -87,6 +87,6 @@ async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        *YapfRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *YapfRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]
