@@ -1307,13 +1307,11 @@ impl NodeKey {
       NodeKey::Task(ref task) => {
         let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
 
-        let displayable_param_names: Vec<_> = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
+        let displayable_param_names: Vec<_> = Python::with_gil(|py| {
           Self::engine_aware_params(context, py, &task.params)
             .filter_map(|k| EngineAwareParameter::debug_hint((*k.value).as_ref(py)))
             .collect()
-        };
+        });
 
         let desc = if displayable_param_names.is_empty() {
           task_desc
@@ -1400,11 +1398,11 @@ impl Node for NodeKey {
       desc = workunit_desc.clone(),
       user_metadata = {
         if let Some(params) = maybe_params {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          Self::engine_aware_params(&context, py, params)
-            .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
-            .collect()
+          Python::with_gil(|py| {
+            Self::engine_aware_params(&context, py, params)
+              .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
+              .collect()
+          })
         } else {
           vec![]
         }
