@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,13 +34,6 @@ class ShellcheckFieldSet(FieldSet):
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
     tool_subsystem = Shellcheck
-
-
-@rule
-async def partition_shellcheck(
-    request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
-) -> Partitions[ShellcheckFieldSet]:
-    return Partitions() if shellcheck.skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
@@ -110,4 +103,9 @@ async def run_shellcheck(
 
 
 def rules():
-    return [*collect_rules(), *ShellcheckRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *ShellcheckRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
+    ]

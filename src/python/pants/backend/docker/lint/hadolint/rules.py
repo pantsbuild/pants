@@ -8,7 +8,7 @@ from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -45,13 +45,6 @@ def generate_argv(
     args.extend(hadolint.args)
     args.extend(info.source for info in dockerfile_infos)
     return tuple(args)
-
-
-@rule
-async def partition_hadolint(
-    request: HadolintRequest.PartitionRequest[HadolintFieldSet], hadolint: Hadolint
-) -> Partitions[HadolintFieldSet]:
-    return Partitions() if hadolint.skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
@@ -109,5 +102,7 @@ async def run_hadolint(
 def rules():
     return [
         *collect_rules(),
-        *HadolintRequest.registration_rules(),
+        *HadolintRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
     ]

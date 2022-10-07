@@ -8,7 +8,8 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
@@ -32,19 +33,6 @@ class DocformatterFieldSet(FieldSet):
 class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
     tool_subsystem = Docformatter
-
-
-@rule
-async def partition_docformatter(
-    request: DocformatterRequest.PartitionRequest, docformatter: Docformatter
-) -> Partitions:
-    return (
-        Partitions()
-        if docformatter.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
@@ -76,6 +64,8 @@ async def docformatter_fmt(
 def rules():
     return [
         *collect_rules(),
-        *DocformatterRequest.registration_rules(),
+        *DocformatterRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
         *pex.rules(),
     ]

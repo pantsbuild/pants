@@ -114,4 +114,7 @@ async def run_buf(
 
 
 def rules():
-    return [*collect_rules(), *BufLintRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *BufLintRequest.registration_rules(),
+    ]

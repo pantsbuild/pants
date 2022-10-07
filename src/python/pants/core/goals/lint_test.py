@@ -20,6 +20,7 @@ from pants.core.goals.lint import (
     LintResult,
     LintSubsystem,
     LintTargetsRequest,
+    PartitionerType,
     Partitions,
     lint,
 )
@@ -27,8 +28,11 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
@@ -385,6 +389,36 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ SuccessfulLinter succeeded.
         """
     )
+
+
+def test_default_single_partition_partitioner() -> None:
+    class KitchenSubsystem(Subsystem):
+        options_scope = "kitchen"
+        help = "a cookbook might help"
+        name = "The Kitchen"
+        skip = SkipOption("lint")
+
+    class LintKitchenRequest(LintTargetsRequest):
+        field_set_type = MockLinterFieldSet
+        tool_subsystem = KitchenSubsystem
+
+    rules = [
+        *LintKitchenRequest._get_registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
+        QueryRule(Partitions, [LintKitchenRequest.PartitionRequest]),
+    ]
+    rule_runner = RuleRunner(rules=rules)
+    field_sets = (
+        MockLinterFieldSet(Address("knife"), MultipleSourcesField(["knife"], Address("knife"))),
+        MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
+    )
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([(None, field_sets)])
+
+    rule_runner.set_options(["--kitchen-skip"])
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([])
 
 
 @pytest.mark.parametrize("batch_size", [1, 32, 128, 1024])

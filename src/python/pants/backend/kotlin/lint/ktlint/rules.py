@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from pants.backend.kotlin.lint.ktlint.skip_field import SkipKtlintField
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.lint import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
@@ -43,19 +44,6 @@ class KtlintRequest(FmtTargetsRequest):
 
 class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = KtlintSubsystem.options_scope
-
-
-@rule
-async def partition_ktlint(
-    request: KtlintRequest.PartitionRequest, tool: KtlintSubsystem
-) -> Partitions:
-    return (
-        Partitions()
-        if tool.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
@@ -113,6 +101,8 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *KtlintRequest.registration_rules(),
+        *KtlintRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]

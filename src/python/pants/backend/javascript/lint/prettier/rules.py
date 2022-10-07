@@ -10,7 +10,8 @@ from typing import Iterable
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.javascript.target_types import JSSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
@@ -33,19 +34,6 @@ class PrettierFmtFieldSet(FieldSet):
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
     tool_subsystem = Prettier
-
-
-@rule
-async def partition_prettier(
-    request: PrettierFmtRequest.PartitionRequest, prettier: Prettier
-) -> Partitions:
-    return (
-        Partitions()
-        if prettier.skip
-        else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(level=LogLevel.DEBUG)
@@ -96,5 +84,7 @@ async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prett
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *PrettierFmtRequest.registration_rules(),
+        *PrettierFmtRequest.registration_rules(
+            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
+        ),
     )

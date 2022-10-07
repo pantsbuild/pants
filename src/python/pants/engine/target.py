@@ -1300,16 +1300,18 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
+def _get_field_set_fields(field_set: Type[FieldSet]) -> Dict[str, Type[Field]]:
+    return {
+        name: field_type
+        for name, field_type in get_type_hints(field_set).items()
+        if isinstance(field_type, type) and issubclass(field_type, Field)
+    }
 
 
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
+    all_expected_fields = _get_field_set_fields(field_set)
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)

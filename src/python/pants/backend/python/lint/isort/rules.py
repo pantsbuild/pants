@@ -10,7 +10,8 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.lint import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
@@ -60,17 +61,6 @@ def generate_argv(
     return tuple(args)
 
 
-@rule
-async def partition_isort(request: IsortRequest.PartitionRequest, isort: Isort) -> Partitions:
-    return (
-        Partitions()
-        if isort.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
-
-
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResult:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
@@ -114,6 +104,6 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
 def rules():
     return [
         *collect_rules(),
-        *IsortRequest.registration_rules(),
+        *IsortRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
         *pex.rules(),
     ]
