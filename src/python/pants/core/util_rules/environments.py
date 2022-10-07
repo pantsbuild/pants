@@ -148,7 +148,7 @@ class LocalEnvironmentTarget(Target):
         f"""
         Configuration of a local execution environment for specific platforms.
 
-        Environment conviguration includes the platforms the environment is compatible with, and
+        Environment configuration includes the platforms the environment is compatible with, and
         optionally a fallback environment, along with environment-aware options (such as
         environment variables and search paths) used by Pants to execute processes in this
         environment.
