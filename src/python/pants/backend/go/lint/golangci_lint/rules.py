@@ -3,6 +3,7 @@
 
 import textwrap
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
@@ -15,7 +16,8 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -49,18 +51,12 @@ class GolangciLintFieldSet(FieldSet):
 class GolangciLintRequest(LintTargetsRequest):
     field_set_type = GolangciLintFieldSet
     tool_subsystem = GolangciLint
-
-
-@rule
-async def partition_golangci_lint(
-    request: GolangciLintRequest.PartitionRequest[GolangciLintFieldSet], golangci_lint: GolangciLint
-) -> Partitions[GolangciLintFieldSet]:
-    return Partitions() if golangci_lint.skip else Partitions.single_partition(request.field_sets)
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Lint with golangci-lint", level=LogLevel.DEBUG)
 async def run_golangci_lint(
-    request: GolangciLintRequest.SubPartition[GolangciLintFieldSet],
+    request: GolangciLintRequest.SubPartition[Any, GolangciLintFieldSet],
     golangci_lint: GolangciLint,
     goroot: GoRoot,
     bash: BashBinary,

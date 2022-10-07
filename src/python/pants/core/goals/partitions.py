@@ -4,13 +4,13 @@
 """Contains the "base" code for plugin APIs which require partitioning."""
 
 from __future__ import annotations
-from dataclasses import dataclass
 
-from enum import Enum
 import itertools
-from typing import Any, Callable, Generic, Iterable, Protocol, TypeVar
+from dataclasses import dataclass
+from enum import Enum
+from typing import Generic, Iterable, Protocol, TypeVar
+
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.engine.environment import EnvironmentName
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -20,14 +20,10 @@ from pants.engine.target import (
     SourcesPathsRequest,
     _get_field_set_fields,
 )
-from pants.engine.unions import distinct_union_type_per_subclass
-from pants.util.collections import partition_sequentially
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 
-_PartitionElementT = TypeVar("_PartitionElementT")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
 
@@ -43,12 +39,16 @@ class PartitionerType(Enum):
 
 class PartitionKey(Protocol):
     @property
-    def partition_description(self) -> str:
+    def description(self) -> str:
         ...
 
 
+PartitionKeyT = TypeVar("PartitionKeyT", bound=PartitionKey)
+PartitionElementT = TypeVar("PartitionElementT")
+
+
 @runtime_ignore_subscripts
-class Partitions(FrozenDict["PartitionKey | None", "tuple[_PartitionElementT, ...]"]):
+class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
     """A mapping from <partition key> to <partition>.
 
     When implementing a linter, one of your rules will return this type, taking in a
@@ -71,26 +71,28 @@ class Partitions(FrozenDict["PartitionKey | None", "tuple[_PartitionElementT, ..
 
     @classmethod
     def single_partition(
-        cls, elements: Iterable[_PartitionElementT], key: Any = None
-    ) -> Partitions[_PartitionElementT]:
+        cls, elements: Iterable[PartitionElementT], key: PartitionKeyT = None  # type: ignore[assignment]
+    ) -> Partitions[PartitionKeyT, PartitionElementT]:
         """Helper constructor for implementations that have only one partition."""
         return Partitions([(key, tuple(elements))])
 
 
-@distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
 # NB: Not frozen so it can be subclassed
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
-class SubPartition(Generic[_PartitionElementT]):
-    elements: tuple[_PartitionElementT, ...]
-    key: Any
+class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
+    elements: tuple[PartitionElementT, ...]
+    key: PartitionKeyT
 
 
-@distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+class SubPartition(_SubPartitionBase):
+    pass
+
+
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
-class PartitionFieldSetsRequest(Generic[_FieldSetT]):
+class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
     """Returns a unique type per calling type.
 
     Subclasses should re-export in their plugin request base type: `PartitionRequest = PartitionFieldSetsRequest`.
@@ -103,9 +105,8 @@ class PartitionFieldSetsRequest(Generic[_FieldSetT]):
     field_sets: tuple[_FieldSetT, ...]
 
 
-@distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
-class PartitionFilesRequest:
+class _PartitionFilesRequestBase:
     """Returns a unique type per calling type.
 
     Subclasses should re-export in their plugin request base type: `PartitionRequest = PartitionFilesRequest`.
@@ -118,14 +119,10 @@ class PartitionFilesRequest:
     files: tuple[str, ...]
 
 
-class PluginCoreRequestType(Protocol):
-    PartitionRequest: type[PartitionFieldSetsRequest]
-    tool_subsystem: type[SkippableSubsystem]
-
-
 @memoized
-def single_partition_field_sets_partitioner_rules(cls: PluginCoreRequestType) -> Iterable:
-    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns one partition."""
+def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    one partition."""
 
     @rule(
         _param_type_overrides={
@@ -134,7 +131,7 @@ def single_partition_field_sets_partitioner_rules(cls: PluginCoreRequestType) ->
         }
     )
     async def partitioner(
-        request: PartitionFieldSetsRequest, subsystem: SkippableSubsystem
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
     ) -> Partitions:
         return Partitions() if subsystem.skip else Partitions.single_partition(request.field_sets)
 
@@ -142,8 +139,9 @@ def single_partition_field_sets_partitioner_rules(cls: PluginCoreRequestType) ->
 
 
 @memoized
-def single_partition_field_sets_by_file_partitioner_rules(cls: PluginCoreRequestType) -> Iterable:
-    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns one partition."""
+def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    one partition."""
 
     # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
     # a better user experience.
@@ -170,7 +168,7 @@ def single_partition_field_sets_by_file_partitioner_rules(cls: PluginCoreRequest
         }
     )
     async def partitioner(
-        request: PartitionFieldSetsRequest, subsystem: SkippableSubsystem
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
     ) -> Partitions:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(

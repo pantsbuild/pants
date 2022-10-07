@@ -7,7 +7,7 @@ from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import PartitionerType
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests

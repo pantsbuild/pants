@@ -12,7 +12,7 @@ from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import PartitionerType
+from pants.core.goals.partitions import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get

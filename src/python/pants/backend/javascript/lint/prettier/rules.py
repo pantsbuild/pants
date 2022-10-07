@@ -11,7 +11,7 @@ from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import PartitionerType
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult

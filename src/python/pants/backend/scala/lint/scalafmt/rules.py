@@ -67,6 +67,10 @@ class PartitionInfo:
     config_snapshot: Snapshot
     extra_immutable_input_digests: FrozenDict[str, Digest]
 
+    @property
+    def description(self) -> str:
+        return self.config_snapshot.files[0]
+
 
 def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
     while True:
@@ -119,7 +123,7 @@ async def gather_scalafmt_config_files(
 @rule
 async def partition_scalafmt(
     request: ScalafmtRequest.PartitionRequest, tool: ScalafmtSubsystem
-) -> Partitions:
+) -> Partitions[PartitionInfo]:
     if tool.skip:
         return Partitions()
 

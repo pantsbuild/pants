@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -15,14 +15,12 @@ from pants.core.goals.lint import (
     LintRequest,
     LintResult,
     LintTargetsRequest,
-    PartitionerType,
+    _get_partitions_by_request_type,
 )
-from pants.core.goals._partitions import (
-    Partitions as UntypedPartitions,
-    single_partition_field_sets_by_file_partitioner_rules,
-)
-from pants.core.goals.lint import _get_partitions_by_request_type, PartitionerType
-from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption, SkippableSubsystem
+from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
+from pants.core.goals.partitions import PartitionerType, PartitionKeyT
+from pants.core.goals.partitions import Partitions as UntypedPartitions
+from pants.core.goals.partitions import _single_partition_field_sets_by_file_partitioner_rules
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -31,21 +29,11 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotD
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
-from pants.engine.target import (
-    SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    _get_field_set_fields,
-)
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
-
-_F = TypeVar("_F", bound="FmtResult")
-_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +115,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = UntypedPartitions[str]
+Partitions = UntypedPartitions[PartitionKeyT, str]
 
 
 @union
@@ -135,6 +123,8 @@ class FmtRequest(LintRequest):
     is_formatter = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    @frozen_after_init
+    @dataclass(unsafe_hash=True)
     class SubPartition(LintRequest.SubPartition):
         snapshot: Snapshot
 
@@ -153,7 +143,7 @@ class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from single_partition_field_sets_by_file_partitioner_rules(cls)
+            yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
 
         yield from (
             rule

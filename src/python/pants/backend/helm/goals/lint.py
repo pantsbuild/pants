@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
@@ -38,7 +37,7 @@ class HelmLintRequest(LintTargetsRequest):
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-) -> Partitions[HelmLintFieldSet]:
+) -> Partitions[HelmChart, HelmLintFieldSet]:
     field_sets = tuple(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
@@ -48,11 +47,12 @@ async def partition_helm_lint(
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
-    request: HelmLintRequest.SubPartition[HelmLintFieldSet], helm_subsystem: HelmSubsystem
+    request: HelmLintRequest.SubPartition[HelmChart, HelmLintFieldSet],
+    helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1
     field_set = request.elements[0]
-    chart = cast(HelmChart, request.key)
+    chart = request.key
 
     argv = ["lint", chart.name]
 

@@ -11,7 +11,7 @@ from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.cc.target_types import CCSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import PartitionerType
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult

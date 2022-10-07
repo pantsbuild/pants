@@ -24,7 +24,7 @@ from pants.core.goals.fmt import (
     Partitions,
 )
 from pants.core.goals.fmt import rules as fmt_rules
-from pants.core.goals.lint import PartitionerType
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules import source_files
 from pants.engine.fs import (
     EMPTY_DIGEST,

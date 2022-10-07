@@ -6,19 +6,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Generic,
-    Iterable,
-    Iterator,
-    Sequence,
-    Tuple,
-    TypeVar,
-    cast,
-)
+from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
 from typing_extensions import final
 
@@ -30,6 +18,14 @@ from pants.core.goals.multi_tool_goal_helper import (
     determine_specified_tool_names,
     write_reports,
 )
+from pants.core.goals.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.goals.partitions import Partitions as Partitions  # re-export
+from pants.core.goals.partitions import (
+    _PartitionFieldSetsRequestBase,
+    _PartitionFilesRequestBase,
+    _single_partition_field_sets_partitioner_rules,
+    _SubPartitionBase,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -38,31 +34,20 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, SpecsPaths, Workspa
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
-from pants.util.meta import classproperty, frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, strip_v2_chroot_path
-from pants.core.goals._partitions import (
-    Partitions as Partitions,  # re-export
-    SubPartition,
-    PartitionFieldSetsRequest,
-    PartitionerType,
-    PartitionFilesRequest,
-    single_partition_field_sets_partitioner_rules,
-)
 
 logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
-_PartitionElementT = TypeVar("_PartitionElementT")
 
 
 @dataclass(frozen=True)
@@ -177,7 +162,9 @@ class LintRequest:
     def tool_name(cls) -> str:
         return cls.tool_subsystem.options_scope
 
-    SubPartition = SubPartition
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    class SubPartition(_SubPartitionBase[PartitionKeyT, PartitionElementT]):
+        pass
 
     @final
     @classmethod
@@ -195,12 +182,14 @@ class LintTargetsRequest(LintRequest):
 
     field_set_type: ClassVar[type[FieldSet]]
 
-    PartitionRequest = PartitionFieldSetsRequest
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    class PartitionRequest(_PartitionFieldSetsRequestBase[_FieldSetT]):
+        pass
 
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from single_partition_field_sets_partitioner_rules(cls)
+            yield from _single_partition_field_sets_partitioner_rules(cls)
 
         yield from super()._get_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
@@ -209,7 +198,9 @@ class LintTargetsRequest(LintRequest):
 class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
-    PartitionRequest = PartitionFilesRequest
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    class PartitionRequest(_PartitionFilesRequestBase):
+        pass
 
     @classmethod
     def _get_rules(cls) -> Iterable:

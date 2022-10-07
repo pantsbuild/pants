@@ -71,7 +71,7 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[PylintFieldSet],
+        Partitions[PartitionKey, PylintFieldSet],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
@@ -522,7 +522,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partition_keys = list(rule_runner.request(Partitions[PylintFieldSet], [request]))
+    partition_keys = list(rule_runner.request(Partitions[PartitionKey, PylintFieldSet], [request]))
     assert len(partition_keys) == 3
 
     def assert_partition(
@@ -539,7 +539,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         }
         ics = [f"CPython=={interpreter}.*"]
         assert key.interpreter_constraints == InterpreterConstraints(ics)
-        assert key.description() == f"{resolve}, {ics}"
+        assert key.description == f"{resolve}, {ics}"
 
     assert_partition(partition_keys[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
     assert_partition(partition_keys[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")

@@ -20,10 +20,10 @@ from pants.core.goals.lint import (
     LintResult,
     LintSubsystem,
     LintTargetsRequest,
-    PartitionerType,
     Partitions,
     lint,
 )
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
@@ -141,7 +141,7 @@ class InvalidRequest(MockLintTargetsRequest):
 
 def mock_target_partitioner(
     request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[MockLinterFieldSet]:
+) -> Partitions[Any, MockLinterFieldSet]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -161,7 +161,7 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
     return Partitions.single_partition(request.files)
 
 
@@ -413,7 +413,7 @@ def test_default_single_partition_partitioner() -> None:
         MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions([(None, field_sets)])
+    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])

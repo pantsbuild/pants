@@ -70,6 +70,10 @@ class HelmChart:
         return self.info.name
 
     @property
+    def description(self) -> str:
+        return self.name
+
+    @property
     def immutable_input_digests(self) -> FrozenDict[str, Digest]:
         return FrozenDict({self.name: self.snapshot.digest})
 

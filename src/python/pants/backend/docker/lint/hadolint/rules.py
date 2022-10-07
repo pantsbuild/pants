@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.docker.lint.hadolint.skip_field import SkipHadolintField
 from pants.backend.docker.lint.hadolint.subsystem import Hadolint
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -50,7 +52,9 @@ def generate_argv(
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(
-    request: HadolintRequest.SubPartition[HadolintFieldSet], hadolint: Hadolint, platform: Platform
+    request: HadolintRequest.SubPartition[Any, HadolintFieldSet],
+    hadolint: Hadolint,
+    platform: Platform,
 ) -> LintResult:
     downloaded_hadolint, config_files = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, hadolint.get_request(platform)),
