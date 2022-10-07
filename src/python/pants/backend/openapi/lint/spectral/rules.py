@@ -18,7 +18,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
@@ -37,10 +36,6 @@ class SpectralFieldSet(FieldSet):
 class SpectralRequest(LintTargetsRequest):
     field_set_type = SpectralFieldSet
     tool_subsystem = SpectralSubsystem
-
-    @classproperty
-    def tool_name(cls) -> str:
-        return "spectral"
 
 
 @rule(desc="Lint with Spectral", level=LogLevel.DEBUG)
