@@ -86,10 +86,6 @@ class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
     key: PartitionKeyT
 
 
-class SubPartition(_SubPartitionBase):
-    pass
-
-
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
 class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
