@@ -153,9 +153,6 @@ class LocalEnvironmentTarget(Target):
         environment variables and search paths) used by Pants to execute processes in this
         environment.
 
-        Configuration of environment-sensitive options, such as environment variables and search
-        paths when Pants runs subprocesses locally.
-
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
