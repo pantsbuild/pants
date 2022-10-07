@@ -183,5 +183,5 @@ async def run_golangci_lint(
 def rules():
     return [
         *collect_rules(),
-        *GolangciLintRequest.registration_rules(),
+        *GolangciLintRequest.rules(),
     ]

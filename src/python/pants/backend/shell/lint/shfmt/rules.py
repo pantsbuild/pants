@@ -34,6 +34,7 @@ class ShfmtFieldSet(FieldSet):
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
     tool_subsystem = Shfmt
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
@@ -82,5 +83,5 @@ async def shfmt_fmt(
 def rules():
     return [
         *collect_rules(),
-        *ShfmtRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *ShfmtRequest.rules(),
     ]

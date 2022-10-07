@@ -76,4 +76,4 @@ async def run_helm_lint(
 
 
 def rules():
-    return [*collect_rules(), *tool.rules(), *HelmLintRequest.registration_rules()]
+    return [*collect_rules(), *tool.rules(), *HelmLintRequest.rules()]

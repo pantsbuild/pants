@@ -34,6 +34,7 @@ class ClangFormatFmtFieldSet(FieldSet):
 class ClangFormatRequest(FmtTargetsRequest):
     field_set_type = ClangFormatFmtFieldSet
     tool_subsystem = ClangFormat
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(level=LogLevel.DEBUG)
@@ -95,7 +96,5 @@ async def clangformat_fmt(
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *ClangFormatRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *ClangFormatRequest.rules(),
     )

@@ -33,6 +33,7 @@ class AutoflakeFieldSet(FieldSet):
 class AutoflakeRequest(FmtTargetsRequest):
     field_set_type = AutoflakeFieldSet
     tool_subsystem = Autoflake
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
@@ -67,8 +68,6 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
 def rules():
     return [
         *collect_rules(),
-        *AutoflakeRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *AutoflakeRequest.rules(),
         *pex.rules(),
     ]

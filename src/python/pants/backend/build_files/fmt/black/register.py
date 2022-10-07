@@ -43,6 +43,6 @@ async def black_fmt(request: BlackRequest.SubPartition, black: Black) -> FmtResu
 def rules():
     return [
         *collect_rules(),
-        *BlackRequest.registration_rules(),
+        *BlackRequest.rules(),
         *black_subsystem.rules(),
     ]

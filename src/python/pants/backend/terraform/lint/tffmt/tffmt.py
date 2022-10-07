@@ -77,5 +77,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *tool_rules(),
-        *TffmtRequest.registration_rules(),
+        *TffmtRequest.rules(),
     ]

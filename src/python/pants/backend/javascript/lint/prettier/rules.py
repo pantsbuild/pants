@@ -34,6 +34,7 @@ class PrettierFmtFieldSet(FieldSet):
 class PrettierFmtRequest(FmtTargetsRequest):
     field_set_type = PrettierFmtFieldSet
     tool_subsystem = Prettier
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(level=LogLevel.DEBUG)
@@ -84,7 +85,5 @@ async def prettier_fmt(request: PrettierFmtRequest.SubPartition, prettier: Prett
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *PrettierFmtRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *PrettierFmtRequest.rules(),
     )

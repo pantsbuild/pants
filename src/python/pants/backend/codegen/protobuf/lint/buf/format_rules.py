@@ -111,5 +111,5 @@ async def run_buf_format(
 def rules():
     return [
         *collect_rules(),
-        *BufFormatRequest.registration_rules(),
+        *BufFormatRequest.rules(),
     ]

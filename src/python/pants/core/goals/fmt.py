@@ -21,7 +21,7 @@ from pants.core.goals._partitions import (
     Partitions as UntypedPartitions,
     single_partition_field_sets_by_file_partitioner_rules,
 )
-from pants.core.goals.lint import _get_partitions_by_request_type
+from pants.core.goals.lint import _get_partitions_by_request_type, PartitionerType
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption, SkippableSubsystem
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -143,33 +143,37 @@ class FmtRequest(LintRequest):
             return self.elements
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+    def _get_rules(cls) -> Iterable[UnionRule]:
+        yield from super()._get_rules()
         yield UnionRule(FmtRequest, cls)
         yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
 
 
 class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
-        if partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
             yield from single_partition_field_sets_by_file_partitioner_rules(cls)
-            partitioner_type = PartitionerType.CUSTOM
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from (
+            rule
+            for rule in super()._get_rules()
+            # NB: We don't want to yield `lint.py`'s default partitioner
+            if isinstance(rule, UnionRule)
+        )
         yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
 class FmtFilesRequest(FmtRequest, LintFilesRequest):
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
-        if partitioner_type is not PartitionerType.CUSTOM:
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is not PartitionerType.CUSTOM:
             raise ValueError(
                 "Pants does not provide default partitioners for `FmtFilesRequest`."
                 + " You will need to provide your own partitioner rule."
             )
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from super()._get_rules()
         yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 

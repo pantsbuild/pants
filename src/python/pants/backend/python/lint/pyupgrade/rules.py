@@ -34,6 +34,7 @@ class PyUpgradeFieldSet(FieldSet):
 class PyUpgradeRequest(FmtTargetsRequest):
     field_set_type = PyUpgradeFieldSet
     tool_subsystem = PyUpgrade
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
@@ -60,8 +61,6 @@ async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpg
 def rules():
     return [
         *collect_rules(),
-        *PyUpgradeRequest.registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *PyUpgradeRequest.rules(),
         *pex.rules(),
     ]

@@ -53,6 +53,7 @@ from pants.core.goals._partitions import (
     Partitions as Partitions,  # re-export
     SubPartition,
     PartitionFieldSetsRequest,
+    PartitionerType,
     PartitionFilesRequest,
     single_partition_field_sets_partitioner_rules,
 )
@@ -163,11 +164,13 @@ class LintRequest:
         def rules():
             return [
                 *collect_rules(),
-                *DryCleaningRequest.registration_rules()
+                *DryCleaningRequest.rules()
             ]
     """
 
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
+    partitioner_type: ClassVar[PartitionerType] = PartitionerType.CUSTOM
+
     is_formatter: ClassVar[bool] = False
 
     @classproperty
@@ -178,13 +181,11 @@ class LintRequest:
 
     @final
     @classmethod
-    def registration_rules(
-        cls, *, partitioner_type: PartitionerType = PartitionerType.CUSTOM
-    ) -> Iterable:
-        yield from cls._get_registration_rules(partitioner_type=partitioner_type)
+    def rules(cls) -> Iterable:
+        yield from cls._get_rules()
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
+    def _get_rules(cls) -> Iterable:
         yield UnionRule(LintRequest, cls)
         yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
 
@@ -197,11 +198,11 @@ class LintTargetsRequest(LintRequest):
     PartitionRequest = PartitionFieldSetsRequest
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
-        if partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
             yield from single_partition_field_sets_partitioner_rules(cls)
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from super()._get_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
@@ -211,14 +212,14 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
     PartitionRequest = PartitionFilesRequest
 
     @classmethod
-    def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
-        if partitioner_type is not PartitionerType.CUSTOM:
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is not PartitionerType.CUSTOM:
             raise ValueError(
                 "Pants does not provide default partitioners for `LintFilesRequest`."
                 + " You will need to provide your own partitioner rule."
             )
 
-        yield from super()._get_registration_rules(partitioner_type=partitioner_type)
+        yield from super()._get_rules()
         yield UnionRule(LintFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
