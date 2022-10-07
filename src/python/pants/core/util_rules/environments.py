@@ -347,7 +347,7 @@ def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentNam
         ChosenLocalEnvironmentName,
         session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
     )
-    return EnvironmentName(local_env.val)
+    return local_env.val
 
 
 class AmbiguousEnvironmentError(Exception):
@@ -370,7 +370,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 class ChosenLocalEnvironmentName:
     """Which environment name from `[environments-preview].names` that __local__ resolves to."""
 
-    val: str | None
+    val: EnvironmentName
 
 
 @dataclass(frozen=True)
@@ -452,11 +452,11 @@ async def determine_local_environment(
     ]
     if not compatible_name_and_targets:
         # That is, use the values from the options system instead, rather than from fields.
-        return ChosenLocalEnvironmentName(None)
+        return ChosenLocalEnvironmentName(EnvironmentName(None))
 
     if len(compatible_name_and_targets) == 1:
         result_name, _tgt = compatible_name_and_targets[0]
-        return ChosenLocalEnvironmentName(result_name)
+        return ChosenLocalEnvironmentName(EnvironmentName(result_name))
 
     raise AmbiguousEnvironmentError(
         softwrap(
@@ -517,7 +517,7 @@ async def resolve_environment_name(
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
-        return EnvironmentName(local_env_name.val)
+        return local_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
             softwrap(

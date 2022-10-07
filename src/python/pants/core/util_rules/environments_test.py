@@ -192,7 +192,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
 
     def get_env() -> EnvironmentTarget:
         name = rule_runner.request(ChosenLocalEnvironmentName, [])
-        return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
+        return rule_runner.request(EnvironmentTarget, [name.val])
 
     # If `--names` is not set, do not choose an environment.
     assert get_env().val is None
@@ -284,7 +284,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 MockGet(
                     output_type=ChosenLocalEnvironmentName,
                     input_types=(),
-                    mock=lambda: ChosenLocalEnvironmentName(None),
+                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
                 ),
                 MockGet(
                     output_type=EnvironmentTarget,
