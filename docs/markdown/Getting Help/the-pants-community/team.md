@@ -44,7 +44,7 @@ Pants open source project has had many team members in over a decade. The curren
 | ---------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Chris Williams**     |                                                                                                         |
 | **Dan Moran**          | "Enabling automatic usage of `pytest-xdist` in `./pants test`"                                          |
-| **Doron Somech**       |                                                                                                         |
+| **Doron Somech**       | "Improving Scala dependency inference to support our codebase"                                                                                                        |
 | **Jacob Floyd**        | Gave the idea for skip_flake8 et al, which grew into a flagship feature: incremental adoption           |
 | **Jonas Stendahl**     | "Adding formatting and linting support for Protobuf"                                                                                                        |
 | **Josh Reed**          | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                     |
