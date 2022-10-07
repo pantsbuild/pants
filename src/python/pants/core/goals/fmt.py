@@ -17,7 +17,10 @@ from pants.core.goals.lint import (
     LintTargetsRequest,
     PartitionerType,
 )
-from pants.core.goals.lint import Partitions as LintPartitions
+from pants.core.goals._partitions import (
+    Partitions as UntypedPartitions,
+    single_partition_field_sets_by_file_partitioner_rules,
+)
 from pants.core.goals.lint import _get_partitions_by_request_type
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption, SkippableSubsystem
 from pants.engine.collection import Collection
@@ -124,7 +127,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = LintPartitions[str]
+Partitions = UntypedPartitions[str]
 
 
 @union
@@ -132,9 +135,6 @@ class FmtRequest(LintRequest):
     is_formatter = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @runtime_ignore_subscripts
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
     class SubPartition(LintRequest.SubPartition):
         snapshot: Snapshot
 
@@ -150,57 +150,10 @@ class FmtRequest(LintRequest):
 
 
 class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
-    @memoized_classproperty
-    def _default_single_partition_partitioner_rules(cls) -> Iterable:
-        # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
-        # a better user experience.
-        sources_field_name = None
-        for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
-            if issubclass(fieldtype, SourcesField):
-                if sources_field_name is None:
-                    sources_field_name = fieldname
-                    break
-                raise TypeError(
-                    f"Type {cls.field_set_type} has multiple `SourcesField` fields."
-                    + " Pants can't provide a default partitioner."
-                )
-        else:
-            raise TypeError(
-                f"Type {cls.field_set_type} has does not have a `SourcesField` field."
-                + " Pants can't provide a default partitioner."
-            )
-
-        @rule(
-            _param_type_overrides={
-                "request": cls.PartitionRequest,
-                "subsystem": cls.tool_subsystem,
-            }
-        )
-        async def default_single_partition_partitioner(
-            request: FmtTargetsRequest.PartitionRequest, subsystem: SkippableSubsystem
-        ) -> Partitions:
-            assert sources_field_name is not None
-            all_sources_paths = await MultiGet(
-                Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
-                for field_set in request.field_sets
-            )
-
-            return (
-                Partitions()
-                if subsystem.skip
-                else Partitions.single_partition(
-                    itertools.chain.from_iterable(
-                        sources_paths.files for sources_paths in all_sources_paths
-                    )
-                )
-            )
-
-        return collect_rules(locals())
-
     @classmethod
     def _get_registration_rules(cls, *, partitioner_type: PartitionerType) -> Iterable:
         if partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from cls._default_single_partition_partitioner_rules
+            yield from single_partition_field_sets_by_file_partitioner_rules(cls)
             partitioner_type = PartitionerType.CUSTOM
 
         yield from super()._get_registration_rules(partitioner_type=partitioner_type)
