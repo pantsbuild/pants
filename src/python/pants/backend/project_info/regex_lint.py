@@ -339,4 +339,4 @@ async def lint_with_regex_patterns(
 
 
 def rules():
-    return (*collect_rules(), *RegexLintRequest.registration_rules())
+    return (*collect_rules(), *RegexLintRequest.rules())

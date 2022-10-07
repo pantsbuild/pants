@@ -140,6 +140,6 @@ async def run_flake8(
 def rules():
     return [
         *collect_rules(),
-        *Flake8Request.registration_rules(),
+        *Flake8Request.rules(),
         *pex.rules(),
     ]

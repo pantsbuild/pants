@@ -200,9 +200,7 @@ def fmt_rule_runner(
             *collect_rules(),
             *source_files.rules(),
             *fmt_rules(),
-            *itertools.chain.from_iterable(
-                request_type.registration_rules() for request_type in request_types
-            ),
+            *itertools.chain.from_iterable(request_type.rules() for request_type in request_types),
         ],
         target_types=target_types,
     )
@@ -474,11 +472,10 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     class FmtKitchenRequest(FmtTargetsRequest):
         field_set_type = kitchen_field_set_type
         tool_subsystem = KitchenSubsystem
+        partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     rules = [
-        *FmtKitchenRequest._get_registration_rules(
-            partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
-        ),
+        *FmtKitchenRequest._get_rules(),
         QueryRule(Partitions, [FmtKitchenRequest.PartitionRequest]),
     ]
     rule_runner = RuleRunner(rules=rules)

@@ -213,6 +213,6 @@ async def run_pylint(
 def rules():
     return [
         *collect_rules(),
-        *PylintRequest.registration_rules(),
+        *PylintRequest.rules(),
         *pex_from_targets.rules(),
     ]

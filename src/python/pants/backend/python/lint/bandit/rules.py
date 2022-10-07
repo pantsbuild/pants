@@ -104,4 +104,4 @@ async def bandit_lint(
 
 
 def rules():
-    return [*collect_rules(), *BanditRequest.registration_rules(), *pex.rules()]
+    return [*collect_rules(), *BanditRequest.rules(), *pex.rules()]

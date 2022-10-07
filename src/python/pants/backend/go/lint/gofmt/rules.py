@@ -37,6 +37,7 @@ class GofmtFieldSet(FieldSet):
 class GofmtRequest(FmtTargetsRequest):
     field_set_type = GofmtFieldSet
     tool_subsystem = GofmtSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with gofmt")
@@ -66,5 +67,5 @@ def rules():
     return [
         *collect_rules(),
         *goroot.rules(),
-        *GofmtRequest.registration_rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+        *GofmtRequest.rules(),
     ]
