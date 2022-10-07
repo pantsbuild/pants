@@ -115,7 +115,6 @@ async def run_spectral(
 def rules():
     return [
         *collect_rules(),
-        *SpectralRequest.registration_rules(),
         *SpectralRequest.registration_rules(
             partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION
         ),
