@@ -97,7 +97,7 @@ async def bandit_lint(
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.from_fallible_process_result(
         result,
-        partition_description=str(sorted(str(c) for c in interpreter_constraints)),
+        partition_description=request.key.description,
         linter_name=Bandit.options_scope,
         report=report,
     )
