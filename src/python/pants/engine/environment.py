@@ -8,6 +8,8 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 
+LOCAL_ENVIRONMENT_MATCHER = "__local__"
+
 
 @dataclass(frozen=True)
 class EnvironmentName(EngineAwareParameter):
@@ -23,6 +25,13 @@ class EnvironmentName(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return f"environment:{self.val}" if self.val else None
+
+
+@dataclass(frozen=True)
+class ChosenLocalEnvironmentName:
+    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
+
+    val: EnvironmentName
 
 
 def __getattr__(name):

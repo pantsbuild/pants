@@ -11,6 +11,8 @@ from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple,
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER as LOCAL_ENVIRONMENT_MATCHER
+from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEnvironmentName
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
@@ -75,8 +77,6 @@ class EnvironmentsSubsystem(Subsystem):
 # -------------------------------------------------------------------------------------------
 # Environment targets
 # -------------------------------------------------------------------------------------------
-
-LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
 class EnvironmentField(StringField):
@@ -364,13 +364,6 @@ class NoFallbackEnvironmentError(Exception):
 
 class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment names to their corresponding environment target."""
-
-
-@dataclass(frozen=True)
-class ChosenLocalEnvironmentName:
-    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
-
-    val: EnvironmentName
 
 
 @dataclass(frozen=True)
