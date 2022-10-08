@@ -216,11 +216,7 @@ pub struct Builder<R: Rule> {
 }
 
 impl<R: Rule> Builder<R> {
-  pub fn new(
-    rules: IndexSet<R>,
-    mut queries: IndexSet<Query<R::TypeId>>,
-    query_inputs_filter: ParamTypes<R::TypeId>,
-  ) -> Builder<R> {
+  pub fn new(rules: IndexSet<R>, mut queries: IndexSet<Query<R::TypeId>>) -> Builder<R> {
     // Extend the Queries with those assumed by Reentry nodes.
     queries.extend(rules.iter().flat_map(|rule| {
       rule
@@ -228,20 +224,6 @@ impl<R: Rule> Builder<R> {
         .into_iter()
         .filter_map(|dk| dk.as_reentry_query())
     }));
-
-    // Filter the given types out of all queries. This facility is used to conditionally allow a
-    // type to be provided as a singleton rather than as a parameter.
-    queries = queries
-      .into_iter()
-      .map(|q| {
-        Query::new(
-          q.product,
-          q.params
-            .into_iter()
-            .filter(|p| !query_inputs_filter.contains(p)),
-        )
-      })
-      .collect();
 
     // Group rules by product/return type.
     let mut rules_by_type = BTreeMap::new();

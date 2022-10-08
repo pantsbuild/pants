@@ -300,8 +300,6 @@ class RuleRunner:
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
-                # TODO: Remove this facility.
-                query_inputs_filter=(),
             ).scheduler
         )
 
