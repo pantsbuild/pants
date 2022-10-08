@@ -471,7 +471,7 @@ def test_streaming_output_skip() -> None:
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message="demo_test:demo_test skipped.",
+        expected_message="skipped.",
     )
 
 
@@ -482,19 +482,15 @@ def test_streaming_output_success() -> None:
     assert_success_streamed(
         expected_message=dedent(
             """\
-            demo_test:demo_test succeeded.
+            succeeded.
             stdout
             stderr
 
             """
         ),
     )
-    assert_success_streamed(
-        output_setting=ShowOutput.FAILED, expected_message="demo_test:demo_test succeeded."
-    )
-    assert_success_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test succeeded."
-    )
+    assert_success_streamed(output_setting=ShowOutput.FAILED, expected_message="succeeded.")
+    assert_success_streamed(output_setting=ShowOutput.NONE, expected_message="succeeded.")
 
 
 def test_streaming_output_failure() -> None:
@@ -503,7 +499,7 @@ def test_streaming_output_failure() -> None:
     )
     message = dedent(
         """\
-        demo_test:demo_test failed (exit code 1).
+        failed (exit code 1).
         stdout
         stderr
 
@@ -512,7 +508,7 @@ def test_streaming_output_failure() -> None:
     assert_failure_streamed(expected_message=message)
     assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
     assert_failure_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test failed (exit code 1)."
+        output_setting=ShowOutput.NONE, expected_message="failed (exit code 1)."
     )
 
 

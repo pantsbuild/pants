@@ -21,8 +21,8 @@ class EnvironmentName(EngineAwareParameter):
 
     val: str | None
 
-    def debug_hint(self) -> str:
-        return self.val or "<none>"
+    def debug_hint(self) -> str | None:
+        return f"environment:{self.val}" if self.val else None
 
 
 def __getattr__(name):

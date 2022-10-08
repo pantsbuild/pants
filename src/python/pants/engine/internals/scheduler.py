@@ -488,29 +488,13 @@ class SchedulerSession:
 
     def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
-
-        if self._scheduler.include_trace_on_error:
-            throw = throws[0]
-            etb = throw.engine_traceback
-            python_traceback_str = throw.python_traceback or ""
-            engine_traceback_str = ""
-            others_msg = f"\n(and {len(throws) - 1} more)" if len(throws) > 1 else ""
-            if etb:
-                sep = "\n  in "
-                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n"
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n"
-                f"{engine_traceback_str}"
-                f"{python_traceback_str}"
-                f"{others_msg}",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
-        else:
-            exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n  {exception_strs}\n",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
+        others_msg = f"\n(and {len(throws) - 1} more)\n" if len(throws) > 1 else ""
+        raise ExecutionError(
+            f"{exception_noun} encountered:\n\n"
+            f"{throws[0].render(self._scheduler.include_trace_on_error)}\n"
+            f"{others_msg}",
+            wrapped_exceptions=tuple(t.exc for t in throws),
+        )
 
     def execute(self, execution_request: ExecutionRequest) -> list[Any]:
         """Invoke the engine for the given ExecutionRequest, returning successful values or raising.

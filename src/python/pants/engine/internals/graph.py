@@ -1141,7 +1141,7 @@ async def _fill_parameters(
     )
 
 
-@rule(desc="Resolve direct dependencies")
+@rule(desc="Resolve direct dependencies of target")
 async def resolve_dependencies(
     request: DependenciesRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
