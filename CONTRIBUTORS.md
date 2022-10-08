@@ -78,6 +78,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Evgeny Kravchenko
 + Fatin H
 + Fedor Korotkov
 + Fiona Condone
