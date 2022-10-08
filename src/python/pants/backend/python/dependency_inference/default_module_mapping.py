@@ -130,6 +130,7 @@ DEFAULT_MODULE_MAPPING = {
     "scikit-image": ("skimage",),
     "scikit-learn": ("sklearn",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
+    "snowflake-connector-python": ("snowflake.connector",),
     "streamlit-aggrid": ("st_aggrid",),
     "opensearch-py": ("opensearchpy",),
 }
