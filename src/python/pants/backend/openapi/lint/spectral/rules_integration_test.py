@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -63,7 +64,7 @@ def run_spectral(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        Partitions[SpectralFieldSet],
+        Partitions[Any, SpectralFieldSet],
         [SpectralRequest.PartitionRequest(tuple(SpectralFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
