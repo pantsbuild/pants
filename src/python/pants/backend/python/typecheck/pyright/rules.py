@@ -47,7 +47,10 @@ async def pyright_typecheck(request: PyrightRequest, pyright: Pyright) -> CheckR
         Process,
         NpxProcess(
             npm_package=pyright.default_version,
-            args=(*source_files.snapshot.files,),
+            args=(
+                *pyright.args,  # User-added arguments
+                *source_files.snapshot.files,
+            ),
             input_digest=source_files.snapshot.digest,
             description=f"Run Pyright on {pluralize(len(source_files.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
