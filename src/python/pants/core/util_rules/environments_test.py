@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
-        singleton_environment=None,
+        inherent_environment=None,
     )
 
 

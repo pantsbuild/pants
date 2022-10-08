@@ -133,9 +133,9 @@ def test_complete_env_vars() -> None:
 
 def test_docker_complete_env_vars() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(CompleteEnvironmentVars, [])],
+        rules=[QueryRule(CompleteEnvironmentVars, [EnvironmentName])],
         target_types=[DockerEnvironmentTarget],
-        singleton_environment=EnvironmentName("docker"),
+        inherent_environment=EnvironmentName("docker"),
     )
     rule_runner.write_files(
         {

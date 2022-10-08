@@ -45,7 +45,6 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
-from pants.engine.rules import rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
@@ -69,6 +68,7 @@ from pants.util.dirutil import (
     safe_open,
 )
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -210,7 +210,7 @@ class RuleRunner:
         bootstrap_args: Iterable[str] = (),
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
-        singleton_environment: EnvironmentName | None = EnvironmentName(None),
+        inherent_environment: EnvironmentName | None = EnvironmentName(None),
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -231,20 +231,19 @@ class RuleRunner:
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
 
-        @rule
-        def environment_name_singleton() -> EnvironmentName:
-            assert singleton_environment is not None
-            return singleton_environment
+        def rewrite_rule_for_inherent_environment(rule):
+            if not inherent_environment or not isinstance(rule, QueryRule):
+                return rule
+            return QueryRule(rule.output_type, OrderedSet((*rule.input_types, EnvironmentName)))
 
         # TODO: Redesign rule registration for tests to be more ergonomic and to make this less
         #  special-cased.
-        self.rules = tuple(rules or ())
+        self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
             *self.rules,
             *source_root.rules(),
-            *([] if singleton_environment is None else [environment_name_singleton]),
-            QueryRule(WrappedTarget, [WrappedTargetRequest, EnvironmentName]),
-            QueryRule(AllTargets, [EnvironmentName]),
+            QueryRule(WrappedTarget, [WrappedTargetRequest]),
+            QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
         build_config_builder = BuildConfiguration.Builder()
@@ -260,6 +259,7 @@ class RuleRunner:
         self.environment = CompleteEnvironmentVars({})
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         self.extra_session_values = extra_session_values or {}
+        self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
         options = self.options_bootstrapper.full_options(
             self.build_config,
@@ -283,11 +283,6 @@ class RuleRunner:
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
-        # TODO: When installed, this has the effect of filtering the EnvironmentName out of all
-        # QueryRules (even those created synthetically in the RuleGraph), which allows the
-        # EnvironmentName to be provided as a singleton instead.
-        query_inputs_filter = [] if singleton_environment is None else [EnvironmentName]
-
         self._set_new_session(
             EngineInitializer.setup_graph_extended(
                 pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
@@ -305,7 +300,8 @@ class RuleRunner:
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
-                query_inputs_filter=query_inputs_filter,
+                # TODO: Remove this facility.
+                query_inputs_filter=(),
             ).scheduler
         )
 
@@ -343,9 +339,12 @@ class RuleRunner:
         self.scheduler = self.scheduler.scheduler.new_session(build_id)
 
     def request(self, output_type: type[_O], inputs: Iterable[Any]) -> _O:
-        result = assert_single_element(
-            self.scheduler.product_request(output_type, [Params(*inputs)])
+        params = (
+            Params(*inputs, self.inherent_environment)
+            if self.inherent_environment
+            else Params(*inputs)
         )
+        result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -377,6 +376,7 @@ class RuleRunner:
                 specs,
                 console,
                 Workspace(self.scheduler),
+                *([self.inherent_environment] if self.inherent_environment else []),
             ),
         )
 
