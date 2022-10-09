@@ -42,6 +42,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDige
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.util.logging import LogLevel
 
 _logger = logging.getLogger(__name__)
 
@@ -349,6 +350,7 @@ async def _cc(
         input_digest=input_digest,
         output_files=(obj_file,),
         description=description,
+        level=LogLevel.DEBUG,
     )
 
 
@@ -384,6 +386,7 @@ async def _gccld(
             input_digest=input_digest,
             output_files=(outfile,),
             description=description,
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -411,6 +414,7 @@ class _DynImportResult:
 # Note: Commented-out Go code remains in this function because it was not clear yet how to adapt that code.
 @rule_helper
 async def _dynimport(
+    import_path: str,
     input_digest: Digest,
     obj_files: Iterable[str],
     obj_dir_path: str,
@@ -429,7 +433,7 @@ async def _dynimport(
         src_file=os.path.join(obj_dir_path, "_cgo_main.c"),
         flags=cflags,
         obj_file=os.path.join(obj_dir_path, "_cgo_main.o"),
-        description="Compile _cgo_main.c",
+        description=f"Compile _cgo_main.c ({import_path})",
         golang_env_aware=golang_env_aware,
     )
     cgo_main_compile_result = await Get(ProcessResult, Process, cgo_main_compile_process)
@@ -465,7 +469,7 @@ async def _dynimport(
         outfile=dynobj,
         flags=ldflags,
         objs=[*obj_files, os.path.join(obj_dir_path, "_cgo_main.o")],
-        description="Link _cgo_.o",
+        description=f"Link _cgo_.o ({import_path})",
     )
     if cgo_binary_link_result.exit_code != 0:
         # From `go` source:
@@ -506,7 +510,7 @@ async def _dynimport(
             outfile=dynobj,
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
             objs=obj_files,
-            description="Link _cgo_.o",
+            description=f"Link _cgo_.o ({import_path})",
         )
         if cgo_binary_link_result.exit_code != 0:
             raise ValueError(
@@ -845,6 +849,7 @@ async def cgo_compile_request(
         ),
     )
     dynimport_result = await _dynimport(
+        import_path=request.import_path,
         input_digest=dynimport_input_digest,
         obj_files=out_obj_files,
         obj_dir_path=obj_dir_path,
