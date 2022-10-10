@@ -13,7 +13,7 @@ from pants.core.util_rules.environments import (
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -25,19 +25,14 @@ def current_platform(
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
 ) -> Platform:
+    if environments_subsystem.remote_execution_used_globally(global_options):
+        return Platform.linux_x86_64
+
     if env_tgt.val:
         if env_tgt.val.has_field(DockerPlatformField):
             return Platform(env_tgt.val[DockerPlatformField].normalized_value)
         if env_tgt.val.has_field(RemotePlatformField):
             return Platform(env_tgt.val[RemotePlatformField].value)
-        # Else, it's a local environment.
-        return Platform.create_for_localhost()
-
-    # If the environments mechanism is not used, fall back to legacy behavior of
-    # `--remote-execution` being a global toggle.
-    if not environments_subsystem.names and global_options.remote_execution:
-        return Platform.linux_x86_64
-
     return Platform.create_for_localhost()
 
 
@@ -64,9 +59,7 @@ async def complete_environment_vars(
             # Else, it's a local environment.
             return session_values[CompleteEnvironmentVars]
     else:
-        # If the environments mechanism is not used, fall back to legacy behavior of
-        # `--remote-execution` being a global toggle.
-        if not environments_subsystem.names and global_options.remote_execution:
+        if environments_subsystem.remote_execution_used_globally(global_options):
             description_of_env_source = "the remote execution environment"
         else:
             return session_values[CompleteEnvironmentVars]

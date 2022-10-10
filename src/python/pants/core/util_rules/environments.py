@@ -73,6 +73,11 @@ class EnvironmentsSubsystem(Subsystem):
         )
     )
 
+    def remote_execution_used_globally(self, global_options: GlobalOptions) -> bool:
+        """If the environments mechanism is not used, `--remote-execution` toggles remote execution
+        globally."""
+        return not self.names and global_options.remote_execution
+
 
 # -------------------------------------------------------------------------------------------
 # Environment targets
@@ -697,9 +702,7 @@ async def extract_process_config_from_environment(
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
 
-    # If the environments mechanism is not used, fall back to legacy behavior of
-    # `--remote-execution` being a global toggle.
-    if not environments_subsystem.names and global_options.remote_execution:
+    if environments_subsystem.remote_execution_used_globally(global_options):
         remote_execution = True
         raw_remote_execution_extra_platform_properties = (
             global_options.remote_execution_extra_platform_properties
