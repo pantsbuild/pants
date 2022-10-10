@@ -14,7 +14,11 @@ from typing import Any, ClassVar, Optional, TypeVar, cast
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentName, EnvironmentNameRequest
+from pants.core.util_rules.environments import (
+    ChosenLocalEnvironmentName,
+    EnvironmentName,
+    EnvironmentNameRequest,
+)
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -429,6 +433,7 @@ class TestSubsystem(GoalSubsystem):
 
 class Test(Goal):
     subsystem_cls = TestSubsystem
+    environment_migrated = True
 
     __test__ = False
 
@@ -485,6 +490,7 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
 async def _run_debug_tests(
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
@@ -496,11 +502,19 @@ async def _run_debug_tests(
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
     )
+    # TODO: Because these are interactive, they are always pinned to the local environment.
+    # See https://github.com/pantsbuild/pants/issues/17182
     debug_requests = await MultiGet(
         (
-            Get(TestDebugRequest, TestFieldSet, field_set)
+            Get(
+                TestDebugRequest,
+                {field_set: TestFieldSet, local_environment_name.val: EnvironmentName},
+            )
             if not test_subsystem.debug_adapter
-            else Get(TestDebugAdapterRequest, TestFieldSet, field_set)
+            else Get(
+                TestDebugAdapterRequest,
+                {field_set: TestFieldSet, local_environment_name.val: EnvironmentName},
+            )
         )
         for field_set in targets_to_valid_field_sets.field_sets
     )
@@ -517,7 +531,11 @@ async def _run_debug_tests(
             )
 
         debug_result = await Effect(
-            InteractiveProcessResult, InteractiveProcess, debug_request.process
+            InteractiveProcessResult,
+            {
+                debug_request.process: InteractiveProcess,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         if debug_result.exit_code != 0:
             exit_code = debug_result.exit_code
@@ -533,9 +551,10 @@ async def run_tests(
     union_membership: UnionMembership,
     distdir: DistDir,
     run_id: RunId,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
     if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(test_subsystem, debug_adapter)
+        return await _run_debug_tests(test_subsystem, debug_adapter, local_environment_name)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
@@ -608,7 +627,13 @@ async def run_tests(
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(
-            Get(CoverageReports, CoverageDataCollection, coverage_collection)
+            Get(
+                CoverageReports,
+                {
+                    coverage_collection: CoverageDataCollection,
+                    local_environment_name.val: EnvironmentName,
+                },
+            )
             for coverage_collection in coverage_collections
         )
 
@@ -622,7 +647,10 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                _ = await Effect(InteractiveProcessResult, InteractiveProcess, process)
+                _ = await Effect(
+                    InteractiveProcessResult,
+                    {process: InteractiveProcess, local_environment_name.val: EnvironmentName},
+                )
 
         for coverage_reports in coverage_reports_collections:
             if coverage_reports.coverage_insufficient:

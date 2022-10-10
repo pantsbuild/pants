@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Tuple
 
+from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentName
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -35,13 +36,21 @@ class OpenFiles:
 @rule
 async def find_open_program(
     request: OpenFilesRequest,
-    plat: Platform,
-    complete_env: CompleteEnvironmentVars,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> OpenFiles:
+    plat, complete_env = await MultiGet(
+        Get(Platform, EnvironmentName, local_environment_name.val),
+        Get(CompleteEnvironmentVars, EnvironmentName, local_environment_name.val),
+    )
     open_program_name = "open" if plat.is_macos else "xdg-open"
     open_program_paths = await Get(
         BinaryPaths,
-        BinaryPathRequest(binary_name=open_program_name, search_path=("/bin", "/usr/bin")),
+        {
+            BinaryPathRequest(
+                binary_name=open_program_name, search_path=("/bin", "/usr/bin")
+            ): BinaryPathRequest,
+            local_environment_name.val: EnvironmentName,
+        },
     )
     if not open_program_paths.first_path:
         error = (

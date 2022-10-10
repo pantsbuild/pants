@@ -133,7 +133,7 @@ def single_target_run(
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
+                    input_types=(InteractiveProcess,),
                     mock=rule_runner.run_interactive_process,
                 ),
             ],
