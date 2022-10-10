@@ -13,7 +13,7 @@ from pants.core.util_rules.environments import (
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult, ProcessCacheScope
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
