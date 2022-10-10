@@ -59,19 +59,23 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
     }
+    locals: dict[str, Any] = {}
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
             content = compile(file_content_str, file_content.path, "exec")
-            exec(content, globals)
+            exec(content, globals, locals)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
         error_on_imports(file_content_str, file_content.path)
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
-    globals.pop("__builtins__", None)
-    return BuildFilePreludeSymbols(FrozenDict(globals))
+    locals.pop("__builtins__", None)
+    # Ensure preludes can reference each other by populating the shared globals object with references
+    # to the other symbols
+    globals.update(locals)
+    return BuildFilePreludeSymbols(FrozenDict(locals))
 
 
 @rule
