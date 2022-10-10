@@ -9,6 +9,40 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `EnvironmentName` is now required to run processes, get environment variables, etc
+
+In order to support the new [environments](doc:environments) feature, an `EnvironmentName` parameter
+is now required in order to:
+* Run a `Process`
+* Get environment variables
+* Inspect the current `Platform`
+
+Some deprecations are in place to reduce the burden on `@rule` authors:
+
+#### `Goal.environment_migrated`
+
+The `Goal` class has an `environment_migrated` property, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. When `environment_migrated=False` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName`.
+
+To migrate a `Goal`, set `environment_migrated=True`, select an `EnvironmentName` to use for (different portions of) your `Goal`, and then provide the `EnvironmentName` to the relevant callsites. In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+```python
+Get(
+    EnvironmentName,
+    EnvironmentNameRequest,
+    EnvironmentNameRequest.from_field_set(field_set),
+)
+```
+If rather than using the environment configured by a target your `Goal` should always be pinned to run in the local environment, you can instead request the `ChosenLocalEnvironmentName` and use its content as the `EnvironmentName`.
+
+Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
+```python
+Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
+```
+The multi-parameter `Get` syntax provides the value transitively, and so will need to be used in many `Get` callsites in `@goal_rule`s which transitively run processes, consume the platform, etc. One exception is that (most of) the APIs provided by `pants.engine.target` are pinned to running in the `__local__` environment, and so do not require an `EnvironmentName` to use.
+
+#### `RuleRunner.inherent_environment`
+
+To reduce the number of changes necessary in tests, the `RuleRunner.inherent_environment` argument defaults to injecting an `EnvironmentName` when running `@rule`s in tests.
+
 ### `platform` kwarg for `Process` deprecated
 
 Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
