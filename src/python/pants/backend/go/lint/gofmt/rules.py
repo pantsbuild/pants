@@ -45,7 +45,8 @@ async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtRe
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
-        *request.files,
+        # Filter out non-.go files, e.g. assembly sources, from the file list.
+        *(f for f in request.files if f.endswith(".go")),
     )
     result = await Get(
         ProcessResult,
