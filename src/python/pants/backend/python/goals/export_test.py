@@ -96,10 +96,11 @@ def test_export_venv_pipified(
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                "--remove=all",
+                "--remove=pex",
                 f"{{digest_root}}/{current_interpreter}",
             )
-            assert ppc0.extra_env == FrozenDict({"PEX_MODULE": "pex.tools"})
+            assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
+            assert ppc0.extra_env.get("PEX_ROOT") is not None
 
             ppc1 = result.post_processing_cmds[1]
             assert ppc1.argv == (
