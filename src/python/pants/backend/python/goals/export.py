@@ -188,7 +188,7 @@ async def do_export(
                             "venv",
                             "--pip",
                             "--collisions-ok",
-                            "--remove=all",
+                            "--remove=pex",
                             output_path,
                         ],
                         python=requirements_pex.python,
