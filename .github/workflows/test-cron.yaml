@@ -52,7 +52,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -63,8 +63,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -72,7 +72,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - id: get-engine-hash
@@ -84,7 +84,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -123,7 +123,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -195,7 +195,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -206,8 +206,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -215,7 +215,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - id: get-engine-hash
@@ -227,7 +227,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -266,7 +266,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -342,7 +342,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -431,7 +431,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -520,7 +520,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -609,7 +609,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -684,7 +684,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
