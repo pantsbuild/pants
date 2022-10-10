@@ -42,12 +42,11 @@ class GofmtRequest(FmtTargetsRequest):
 
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtResult:
-    # Filter out non-.go files, e.g. assembly sources, from the file list.
-    files = [f for f in request.files if f.endswith(".go")]
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
-        *files,
+        # Filter out non-.go files, e.g. assembly sources, from the file list.
+        *(f for f in request.files if f.endswith(".go")),
     )
     result = await Get(
         ProcessResult,
