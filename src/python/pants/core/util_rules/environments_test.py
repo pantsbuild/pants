@@ -64,6 +64,7 @@ def rule_runner() -> RuleRunner:
 def test_extract_process_config_from_environment() -> None:
     def assert_config(
         *,
+        envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         enable_remote_execution: bool,
         expected_remote_execution: bool,
@@ -75,9 +76,18 @@ def test_extract_process_config_from_environment() -> None:
             remote_execution=enable_remote_execution,
             remote_execution_extra_platform_properties=["global_k=v"],
         )
+        env_subsystem = create_subsystem(
+            EnvironmentsSubsystem,
+            names={"name": "addr"} if envs_enabled else {},
+        )
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
-            rule_args=[EnvironmentTarget(env_tgt), Platform.linux_arm64, global_options],
+            rule_args=[
+                EnvironmentTarget(env_tgt),
+                Platform.linux_arm64,
+                global_options,
+                env_subsystem,
+            ],
             mock_gets=[
                 MockGet(
                     output_type=DockerResolveImageResult,
@@ -105,10 +115,18 @@ def test_extract_process_config_from_environment() -> None:
     )
     assert_config(
         env_tgt=None,
+        envs_enabled=False,
         enable_remote_execution=True,
         expected_remote_execution=True,
         expected_docker_image=None,
         expected_remote_execution_extra_platform_properties=[("global_k", "v")],
+    )
+    assert_config(
+        env_tgt=None,
+        envs_enabled=True,
+        enable_remote_execution=True,
+        expected_remote_execution=False,
+        expected_docker_image=None,
     )
 
     for re in (False, True):
