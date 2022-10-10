@@ -30,23 +30,23 @@ def __getattr__(name):
         return EnvironmentName
     if name == "CompleteEnvironment":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.CompleteEnvironment`",
-            "Use `pants.engine.env_vars.CompleteEnvironmentVars",
+            "Use `pants.engine.env_vars.CompleteEnvironmentVars`.",
         )
         return CompleteEnvironmentVars
     if name == "EnvironmentRequest":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.EnvironmentRequest`",
-            "Use `pants.engine.env_vars.EnvironmentVarsRequest",
+            "Use `pants.engine.env_vars.EnvironmentVarsRequest`.",
         )
         return EnvironmentVarsRequest
     if name == "Environment":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.Environment`",
-            "Use `pants.engine.env_vars.EnvironmentVars",
+            "Use `pants.engine.env_vars.EnvironmentVars`.",
         )
         return EnvironmentVars
     raise AttributeError(name)
