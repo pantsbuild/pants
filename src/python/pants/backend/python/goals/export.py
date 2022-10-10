@@ -181,16 +181,18 @@ async def do_export(
             digest=merged_digest,
             post_processing_cmds=[
                 PostProcessingCommand(
-                    [
-                        requirements_pex.python.path,
+                    complete_pex_env.create_argv(
                         os.path.join(pex_pex_dest, pex_pex.exe),
-                        os.path.join("{digest_root}", requirements_pex.name),
-                        "venv",
-                        "--pip",
-                        "--collisions-ok",
-                        "--remove=all",
-                        output_path,
-                    ],
+                        *[
+                            os.path.join("{digest_root}", requirements_pex.name),
+                            "venv",
+                            "--pip",
+                            "--collisions-ok",
+                            "--remove=all",
+                            output_path,
+                        ],
+                        python=requirements_pex.python,
+                    ),
                     {
                         **complete_pex_env.environment_dict(python_configured=True),
                         "PEX_MODULE": "pex.tools",
