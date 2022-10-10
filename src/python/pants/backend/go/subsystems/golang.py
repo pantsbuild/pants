@@ -203,8 +203,7 @@ class GolangSubsystem(Subsystem):
     )
 
     cgo_enabled = BoolOption(
-        "--cgo-enabled",
-        default=False,
+        default=True,
         help=softwrap(
             """\
             Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
