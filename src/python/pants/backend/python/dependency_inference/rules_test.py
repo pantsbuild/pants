@@ -716,7 +716,11 @@ class TestCategoriseImportsInfo:
             self.address,
             owners_per_import,
             parsed_imports,
-            ExplicitlyProvidedDependencies(self.address, FrozenOrderedSet(), FrozenOrderedSet()),
+            ExplicitlyProvidedDependencies(
+                self.address,
+                FrozenOrderedSet(),
+                FrozenOrderedSet((Address("ambiguous_disambiguatable", target_name="bad"),)),
+            ),
         )
 
         assert len(resolve_result) == 1 and case_name in resolve_result
@@ -759,43 +763,10 @@ class TestCategoriseImportsInfo:
 
     def test_ambiguous_disambiguatable(self):
         case_name = "ambiguous_disambiguatable"
-
-        owners_per_import, parsed_imports = self.separate_owners_and_imports(
-            self.filter_case(case_name)
-        )
-        resolve_result = _get_imports_info(
-            self.address,
-            owners_per_import,
-            parsed_imports,
-            ExplicitlyProvidedDependencies(
-                self.address,
-                FrozenOrderedSet(),
-                FrozenOrderedSet((Address("ambiguous_disambiguatable", target_name="bad"),)),
-            ),
-        )
-        assert len(resolve_result) == 1 and case_name in resolve_result
-        resolved = resolve_result[case_name]
-        assert resolved.status == ImportOwnerStatus.disambiguated
-
+        resolved = self.do_test(case_name, ImportOwnerStatus.disambiguated)
         assert resolved.address == (self.import_cases[case_name][1].ambiguous[0],)
 
     def test_ambiguous_not_disambiguatable(self):
         case_name = "ambiguous_terminal"
-
-        owners_per_import, parsed_imports = self.separate_owners_and_imports(
-            self.filter_case(case_name)
-        )
-        resolve_result = _get_imports_info(
-            self.address,
-            owners_per_import,
-            parsed_imports,
-            ExplicitlyProvidedDependencies(
-                self.address,
-                FrozenOrderedSet(),
-                FrozenOrderedSet(),
-            ),
-        )
-        assert len(resolve_result) == 1 and case_name in resolve_result
-        resolved = resolve_result[case_name]
-        assert resolved.status == ImportOwnerStatus.unowned
+        resolved = self.do_test(case_name, ImportOwnerStatus.unowned)
         assert resolved.address == ()
