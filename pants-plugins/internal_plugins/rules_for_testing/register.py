@@ -16,6 +16,7 @@ class ListAndDieForTestingSubsystem(GoalSubsystem):
 
 class ListAndDieForTesting(Goal):
     subsystem_cls = ListAndDieForTestingSubsystem
+    environment_migrated = True
 
 
 @goal_rule
