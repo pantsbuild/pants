@@ -55,7 +55,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -64,20 +64,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -200,7 +191,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -209,20 +200,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -415,7 +397,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -424,20 +406,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS10-15-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS10-15-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - env:
         ARCHFLAGS: -arch x86_64
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
@@ -519,7 +492,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -528,20 +501,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-ARM64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-ARM64-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -658,7 +622,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -667,20 +631,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - env:
         ARCHFLAGS: -arch x86_64
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
