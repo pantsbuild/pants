@@ -11,8 +11,8 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceField,
 )
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform

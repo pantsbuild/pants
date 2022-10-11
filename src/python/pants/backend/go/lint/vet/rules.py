@@ -18,7 +18,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.goals.partitions import PartitionerType
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet

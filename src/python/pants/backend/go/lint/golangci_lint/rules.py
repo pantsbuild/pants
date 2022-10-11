@@ -17,9 +17,9 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests

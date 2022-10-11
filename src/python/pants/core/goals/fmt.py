@@ -18,9 +18,9 @@ from pants.core.goals.lint import (
     _get_partitions_by_request_type,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
-from pants.core.goals.partitions import PartitionerType, PartitionKeyT
-from pants.core.goals.partitions import Partitions as UntypedPartitions
-from pants.core.goals.partitions import _single_partition_field_sets_by_file_partitioner_rules
+from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as UntypedPartitions
+from pants.core.util_rules.partitions import _single_partition_field_sets_by_file_partitioner_rules
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType

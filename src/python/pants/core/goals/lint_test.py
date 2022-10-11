@@ -23,8 +23,8 @@ from pants.core.goals.lint import (
     Partitions,
     lint,
 )
-from pants.core.goals.partitions import PartitionerType
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot

@@ -18,15 +18,15 @@ from pants.core.goals.multi_tool_goal_helper import (
     determine_specified_tool_names,
     write_reports,
 )
-from pants.core.goals.partitions import PartitionElementT, PartitionerType, PartitionKeyT
-from pants.core.goals.partitions import Partitions as Partitions  # re-export
-from pants.core.goals.partitions import (
+from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
+from pants.core.util_rules.partitions import (
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
     _single_partition_field_sets_partitioner_rules,
     _SubPartitionBase,
 )
-from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
