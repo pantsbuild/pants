@@ -539,14 +539,10 @@ class RuleRunner:
 
 
 @dataclass(frozen=True)
-class MockEffect(Generic[_O, _I]):
+class MockEffect(Generic[_O]):
     output_type: type[_O]
-    input_type: type[_I]
-    mock: Callable[[_I], _O]
-
-    @property
-    def input_types(self) -> tuple[type, ...]:
-        return (self.input_type,)
+    input_types: tuple[type, ...]
+    mock: Callable[..., _O]
 
 
 @dataclass(frozen=True)

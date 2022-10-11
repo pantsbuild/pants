@@ -37,7 +37,7 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
@@ -199,7 +199,9 @@ def run_test_rule(
             return TargetRootsToFieldSets({})
         return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
 
-    def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
+    def mock_debug_request(
+        _field_set: TestFieldSet, _environment_name: EnvironmentName
+    ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
     def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
@@ -209,6 +211,7 @@ def run_test_rule(
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
+        _: EnvironmentName,
     ) -> CoverageReports:
         addresses = ", ".join(
             coverage_data.address.spec for coverage_data in coverage_data_collection
@@ -229,6 +232,7 @@ def run_test_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
                 run_id,
+                ChosenLocalEnvironmentName(EnvironmentName(None)),
             ],
             mock_gets=[
                 MockGet(
@@ -248,7 +252,7 @@ def run_test_rule(
                 ),
                 MockGet(
                     output_type=TestDebugRequest,
-                    input_types=(TestFieldSet,),
+                    input_types=(TestFieldSet, EnvironmentName),
                     mock=mock_debug_request,
                 ),
                 MockGet(
@@ -264,7 +268,7 @@ def run_test_rule(
                 ),
                 MockGet(
                     output_type=CoverageReports,
-                    input_types=(CoverageDataCollection,),
+                    input_types=(CoverageDataCollection, EnvironmentName),
                     mock=mock_coverage_report_generation,
                 ),
                 MockGet(
@@ -274,8 +278,8 @@ def run_test_rule(
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
-                    mock=lambda _: InteractiveProcessResult(0),
+                    input_types=(InteractiveProcess, EnvironmentName),
+                    mock=lambda _p, _e: InteractiveProcessResult(0),
                 ),
             ],
             union_membership=union_membership,
