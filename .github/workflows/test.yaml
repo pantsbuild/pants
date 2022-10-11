@@ -372,7 +372,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
+    timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -473,7 +473,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 80
+    timeout-minutes: 120
   build_wheels_macos11_arm64:
     env:
       ARCHFLAGS: -arch arm64
@@ -613,7 +613,7 @@ jobs:
       matrix:
         python-version:
         - '3.9'
-    timeout-minutes: 60
+    timeout-minutes: 120
   build_wheels_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -716,7 +716,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 80
+    timeout-minutes: 120
   check_labels:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label

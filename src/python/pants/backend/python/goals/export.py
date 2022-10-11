@@ -134,6 +134,7 @@ async def do_export(
         else req.dest_prefix
     )
 
+    complete_pex_env = pex_env.in_workspace()
     if export_subsys.options.symlink_python_virtualenv:
         requirements_venv_pex = await Get(VenvPex, PexRequest, req.pex_request)
         py_version = await _get_full_python_version(requirements_venv_pex)
@@ -141,10 +142,9 @@ async def do_export(
         # we need some name for the symlink anyway.
         output_path = f"{{digest_root}}/{py_version}"
         description = (
-            f"Symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
+            f"symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
         )
-        complete_pex_env = pex_env.in_workspace()
         venv_abspath = os.path.join(complete_pex_env.pex_root, requirements_venv_pex.venv_rel_dir)
         return ExportResult(
             description,
@@ -161,7 +161,7 @@ async def do_export(
             f"{{digest_root}}/{py_version if req.qualify_path_with_python_version else ''}"
         )
         description = (
-            f"Mutable virtualenv for {req.resolve_name or 'requirements'} "
+            f"mutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
         )
 
@@ -181,17 +181,22 @@ async def do_export(
             digest=merged_digest,
             post_processing_cmds=[
                 PostProcessingCommand(
-                    [
-                        requirements_pex.python.path,
+                    complete_pex_env.create_argv(
                         os.path.join(pex_pex_dest, pex_pex.exe),
-                        os.path.join("{digest_root}", requirements_pex.name),
-                        "venv",
-                        "--pip",
-                        "--collisions-ok",
-                        "--remove=all",
-                        output_path,
-                    ],
-                    {"PEX_MODULE": "pex.tools"},
+                        *[
+                            os.path.join("{digest_root}", requirements_pex.name),
+                            "venv",
+                            "--pip",
+                            "--collisions-ok",
+                            "--remove=pex",
+                            output_path,
+                        ],
+                        python=requirements_pex.python,
+                    ),
+                    {
+                        **complete_pex_env.environment_dict(python_configured=True),
+                        "PEX_MODULE": "pex.tools",
+                    },
                 ),
                 # Remove the PEX pex, to avoid confusion.
                 PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
