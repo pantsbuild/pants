@@ -374,3 +374,48 @@ def test_build_file_address() -> None:
     # Generated targets should use their target generator's BUILD file.
     assert_bfa_resolved(Address("helloworld", generated_name="f.txt"))
     assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
+
+
+def test_build_files_share_globals() -> None:
+    """Test that a macro in a prelude can reference another macro in another prelude.
+
+    At some point a change was made to separate the globals/locals dict (uninentional) which has the
+    unintended side-effect of having the `__globals__` of a macro not contain references to every
+    other symbol in every other prelude.
+    """
+
+    symbols = run_rule_with_mocks(
+        evaluate_preludes,
+        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
+        mock_gets=[
+            MockGet(
+                output_type=DigestContents,
+                input_types=(PathGlobs,),
+                mock=lambda _: DigestContents(
+                    [
+                        FileContent(
+                            path="/dev/null/prelude1",
+                            content=dedent(
+                                """\
+                                def hello():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                        FileContent(
+                            path="/dev/null/prelude2",
+                            content=dedent(
+                                """\
+                                def world():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                    ]
+                ),
+            ),
+        ],
+    )
+    assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
+    assert "world" in symbols.symbols["hello"].__globals__
+    assert "hello" in symbols.symbols["world"].__globals__
