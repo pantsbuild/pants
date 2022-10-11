@@ -74,7 +74,7 @@ def run_pyupgrade(
         FmtResult,
         [
             PyUpgradeRequest.SubPartition(
-                input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
     )

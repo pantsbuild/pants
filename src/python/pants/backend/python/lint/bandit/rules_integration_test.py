@@ -67,7 +67,7 @@ def run_bandit(
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.SubPartition(subpartition, key)],
+            [BanditRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)
