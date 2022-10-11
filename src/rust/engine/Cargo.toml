@@ -127,7 +127,7 @@ futures-core = "^0.3.23"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-humansize = "1.1"
+humansize = "2.1"
 indexmap = "1.9"
 internment = "0.6"
 itertools = "0.10"
