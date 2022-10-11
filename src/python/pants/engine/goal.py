@@ -84,13 +84,12 @@ class Goal:
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
 
-    """Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
+    f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 
-    All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, so that
-    goals in plugins never need to experience this migration.
-      see https://github.com/pantsbuild/pants/issues/17129
+    All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
+    user goals have until `2.17.0.dev0` to migrate.
 
-    TODO: Expand this, fill out the plugin migration guide, and deprecate setting `False` before landing.
+    See {doc_url('plugin-upgrade-guide')}.
     """
     environment_migrated: ClassVar[bool] = False
 
