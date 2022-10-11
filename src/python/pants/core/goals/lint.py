@@ -60,12 +60,11 @@ class LintResult(EngineAwareReturnType):
     report: Digest = EMPTY_DIGEST
 
     @classmethod
-    def from_fallible_process_result(
+    def create(
         cls,
+        request: LintRequest.SubPartition,
         process_result: FallibleProcessResult,
         *,
-        linter_name: str,
-        partition_description: str | None = None,
         strip_chroot_path: bool = False,
         report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
@@ -76,8 +75,8 @@ class LintResult(EngineAwareReturnType):
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            linter_name=linter_name,
-            partition_description=partition_description,
+            linter_name=request.tool_name,
+            partition_description=request.key.description,
             report=report,
         )
 
@@ -424,7 +423,10 @@ async def lint(
 
     subpartitions = [
         request_type.SubPartition(
-            elements, key, **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {}
+            request_type.tool_name,
+            elements,
+            key,
+            **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {},
         )
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, key in batch
