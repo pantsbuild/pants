@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
@@ -16,7 +17,8 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -45,7 +47,7 @@ class GoVetRequest(LintTargetsRequest):
 
 
 @rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintResult:
+async def run_go_vet(request: GoVetRequest.SubPartition[Any, GoVetFieldSet]) -> LintResult:
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in request.elements),

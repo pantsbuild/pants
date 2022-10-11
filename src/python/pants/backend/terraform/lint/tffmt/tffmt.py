@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.terraform.partition import partition_files_by_directory
@@ -37,6 +38,15 @@ class TffmtRequest(FmtTargetsRequest):
     tool_subsystem = TfFmtSubsystem
 
 
+@dataclass(frozen=True)
+class PartitionKey:
+    directory: str
+
+    @property
+    def description(self) -> str:
+        return self.directory
+
+
 @rule
 async def partition_tffmt(
     request: TffmtRequest.PartitionRequest, tffmt: TfFmtSubsystem
@@ -49,14 +59,14 @@ async def partition_tffmt(
     )
 
     return Partitions(
-        (directory, tuple(files))
+        (PartitionKey(directory), tuple(files))
         for directory, files in partition_files_by_directory(source_files.files).items()
     )
 
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -> FmtResult:
-    directory = cast(str, request.key)
+    directory = cast(PartitionKey, request.key).directory
     result = await Get(
         ProcessResult,
         TerraformProcess(

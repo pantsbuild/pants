@@ -2,13 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
@@ -39,7 +41,7 @@ class ShellcheckRequest(LintTargetsRequest):
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(
-    request: ShellcheckRequest.SubPartition[ShellcheckFieldSet],
+    request: ShellcheckRequest.SubPartition[Any, ShellcheckFieldSet],
     shellcheck: Shellcheck,
     platform: Platform,
 ) -> LintResult:

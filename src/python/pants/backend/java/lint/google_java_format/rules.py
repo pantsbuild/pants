@@ -8,7 +8,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import PartitionerType
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get

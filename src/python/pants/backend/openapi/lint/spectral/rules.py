@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.openapi.lint.spectral.skip_field import SkipSpectralField
 from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
@@ -9,8 +10,9 @@ from pants.backend.openapi.target_types import (
     OpenApiDocumentField,
     OpenApiSourceField,
 )
-from pants.core.goals.lint import LintResult, LintTargetsRequest, PartitionerType
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
@@ -41,7 +43,7 @@ class SpectralRequest(LintTargetsRequest):
 
 @rule(desc="Lint with Spectral", level=LogLevel.DEBUG)
 async def run_spectral(
-    request: SpectralRequest.SubPartition[SpectralFieldSet],
+    request: SpectralRequest.SubPartition[Any, SpectralFieldSet],
     spectral: SpectralSubsystem,
     platform: Platform,
 ) -> LintResult:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -48,7 +49,7 @@ def run_hadolint(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        Partitions[HadolintFieldSet],
+        Partitions[Any, HadolintFieldSet],
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet
 from pants.backend.go import target_type_rules
 from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
@@ -97,7 +96,7 @@ def run_go_vet(
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
     partition = rule_runner.request(
-        Partitions[HadolintFieldSet],
+        Partitions,
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

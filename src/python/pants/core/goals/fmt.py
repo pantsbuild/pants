@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -15,11 +15,12 @@ from pants.core.goals.lint import (
     LintRequest,
     LintResult,
     LintTargetsRequest,
-    PartitionerType,
+    _get_partitions_by_request_type,
 )
-from pants.core.goals.lint import Partitions as LintPartitions
-from pants.core.goals.lint import _get_partitions_by_request_type
-from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption, SkippableSubsystem
+from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
+from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as UntypedPartitions
+from pants.core.util_rules.partitions import _single_partition_field_sets_by_file_partitioner_rules
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -28,21 +29,11 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotD
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
-from pants.engine.target import (
-    SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    _get_field_set_fields,
-)
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
-
-_F = TypeVar("_F", bound="FmtResult")
-_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +115,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = LintPartitions[str]
+Partitions = UntypedPartitions[PartitionKeyT, str]
 
 
 @union
@@ -132,7 +123,6 @@ class FmtRequest(LintRequest):
     is_formatter = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @runtime_ignore_subscripts
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class SubPartition(LintRequest.SubPartition):
@@ -150,57 +140,10 @@ class FmtRequest(LintRequest):
 
 
 class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
-    @memoized_classproperty
-    def _default_single_partition_partitioner_rules(cls) -> Iterable:
-        # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
-        # a better user experience.
-        sources_field_name = None
-        for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
-            if issubclass(fieldtype, SourcesField):
-                if sources_field_name is None:
-                    sources_field_name = fieldname
-                    break
-                raise TypeError(
-                    f"Type {cls.field_set_type} has multiple `SourcesField` fields."
-                    + " Pants can't provide a default partitioner."
-                )
-        else:
-            raise TypeError(
-                f"Type {cls.field_set_type} has does not have a `SourcesField` field."
-                + " Pants can't provide a default partitioner."
-            )
-
-        @rule(
-            _param_type_overrides={
-                "request": cls.PartitionRequest,
-                "subsystem": cls.tool_subsystem,
-            }
-        )
-        async def default_single_partition_partitioner(
-            request: FmtTargetsRequest.PartitionRequest, subsystem: SkippableSubsystem
-        ) -> Partitions:
-            assert sources_field_name is not None
-            all_sources_paths = await MultiGet(
-                Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
-                for field_set in request.field_sets
-            )
-
-            return (
-                Partitions()
-                if subsystem.skip
-                else Partitions.single_partition(
-                    itertools.chain.from_iterable(
-                        sources_paths.files for sources_paths in all_sources_paths
-                    )
-                )
-            )
-
-        return collect_rules(locals())
-
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from cls._default_single_partition_partitioner_rules
+            yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
 
         yield from (
             rule

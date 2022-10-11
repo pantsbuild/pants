@@ -12,8 +12,8 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import PartitionerType
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
