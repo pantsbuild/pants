@@ -587,7 +587,7 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "name": f"Build wheels and fs_util ({helper.platform_name()})",
                     "runs-on": helper.runs_on(),
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "timeout-minutes": 65,
+                    "timeout-minutes": 90,
                     **helper.build_wheels_common,
                     "steps": [
                         *checkout(containerized=True),
@@ -669,7 +669,7 @@ def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "build_wheels_macos11_x86_64": {
                     "name": f"Build wheels and fs_util ({helper.platform_name()})",
                     "runs-on": helper.runs_on(),
-                    "timeout-minutes": 80,
+                    "timeout-minutes": 120,
                     **helper.build_wheels_common,
                     "steps": [
                         *checkout(),
@@ -696,7 +696,7 @@ def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
         "build_wheels_macos10_15_x86_64": {
             "name": f"Build wheels and fs_util ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
-            "timeout-minutes": 80,
+            "timeout-minutes": 120,
             **helper.build_wheels_common,
             "steps": [
                 *checkout(),
@@ -743,7 +743,7 @@ def macos11_arm64_jobs() -> Jobs:
             "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
-            "timeout-minutes": 60,
+            "timeout-minutes": 120,
             "if": IS_PANTS_OWNER,
             "steps": steps,
             "env": {**helper.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
