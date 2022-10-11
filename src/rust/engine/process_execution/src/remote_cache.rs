@@ -469,6 +469,7 @@ impl crate::CommandRunner for CommandRunner {
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let (action, command, _execute_request) = make_execute_request(
       &request,
+      self.cache_read,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
     )?;

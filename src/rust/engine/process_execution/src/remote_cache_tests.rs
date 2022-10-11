@@ -160,7 +160,7 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   let process = Process::new(vec![
     "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
-  let (action, command, _exec_request) = make_execute_request(&process, None, None).unwrap();
+  let (action, command, _exec_request) = make_execute_request(&process, true, None, None).unwrap();
   let (_command_digest, action_digest) =
     ensure_action_stored_locally(&store_setup.store, &command, &action)
       .await

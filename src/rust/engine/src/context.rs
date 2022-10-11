@@ -263,6 +263,7 @@ impl Core {
       let remote_execution_runner = Box::new(remote::CommandRunner::new(
         // We unwrap because global_options.py will have already validated this is defined.
         remoting_opts.execution_address.as_ref().unwrap(),
+        exec_strategy_opts.remote_cache_read,
         instance_name,
         process_cache_namespace,
         root_ca_certs.clone(),
