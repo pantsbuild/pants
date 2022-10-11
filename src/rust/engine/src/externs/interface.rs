@@ -99,12 +99,10 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(task_side_effected, m)?)?;
 
-  m.add_function(wrap_pyfunction!(tasks_add_query_inputs_filter, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
-  m.add_function(wrap_pyfunction!(tasks_add_select, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
 
   m.add_function(wrap_pyfunction!(write_digest, m)?)?;
@@ -1112,17 +1110,12 @@ fn execution_add_root_select(
 }
 
 #[pyfunction]
-fn tasks_add_query_inputs_filter(py_tasks: &PyTasks, filtered_type: &PyType) {
-  let filtered_type = TypeId::new(filtered_type);
-  let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_query_inputs_filter(filtered_type);
-}
-
-#[pyfunction]
 fn tasks_task_begin(
   py_tasks: &PyTasks,
   func: PyObject,
   output_type: &PyType,
+  arg_types: Vec<&PyType>,
+  masked_types: Vec<&PyType>,
   side_effecting: bool,
   engine_aware_return_type: bool,
   cacheable: bool,
@@ -1135,12 +1128,16 @@ fn tasks_task_begin(
     .map_err(|e| PyException::new_err(format!("{}", e)))?;
   let func = Function(Key::from_value(func.into())?);
   let output_type = TypeId::new(output_type);
+  let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+  let masked_types = masked_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
   tasks.task_begin(
     func,
     output_type,
     side_effecting,
     engine_aware_return_type,
+    arg_types,
+    masked_types,
     cacheable,
     name,
     if desc.is_empty() { None } else { Some(desc) },
@@ -1175,13 +1172,6 @@ fn tasks_add_get_union(
   let in_scope_types = in_scope_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
   tasks.add_get_union(product, input_types, in_scope_types);
-}
-
-#[pyfunction]
-fn tasks_add_select(py_tasks: &PyTasks, selector: &PyType) {
-  let selector = TypeId::new(selector);
-  let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_select(selector);
 }
 
 #[pyfunction]

@@ -12,6 +12,7 @@ from pants.backend.explorer.graphql.rules import rules
 from pants.backend.explorer.graphql.setup import create_schema
 from pants.backend.explorer.rules import validate_explorer_dependencies
 from pants.backend.project_info import peek
+from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -28,7 +29,10 @@ def schema():
 def context(all_help_info: AllHelpInfo, rule_runner: RuleRunner) -> dict:
     return dict(
         pants_request_state=RequestState(
-            all_help_info, rule_runner.build_config, rule_runner.scheduler
+            all_help_info,
+            rule_runner.build_config,
+            rule_runner.scheduler,
+            env_name=EnvironmentName(None),
         )
     )
 
