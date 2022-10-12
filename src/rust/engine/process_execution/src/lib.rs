@@ -941,13 +941,8 @@ pub fn digest(
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
 ) -> Digest {
-  let (_, _, execute_request) = remote::make_execute_request(
-    process,
-    // This does not impact the `.action_digest`.
-    instance_name,
-    process_cache_namespace,
-  )
-  .unwrap();
+  let (_, _, execute_request) =
+    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 
