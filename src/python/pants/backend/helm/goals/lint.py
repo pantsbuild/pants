@@ -68,11 +68,7 @@ async def run_helm_lint(
             description=f"Linting chart: {chart.info.name}",
         ),
     )
-    return LintResult.from_fallible_process_result(
-        process_result,
-        linter_name=HelmSubsystem.options_scope,
-        partition_description=chart.info.name,
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():

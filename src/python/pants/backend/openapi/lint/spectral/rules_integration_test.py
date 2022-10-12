@@ -71,7 +71,7 @@ def run_spectral(
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [SpectralRequest.SubPartition(subpartition, key)],
+            [SpectralRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

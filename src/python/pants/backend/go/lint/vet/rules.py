@@ -79,9 +79,7 @@ async def run_go_vet(request: GoVetRequest.SubPartition[Any, GoVetFieldSet]) -> 
         ),
     )
 
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=GoVetSubsystem.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():

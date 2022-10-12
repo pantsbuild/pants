@@ -103,7 +103,7 @@ def run_go_vet(
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.SubPartition(subpartition, key)],
+            [GoVetRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

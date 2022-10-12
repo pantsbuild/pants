@@ -110,7 +110,7 @@ def run_golangci_lint(
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
-            LintResult, [GolangciLintRequest.SubPartition(subpartition, key)]
+            LintResult, [GolangciLintRequest.SubPartition("", subpartition, key)]
         )
         results.append(result)
     return tuple(results)

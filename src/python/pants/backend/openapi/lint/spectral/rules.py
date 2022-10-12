@@ -110,9 +110,7 @@ async def run_spectral(
         ),
     )
 
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=SpectralRequest.tool_name
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
