@@ -20,6 +20,7 @@ from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
+from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -376,6 +377,24 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 @dataclass(frozen=True)
 class EnvironmentTarget:
     val: Target | None
+
+    def executable_search_path_cache_scope(
+        self, *, cache_failures: bool = False
+    ) -> ProcessCacheScope:
+        """Whether it's safe to cache exectuable search path discovery or not.
+
+        If the environment may change on us, e.g. the user upgrades a binary, then it's not safe to
+        cache the discovery to disk. Technically, in that case, we should recheck the binary every
+        session (i.e. Pants run), but we instead settle for every Pantsd lifetime to have more
+        acceptable performance.
+
+        Meanwhile, when running with Docker, we already invalidate whenever the image changes
+        thanks to https://github.com/pantsbuild/pants/pull/17101.
+        """
+        docker = self.val and self.val.has_field(DockerImageField)
+        if cache_failures:
+            return ProcessCacheScope.ALWAYS if docker else ProcessCacheScope.PER_RESTART_ALWAYS
+        return ProcessCacheScope.SUCCESSFUL if docker else ProcessCacheScope.PER_RESTART_SUCCESSFUL
 
 
 @dataclass(frozen=True)

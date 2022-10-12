@@ -15,12 +15,13 @@ from typing import Iterable, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -486,7 +487,7 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
+async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -537,11 +538,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
-    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
-    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
-    #      processes since all known remoting configurations include a static container image as
-    #      part of their cache key which automatically avoids this problem. See #10769 for a
-    #      solution that is less of a tradeoff.
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         ProcessResult,
@@ -551,7 +547,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             input_digest=script_digest,
             argv=[script_path, request.binary_name],
             env={"PATH": search_path},
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
 
@@ -567,9 +563,9 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                # NB: Since a failure is a valid result for this script, we always cache it for
-                # `pantsd`'s lifetime, regardless of success or failure.
-                cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
+                # NB: Since a failure is a valid result for this script, we always cache it,
+                # regardless of success or failure.
+                cache_scope=env_target.executable_search_path_cache_scope(cache_failures=True),
             ),
         )
         for path in found_paths
