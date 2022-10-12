@@ -5,7 +5,7 @@ from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
@@ -39,10 +39,7 @@ async def buildfier_fmt(
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=BuildifierRequest.tool_name
-    )
+    return await FmtResult.create(request, result)
 
 
 def rules():

@@ -202,12 +202,7 @@ async def run_pylint(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=request.key.description,
-        linter_name=Pylint.options_scope,
-        report=report,
-    )
+    return LintResult.create(request, result, report=report)
 
 
 def rules():

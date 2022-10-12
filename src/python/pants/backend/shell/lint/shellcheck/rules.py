@@ -100,9 +100,7 @@ async def run_shellcheck(
             level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=Shellcheck.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
