@@ -166,6 +166,7 @@ class FixFilesRequest(FixRequest, LintFilesRequest):
 
 class _FixSubpartitionBatchElement(NamedTuple):
     request_type: type[FixRequest.SubPartition]
+    tool_name: str
     files: tuple[str, ...]
     key: Any
 
@@ -292,7 +293,10 @@ async def fix(
             for subpartition in batch(files):
                 yield _FixSubpartitionBatchRequest(
                     _FixSubpartitionBatchElement(
-                        request_type.SubPartition, subpartition, partition_key
+                        request_type.SubPartition,
+                        request_type.tool_name,
+                        subpartition,
+                        partition_key,
                     )
                     for request_type, partition_key in partition_infos
                 )
@@ -321,8 +325,8 @@ async def fix_batch(
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
-    for request_type, files, key in request:
-        subpartition = request_type(files, key, current_snapshot)
+    for request_type, tool_name, files, key in request:
+        subpartition = request_type(tool_name, files, key, current_snapshot)
         result = await Get(FixResult, FixRequest.SubPartition, subpartition)
         results.append(result)
 
