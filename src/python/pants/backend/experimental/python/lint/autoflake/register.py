@@ -11,6 +11,6 @@ logger = logging.getLogger(__name__)
 def rules():
     logger.warning(
         "DEPRECATED: The autoflake plugin has moved to `pants.backend.python.lint.autoflake`"
-        + " (and is a part of the `fix` goal)."
+        + " (and from the `fmt` goal to the `fix` goal)."
     )
     return autoflake_rules()

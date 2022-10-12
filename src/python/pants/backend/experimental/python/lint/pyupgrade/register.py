@@ -12,6 +12,6 @@ logger = logging.getLogger(__name__)
 def rules():
     logger.warning(
         "DEPRECATED: The pyupgrade plugin has moved to `pants.backend.python.lint.pyupgrade`"
-        + " (and is a part of the `fix` goal)."
+        + " (and from the `fmt` goal to the `fix` goal)."
     )
     return pyupgrade_rules()
