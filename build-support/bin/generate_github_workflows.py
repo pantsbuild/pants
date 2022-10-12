@@ -110,7 +110,7 @@ def is_docs_only() -> Jobs:
                 {
                     "id": "files",
                     "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v23.1",
+                    "uses": "tj-actions/changed-files@v32.0.0",
                     "with": {"files_ignore_separator": "|", "files_ignore": "|".join(docs_files)},
                 },
                 {
@@ -132,7 +132,7 @@ def ensure_category_label() -> Sequence[Step]:
         {
             "if": "github.event_name == 'pull_request'",
             "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v1",
+            "uses": "mheap/github-action-required-labels@v2.1.0",
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "exactly",

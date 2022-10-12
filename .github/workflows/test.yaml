@@ -727,7 +727,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request'
       name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
+      uses: mheap/github-action-required-labels@v2.1.0
       with:
         count: 1
         labels: category:new feature, category:user api change, category:plugin api
@@ -747,7 +747,7 @@ jobs:
         fetch-depth: 10
     - id: files
       name: Get changed files
-      uses: tj-actions/changed-files@v23.1
+      uses: tj-actions/changed-files@v32.0.0
       with:
         files_ignore: docs/**|build-support/bin/generate_user_list.py
         files_ignore_separator: '|'
