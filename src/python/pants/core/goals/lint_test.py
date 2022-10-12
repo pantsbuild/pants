@@ -12,6 +12,7 @@ from typing import Any, Iterable, Optional, Tuple, Type, TypeVar
 import pytest
 
 from pants.base.specs import Specs
+from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
     Lint,
@@ -139,13 +140,25 @@ class InvalidRequest(MockLintTargetsRequest):
         return -1
 
 
+def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
+    classes = [MockLintRequest]
+    while classes:
+        cls = classes.pop()
+        subclasses = cls.__subclasses__()
+        classes.extend(subclasses)
+        yield from subclasses
+
+
 def mock_target_partitioner(
     request: MockLintTargetsRequest.PartitionRequest,
 ) -> Partitions[Any, MockLinterFieldSet]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
-    if type(request) in {SuccessfulFormatter.PartitionRequest, FailingFormatter.PartitionRequest}:
+    operates_on_paths = {
+        getattr(cls, "PartitionRequest"): cls._requires_snapshot for cls in _all_lint_requests()
+    }[type(request)]
+    if operates_on_paths:
         return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
 
     return Partitions.single_partition(request.field_sets)
@@ -163,15 +176,6 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
 
 def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
     return Partitions.single_partition(request.files)
-
-
-def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
-    classes = [MockLintRequest]
-    while classes:
-        cls = classes.pop()
-        subclasses = cls.__subclasses__()
-        classes.extend(subclasses)
-        yield from subclasses
 
 
 def mock_lint_partition(request: Any) -> LintResult:
@@ -213,6 +217,40 @@ class BuildFileFormatter(MockLintRequest, FmtFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
+class MockFixRequest(MockLintRequest, FixTargetsRequest):
+    field_set_type = MockLinterFieldSet
+
+
+class SuccessfulFixer(MockFixRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulFixer"
+
+    @classmethod
+    def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
+        return LintResult(0, "", "", cls.tool_name)
+
+
+class FailingFixer(MockFixRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingFixer"
+
+    @classmethod
+    def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
+        return LintResult(1, "", "", cls.tool_name)
+
+
+class BuildFileFixer(MockLintRequest, FixFilesRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BUILDAnnually"
+
+    @classmethod
+    def get_lint_result(cls, files: Iterable[str]) -> LintResult:
+        return LintResult(0, "", "", cls.tool_name)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -230,6 +268,7 @@ def run_lint_rule(
     batch_size: int = 128,
     only: list[str] | None = None,
     skip_formatters: bool = False,
+    skip_fixers: bool = False,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
@@ -250,6 +289,7 @@ def run_lint_rule(
         batch_size=batch_size,
         only=only or [],
         skip_formatters=skip_formatters,
+        skip_fixers=skip_fixers,
     )
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
@@ -326,6 +366,9 @@ def test_summary(rule_runner: RuleRunner) -> None:
         SuccessfulFormatter,
         FailingFormatter,
         BuildFileFormatter,
+        SuccessfulFixer,
+        FailingFixer,
+        BuildFileFixer,
         MockFilesRequest,
     ]
     targets = [make_target(good_address), make_target(bad_address)]
@@ -336,6 +379,76 @@ def test_summary(rule_runner: RuleRunner) -> None:
         targets=targets,
     )
     assert exit_code == FailingRequest.exit_code([bad_address])
+    assert stderr == dedent(
+        """\
+
+        ✓ BUILDAnnually succeeded.
+        ✓ BobTheBUILDer succeeded.
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFixer failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulFixer succeeded.
+        ✓ SuccessfulFormatter succeeded.
+        ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more fixers failed. Run `./pants fix` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        only=[
+            FailingRequest.tool_name,
+            MockFilesRequest.tool_name,
+            FailingFormatter.tool_name,
+            FailingFixer.tool_name,
+            BuildFileFormatter.tool_name,
+            BuildFileFixer.tool_name,
+        ],
+    )
+    assert stderr == dedent(
+        """\
+
+        ✓ BUILDAnnually succeeded.
+        ✓ BobTheBUILDer succeeded.
+        ✕ FailingFixer failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more fixers failed. Run `./pants fix` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        skip_formatters=True,
+        skip_fixers=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulLinter succeeded.
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        skip_fixers=True,
+    )
     assert stderr == dedent(
         """\
 
@@ -355,38 +468,20 @@ def test_summary(rule_runner: RuleRunner) -> None:
         rule_runner,
         lint_request_types=request_types,
         targets=targets,
-        only=[
-            FailingRequest.tool_name,
-            MockFilesRequest.tool_name,
-            FailingFormatter.tool_name,
-            BuildFileFormatter.tool_name,
-        ],
-    )
-    assert stderr == dedent(
-        """\
-
-        ✓ BobTheBUILDer succeeded.
-        ✕ FailingFormatter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-
-        (One or more formatters failed. Run `./pants fmt` to fix.)
-        """
-    )
-
-    exit_code, stderr = run_lint_rule(
-        rule_runner,
-        lint_request_types=request_types,
-        targets=targets,
         skip_formatters=True,
     )
     assert stderr == dedent(
         """\
 
+        ✓ BUILDAnnually succeeded.
         ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFixer failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+        ✓ SuccessfulFixer succeeded.
         ✓ SuccessfulLinter succeeded.
+
+        (One or more fixers failed. Run `./pants fix` to fix.)
         """
     )
 

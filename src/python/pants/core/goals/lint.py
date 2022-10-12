@@ -284,12 +284,13 @@ def _print_results(
             status = "succeeded"
         console.print_stderr(f"{sigil} {tool_name} {status}.")
 
-    if formatter_failed:
+    if formatter_failed or fixer_failed:
         console.print_stderr("")
+
+    if formatter_failed:
         console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
 
     if fixer_failed:
-        console.print_stderr("")
         console.print_stderr(f"(One or more fixers failed. Run `{bin_name()} fix` to fix.)")
 
 
