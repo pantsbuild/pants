@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+
 from pants.backend.python.lint.autoflake.register import rules as autoflake_rules
 
 logger = logging.getLogger(__name__)

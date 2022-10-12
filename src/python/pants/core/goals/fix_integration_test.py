@@ -15,7 +15,7 @@ def test_fix_then_edit(use_pantsd: bool) -> None:
     def run() -> None:
         run_pants(
             [
-                "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
+                "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.autoflake']",
                 "fix",
                 f,
             ],
@@ -27,7 +27,9 @@ def test_fix_then_edit(use_pantsd: bool) -> None:
     good_content = read_file(f)
 
     # Edit the file.
-    with overwrite_file_content(f, lambda c: re.sub(b"def greet", b"def  greet", c)):
+    with overwrite_file_content(
+        f, lambda c: re.sub(b"import pkgutil", b"import pkgutil\nimport os", c)
+    ):
         assert good_content != read_file(f)
 
         # Re-run and confirm that the file was fixed.

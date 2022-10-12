@@ -46,25 +46,23 @@ class FixResult(EngineAwareReturnType):
     stderr: str
     tool_name: str
 
-    @classmethod
-    def create(
-        cls,
+    @staticmethod
+    @rule_helper(_public=True)
+    async def create(
+        request: FixRequest.SubPartition,
         process_result: ProcessResult | FallibleProcessResult,
-        input_snapshot: Snapshot,
-        output: Snapshot,
         *,
-        tool_name: str,
         strip_chroot_path: bool = False,
     ) -> FixResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return cls(
-            input=input_snapshot,
-            output=output,
+        return FixResult(
+            input=request.snapshot,
+            output=await Get(Snapshot, Digest, process_result.output_digest),
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            tool_name=tool_name,
+            tool_name=request.tool_name,
         )
 
     def __post_init__(self):
