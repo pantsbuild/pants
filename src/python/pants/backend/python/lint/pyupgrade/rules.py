@@ -9,7 +9,7 @@ from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -31,14 +31,14 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(FmtTargetsRequest):
+class PyUpgradeRequest(FixTargetsRequest):
     field_set_type = PyUpgradeFieldSet
     tool_subsystem = PyUpgrade
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpgrade) -> FmtResult:
+@rule(desc="Fix with pyupgrade", level=LogLevel.DEBUG)
+async def pyupgrade_fix(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpgrade) -> FixResult:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
     result = await Get(
@@ -53,7 +53,7 @@ async def pyupgrade_fmt(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpg
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
+    return FixResult.create(
         result, request.snapshot, output_snapshot, formatter_name=PyUpgradeRequest.tool_name
     )
 
