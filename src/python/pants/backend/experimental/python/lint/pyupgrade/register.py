@@ -4,7 +4,7 @@
 
 import logging
 
-from pants.backend.python.lint.pyupgrade import rules as pyupgrade_rules
+from pants.backend.python.lint.pyupgrade.register import rules as pyupgrade_rules
 
 logger = logging.getLogger(__name__)
 
