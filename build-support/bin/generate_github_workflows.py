@@ -87,43 +87,64 @@ IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 # Actions
 # ----------------------------------------------------------------------
 
-_DOCS_ONLY_TEXT = "DOCS_ONLY"
-
-
-def _docs_only_cond(docs_only: bool) -> str:
-    op = "==" if docs_only else "!="
-    return f"needs.docs_only_check.outputs.docs_only {op} '{_DOCS_ONLY_TEXT}'"
-
-
-def is_docs_only() -> Jobs:
-    """Check if this change only involves docs."""
+def classify_changes() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
-    docs_files = ["docs/**", "build-support/bin/generate_user_list.py"]
     return {
-        "docs_only_check": {
-            "name": "Check for docs-only change",
+        "classify_changes": {
+            "name": "Classify changes",
             "runs-on": linux_x86_64_helper.runs_on(),
             "if": IS_PANTS_OWNER,
-            "outputs": {"docs_only": gha_expr("steps.docs_only_check.outputs.docs_only")},
+            "outputs": {
+                "docs_only": gha_expr("steps.classify.outputs.docs_only"),
+                "docs": gha_expr("steps.classify.outputs.docs"),
+                "rust": gha_expr("steps.classify.outputs.rust"),
+                "release": gha_expr("steps.classify.outputs.release"),
+                "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+            },
             "steps": [
                 *checkout(get_commit_msg=False),
                 {
                     "id": "files",
                     "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v32.0.0",
-                    "with": {"files_ignore_separator": "|", "files_ignore": "|".join(docs_files)},
+                    "uses": "tj-actions/changed-files@v32",
+                    "with": {"separator": "|"},
                 },
                 {
-                    "id": "docs_only_check",
-                    "name": "Check for docs-only changes",
-                    # Note that if no changes were detected in the step above, the string
-                    # may be empty, not 'false', so we check for != 'true'.
-                    "if": "steps.files.outputs.any_changed != 'true'",
-                    "run": f"echo '::set-output name=docs_only::{_DOCS_ONLY_TEXT}'",
+                    "id": "classify",
+                    "name": "Classify changed files",
+                    "run": dedent(
+                        """\
+                        affected=$(python build-support/bin/classify_changed_files.py \
+                          '${{ steps.files.outputs.all_modified_files }}')
+                        echo "Affected:\n${affected}"
+                        if [[ "${affected}" == "docs" ]]; then
+                          echo '::set-output name=docs_only::true'
+                        fi
+                        for i in ${affected}; do
+                          if [[ "${i}" == "docs" ]]; then
+                            echo '::set-output name=docs::true'
+                          fi
+                          if [[ "${i}" == "rust" ]]; then
+                            echo '::set-output name=rust::true'
+                          fi
+                          if [[ "${i}" == "release" ]]; then
+                            echo '::set-output name=release::true'
+                          fi
+                          if [[ "${i}" == "ci_config" ]]; then
+                            echo '::set-output name=ci_config::true'
+                          fi
+                        done
+                        """
+                    ),
                 },
             ],
         },
     }
+
+
+def _docs_only_cond(docs_only: bool) -> str:
+    op = "==" if docs_only else "!="
+    return f"needs.classify_changes.outputs.docs_only {op} true"
 
 
 def ensure_category_label() -> Sequence[Step]:
@@ -918,7 +939,7 @@ def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
             # If in the future we have any docs-related checks, we can make both "Set Merge OK"
             # jobs depend on them here (it has to be both since some changes may modify docs
             # as well as code, and so are not "docs only").
-            "needs": ["docs_only_check", "check_labels"] + sorted(needs),
+            "needs": ["classify_changes", "check_labels"] + sorted(needs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -971,14 +992,14 @@ def generate() -> dict[Path, str]:
 
     not_docs_only = _docs_only_cond(docs_only=False)
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
-    pr_jobs.update(**is_docs_only())
+    pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "docs_only_check"}:
+        if key in {"check_labels", "classify_changes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.extend(["docs_only_check"])
+        needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
