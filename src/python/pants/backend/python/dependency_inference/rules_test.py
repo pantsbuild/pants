@@ -26,6 +26,8 @@ from pants.backend.python.dependency_inference.rules import (
     PythonInferSubsystem,
     UnownedDependencyError,
     UnownedDependencyUsage,
+    UnownedImportsPossibleOwners,
+    UnownedImportsPossibleOwnersRequest,
     _get_imports_info,
     import_rules,
     infer_python_conftest_dependencies,
@@ -477,6 +479,7 @@ def imports_rule_runner() -> RuleRunner:
             *core_target_types_rules(),
             *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+            QueryRule(UnownedImportsPossibleOwners, [UnownedImportsPossibleOwnersRequest]),
         ],
         target_types=[
             PythonSourceTarget,
@@ -770,3 +773,103 @@ class TestCategoriseImportsInfo:
         case_name = "ambiguous_terminal"
         resolved = self.do_test(case_name, ImportOwnerStatus.unowned)
         assert resolved.address == ()
+
+
+class TestFindOtherOwners:
+    missing_import_name = "missing"
+    other_resolve = "other-resolve"
+    other_other_resolve = "other-other-resolve"
+
+    def do_test(self, imports_rule_runner):
+        resolves = {"python-default": "", self.other_resolve: "", self.other_other_resolve: ""}
+        imports_rule_runner.set_options(
+            [
+                "--python-enable-resolves",
+                f"--python-resolves={resolves}",
+            ]
+        )
+
+        imports_rule_runner.write_files(
+            {
+                "project/cheesey.py": dedent(
+                    f"""\
+                        import other.{self.missing_import_name}
+                    """
+                ),
+                "project/BUILD": "python_sources()",
+            }
+        )
+
+        return imports_rule_runner.request(
+            UnownedImportsPossibleOwners,
+            [
+                UnownedImportsPossibleOwnersRequest(
+                    frozenset((f"other.{self.missing_import_name}",)), "original_resolve"
+                )
+            ],
+        )
+
+    def test_no_other_owners_found(self, imports_rule_runner: RuleRunner):
+        r = self.do_test(imports_rule_runner)
+        assert not r.value
+
+    def test_other_owners_found_in_single_resolve(self, imports_rule_runner: RuleRunner):
+
+        imports_rule_runner.write_files(
+            {
+                "other/BUILD": dedent(
+                    f"""\
+                    python_source(
+                        name="{self.missing_import_name}",
+                        source="{self.missing_import_name}.py",
+                        resolve="{self.other_resolve}",
+                    )
+                """
+                ),
+                f"other/{self.missing_import_name}.py": "",
+            }
+        )
+
+        r = self.do_test(imports_rule_runner)
+
+        as_module = f"other.{self.missing_import_name}"
+        assert as_module in r.value
+        assert r.value[as_module] == [
+            (
+                Address("other", target_name=self.missing_import_name),
+                self.other_resolve,
+            )
+        ]
+
+    def test_other_owners_found_in_multiple_resolves(self, imports_rule_runner: RuleRunner):
+
+        imports_rule_runner.write_files(
+            {
+                "other/BUILD": dedent(
+                    f"""\
+                    python_source(
+                        name="{self.missing_import_name}",
+                        source="{self.missing_import_name}.py",
+                        resolve=parametrize("{self.other_resolve}", "{self.other_other_resolve}"),
+                    )
+                """
+                ),
+                f"other/{self.missing_import_name}.py": "",
+            }
+        )
+
+        r = self.do_test(imports_rule_runner)
+
+        as_module = f"other.{self.missing_import_name}"
+        assert as_module in r.value
+        assert r.value[as_module] == [
+            (
+                Address(
+                    "other",
+                    target_name=self.missing_import_name,
+                    parameters={"resolve": resolve},
+                ),
+                resolve,
+            )
+            for resolve in (self.other_other_resolve, self.other_resolve)
+        ]
