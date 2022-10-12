@@ -203,13 +203,7 @@ async def scalafmt_fmt(
         ),
     )
 
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        request.snapshot,
-        output_snapshot,
-        formatter_name=ScalafmtRequest.tool_name,
-    )
+    return await FmtResult.create(request, result)
 
 
 @rule

@@ -78,7 +78,7 @@ def run_pylint(
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [PylintRequest.SubPartition(subpartition, key)],
+            [PylintRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

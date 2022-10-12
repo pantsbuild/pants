@@ -141,6 +141,7 @@ def run_scalafmt(
             FmtResult,
             [
                 ScalafmtRequest.SubPartition(
+                    "",
                     partition,
                     key=key,
                     snapshot=rule_runner.request(Snapshot, [PathGlobs(partition)]),

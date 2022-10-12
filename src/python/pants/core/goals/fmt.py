@@ -46,25 +46,23 @@ class FmtResult(EngineAwareReturnType):
     stderr: str
     formatter_name: str
 
-    @classmethod
-    def create(
-        cls,
+    @staticmethod
+    @rule_helper(_public=True)
+    async def create(
+        request: FmtRequest.SubPartition,
         process_result: ProcessResult | FallibleProcessResult,
-        input_snapshot: Snapshot,
-        output: Snapshot,
         *,
-        formatter_name: str,
         strip_chroot_path: bool = False,
     ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return cls(
-            input=input_snapshot,
-            output=output,
+        return FmtResult(
+            input=request.snapshot,
+            output=await Get(Snapshot, Digest, process_result.output_digest),
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            formatter_name=formatter_name,
+            formatter_name=request.tool_name,
         )
 
     def __post_init__(self):
@@ -169,6 +167,7 @@ class FmtFilesRequest(FmtRequest, LintFilesRequest):
 
 class _FmtSubpartitionBatchElement(NamedTuple):
     request_type: type[FmtRequest.SubPartition]
+    tool_name: str
     files: tuple[str, ...]
     key: Any
 
@@ -295,7 +294,10 @@ async def fmt(
             for subpartition in batch(files):
                 yield _FmtSubpartitionBatchRequest(
                     _FmtSubpartitionBatchElement(
-                        request_type.SubPartition, subpartition, partition_key
+                        request_type.SubPartition,
+                        request_type.tool_name,
+                        subpartition,
+                        partition_key,
                     )
                     for request_type, partition_key in partition_infos
                 )
@@ -324,8 +326,8 @@ async def fmt_batch(
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
-    for request_type, files, key in request:
-        subpartition = request_type(files, key, current_snapshot)
+    for request_type, tool_name, files, key in request:
+        subpartition = request_type(tool_name, files, key, current_snapshot)
         result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
         results.append(result)
 

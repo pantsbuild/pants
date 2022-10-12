@@ -62,7 +62,7 @@ def run_buildifier(rule_runner: RuleRunner) -> FmtResult:
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BuildifierRequest.SubPartition(snapshot.files, key=None, snapshot=snapshot),
+            BuildifierRequest.SubPartition("", snapshot.files, key=None, snapshot=snapshot),
         ],
     )
     return fmt_result

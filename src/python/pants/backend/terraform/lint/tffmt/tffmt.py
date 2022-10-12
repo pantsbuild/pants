@@ -13,8 +13,6 @@ from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -77,9 +75,7 @@ async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -
         ),
     )
 
-    output = await Get(Snapshot, Digest, result.output_digest)
-
-    return FmtResult.create(result, request.snapshot, output, formatter_name=TffmtRequest.tool_name)
+    return await FmtResult.create(request, result)
 
 
 def rules():

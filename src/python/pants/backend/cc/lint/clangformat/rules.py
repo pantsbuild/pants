@@ -13,7 +13,7 @@ from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -83,14 +83,7 @@ async def clangformat_fmt(
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        request.snapshot,
-        output_snapshot,
-        formatter_name=ClangFormatRequest.tool_name,
-        strip_chroot_path=True,
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules() -> Iterable[Rule | UnionRule]:
