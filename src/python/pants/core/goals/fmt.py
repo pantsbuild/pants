@@ -345,6 +345,7 @@ async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult
         fmt_result.stdout,
         fmt_result.stderr,
         linter_name=fmt_result.formatter_name,
+        _render_message=False,  # Don't re-render the message
     )
 
 
