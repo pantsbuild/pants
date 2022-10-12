@@ -99,9 +99,7 @@ async def run_hadolint(
         ),
     )
 
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=Hadolint.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():

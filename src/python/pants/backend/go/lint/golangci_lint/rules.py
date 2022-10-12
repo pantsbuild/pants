@@ -171,9 +171,7 @@ async def run_golangci_lint(
         ),
     )
 
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=GolangciLint.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
