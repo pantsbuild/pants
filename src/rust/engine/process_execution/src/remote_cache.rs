@@ -271,20 +271,16 @@ impl CommandRunner {
       .await;
       match response {
         Ok(cached_response_opt) => match &cached_response_opt {
-          Some(cached_response) => {
+          Some(cached_response) if cached_response.exit_code == 0 || failures_cached => {
             log::debug!(
               "remote cache hit for: {:?} digest={:?} response={:?}",
               request.description,
               action_digest,
               cached_response
             );
-            if cached_response.exit_code == 0 || failures_cached {
-              cached_response_opt
-            } else {
-              None
-            }
+            cached_response_opt
           }
-          None => {
+          _ => {
             log::debug!(
               "remote cache miss for: {:?} digest={:?}",
               request.description,
