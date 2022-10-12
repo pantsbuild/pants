@@ -944,7 +944,6 @@ pub fn digest(
   let (_, _, execute_request) = remote::make_execute_request(
     process,
     // This does not impact the `.action_digest`.
-    true,
     instance_name,
     process_cache_namespace,
   )

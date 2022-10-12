@@ -299,7 +299,6 @@ async fn main() {
 
       let remote_runner = process_execution::remote::CommandRunner::new(
         &address,
-        true,
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
         root_ca_certs.clone(),

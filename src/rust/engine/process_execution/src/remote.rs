@@ -98,7 +98,6 @@ pub enum ExecutionError {
 #[derive(Clone)]
 pub struct CommandRunner {
   instance_name: Option<String>,
-  remote_cache_read: bool,
   process_cache_namespace: Option<String>,
   store: Store,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -117,7 +116,6 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     execution_address: &str,
-    remote_cache_read: bool,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
@@ -154,7 +152,6 @@ impl CommandRunner {
 
     let command_runner = CommandRunner {
       instance_name,
-      remote_cache_read,
       process_cache_namespace,
       execution_client,
       store,
@@ -745,7 +742,6 @@ impl crate::CommandRunner for CommandRunner {
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let (action, command, execute_request) = make_execute_request(
       &request,
-      self.remote_cache_read,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
     )?;
@@ -850,7 +846,6 @@ fn maybe_add_workunit(
 
 pub fn make_execute_request(
   req: &Process,
-  remote_cache_read: bool,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
 ) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
@@ -1015,7 +1010,11 @@ pub fn make_execute_request(
   let execute_request = remexec::ExecuteRequest {
     action_digest: Some((&digest(&action)?).into()),
     instance_name: instance_name.unwrap_or_else(|| "".to_owned()),
-    skip_cache_lookup: !remote_cache_read,
+    // We rely on the RemoteCache command runner for caching with remote execution. We always
+    // disable remote servers from doing caching themselves not only to avoid wasted work, but
+    // more importantly because they do not have our same caching semantics, e.g.
+    // `ProcessCacheScope.SUCCESSFUL` vs `ProcessCacheScope.ALWAYS`.
+    skip_cache_lookup: true,
     ..remexec::ExecuteRequest::default()
   };
 
