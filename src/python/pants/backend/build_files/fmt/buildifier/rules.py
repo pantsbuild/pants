@@ -1,41 +1,21 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-
+from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.build_files.fmt.buildifier.subsystem import Buildifier
-from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
+from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.source.filespec import FilespecMatcher
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class BuildifierRequest(FmtFilesRequest):
+class BuildifierRequest(FmtBuildFilesRequest):
     tool_subsystem = Buildifier
-
-
-@rule
-async def partition_build_files(
-    request: BuildifierRequest.PartitionRequest,
-    buildifier: Buildifier,
-    build_file_options: BuildFileOptions,
-) -> Partitions:
-    if buildifier.skip:
-        return Partitions()
-
-    specified_build_files = FilespecMatcher(
-        includes=[os.path.join("**", p) for p in build_file_options.patterns],
-        excludes=build_file_options.ignores,
-    ).matches(request.files)
-
-    return Partitions.single_partition(specified_build_files)
 
 
 @rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
