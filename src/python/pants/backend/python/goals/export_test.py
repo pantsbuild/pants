@@ -87,7 +87,8 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
                 "--remove=all",
                 f"{{digest_root}}/{current_interpreter}",
             )
-            assert ppc0.extra_env == FrozenDict({"PEX_MODULE": "pex.tools"})
+            assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
+            assert "PEX_ROOT" in ppc0.extra_env
 
             ppc1 = result.post_processing_cmds[1]
             assert ppc1.argv == (

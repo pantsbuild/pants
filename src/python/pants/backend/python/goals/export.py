@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex_environment import PythonExecutable, PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
     ExportError,
@@ -79,7 +79,7 @@ class ExportPythonTool(EngineAwareParameter):
 
 @rule
 async def export_virtualenv(
-    request: _ExportVenvRequest, python_setup: PythonSetup, pex_pex: PexPEX
+    request: _ExportVenvRequest, python_setup: PythonSetup, pex_pex: PexPEX, pex_env: PexEnvironment
 ) -> ExportResult:
     if request.resolve:
         interpreter_constraints = InterpreterConstraints(
@@ -127,6 +127,7 @@ async def export_virtualenv(
     merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
     pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
     maybe_resolve_str = f"for the resolve '{request.resolve}' " if request.resolve else ""
+    complete_pex_env = pex_env.in_workspace()
     return ExportResult(
         f"virtualenv {maybe_resolve_str}(using Python {py_version})",
         dest,
@@ -143,7 +144,10 @@ async def export_virtualenv(
                     "--remove=all",
                     f"{{digest_root}}/{py_version}",
                 ],
-                {"PEX_MODULE": "pex.tools"},
+                {
+                    **complete_pex_env.environment_dict(python_configured=True),
+                    "PEX_MODULE": "pex.tools"
+                },
             ),
             PostProcessingCommand(["rm", "-f", pex_pex_path]),
         ],
@@ -151,7 +155,7 @@ async def export_virtualenv(
 
 
 @rule
-async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
+async def export_tool(request: ExportPythonTool, pex_pex: PexPEX, pex_env: PexEnvironment) -> ExportResult:
     assert request.pex_request is not None
 
     # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
@@ -173,6 +177,7 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
     pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
 
     merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, pex.digest]))
+    complete_pex_env = pex_env.in_workspace()
     return ExportResult(
         f"virtualenv for the tool '{request.resolve_name}'",
         dest,
@@ -188,7 +193,10 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
                     "--remove=all",
                     f"{{digest_root}}/{request.resolve_name}",
                 ],
-                {"PEX_MODULE": "pex.tools"},
+                {
+                    **complete_pex_env.environment_dict(python_configured=True),
+                    "PEX_MODULE": "pex.tools"
+                },
             ),
             PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
         ],
