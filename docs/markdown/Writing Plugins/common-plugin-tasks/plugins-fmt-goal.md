@@ -149,8 +149,7 @@ async def shfmt_fmt(request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: 
     )
 
     result = await Get(ProcessResult, Process, process)
-    output_snapshot = await Get(Snapshot, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result, output_snapshot)
 ```
 
 The `FmtRequest.SubPartition` has `.snapshot`, which stores the list of files and the `Digest` for each source file.

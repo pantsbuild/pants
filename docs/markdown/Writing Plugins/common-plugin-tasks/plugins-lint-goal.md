@@ -114,7 +114,7 @@ from pants.core.goals.lint import LintResult
 async def run_shellcheck(
     request: ShellcheckRequest, shellcheck: Shellcheck
 ) -> LintResult:
-    return LintResult(..., linter_name=ShellcheckRequest.tool_name)
+    return LintResult.create(...)
 ```
 
 The `ShellcheckRequest.SubPartition` instance has a property called `.elements`, which in this case,
@@ -211,8 +211,7 @@ async def run_shellcheck(
             level=LogLevel.DEBUG,
         ),
     )
-    result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name=request.name)
+    return LintResult.create(request, process_result)
 
 ```
 
