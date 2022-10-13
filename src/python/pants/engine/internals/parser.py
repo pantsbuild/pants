@@ -157,14 +157,6 @@ class Parser:
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
-        # We update the known symbols with Build File Preludes. This is subtle code; functions have
-        # their own globals set on __globals__ which they derive from the environment where they
-        # were executed. So for each extra_symbol which comes from a separate execution
-        # environment, we need to to add all of our self._symbols to those __globals__, otherwise
-        # those extra symbols will not see our target aliases etc. This also means that if multiple
-        # prelude files are present, they probably cannot see each others' symbols. We may choose
-        # to change this at some point.
-
         global_symbols = {**self._symbols, **extra_symbols.symbols}
 
         if self.ignore_unrecognized_symbols:
