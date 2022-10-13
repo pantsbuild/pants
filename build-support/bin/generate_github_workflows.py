@@ -71,9 +71,10 @@ PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
 
-DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
+IS_PUSH = "github.event_name == 'push'"
+DONT_SKIP_RUST = "!contains(github.event.commits[0].message, '[ci skip-rust]')"
 DONT_SKIP_WHEELS = (
-    "github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')"
+    f"({IS_PUSH}) || !contains(github.event.commits[0].message, '[ci skip-build-wheels]')"
 )
 
 
@@ -179,7 +180,7 @@ def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Seq
                 # This CI currently only runs on PRs, so this is future-proofing.
                 {
                     "name": "Get commit message for branch builds",
-                    "if": "github.event_name == 'push'",
+                    "if": IS_PUSH,
                     "run": dedent(
                         """\
                     echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -288,7 +289,7 @@ def deploy_to_s3() -> Step:
     return {
         "name": "Deploy to S3",
         "run": "./build-support/bin/deploy_to_s3.py",
-        "if": "github.event_name == 'push'",
+        "if": IS_PUSH,
         "env": {
             "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
             "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
@@ -463,7 +464,7 @@ class Helper:
             self.native_binaries_upload(),
         ]
 
-    def build_steps(self) -> list[Step]:
+    def build_wheels_and_binaries_steps(self) -> list[Step]:
         return [
             {
                 "name": "Build wheels",
@@ -491,7 +492,7 @@ class Helper:
                 "run": "./build-support/bin/release.sh build-fs-util",
                 # We only build fs_util on branch builds, given that Pants compilation already
                 # checks the code compiles and the release process is simple and low-stakes.
-                "if": "github.event_name == 'push'",
+                "if": IS_PUSH,
                 "env": self.platform_env(),
             },
         ]
@@ -510,7 +511,7 @@ class Helper:
 
     build_wheels_common = {
         "env": DISABLE_REMOTE_CACHE_ENV,
-        "if": IS_PANTS_OWNER,
+        "if": f"({DONT_SKIP_WHEELS}) || ({IS_PANTS_OWNER})",
     }
 
 
@@ -602,7 +603,7 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                             ),
                         },
                         setup_toolchain_auth(),
-                        *helper.build_steps(),
+                        *helper.build_wheels_and_binaries_steps(),
                         helper.upload_log_artifacts(name="wheels"),
                         deploy_to_s3(),
                     ],
@@ -680,7 +681,7 @@ def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
                         *helper.rust_caches(),
-                        *helper.build_steps(),
+                        *helper.build_wheels_and_binaries_steps(),
                         helper.upload_log_artifacts(name="wheels"),
                         deploy_to_s3(),
                     ],
@@ -706,7 +707,7 @@ def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
                 # multiple Python versions, whereas that caching assumes only one primary
                 # Python version (marked via matrix.strategy).
                 *helper.rust_caches(),
-                *helper.build_steps(),
+                *helper.build_wheels_and_binaries_steps(),
                 helper.upload_log_artifacts(name="wheels"),
                 deploy_to_s3(),
             ],
@@ -734,7 +735,7 @@ def macos11_arm64_jobs() -> Jobs:
             "run": f"USE_PY39=true {helper.wrap_cmd('./build-support/bin/release.sh build-fs-util')}",
             # We only build fs_util on branch builds, given that Pants compilation already
             # checks the code compiles and the release process is simple and low-stakes.
-            "if": "github.event_name == 'push'",
+            "if": IS_PUSH,
         }
     )
     steps.append(deploy_to_s3())
@@ -744,7 +745,9 @@ def macos11_arm64_jobs() -> Jobs:
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
             "timeout-minutes": 120,
-            "if": IS_PANTS_OWNER,
+            # Skip the workflow entirely unless the conditions for any of the steps are true. This
+            # avoids acquiring a worker and setting up a workspace when there is nothing to do.
+            "if": f"({DONT_SKIP_WHEELS}) || ({IS_PANTS_OWNER}) || ({IS_PUSH})",
             "steps": steps,
             "env": {**helper.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
         },
