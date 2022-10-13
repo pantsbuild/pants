@@ -22,6 +22,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -463,6 +464,21 @@ class HelmDeploymentTimeoutField(IntField):
     valid_numbers = ValidNumbers.positive_only
 
 
+class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
+    alias = "post_renderers"
+    help = softwrap(
+        """
+        List of runnable targets to be used to post-process the helm chart after being renderer by Helm.
+
+        This is equivalent to the same post-renderer feature already available in Helm with the difference
+        that this supports a list of executables instead of a single one.
+
+        When more than one post-renderer is given, they will be combined into a single one in which the
+        input of each of them would be output of the previous one.
+        """
+    )
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -476,6 +492,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
+        HelmDeploymentPostRenderersField,
     )
     help = "A Helm chart deployment."
 
@@ -496,6 +513,7 @@ class HelmDeploymentFieldSet(FieldSet):
     no_hooks: HelmDeploymentNoHooksField
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
+    post_renderers: HelmDeploymentPostRenderersField
 
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False

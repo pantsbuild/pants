@@ -147,7 +147,11 @@ async def prepare_post_renderer_for_helm_deployment(
 
     return await Get(
         HelmPostRenderer,
-        SetupHelmPostRenderer(replacements, description_of_origin=request.field_set.address.spec),
+        SetupHelmPostRenderer(
+            replacements,
+            extra_post_renderers=request.field_set.post_renderers.to_unparsed_address_inputs(),
+            description_of_origin=request.field_set.address.spec,
+        ),
     )
 
 

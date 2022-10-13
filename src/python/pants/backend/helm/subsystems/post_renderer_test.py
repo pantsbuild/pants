@@ -11,6 +11,7 @@ import pytest
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.utils.yaml import MutableYamlIndex, YamlPath
+from pants.core.goals.run import rules as run_rules
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -22,6 +23,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *post_renderer.rules(),
+            *run_rules(),
             QueryRule(HelmPostRenderer, (SetupHelmPostRenderer,)),
             QueryRule(ProcessResult, (Process,)),
         ]

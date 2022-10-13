@@ -290,9 +290,9 @@ async def setup_render_helm_deployment_process(
     if request.post_renderer:
         logger.debug(f"Using post-renderer stage in deployment {request.field_set.address}")
         input_digests.append(request.post_renderer.digest)
-        env = request.post_renderer.env
+        env.update(request.post_renderer.env)
         immutable_input_digests.update(request.post_renderer.immutable_input_digests)
-        append_only_caches = request.post_renderer.append_only_caches
+        append_only_caches.update(request.post_renderer.append_only_caches)
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
