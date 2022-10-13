@@ -48,7 +48,10 @@ def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOption
 
 
 @rule(desc="Expand macros")
-async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(
+    build_file_options: BuildFileOptions,
+    parser: Parser,
+) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
         PathGlobs(
@@ -58,6 +61,8 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
     )
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
+        **parser.builtin_symbols,
     }
     locals: dict[str, Any] = {}
     for file_content in prelude_digest_contents:

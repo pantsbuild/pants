@@ -84,7 +84,15 @@ def test_parse_address_family_empty() -> None:
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                target_type_aliases=["target"],
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
@@ -136,6 +144,20 @@ def test_prelude_exceptions() -> None:
     assert "ValueError" not in result.symbols
     with pytest.raises(ValueError):
         result.symbols["abort"]()
+
+
+def test_prelude_references_builtin_symbols() -> None:
+    prelude_content = dedent(
+        """\
+        def make_a_target():
+            # Can't call it outside of the context of a BUILD file, less we get internal errors
+            target
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    # In the real world, this would define the target (note it doesn't need to return, as BUILD files
+    # don't). In the test we're just ensuring we don't get a `NameError`
+    result.symbols["make_a_target"]()
 
 
 class ResolveField(StringField):
