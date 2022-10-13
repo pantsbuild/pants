@@ -250,6 +250,59 @@ helm_deployment(
 
 In this example, the deployment at `src/deploy:main` declares a dependency on a 3rd party Helm artifact instead of a chart in the same repository. The only difference in this case when compared to first party charts is that Pants will resolve and fetch the third party artifact automatically. Once the artifact has been resolved, there is no difference to Pants.
 
+Post-renderers
+--------------
+
+User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `./pants run [address]`) and will compile and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
+
+As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
+
+```python src/chart/BUILD
+helm_chart()
+```
+```yaml src/chart/Chart.yaml
+apiVersion: v2
+description: Example Helm chart with vals
+name: example
+version: 0.1.0
+```
+```yaml src/chart/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+  namespace: default
+data:
+  username: admin
+  # This should be replaced by `vals` during the post-rendering
+  password: ref+vault://path/to/admin#/password
+type: Opaque
+```
+```python src/deploy/BUILD
+experimental_shell_command(
+  name="vals",
+  command="vals eval -f -",
+  extra_env_vars=[
+    "VAULT_ADDR",
+    "VAULT_NAMESPACE",
+    "VAULT_TOKEN",
+    ...
+  ],
+  tools=["vals"],
+)
+
+helm_deployment(
+  dependencies=["//src/chart"],
+  post_renderers=[":vals"],
+)
+```
+
+In the previous example we define a `experimental_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
+
+> 📘 Using multiple post-renderers
+>
+> If more than one target address is given in the `post_renderers` field, then they will be invoked in the same order given piping the output of one them into the input of the next one.
+
 Deploying
 ---------
 
