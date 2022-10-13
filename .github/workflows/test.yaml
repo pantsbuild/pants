@@ -118,7 +118,7 @@ jobs:
       run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
-    - if: '!contains(github.event.commits[0].message, ''[ci skip-rust]'')'
+    - if: '!contains(github.event.head_commit.message, ''[ci skip-rust]'')'
       name: Test and lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
@@ -243,7 +243,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: '!contains(github.event.commits[0].message, ''[ci skip-rust]'')'
+      if: '!contains(github.event.head_commit.message, ''[ci skip-rust]'')'
       name: Test Rust
       run: ./cargo test --tests -- --nocapture
     strategy:
@@ -256,7 +256,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (((github.event_name == 'push') || !contains(github.event.commits[0].message,
+    if: (((github.event_name == 'push') || !contains(github.event.head_commit.message,
       '[ci skip-build-wheels]')) || (github.repository_owner == 'pantsbuild')) &&
       (needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY')
     name: Build wheels and fs_util (Linux-x86_64)
@@ -287,7 +287,7 @@ jobs:
 
         '
     - env: {}
-      if: (github.event_name == 'push') || !contains(github.event.commits[0].message,
+      if: (github.event_name == 'push') || !contains(github.event.head_commit.message,
         '[ci skip-build-wheels]')
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -325,7 +325,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (((github.event_name == 'push') || !contains(github.event.commits[0].message,
+    if: (((github.event_name == 'push') || !contains(github.event.head_commit.message,
       '[ci skip-build-wheels]')) || (github.repository_owner == 'pantsbuild')) &&
       (needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS10-15-x86_64)
@@ -371,7 +371,7 @@ jobs:
           '
     - env:
         ARCHFLAGS: -arch x86_64
-      if: (github.event_name == 'push') || !contains(github.event.commits[0].message,
+      if: (github.event_name == 'push') || !contains(github.event.head_commit.message,
         '[ci skip-build-wheels]')
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -411,7 +411,7 @@ jobs:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (((github.event_name == 'push') || !contains(github.event.commits[0].message,
+    if: (((github.event_name == 'push') || !contains(github.event.head_commit.message,
       '[ci skip-build-wheels]')) || (github.repository_owner == 'pantsbuild') || (github.event_name
       == 'push')) && (needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY')
     name: Bootstrap Pants, build wheels and fs_util (macOS11-ARM64)
@@ -511,7 +511,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: ((github.event_name == 'push') || !contains(github.event.commits[0].message,
+    - if: ((github.event_name == 'push') || !contains(github.event.head_commit.message,
         '[ci skip-build-wheels]')) && (github.repository_owner == 'pantsbuild')
       name: Build wheels
       run: USE_PY39=true arch -arm64 ./build-support/bin/release.sh build-wheels
@@ -533,7 +533,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (((github.event_name == 'push') || !contains(github.event.commits[0].message,
+    if: (((github.event_name == 'push') || !contains(github.event.head_commit.message,
       '[ci skip-build-wheels]')) || (github.repository_owner == 'pantsbuild')) &&
       (needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY')
     name: Build wheels and fs_util (macOS11-x86_64)
@@ -581,7 +581,7 @@ jobs:
           '
     - env:
         ARCHFLAGS: -arch x86_64
-      if: (github.event_name == 'push') || !contains(github.event.commits[0].message,
+      if: (github.event_name == 'push') || !contains(github.event.head_commit.message,
         '[ci skip-build-wheels]')
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug

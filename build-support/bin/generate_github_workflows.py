@@ -72,9 +72,9 @@ PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
 
 IS_PUSH = "github.event_name == 'push'"
-DONT_SKIP_RUST = "!contains(github.event.commits[0].message, '[ci skip-rust]')"
+DONT_SKIP_RUST = "!contains(github.event.head_commit.message, '[ci skip-rust]')"
 DONT_SKIP_WHEELS = (
-    f"({IS_PUSH}) || !contains(github.event.commits[0].message, '[ci skip-build-wheels]')"
+    f"({IS_PUSH}) || !contains(github.event.head_commit.message, '[ci skip-build-wheels]')"
 )
 
 
