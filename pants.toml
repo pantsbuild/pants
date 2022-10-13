@@ -6,9 +6,9 @@ pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
-  "pants.backend.experimental.python.lint.autoflake",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.explorer",
+  "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
