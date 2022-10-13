@@ -342,6 +342,7 @@ async def convert_fix_result_to_lint_result(fix_result: FixResult) -> LintResult
         fix_result.stdout,
         fix_result.stderr,
         linter_name=fix_result.tool_name,
+        _render_message=False,  # Don't re-render the message
     )
 
 
