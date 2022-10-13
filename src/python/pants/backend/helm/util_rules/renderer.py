@@ -39,7 +39,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.process import InteractiveProcess, Process, ProcessResult
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -314,6 +314,11 @@ async def setup_render_helm_deployment_process(
             return f'"{value}"'
         return value
 
+    process_cache = (
+        ProcessCacheScope.PER_RESTART_SUCCESSFUL
+        if request.post_renderer
+        else ProcessCacheScope.SUCCESSFUL
+    )
     process = HelmProcess(
         argv=[
             request.cmd.value,
@@ -355,6 +360,7 @@ async def setup_render_helm_deployment_process(
         description=request.description,
         input_digest=merged_digests,
         output_directories=output_directories,
+        cache_scope=process_cache,
     )
 
     return _HelmDeploymentProcessWrapper(
