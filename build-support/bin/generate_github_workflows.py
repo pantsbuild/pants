@@ -72,9 +72,16 @@ PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
 
 IS_PUSH = "github.event_name == 'push'"
-DONT_SKIP_RUST = "!contains(github.event.head_commit.message, '[ci skip-rust]')"
+DONT_SKIP_RUST = (
+    # Skip rust builds for a tagged pull request body or push commit message.
+    "!("
+    "contains(github.event.pull_request.body, '[ci skip-rust]') || "
+    "contains(github.event.head_commit.message, '[ci skip-rust]')"
+    ")"
+)
 DONT_SKIP_WHEELS = (
-    f"({IS_PUSH}) || !contains(github.event.head_commit.message, '[ci skip-build-wheels]')"
+    # Skip wheel builds only for pull requests with a tagged body.
+    "!contains(github.event.pull_request.body, '[ci skip-build-wheels]')"
 )
 
 
