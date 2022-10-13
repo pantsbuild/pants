@@ -413,7 +413,15 @@ def test_build_files_share_globals() -> None:
 
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                target_type_aliases=[],
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
