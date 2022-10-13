@@ -107,7 +107,7 @@ def is_docs_only() -> Jobs:
             "if": IS_PANTS_OWNER,
             "outputs": {"docs_only": gha_expr("steps.docs_only_check.outputs.docs_only")},
             "steps": [
-                *checkout(get_commit_msg=False),
+                *checkout(),
                 {
                     "id": "files",
                     "name": "Get changed files",
@@ -150,7 +150,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Sequence[Step]:
+def checkout(*, containerized: bool = False) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -172,37 +172,6 @@ def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Seq
                 "name": "Configure Git",
                 "run": 'git config --global safe.directory "$GITHUB_WORKSPACE"',
             }
-        )
-    if get_commit_msg:
-        steps.extend(
-            [
-                # For a push event, the commit we care about is HEAD itself.
-                # This CI currently only runs on PRs, so this is future-proofing.
-                {
-                    "name": "Get commit message for branch builds",
-                    "if": IS_PUSH,
-                    "run": dedent(
-                        """\
-                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                    echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-                    echo "EOF" >> $GITHUB_ENV
-                    """
-                    ),
-                },
-                # For a pull_request event, the commit we care about is the second parent of the
-                # merge commit. This CI currently only runs on PRs, so this is future-proofing.
-                {
-                    "name": "Get commit message for PR builds",
-                    "if": "github.event_name == 'pull_request'",
-                    "run": dedent(
-                        """\
-                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                    echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-                    echo "EOF" >> $GITHUB_ENV
-                    """
-                    ),
-                },
-            ]
         )
     return steps
 

@@ -23,24 +23,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -168,24 +150,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -307,24 +271,6 @@ jobs:
         fetch-depth: 10
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install rustup
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
         -v -y --default-toolchain none
@@ -392,24 +338,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -496,24 +424,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
@@ -636,24 +546,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -776,24 +668,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -897,24 +771,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -988,24 +844,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -1079,24 +917,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
@@ -1172,24 +992,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name == 'push'
-      name: Get commit message for branch builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
-    - if: github.event_name == 'pull_request'
-      name: Get commit message for PR builds
-      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-
-        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-
-        echo "EOF" >> $GITHUB_ENV
-
-        '
     - name: Install AdoptJDK
       uses: actions/setup-java@v3
       with:
