@@ -6,10 +6,9 @@ from dataclasses import dataclass
 from pants.backend.java.lint.google_java_format.skip_field import SkipGoogleJavaFormatField
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.target_types import JavaSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -39,24 +38,11 @@ class GoogleJavaFormatFieldSet(FieldSet):
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
     tool_subsystem = GoogleJavaFormatSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = GoogleJavaFormatSubsystem.options_scope
-
-
-@rule
-async def partition_google_java_fmt(
-    request: GoogleJavaFormatRequest.PartitionRequest,
-    tool: GoogleJavaFormatSubsystem,
-) -> Partitions:
-    return (
-        Partitions()
-        if tool.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
@@ -108,14 +94,7 @@ async def google_java_format_fmt(
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        request.snapshot,
-        output_snapshot,
-        strip_chroot_path=True,
-        formatter_name=GoogleJavaFormatRequest.tool_name,
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 @rule
@@ -129,6 +108,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        *GoogleJavaFormatRequest.registration_rules(),
+        *GoogleJavaFormatRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

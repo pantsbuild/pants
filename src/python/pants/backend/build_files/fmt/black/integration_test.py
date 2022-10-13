@@ -61,7 +61,7 @@ def run_black(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest.SubPartition(snapshot.files, key=None, snapshot=snapshot),
+            BlackRequest.SubPartition("", snapshot.files, key=None, snapshot=snapshot),
         ],
     )
     return fmt_result

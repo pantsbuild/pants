@@ -144,6 +144,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
 
 class FilterGoal(Goal):
     subsystem_cls = FilterSubsystem
+    environment_migrated = True
 
 
 @goal_rule

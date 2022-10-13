@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.flake8.subsystem import (
     Flake8,
@@ -47,7 +47,7 @@ async def partition_flake8(
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> Partitions[Flake8FieldSet]:
+) -> Partitions[InterpreterConstraints, Flake8FieldSet]:
     if flake8.skip:
         return Partitions()
 
@@ -67,11 +67,11 @@ async def partition_flake8(
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def run_flake8(
-    request: Flake8Request.SubPartition[Flake8FieldSet],
+    request: Flake8Request.SubPartition[InterpreterConstraints, Flake8FieldSet],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = cast(InterpreterConstraints, request.key)
+    interpreter_constraints = request.key
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,
@@ -129,17 +129,12 @@ async def run_flake8(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=str(sorted(str(c) for c in interpreter_constraints)),
-        linter_name=Flake8.options_scope,
-        report=report,
-    )
+    return LintResult.create(request, result, report=report)
 
 
 def rules():
     return [
         *collect_rules(),
-        *Flake8Request.registration_rules(),
+        *Flake8Request.rules(),
         *pex.rules(),
     ]

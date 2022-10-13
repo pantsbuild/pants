@@ -8,6 +8,8 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 
+LOCAL_ENVIRONMENT_MATCHER = "__local__"
+
 
 @dataclass(frozen=True)
 class EnvironmentName(EngineAwareParameter):
@@ -21,8 +23,15 @@ class EnvironmentName(EngineAwareParameter):
 
     val: str | None
 
-    def debug_hint(self) -> str:
-        return self.val or "<none>"
+    def debug_hint(self) -> str | None:
+        return f"environment:{self.val}" if self.val else None
+
+
+@dataclass(frozen=True)
+class ChosenLocalEnvironmentName:
+    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
+
+    val: EnvironmentName
 
 
 def __getattr__(name):
@@ -30,23 +39,23 @@ def __getattr__(name):
         return EnvironmentName
     if name == "CompleteEnvironment":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.CompleteEnvironment`",
-            "Use `pants.engine.env_vars.CompleteEnvironmentVars",
+            "Use `pants.engine.env_vars.CompleteEnvironmentVars`.",
         )
         return CompleteEnvironmentVars
     if name == "EnvironmentRequest":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.EnvironmentRequest`",
-            "Use `pants.engine.env_vars.EnvironmentVarsRequest",
+            "Use `pants.engine.env_vars.EnvironmentVarsRequest`.",
         )
         return EnvironmentVarsRequest
     if name == "Environment":
         warn_or_error(
-            "2.16.0.dev0",
+            "2.17.0.dev0",
             "`pants.engine.environment.Environment`",
-            "Use `pants.engine.env_vars.EnvironmentVars",
+            "Use `pants.engine.env_vars.EnvironmentVars`.",
         )
         return EnvironmentVars
     raise AttributeError(name)

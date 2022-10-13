@@ -1302,9 +1302,29 @@ impl NodeKey {
   /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
   /// user-facing name should be the same as the `desc` annotation on the rule decorator.
   ///
-  fn user_facing_name(&self) -> Option<String> {
+  fn workunit_desc(&self, context: &Context) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => {
+        let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
+
+        let displayable_param_names: Vec<_> = Python::with_gil(|py| {
+          Self::engine_aware_params(context, py, &task.params)
+            .filter_map(|k| EngineAwareParameter::debug_hint((*k.value).as_ref(py)))
+            .collect()
+        });
+
+        let desc = if displayable_param_names.is_empty() {
+          task_desc
+        } else {
+          format!(
+            "{} - {}",
+            task_desc,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        };
+
+        Some(desc)
+      }
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
       NodeKey::ExecuteProcess(epr) => {
@@ -1341,22 +1361,17 @@ impl NodeKey {
   /// Filters the given Params to those which are subtypes of EngineAwareParameter.
   ///
   fn engine_aware_params<'a>(
-    context: Context,
+    context: &Context,
     py: Python<'a>,
     params: &'a Params,
-  ) -> impl Iterator<Item = Value> + 'a {
+  ) -> impl Iterator<Item = &'a Key> + 'a {
     let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
-    params.keys().filter_map(move |key| {
-      if key
+    params.keys().filter(move |key| {
+      key
         .type_id()
         .as_py_type(py)
         .is_subclass(engine_aware_param_ty)
         .unwrap_or(false)
-      {
-        Some(key.to_value())
-      } else {
-        None
-      }
     })
   }
 }
@@ -1370,22 +1385,27 @@ impl Node for NodeKey {
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let workunit_name = self.workunit_name();
-    let params = match &self {
-      NodeKey::Task(ref task) => task.params.clone(),
-      _ => Params::default(),
+    let workunit_desc = self.workunit_desc(&context);
+    let maybe_params = match &self {
+      NodeKey::Task(ref task) => Some(&task.params),
+      _ => None,
     };
     let context2 = context.clone();
 
     in_workunit!(
       workunit_name,
       self.workunit_level(),
-      desc = self.user_facing_name(),
+      desc = workunit_desc.clone(),
       user_metadata = {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        Self::engine_aware_params(context.clone(), py, &params)
-          .flat_map(|val| EngineAwareParameter::metadata((*val).as_ref(py)))
-          .collect()
+        if let Some(params) = maybe_params {
+          Python::with_gil(|py| {
+            Self::engine_aware_params(&context, py, params)
+              .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
+              .collect()
+          })
+        } else {
+          vec![]
+        }
       },
       |workunit| async move {
         // Ensure that we have installed filesystem watches before Nodes which inspect the
@@ -1425,33 +1445,7 @@ impl Node for NodeKey {
         }
 
         // If the node failed, expand the Failure with a new frame.
-        result = result.map_err(|failure| {
-          let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            Self::engine_aware_params(context2, py, &params)
-              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
-              .collect()
-          };
-          let failure_name = if displayable_param_names.is_empty() {
-            name.to_owned()
-          } else if displayable_param_names.len() == 1 {
-            format!(
-              "{} ({})",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          } else {
-            format!(
-              "{} {}",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          };
-
-          failure.with_pushed_frame(&failure_name)
-        });
+        result = result.map_err(|failure| failure.with_pushed_frame(workunit_name, workunit_desc));
 
         result
       }

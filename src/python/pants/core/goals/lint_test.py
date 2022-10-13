@@ -24,11 +24,15 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
@@ -137,7 +141,7 @@ class InvalidRequest(MockLintTargetsRequest):
 
 def mock_target_partitioner(
     request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[MockLinterFieldSet]:
+) -> Partitions[Any, MockLinterFieldSet]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -157,7 +161,7 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
     return Partitions.single_partition(request.files)
 
 
@@ -385,6 +389,35 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ SuccessfulLinter succeeded.
         """
     )
+
+
+def test_default_single_partition_partitioner() -> None:
+    class KitchenSubsystem(Subsystem):
+        options_scope = "kitchen"
+        help = "a cookbook might help"
+        name = "The Kitchen"
+        skip = SkipOption("lint")
+
+    class LintKitchenRequest(LintTargetsRequest):
+        field_set_type = MockLinterFieldSet
+        tool_subsystem = KitchenSubsystem
+        partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+
+    rules = [
+        *LintKitchenRequest._get_rules(),
+        QueryRule(Partitions, [LintKitchenRequest.PartitionRequest]),
+    ]
+    rule_runner = RuleRunner(rules=rules)
+    field_sets = (
+        MockLinterFieldSet(Address("knife"), MultipleSourcesField(["knife"], Address("knife"))),
+        MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
+    )
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
+
+    rule_runner.set_options(["--kitchen-skip"])
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([])
 
 
 @pytest.mark.parametrize("batch_size", [1, 32, 128, 1024])

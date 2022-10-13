@@ -55,7 +55,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -66,8 +66,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -75,7 +75,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'Linux-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - id: get-engine-hash
@@ -87,7 +87,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -126,7 +126,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -200,7 +200,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -211,8 +211,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -220,7 +220,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - id: get-engine-hash
@@ -232,7 +232,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -271,7 +271,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -372,7 +372,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
+    timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -415,7 +415,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -426,8 +426,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'macOS10-15-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -435,7 +435,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS10-15-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - env:
@@ -473,7 +473,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 80
+    timeout-minutes: 120
   build_wheels_macos11_arm64:
     env:
       ARCHFLAGS: -arch arm64
@@ -519,7 +519,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -530,8 +530,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS11-ARM64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'macOS11-ARM64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -539,7 +539,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS11-ARM64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-ARM64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - id: get-engine-hash
@@ -551,7 +551,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-ARM64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -590,7 +590,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-ARM64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-ARM64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -613,7 +613,7 @@ jobs:
       matrix:
         python-version:
         - '3.9'
-    timeout-minutes: 60
+    timeout-minutes: 120
   build_wheels_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -658,7 +658,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.64.0-*
 
           ~/.rustup/update-hashes
@@ -669,8 +669,8 @@ jobs:
     - name: Cache Cargo
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
+        key: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -678,7 +678,7 @@ jobs:
           ~/.cargo/git
 
           '
-        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
+        restore-keys: 'macOS11-x86_64-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
     - env:
@@ -716,7 +716,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 80
+    timeout-minutes: 120
   check_labels:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
@@ -727,7 +727,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request'
       name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
+      uses: mheap/github-action-required-labels@v2.1.0
       with:
         count: 1
         labels: category:new feature, category:user api change, category:plugin api
@@ -747,7 +747,7 @@ jobs:
         fetch-depth: 10
     - id: files
       name: Get changed files
-      uses: tj-actions/changed-files@v23.1
+      uses: tj-actions/changed-files@v32.0.0
       with:
         files_ignore: docs/**|build-support/bin/generate_user_list.py
         files_ignore_separator: '|'
@@ -801,7 +801,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -945,7 +945,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1036,7 +1036,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1127,7 +1127,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1204,7 +1204,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV

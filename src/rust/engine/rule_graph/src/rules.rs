@@ -178,6 +178,11 @@ pub trait Rule:
   fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>>;
 
   ///
+  /// Returns types which this rule is not allowed to consume from the calling scope.
+  ///
+  fn masked_params(&self) -> Vec<Self::TypeId>;
+
+  ///
   /// True if this rule implementation should be required to be reachable in the RuleGraph.
   ///
   fn require_reachable(&self) -> bool;

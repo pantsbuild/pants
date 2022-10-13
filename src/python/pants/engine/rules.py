@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import inspect
 import sys
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
@@ -23,7 +22,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, Protocol
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
@@ -72,6 +71,7 @@ def _make_rule(
     rule_type: RuleType,
     return_type: Type,
     parameter_types: Iterable[Type],
+    masked_types: Iterable[Type],
     *,
     cacheable: bool,
     canonical_name: str,
@@ -110,8 +110,9 @@ def _make_rule(
         func.rule = TaskRule(
             return_type,
             parameter_types,
+            awaitables,
+            masked_types,
             func,
-            input_gets=awaitables,
             canonical_name=canonical_name,
             desc=desc,
             level=level,
@@ -172,6 +173,10 @@ PRIVATE_RULE_DECORATOR_ARGUMENTS = {
     # (We assume but not enforce since this is likely to be used with unions, which has the same
     # assumption between the union base and its members).
     "_param_type_overrides",
+    # Allows callers to prevent the given list of types from being included in the identity of
+    # a @rule. Although the type may be in scope for callers, it will not be consumable in the
+    # `@rule` which declares the type masked.
+    "_masked_types",
 }
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
@@ -201,6 +206,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
+    masked_types: tuple[type, ...] = tuple(kwargs.get("_masked_types", ()))
     param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
@@ -273,6 +279,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         rule_type,
         return_type,
         parameter_types,
+        masked_types,
         cacheable=cacheable,
         canonical_name=effective_name,
         desc=effective_desc,
@@ -417,7 +424,7 @@ def rule_helper(
     return _rule_helper_decorator(func, **kwargs)
 
 
-class Rule(ABC):
+class Rule(Protocol):
     """Rules declare how to produce products for the product graph.
 
     A rule describes what dependencies must be provided to produce a particular product. They also
@@ -425,7 +432,6 @@ class Rule(ABC):
     """
 
     @property
-    @abstractmethod
     def output_type(self):
         """An output `type` for the rule."""
 
@@ -465,43 +471,23 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
     return list(iter_rules())
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class TaskRule(Rule):
+@dataclass(frozen=True)
+class TaskRule:
     """A Rule that runs a task function when all of its input selectors are satisfied.
 
     NB: This API is not meant for direct consumption. To create a `TaskRule` you should always
     prefer the `@rule` constructor.
     """
 
-    _output_type: Type
+    output_type: Type
     input_selectors: Tuple[Type, ...]
     input_gets: Tuple[AwaitableConstraints, ...]
+    masked_types: Tuple[Type, ...]
     func: Callable
-    cacheable: bool
     canonical_name: str
-    desc: Optional[str]
-    level: LogLevel
-
-    def __init__(
-        self,
-        output_type: Type,
-        input_selectors: Iterable[Type],
-        func: Callable,
-        input_gets: Iterable[AwaitableConstraints],
-        canonical_name: str,
-        desc: Optional[str] = None,
-        level: LogLevel = LogLevel.TRACE,
-        cacheable: bool = True,
-    ) -> None:
-        self._output_type = output_type
-        self.input_selectors = tuple(input_selectors)
-        self.input_gets = tuple(input_gets)
-        self.func = func
-        self.cacheable = cacheable
-        self.canonical_name = canonical_name
-        self.desc = desc
-        self.level = level
+    desc: Optional[str] = None
+    level: LogLevel = LogLevel.TRACE
+    cacheable: bool = True
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={})".format(
@@ -512,14 +498,10 @@ class TaskRule(Rule):
             self.input_gets,
         )
 
-    @property
-    def output_type(self):
-        return self._output_type
-
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class QueryRule(Rule):
+class QueryRule:
     """A QueryRule declares that a given set of Params will be used to request an output type.
 
     Every callsite to `Scheduler.product_request` should have a corresponding QueryRule to ensure

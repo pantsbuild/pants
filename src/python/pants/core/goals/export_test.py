@@ -127,7 +127,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
+                    input_types=(InteractiveProcess,),
                     mock=lambda ip: _mock_run(rule_runner, ip),
                 ),
             ],

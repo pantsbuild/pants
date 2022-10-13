@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -55,14 +56,14 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[Flake8FieldSet],
+        Partitions[Any, Flake8FieldSet],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.SubPartition(subpartition, key)],
+            [Flake8Request.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

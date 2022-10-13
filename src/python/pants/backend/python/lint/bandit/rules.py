@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -39,7 +39,7 @@ async def partition_bandit(
     request: BanditRequest.PartitionRequest[BanditFieldSet],
     bandit: Bandit,
     python_setup: PythonSetup,
-) -> Partitions[BanditFieldSet]:
+) -> Partitions[InterpreterConstraints, BanditFieldSet]:
     if bandit.skip:
         return Partitions()
 
@@ -51,14 +51,14 @@ async def partition_bandit(
         request.field_sets, python_setup
     )
 
-    return Partitions(constraints_to_field_sets)
+    return Partitions(constraints_to_field_sets.items())
 
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
-    request: BanditRequest.SubPartition[BanditFieldSet], bandit: Bandit
+    request: BanditRequest.SubPartition[InterpreterConstraints, BanditFieldSet], bandit: Bandit
 ) -> LintResult:
-    interpreter_constraints = cast(InterpreterConstraints, request.key)
+    interpreter_constraints = request.key
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,
@@ -95,13 +95,8 @@ async def bandit_lint(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=str(sorted(str(c) for c in interpreter_constraints)),
-        linter_name=Bandit.options_scope,
-        report=report,
-    )
+    return LintResult.create(request, result, report=report)
 
 
 def rules():
-    return [*collect_rules(), *BanditRequest.registration_rules(), *pex.rules()]
+    return [*collect_rules(), *BanditRequest.rules(), *pex.rules()]

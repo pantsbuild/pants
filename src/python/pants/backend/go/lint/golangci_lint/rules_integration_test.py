@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -99,7 +100,7 @@ def run_golangci_lint(
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
     partition = rule_runner.request(
-        Partitions[GolangciLintFieldSet],
+        Partitions[Any, GolangciLintFieldSet],
         [
             GolangciLintRequest.PartitionRequest(
                 tuple(GolangciLintFieldSet.create(tgt) for tgt in targets)
@@ -109,7 +110,7 @@ def run_golangci_lint(
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
-            LintResult, [GolangciLintRequest.SubPartition(subpartition, key)]
+            LintResult, [GolangciLintRequest.SubPartition("", subpartition, key)]
         )
         results.append(result)
     return tuple(results)

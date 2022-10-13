@@ -313,13 +313,6 @@ impl Core {
     local_cache_read: bool,
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    // TODO: Until we can deprecate letting the flag default, we implicitly default
-    // cache_content_behavior when remote execution is in use. See the TODO in `global_options.py`.
-    let cache_content_behavior = if remoting_opts.execution_enable {
-      CacheContentBehavior::Defer
-    } else {
-      remoting_opts.cache_content_behavior
-    };
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
@@ -333,7 +326,7 @@ impl Core {
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,
-        cache_content_behavior,
+        remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
         remoting_opts.cache_read_timeout,
       )?);
@@ -345,7 +338,7 @@ impl Core {
         local_cache.clone(),
         full_store.clone(),
         local_cache_read,
-        cache_content_behavior,
+        remoting_opts.cache_content_behavior,
         process_cache_namespace,
       ));
     }
@@ -386,11 +379,8 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
-    // enable them when remote execution is in use. See the TODO in `global_options.py`.
-    let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
-    let remote_cache_write =
-      exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
+    let remote_cache_read = exec_strategy_opts.remote_cache_read;
+    let remote_cache_write = exec_strategy_opts.remote_cache_write;
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
     let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
@@ -565,11 +555,7 @@ impl Core {
     let http_client = http_client_builder
       .build()
       .map_err(|err| format!("Error building HTTP client: {}", err))?;
-    let rule_graph = RuleGraph::with_query_inputs_filter(
-      tasks.rules().clone(),
-      tasks.queries().clone(),
-      tasks.query_inputs_filter().iter().cloned().collect(),
-    )?;
+    let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
     let gitignore_file = if use_gitignore {
       let gitignore_path = build_root.join(".gitignore");

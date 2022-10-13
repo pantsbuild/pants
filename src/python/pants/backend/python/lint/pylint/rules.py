@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -46,6 +46,7 @@ class PartitionKey:
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
+    @property
     def description(self) -> str:
         ics = str(sorted(str(c) for c in self.interpreter_constraints))
         return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
@@ -72,7 +73,7 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> Partitions[PylintFieldSet]:
+) -> Partitions[PartitionKey, PylintFieldSet]:
     if pylint.skip:
         return Partitions()
 
@@ -110,19 +111,18 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def run_pylint(
-    request: PylintRequest.SubPartition[PylintFieldSet],
+    request: PylintRequest.SubPartition[PartitionKey, PylintFieldSet],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
-    partition_key = cast(PartitionKey, request.key)
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in partition_key.coarsened_targets.closure()),
+            (target.address for target in request.key.coarsened_targets.closure()),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=partition_key.interpreter_constraints,
+            hardcoded_interpreter_constraints=request.key.interpreter_constraints,
         ),
     )
 
@@ -130,13 +130,13 @@ async def run_pylint(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=partition_key.interpreter_constraints,
+            interpreter_constraints=request.key.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
     sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(partition_key.coarsened_targets.closure())
+        PythonSourceFiles, PythonSourceFilesRequest(request.key.coarsened_targets.closure())
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -154,7 +154,7 @@ async def run_pylint(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=partition_key.interpreter_constraints,
+                    interpreter_constraints=request.key.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
@@ -202,17 +202,12 @@ async def run_pylint(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=partition_key.description(),
-        linter_name=Pylint.options_scope,
-        report=report,
-    )
+    return LintResult.create(request, result, report=report)
 
 
 def rules():
     return [
         *collect_rules(),
-        *PylintRequest.registration_rules(),
+        *PylintRequest.rules(),
         *pex_from_targets.rules(),
     ]

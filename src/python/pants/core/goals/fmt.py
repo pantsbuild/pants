@@ -7,13 +7,20 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type
 
 from pants.base.specs import Specs
-from pants.core.goals.lint import LintFilesRequest, LintRequest, LintResult, LintTargetsRequest
-from pants.core.goals.lint import Partitions as LintPartitions
-from pants.core.goals.lint import _get_partitions_by_request_type
+from pants.core.goals.lint import (
+    LintFilesRequest,
+    LintRequest,
+    LintResult,
+    LintTargetsRequest,
+    _get_partitions_by_request_type,
+)
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
+from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as UntypedPartitions
+from pants.core.util_rules.partitions import _single_partition_field_sets_by_file_partitioner_rules
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -25,11 +32,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, ru
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
-
-_F = TypeVar("_F", bound="FmtResult")
-_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -42,25 +46,23 @@ class FmtResult(EngineAwareReturnType):
     stderr: str
     formatter_name: str
 
-    @classmethod
-    def create(
-        cls,
+    @staticmethod
+    @rule_helper(_public=True)
+    async def create(
+        request: FmtRequest.SubPartition,
         process_result: ProcessResult | FallibleProcessResult,
-        input_snapshot: Snapshot,
-        output: Snapshot,
         *,
-        formatter_name: str,
         strip_chroot_path: bool = False,
     ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return cls(
-            input=input_snapshot,
-            output=output,
+        return FmtResult(
+            input=request.snapshot,
+            output=await Get(Snapshot, Digest, process_result.output_digest),
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            formatter_name=formatter_name,
+            formatter_name=request.tool_name,
         )
 
     def __post_init__(self):
@@ -111,7 +113,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = LintPartitions[str]
+Partitions = UntypedPartitions[PartitionKeyT, str]
 
 
 @union
@@ -119,7 +121,6 @@ class FmtRequest(LintRequest):
     is_formatter = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @runtime_ignore_subscripts
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class SubPartition(LintRequest.SubPartition):
@@ -130,28 +131,43 @@ class FmtRequest(LintRequest):
             return self.elements
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules()
+    def _get_rules(cls) -> Iterable[UnionRule]:
+        yield from super()._get_rules()
         yield UnionRule(FmtRequest, cls)
         yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
 
 
 class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules()
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
+            yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
+
+        yield from (
+            rule
+            for rule in super()._get_rules()
+            # NB: We don't want to yield `lint.py`'s default partitioner
+            if isinstance(rule, UnionRule)
+        )
         yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
 class FmtFilesRequest(FmtRequest, LintFilesRequest):
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules()
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is not PartitionerType.CUSTOM:
+            raise ValueError(
+                "Pants does not provide default partitioners for `FmtFilesRequest`."
+                + " You will need to provide your own partitioner rule."
+            )
+
+        yield from super()._get_rules()
         yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
 class _FmtSubpartitionBatchElement(NamedTuple):
     request_type: type[FmtRequest.SubPartition]
+    tool_name: str
     files: tuple[str, ...]
     key: Any
 
@@ -278,7 +294,10 @@ async def fmt(
             for subpartition in batch(files):
                 yield _FmtSubpartitionBatchRequest(
                     _FmtSubpartitionBatchElement(
-                        request_type.SubPartition, subpartition, partition_key
+                        request_type.SubPartition,
+                        request_type.tool_name,
+                        subpartition,
+                        partition_key,
                     )
                     for request_type, partition_key in partition_infos
                 )
@@ -307,8 +326,8 @@ async def fmt_batch(
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
-    for request_type, files, key in request:
-        subpartition = request_type(files, key, current_snapshot)
+    for request_type, tool_name, files, key in request:
+        subpartition = request_type(tool_name, files, key, current_snapshot)
         result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
         results.append(result)
 
@@ -326,6 +345,7 @@ async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult
         fmt_result.stdout,
         fmt_result.stderr,
         linter_name=fmt_result.formatter_name,
+        _render_message=False,  # Don't re-render the message
     )
 
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 from pants.core.util_rules.environments import (
     DockerImageField,
     DockerPlatformField,
+    EnvironmentsSubsystem,
     EnvironmentTarget,
     RemotePlatformField,
 )
@@ -19,27 +20,28 @@ from pants.util.logging import LogLevel
 
 
 @rule
-def current_platform(env_tgt: EnvironmentTarget, global_options: GlobalOptions) -> Platform:
+def current_platform(
+    env_tgt: EnvironmentTarget,
+    global_options: GlobalOptions,
+    environments_subsystem: EnvironmentsSubsystem,
+) -> Platform:
+    if environments_subsystem.remote_execution_used_globally(global_options):
+        return Platform.linux_x86_64
+
     if env_tgt.val:
         if env_tgt.val.has_field(DockerPlatformField):
             return Platform(env_tgt.val[DockerPlatformField].normalized_value)
         if env_tgt.val.has_field(RemotePlatformField):
             return Platform(env_tgt.val[RemotePlatformField].value)
-        # Else, it's a local environment.
-        return Platform.create_for_localhost()
-
-    # Else, the environments mechanism is not used. For now, at least, we continue to support
-    # enabling remote execution globally for every build via the `--remote-execution` option.
-    return (
-        Platform.linux_x86_64
-        if global_options.remote_execution
-        else Platform.create_for_localhost()
-    )
+    return Platform.create_for_localhost()
 
 
 @rule
 async def complete_environment_vars(
-    session_values: SessionValues, env_tgt: EnvironmentTarget, global_options: GlobalOptions
+    session_values: SessionValues,
+    env_tgt: EnvironmentTarget,
+    global_options: GlobalOptions,
+    environments_subsystem: EnvironmentsSubsystem,
 ) -> CompleteEnvironmentVars:
     # If a local environment is used, we simply use SessionValues. Otherwise, we need to run `env`
     # and parse the output.
@@ -57,7 +59,7 @@ async def complete_environment_vars(
             # Else, it's a local environment.
             return session_values[CompleteEnvironmentVars]
     else:
-        if global_options.remote_execution:
+        if environments_subsystem.remote_execution_used_globally(global_options):
             description_of_env_source = "the remote execution environment"
         else:
             return session_values[CompleteEnvironmentVars]

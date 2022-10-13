@@ -2,13 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.shell.lint.shellcheck.skip_field import SkipShellcheckField
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
@@ -34,18 +36,12 @@ class ShellcheckFieldSet(FieldSet):
 class ShellcheckRequest(LintTargetsRequest):
     field_set_type = ShellcheckFieldSet
     tool_subsystem = Shellcheck
-
-
-@rule
-async def partition_shellcheck(
-    request: ShellcheckRequest.PartitionRequest[ShellcheckFieldSet], shellcheck: Shellcheck
-) -> Partitions[ShellcheckFieldSet]:
-    return Partitions() if shellcheck.skip else Partitions.single_partition(request.field_sets)
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(
-    request: ShellcheckRequest.SubPartition[ShellcheckFieldSet],
+    request: ShellcheckRequest.SubPartition[Any, ShellcheckFieldSet],
     shellcheck: Shellcheck,
     platform: Platform,
 ) -> LintResult:
@@ -104,10 +100,11 @@ async def run_shellcheck(
             level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=Shellcheck.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
-    return [*collect_rules(), *ShellcheckRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *ShellcheckRequest.rules(),
+    ]

@@ -6,18 +6,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Generic,
-    Iterable,
-    Iterator,
-    Sequence,
-    Tuple,
-    TypeVar,
-    cast,
-)
+from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
 from typing_extensions import final
 
@@ -30,6 +19,14 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
+from pants.core.util_rules.partitions import (
+    _PartitionFieldSetsRequestBase,
+    _PartitionFilesRequestBase,
+    _single_partition_field_sets_partitioner_rules,
+    _SubPartitionBase,
+)
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
@@ -43,16 +40,14 @@ from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty, frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
-_PartitionElementT = TypeVar("_PartitionElementT")
 
 
 @dataclass(frozen=True)
@@ -63,14 +58,14 @@ class LintResult(EngineAwareReturnType):
     linter_name: str
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
+    _render_message: bool = True
 
     @classmethod
-    def from_fallible_process_result(
+    def create(
         cls,
+        request: LintRequest.SubPartition,
         process_result: FallibleProcessResult,
         *,
-        linter_name: str,
-        partition_description: str | None = None,
         strip_chroot_path: bool = False,
         report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
@@ -81,8 +76,8 @@ class LintResult(EngineAwareReturnType):
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            linter_name=linter_name,
-            partition_description=partition_description,
+            linter_name=request.tool_name,
+            partition_description=request.key.description if request.key else None,
             report=report,
         )
 
@@ -90,7 +85,11 @@ class LintResult(EngineAwareReturnType):
         return {"partition": self.partition_description}
 
     def level(self) -> LogLevel | None:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
+        if not self._render_message:
+            return LogLevel.TRACE
+        if self.exit_code != 0:
+            return LogLevel.ERROR
+        return LogLevel.INFO
 
     def message(self) -> str | None:
         message = self.linter_name
@@ -111,36 +110,6 @@ class LintResult(EngineAwareReturnType):
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
         return False
-
-
-@runtime_ignore_subscripts
-class Partitions(FrozenDict[Any, "tuple[_PartitionElementT, ...]"]):
-    """A mapping from <partition key> to <partition>.
-
-    When implementing a linter, one of your rules will return this type, taking in a
-    `PartitionRequest` specific to your linter.
-
-    The return likely will fit into one of:
-        - Returning an empty partition: E.g. if your tool is being skipped.
-        - Returning one partition. The partition may contain all of the inputs
-            (as will likely be the case for target linters) or a subset (which will likely be the
-            case for targetless linters).
-        - Returning >1 partition. This might be the case if you can't run
-            the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
-            and files ABC with Py2.
-
-    The partition key can be of any type able to cross a rule-boundary, and will be provided to the
-    rule which "runs" your tool.
-
-    NOTE: The partition may be divided further into multiple sub-partitions.
-    """
-
-    @classmethod
-    def single_partition(
-        cls, elements: Iterable[_PartitionElementT], key: Any = None
-    ) -> Partitions[_PartitionElementT]:
-        """Helper constructor for implementations that have only one partition."""
-        return Partitions([(key, tuple(elements))])
 
 
 @union
@@ -184,14 +153,13 @@ class LintRequest:
         def rules():
             return [
                 *collect_rules(),
-                *DryCleaningRequest.registration_rules()
+                *DryCleaningRequest.rules()
             ]
-
-    NOTE: For more information about the `PartitionRequest` types, see
-        `LintTargetsRequest.PartitionRequest`/`LintFilesRequest.PartitionRequest`.
     """
 
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
+    partitioner_type: ClassVar[PartitionerType] = PartitionerType.CUSTOM
+
     is_formatter: ClassVar[bool] = False
 
     @classproperty
@@ -199,21 +167,16 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    # NB: Not frozen so `fmt` can subclass
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
-    @runtime_ignore_subscripts
-    class SubPartition(Generic[_PartitionElementT]):
-        elements: Tuple[_PartitionElementT, ...]
-        key: Any
+    class SubPartition(_SubPartitionBase[PartitionKeyT, PartitionElementT]):
+        pass
 
     @final
     @classmethod
-    def registration_rules(cls) -> Iterable[UnionRule]:
-        yield from cls._get_registration_rules()
+    def rules(cls) -> Iterable:
+        yield from cls._get_rules()
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
+    def _get_rules(cls) -> Iterable:
         yield UnionRule(LintRequest, cls)
         yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
 
@@ -224,21 +187,15 @@ class LintTargetsRequest(LintRequest):
     field_set_type: ClassVar[type[FieldSet]]
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @dataclass(frozen=True)
-    @runtime_ignore_subscripts
-    class PartitionRequest(Generic[_FieldSetT]):
-        """Returns a unique `PartitionRequest` type per calling type.
-
-        This serves us 2 purposes:
-            1. `LintTargetsRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-        """
-
-        field_sets: tuple[_FieldSetT, ...]
+    class PartitionRequest(_PartitionFieldSetsRequestBase[_FieldSetT]):
+        pass
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules()
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
+            yield from _single_partition_field_sets_partitioner_rules(cls)
+
+        yield from super()._get_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
@@ -246,20 +203,18 @@ class LintFilesRequest(LintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @dataclass(frozen=True)
-    class PartitionRequest:
-        """Returns a unique `PartitionRequest` type per calling type.
-
-        This serves us 2 purposes:
-            1. `LintFilesRequest.PartitionRequest` is the unique type used as a union base for plugin registration.
-            2. `<Plugin Defined Subclass>.PartitionRequest` is the unique type used as the union member.
-        """
-
-        files: tuple[str, ...]
+    class PartitionRequest(_PartitionFilesRequestBase):
+        pass
 
     @classmethod
-    def _get_registration_rules(cls) -> Iterable[UnionRule]:
-        yield from super()._get_registration_rules()
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is not PartitionerType.CUSTOM:
+            raise ValueError(
+                "Pants does not provide default partitioners for `LintFilesRequest`."
+                + " You will need to provide your own partitioner rule."
+            )
+
+        yield from super()._get_rules()
         yield UnionRule(LintFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
@@ -473,7 +428,10 @@ async def lint(
 
     subpartitions = [
         request_type.SubPartition(
-            elements, key, **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {}
+            request_type.tool_name,
+            elements,
+            key,
+            **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {},
         )
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, key in batch

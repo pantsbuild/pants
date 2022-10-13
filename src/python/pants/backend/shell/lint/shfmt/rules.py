@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from pants.backend.shell.lint.shfmt.skip_field import SkipShfmtField
 from pants.backend.shell.lint.shfmt.subsystem import Shfmt
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -33,17 +33,7 @@ class ShfmtFieldSet(FieldSet):
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
     tool_subsystem = Shfmt
-
-
-@rule
-async def partition_shfmt(request: ShfmtRequest.PartitionRequest, shfmt: Shfmt) -> Partitions:
-    return (
-        Partitions()
-        if shfmt.skip
-        else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
-        )
-    )
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
@@ -83,14 +73,11 @@ async def shfmt_fmt(
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=ShfmtRequest.tool_name
-    )
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        *ShfmtRequest.registration_rules(),
+        *ShfmtRequest.rules(),
     ]

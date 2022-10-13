@@ -7,10 +7,12 @@ import dataclasses
 import logging
 import shlex
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Optional, Tuple, Type, Union, cast
+from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import LOCAL_ENVIRONMENT_MATCHER as LOCAL_ENVIRONMENT_MATCHER
+from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEnvironmentName
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
@@ -40,6 +42,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
+
 
 class EnvironmentsSubsystem(Subsystem):
     options_scope = "environments-preview"
@@ -62,7 +66,7 @@ class EnvironmentsSubsystem(Subsystem):
                 linux_ci = "build-support:linux_ci_env"
                 macos_ci = "build-support:macos_ci_env"
 
-            To use an environment for a given target, specify the name in the `_environment` field
+            To use an environment for a given target, specify the name in the `environment` field
             on that target. Pants will consume the environment target at the address mapped from
             that name.
 
@@ -71,16 +75,19 @@ class EnvironmentsSubsystem(Subsystem):
         )
     )
 
+    def remote_execution_used_globally(self, global_options: GlobalOptions) -> bool:
+        """If the environments mechanism is not used, `--remote-execution` toggles remote execution
+        globally."""
+        return not self.names and global_options.remote_execution
+
 
 # -------------------------------------------------------------------------------------------
 # Environment targets
 # -------------------------------------------------------------------------------------------
 
-LOCAL_ENVIRONMENT_MATCHER = "__local__"
-
 
 class EnvironmentField(StringField):
-    alias = "_environment"
+    alias = "environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
     help = softwrap(
@@ -146,17 +153,22 @@ class LocalEnvironmentTarget(Target):
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
     help = softwrap(
         f"""
-        Configuration of environment-sensitive options, such as environment variables and search
-        paths when Pants runs subprocesses locally.
+        Configuration of a local execution environment for specific platforms.
+
+        Environment configuration includes the platforms the environment is compatible with, and
+        optionally a fallback environment, along with environment-aware options (such as
+        environment variables and search paths) used by Pants to execute processes in this
+        environment.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
 
         Only one `local_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_ENVIRONMENT_MATCHER}` is specified as the environment, the
         `local_environment` that matches the current platform (if defined) will be selected.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -171,6 +183,10 @@ class DockerImageField(StringField):
         This value may be any image identifier that the local Docker installation can accept.
         This includes image names with or without tags (e.g. `centos6` or `centos6:latest`), or
         image names with an immutable digest (e.g. `centos@sha256:<some_sha256_value>`).
+
+        The choice of image ID can affect the reproducibility of builds. Consider using an
+        immutable digest if reproducibility is needed, but regularly ensure that the image
+        is free of relevant bugs or security vulnerabilities.
         """
     )
 
@@ -241,14 +257,17 @@ class DockerEnvironmentTarget(Target):
     )
     help = softwrap(
         """
-        Configuration of a Docker environment used for building your code, including the Docker
-        image, along with environment-sensitive options, which include environment variables and
-        search paths, used by Pants to execute processes in this Docker environment.
+        Configuration of a Docker environment used for building your code.
+
+        Environment configuration includes both Docker-specific information (including the image
+        and platform choice), as well as environment-aware options (such as environment variables
+        and search paths) used by Pants to execute processes in this Docker environment.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -303,22 +322,25 @@ class RemoteEnvironmentTarget(Target):
     )
     help = softwrap(
         """
-        Configuration of a remote execution environment used for building your code, including the
-        environment-sensitive options, which include environment variables and
-        search paths, used by Pants to execute processes in this remote environment.
+        Configuration of a remote execution environment used for building your code.
+
+        Environment configuration includes platform properties and a fallback environment, as well
+        as environment-aware options (such as environment variables and search paths) used by Pants
+        to execute processes in this remote environment.
 
         Note that you must also configure remote execution with the global options like
         `remote_execution` and `remote_execution_address`.
 
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
-        the `_environment` field defined on other targets.
+        the `environment` field defined on other targets.
 
         Often, it is only necessary to have a single `remote_environment` target for your
         repository, but it can be useful to have >1 so that you can set different
         `extra_platform_properties`. For example, with some servers, you could use this to
         configure a different Docker image per environment.
         """
+        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -332,7 +354,7 @@ def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentNam
         ChosenLocalEnvironmentName,
         session.product_request(ChosenLocalEnvironmentName, [Params()])[0],
     )
-    return EnvironmentName(local_env.val)
+    return local_env.val
 
 
 class AmbiguousEnvironmentError(Exception):
@@ -349,13 +371,6 @@ class NoFallbackEnvironmentError(Exception):
 
 class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment names to their corresponding environment target."""
-
-
-@dataclass(frozen=True)
-class ChosenLocalEnvironmentName:
-    """Which environment name from `[environments-preview].names` that __local__ resolves to."""
-
-    val: str | None
 
 
 @dataclass(frozen=True)
@@ -437,11 +452,11 @@ async def determine_local_environment(
     ]
     if not compatible_name_and_targets:
         # That is, use the values from the options system instead, rather than from fields.
-        return ChosenLocalEnvironmentName(None)
+        return ChosenLocalEnvironmentName(EnvironmentName(None))
 
     if len(compatible_name_and_targets) == 1:
         result_name, _tgt = compatible_name_and_targets[0]
-        return ChosenLocalEnvironmentName(result_name)
+        return ChosenLocalEnvironmentName(EnvironmentName(result_name))
 
     raise AmbiguousEnvironmentError(
         softwrap(
@@ -502,7 +517,7 @@ async def resolve_environment_name(
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
         local_env_name = await Get(ChosenLocalEnvironmentName, {})
-        return EnvironmentName(local_env_name.val)
+        return local_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
             softwrap(
@@ -686,15 +701,22 @@ async def _maybe_add_docker_image_id(image_name: str, platform: Platform, addres
 
 @rule
 async def extract_process_config_from_environment(
-    tgt: EnvironmentTarget, platform: Platform, global_options: GlobalOptions
+    tgt: EnvironmentTarget,
+    platform: Platform,
+    global_options: GlobalOptions,
+    environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessConfigFromEnvironment:
-    if tgt.val is None:
-        docker_image = None
-        remote_execution = global_options.remote_execution
+    docker_image = None
+    remote_execution = False
+    raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
+
+    if environments_subsystem.remote_execution_used_globally(global_options):
+        remote_execution = True
         raw_remote_execution_extra_platform_properties = (
-            global_options.remote_execution_extra_platform_properties if remote_execution else ()
+            global_options.remote_execution_extra_platform_properties
         )
-    else:
+
+    elif tgt.val is not None:
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
@@ -710,7 +732,7 @@ async def extract_process_config_from_environment(
                 RemoteExtraPlatformPropertiesField
             ].value
             if global_options.remote_execution_extra_platform_properties:
-                logging.warning(
+                logger.warning(
                     softwrap(
                         f"""\
                         The option `[GLOBAL].remote_execution_extra_platform_properties` is set, but
@@ -721,8 +743,6 @@ async def extract_process_config_from_environment(
                         """
                     )
                 )
-        else:
-            raw_remote_execution_extra_platform_properties = ()
 
     return ProcessConfigFromEnvironment(
         platform=platform.value,
@@ -783,6 +803,10 @@ def add_option_fields_for(env_aware: type[Subsystem.EnvironmentAware]) -> Iterab
     return field_rules
 
 
+def option_field_name_for(flag_names: Sequence[str]) -> str:
+    return flag_names[0][2:].replace("-", "_")
+
+
 def _add_option_field_for(
     env_aware_t: type[Subsystem.EnvironmentAware],
     option: OptionsInfo,
@@ -790,7 +814,7 @@ def _add_option_field_for(
     option_type: type = option.flag_options["type"]
     scope = env_aware_t.subsystem.options_scope
 
-    snake_name = option.flag_names[0][2:].replace("-", "_")
+    snake_name = option_field_name_for(option.flag_names)
 
     # Note that there is not presently good support for enum options. `str`-backed enums should
     # be easy enough to add though...

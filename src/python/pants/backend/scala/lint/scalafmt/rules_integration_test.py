@@ -12,6 +12,7 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint.scalafmt import skip_field
 from pants.backend.scala.lint.scalafmt.rules import (
     GatherScalafmtConfigFilesRequest,
+    PartitionInfo,
     ScalafmtConfigFiles,
     ScalafmtFieldSet,
     ScalafmtRequest,
@@ -124,7 +125,7 @@ def run_scalafmt(
 ) -> FmtResult | list[FmtResult]:
     field_sets = [ScalafmtFieldSet.create(tgt) for tgt in targets]
     partitions = rule_runner.request(
-        Partitions,
+        Partitions[PartitionInfo],
         [
             ScalafmtRequest.PartitionRequest(tuple(field_sets)),
         ],
@@ -140,6 +141,7 @@ def run_scalafmt(
             FmtResult,
             [
                 ScalafmtRequest.SubPartition(
+                    "",
                     partition,
                     key=key,
                     snapshot=rule_runner.request(Snapshot, [PathGlobs(partition)]),

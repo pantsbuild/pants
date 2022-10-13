@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 from pants.backend.terraform.partition import partition_files_by_directory
@@ -12,8 +13,6 @@ from pants.backend.terraform.tool import rules as tool_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -37,6 +36,15 @@ class TffmtRequest(FmtTargetsRequest):
     tool_subsystem = TfFmtSubsystem
 
 
+@dataclass(frozen=True)
+class PartitionKey:
+    directory: str
+
+    @property
+    def description(self) -> str:
+        return self.directory
+
+
 @rule
 async def partition_tffmt(
     request: TffmtRequest.PartitionRequest, tffmt: TfFmtSubsystem
@@ -49,14 +57,14 @@ async def partition_tffmt(
     )
 
     return Partitions(
-        (directory, tuple(files))
+        (PartitionKey(directory), tuple(files))
         for directory, files in partition_files_by_directory(source_files.files).items()
     )
 
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -> FmtResult:
-    directory = cast(str, request.key)
+    directory = cast(PartitionKey, request.key).directory
     result = await Get(
         ProcessResult,
         TerraformProcess(
@@ -67,9 +75,7 @@ async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -
         ),
     )
 
-    output = await Get(Snapshot, Digest, result.output_digest)
-
-    return FmtResult.create(result, request.snapshot, output, formatter_name=TffmtRequest.tool_name)
+    return await FmtResult.create(request, result)
 
 
 def rules():
@@ -77,5 +83,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *tool_rules(),
-        *TffmtRequest.registration_rules(),
+        *TffmtRequest.rules(),
     ]

@@ -40,6 +40,7 @@ class Org:
 # Orgs will be displayed in case-insensitive alphabetical order, but it's useful for human readers
 # to keep this list in that order too.
 _orgs = (
+    Org("Aiven", "https://aiven.io/", "https://files.readme.io/20085f3-aiven-small.png"),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"

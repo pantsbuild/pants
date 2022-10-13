@@ -10,10 +10,10 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -35,6 +35,7 @@ class IsortFieldSet(FieldSet):
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
     tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -58,17 +59,6 @@ def generate_argv(
             args.append(f"--settings={isort.config[0]}")
     args.extend(source_files)
     return tuple(args)
-
-
-@rule
-async def partition_isort(request: IsortRequest.PartitionRequest, isort: Isort) -> Partitions:
-    return (
-        Partitions()
-        if isort.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
@@ -101,19 +91,12 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        request.snapshot,
-        output_snapshot,
-        strip_chroot_path=True,
-        formatter_name=IsortRequest.tool_name,
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        *IsortRequest.registration_rules(),
+        *IsortRequest.rules(),
         *pex.rules(),
     ]

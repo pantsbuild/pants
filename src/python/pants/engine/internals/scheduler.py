@@ -115,7 +115,6 @@ class Scheduler:
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
         executor: PyExecutor,
-        query_inputs_filter: Sequence[type] = tuple(),
         include_trace_on_error: bool = True,
         visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
@@ -132,8 +131,6 @@ class Scheduler:
         :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
         :param local_store_options: Options for the engine's LMDB store(s).
-        :param query_inputs_filter: Types to filter out of all QueryRules which are installed,
-          including those produced synthetically by RuleGraph solving.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :param validate_reachability: True to assert that all rules in an otherwise successfully
           constructed rule graph are reachable: if a graph cannot be successfully constructed, it
@@ -145,7 +142,7 @@ class Scheduler:
         self._visualize_run_count = 0
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
-        tasks = register_rules(rule_index, union_membership, query_inputs_filter)
+        tasks = register_rules(rule_index, union_membership)
 
         # Create the native Scheduler and Session.
         types = PyTypes(
@@ -488,29 +485,13 @@ class SchedulerSession:
 
     def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
-
-        if self._scheduler.include_trace_on_error:
-            throw = throws[0]
-            etb = throw.engine_traceback
-            python_traceback_str = throw.python_traceback or ""
-            engine_traceback_str = ""
-            others_msg = f"\n(and {len(throws) - 1} more)" if len(throws) > 1 else ""
-            if etb:
-                sep = "\n  in "
-                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n"
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n"
-                f"{engine_traceback_str}"
-                f"{python_traceback_str}"
-                f"{others_msg}",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
-        else:
-            exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n  {exception_strs}\n",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
+        others_msg = f"\n(and {len(throws) - 1} more)\n" if len(throws) > 1 else ""
+        raise ExecutionError(
+            f"{exception_noun} encountered:\n\n"
+            f"{throws[0].render(self._scheduler.include_trace_on_error)}\n"
+            f"{others_msg}",
+            wrapped_exceptions=tuple(t.exc for t in throws),
+        )
 
     def execute(self, execution_request: ExecutionRequest) -> list[Any]:
         """Invoke the engine for the given ExecutionRequest, returning successful values or raising.
@@ -648,9 +629,7 @@ class SchedulerSession:
         native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
 
 
-def register_rules(
-    rule_index: RuleIndex, union_membership: UnionMembership, query_inputs_filter: Sequence[type]
-) -> PyTasks:
+def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
     """Create a native Tasks object loaded with given RuleIndex."""
     tasks = PyTasks()
 
@@ -659,6 +638,8 @@ def register_rules(
             tasks,
             rule.func,
             rule.output_type,
+            rule.input_selectors,
+            rule.masked_types,
             side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
             engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
             cacheable=rule.cacheable,
@@ -666,9 +647,6 @@ def register_rules(
             desc=rule.desc or "",
             level=rule.level.level,
         )
-
-        for selector in rule.input_selectors:
-            native_engine.tasks_add_select(tasks, selector)
 
         for the_get in rule.input_gets:
             unions = [t for t in the_get.input_types if is_union(t)]
@@ -702,6 +680,4 @@ def register_rules(
             query.output_type,
             query.input_types,
         )
-    for filtered_type in query_inputs_filter:
-        native_engine.tasks_add_query_inputs_filter(tasks, filtered_type)
     return tasks

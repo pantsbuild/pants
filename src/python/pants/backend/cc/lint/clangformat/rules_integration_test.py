@@ -99,7 +99,7 @@ def run_clangformat(
         FmtResult,
         [
             ClangFormatRequest.SubPartition(
-                input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
@@ -16,7 +17,8 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -41,19 +43,11 @@ class GoVetFieldSet(FieldSet):
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
     tool_subsystem = GoVetSubsystem
-
-
-@rule
-async def partition_go_vet(
-    request: GoVetRequest.PartitionRequest[GoVetFieldSet], go_vet_subsystem: GoVetSubsystem
-) -> Partitions[GoVetFieldSet]:
-    return (
-        Partitions() if go_vet_subsystem.skip else Partitions.single_partition(request.field_sets)
-    )
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintResult:
+async def run_go_vet(request: GoVetRequest.SubPartition[Any, GoVetFieldSet]) -> LintResult:
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in request.elements),
@@ -85,13 +79,11 @@ async def run_go_vet(request: GoVetRequest.SubPartition[GoVetFieldSet]) -> LintR
         ),
     )
 
-    return LintResult.from_fallible_process_result(
-        process_result, linter_name=GoVetSubsystem.options_scope
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
     return [
         *collect_rules(),
-        *GoVetRequest.registration_rules(),
+        *GoVetRequest.rules(),
     ]

@@ -57,13 +57,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
-        singleton_environment=None,
+        inherent_environment=None,
     )
 
 
 def test_extract_process_config_from_environment() -> None:
     def assert_config(
         *,
+        envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         enable_remote_execution: bool,
         expected_remote_execution: bool,
@@ -75,9 +76,18 @@ def test_extract_process_config_from_environment() -> None:
             remote_execution=enable_remote_execution,
             remote_execution_extra_platform_properties=["global_k=v"],
         )
+        env_subsystem = create_subsystem(
+            EnvironmentsSubsystem,
+            names={"name": "addr"} if envs_enabled else {},
+        )
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
-            rule_args=[EnvironmentTarget(env_tgt), Platform.linux_arm64, global_options],
+            rule_args=[
+                EnvironmentTarget(env_tgt),
+                Platform.linux_arm64,
+                global_options,
+                env_subsystem,
+            ],
             mock_gets=[
                 MockGet(
                     output_type=DockerResolveImageResult,
@@ -105,10 +115,18 @@ def test_extract_process_config_from_environment() -> None:
     )
     assert_config(
         env_tgt=None,
+        envs_enabled=False,
         enable_remote_execution=True,
         expected_remote_execution=True,
         expected_docker_image=None,
         expected_remote_execution_extra_platform_properties=[("global_k", "v")],
+    )
+    assert_config(
+        env_tgt=None,
+        envs_enabled=True,
+        enable_remote_execution=True,
+        expected_remote_execution=False,
+        expected_docker_image=None,
     )
 
     for re in (False, True):
@@ -192,7 +210,7 @@ def test_choose_local_environment(rule_runner: RuleRunner) -> None:
 
     def get_env() -> EnvironmentTarget:
         name = rule_runner.request(ChosenLocalEnvironmentName, [])
-        return rule_runner.request(EnvironmentTarget, [EnvironmentName(name.val)])
+        return rule_runner.request(EnvironmentTarget, [name.val])
 
     # If `--names` is not set, do not choose an environment.
     assert get_env().val is None
@@ -284,7 +302,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 MockGet(
                     output_type=ChosenLocalEnvironmentName,
                     input_types=(),
-                    mock=lambda: ChosenLocalEnvironmentName(None),
+                    mock=lambda: ChosenLocalEnvironmentName(EnvironmentName(None)),
                 ),
                 MockGet(
                     output_type=EnvironmentTarget,

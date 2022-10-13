@@ -17,7 +17,6 @@ from pants.core.util_rules.system_binaries import (
     DiffBinaryRequest,
 )
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -102,14 +101,11 @@ async def run_buf_format(
             env={"PATH": binary_shims.bin_directory},
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=BufFormatRequest.tool_name
-    )
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        *BufFormatRequest.registration_rules(),
+        *BufFormatRequest.rules(),
     ]

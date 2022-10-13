@@ -11,10 +11,10 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import FieldSet, Target
@@ -36,6 +36,7 @@ class YapfFieldSet(FieldSet):
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
     tool_subsystem = Yapf
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule_helper
@@ -72,21 +73,7 @@ async def _run_yapf(
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=YapfRequest.tool_name
-    )
-
-
-@rule
-async def partition_yapf(request: YapfRequest.PartitionRequest, yapf: Yapf) -> Partitions:
-    return (
-        Partitions()
-        if yapf.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
+    return await FmtResult.create(request, result)
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
@@ -97,6 +84,6 @@ async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
 def rules():
     return [
         *collect_rules(),
-        *YapfRequest.registration_rules(),
+        *YapfRequest.rules(),
         *pex.rules(),
     ]
