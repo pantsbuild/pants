@@ -85,7 +85,7 @@ async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
     )
     return FmtResult(
-        input=input, output=output, stdout="", stderr="", formatter_name=FortranFmtRequest.tool_name
+        input=input, output=output, stdout="", stderr="", tool_name=FortranFmtRequest.tool_name
     )
 
 
@@ -126,7 +126,7 @@ async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResul
         output=request.snapshot,
         stdout="",
         stderr="",
-        formatter_name=SmalltalkNoopRequest.tool_name,
+        tool_name=SmalltalkNoopRequest.tool_name,
     )
 
 
@@ -187,7 +187,7 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> Fmt
         output=output_snapshot,
         stdout="",
         stderr="",
-        formatter_name=BrickyBuildFileFormatter.tool_name,
+        tool_name=BrickyBuildFileFormatter.tool_name,
     )
 
 
@@ -382,7 +382,7 @@ def test_message_lists_added_files() -> None:
         output=output_snapshot,
         stdout="stdout",
         stderr="stderr",
-        formatter_name="formatter",
+        tool_name="formatter",
     )
     assert result.message() == "formatter made changes.\n  added.ext"
 
@@ -399,7 +399,7 @@ def test_message_lists_removed_files() -> None:
         output=output_snapshot,
         stdout="stdout",
         stderr="stderr",
-        formatter_name="formatter",
+        tool_name="formatter",
     )
     assert result.message() == "formatter made changes.\n  removed.ext"
 
@@ -418,7 +418,7 @@ def test_message_lists_files() -> None:
         output=output_snapshot,
         stdout="stdout",
         stderr="stderr",
-        formatter_name="formatter",
+        tool_name="formatter",
     )
     assert result.message() == "formatter made changes.\n  added.ext\n  removed.ext"
 
@@ -507,7 +507,7 @@ def test_streaming_output_changed(caplog) -> None:
         output=changed_snapshot,
         stdout="stdout",
         stderr="stderr",
-        formatter_name="formatter",
+        tool_name="formatter",
     )
     assert result.level() == LogLevel.WARN
     assert result.message() == "formatter made changes."
@@ -523,7 +523,7 @@ def test_streaming_output_not_changed(caplog) -> None:
         output=EMPTY_SNAPSHOT,
         stdout="stdout",
         stderr="stderr",
-        formatter_name="formatter",
+        tool_name="formatter",
     )
     assert result.level() == LogLevel.INFO
     assert result.message() == "formatter made no changes."
