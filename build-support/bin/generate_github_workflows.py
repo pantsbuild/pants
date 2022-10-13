@@ -87,6 +87,7 @@ IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 # Actions
 # ----------------------------------------------------------------------
 
+
 def classify_changes() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
     return {
@@ -121,18 +122,7 @@ def classify_changes() -> Jobs:
                           echo '::set-output name=docs_only::true'
                         fi
                         for i in ${affected}; do
-                          if [[ "${i}" == "docs" ]]; then
-                            echo '::set-output name=docs::true'
-                          fi
-                          if [[ "${i}" == "rust" ]]; then
-                            echo '::set-output name=rust::true'
-                          fi
-                          if [[ "${i}" == "release" ]]; then
-                            echo '::set-output name=release::true'
-                          fi
-                          if [[ "${i}" == "ci_config" ]]; then
-                            echo '::set-output name=ci_config::true'
-                          fi
+                          echo "::set-output name=${i}::true"
                         done
                         """
                     ),

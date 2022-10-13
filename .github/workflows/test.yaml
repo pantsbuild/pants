@@ -717,15 +717,7 @@ jobs:
         \         if [[ \"${affected}\" == \"docs\" ]]; then\n                   \
         \       echo '::set-output name=docs_only::true'\n                       \
         \ fi\n                        for i in ${affected}; do\n                 \
-        \         if [[ \"${i}\" == \"docs\" ]]; then\n                          \
-        \  echo '::set-output name=docs::true'\n                          fi\n   \
-        \                       if [[ \"${i}\" == \"rust\" ]]; then\n            \
-        \                echo '::set-output name=rust::true'\n                   \
-        \       fi\n                          if [[ \"${i}\" == \"release\" ]]; then\n\
-        \                            echo '::set-output name=release::true'\n    \
-        \                      fi\n                          if [[ \"${i}\" == \"\
-        ci_config\" ]]; then\n                            echo '::set-output name=ci_config::true'\n\
-        \                          fi\n                        done\n"
+        \         echo \"::set-output name=${i}::true\"\n                        done\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != true)
