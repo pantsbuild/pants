@@ -172,6 +172,9 @@ class RenderedHelmFiles(EngineAwareReturnType):
     def metadata(self) -> dict[str, Any] | None:
         return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
 
+    def cacheable(self) -> bool:
+        return not self.post_processed
+
 
 @rule_helper
 async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
