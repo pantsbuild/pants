@@ -58,7 +58,7 @@ class LintResult(EngineAwareReturnType):
     linter_name: str
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
-    _render_message: bool = False
+    _render_message: bool = True
 
     @classmethod
     def create(
@@ -85,8 +85,8 @@ class LintResult(EngineAwareReturnType):
         return {"partition": self.partition_description}
 
     def level(self) -> LogLevel | None:
-        if self._render_message:
-            return LogLevel.DEBUG
+        if not self._render_message:
+            return LogLevel.TRACE
         if self.exit_code != 0:
             return LogLevel.ERROR
         return LogLevel.INFO
