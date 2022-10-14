@@ -248,6 +248,7 @@ impl CommandRunner {
     context: Context,
     cache_lookup_start: Instant,
     action_digest: Digest,
+    failures_cached: bool,
     request: &Process,
     mut local_execution_future: BoxFuture<
       '_,
@@ -269,27 +270,25 @@ impl CommandRunner {
       )
       .await;
       match response {
-        Ok(cached_response_opt) => {
-          match &cached_response_opt {
-            Some(cached_response) => {
-              log::debug!(
-                "remote cache hit for: {:?} digest={:?} response={:?}",
-                request.description,
-                action_digest,
-                cached_response
-              );
-            }
-            None => {
-              log::debug!(
-                "remote cache miss for: {:?} digest={:?}",
-                request.description,
-                action_digest
-              );
-            }
+        Ok(cached_response_opt) => match &cached_response_opt {
+          Some(cached_response) if cached_response.exit_code == 0 || failures_cached => {
+            log::debug!(
+              "remote cache hit for: {:?} digest={:?} response={:?}",
+              request.description,
+              action_digest,
+              cached_response
+            );
+            cached_response_opt
           }
-
-          cached_response_opt
-        }
+          _ => {
+            log::debug!(
+              "remote cache miss for: {:?} digest={:?}",
+              request.description,
+              action_digest
+            );
+            None
+          }
+        },
         Err(err) => {
           self.log_cache_error(err.to_string(), CacheErrorType::ReadError);
           None
@@ -472,7 +471,7 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
     )?;
-    let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
+    let failures_cached = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
@@ -487,6 +486,7 @@ impl crate::CommandRunner for CommandRunner {
           context.clone(),
           cache_lookup_start,
           action_digest,
+          failures_cached,
           &request.clone(),
           self.inner.run(context.clone(), workunit, request),
         )
@@ -499,7 +499,7 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if !hit_cache
-      && (result.exit_code == 0 || write_failures_to_cache)
+      && (result.exit_code == 0 || failures_cached)
       && self.cache_write
       && use_remote_cache
     {

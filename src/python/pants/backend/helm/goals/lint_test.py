@@ -64,7 +64,7 @@ def run_helm_lint(
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [HelmLintRequest.SubPartition(subpartition, key)],
+            [HelmLintRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

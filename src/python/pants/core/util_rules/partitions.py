@@ -84,6 +84,7 @@ class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
 class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
+    tool_name: str
     elements: tuple[PartitionElementT, ...]
     key: PartitionKeyT
 

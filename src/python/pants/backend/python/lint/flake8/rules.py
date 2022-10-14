@@ -129,12 +129,7 @@ async def run_flake8(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.from_fallible_process_result(
-        result,
-        partition_description=interpreter_constraints.description,
-        linter_name=Flake8.options_scope,
-        report=report,
-    )
+    return LintResult.create(request, result, report=report)
 
 
 def rules():

@@ -13,8 +13,6 @@ from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -58,10 +56,7 @@ async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtRe
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, request.snapshot, output_snapshot, formatter_name=GofmtRequest.tool_name
-    )
+    return await FmtResult.create(request, result)
 
 
 def rules():

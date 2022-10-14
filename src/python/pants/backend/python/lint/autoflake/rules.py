@@ -8,10 +8,8 @@ from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -30,14 +28,14 @@ class AutoflakeFieldSet(FieldSet):
         return tgt.get(SkipAutoflakeField).value
 
 
-class AutoflakeRequest(FmtTargetsRequest):
+class AutoflakeRequest(FixTargetsRequest):
     field_set_type = AutoflakeFieldSet
     tool_subsystem = Autoflake
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
-async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autoflake) -> FmtResult:
+@rule(desc="Fix with Autoflake", level=LogLevel.DEBUG)
+async def autoflake_fix(request: AutoflakeRequest.SubPartition, autoflake: Autoflake) -> FixResult:
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     result = await Get(
@@ -55,14 +53,7 @@ async def autoflake_fmt(request: AutoflakeRequest.SubPartition, autoflake: Autof
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        request.snapshot,
-        output_snapshot,
-        strip_chroot_path=True,
-        formatter_name=AutoflakeRequest.tool_name,
-    )
+    return await FixResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
