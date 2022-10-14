@@ -1,3 +1,6 @@
+# See `build-support/reapi-sample-server/README.md` for information on how to use this config
+# for internal testing.
+
 [GLOBAL]
 
 # NB: We disable the `toolchain` plugin to avoid it overriding remote execution settings,
