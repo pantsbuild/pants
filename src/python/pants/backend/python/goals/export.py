@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.backend.python.util_rules.pex_environment import PythonExecutable, PexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
     ExportError,
@@ -146,7 +146,7 @@ async def export_virtualenv(
                 ],
                 {
                     **complete_pex_env.environment_dict(python_configured=True),
-                    "PEX_MODULE": "pex.tools"
+                    "PEX_MODULE": "pex.tools",
                 },
             ),
             PostProcessingCommand(["rm", "-f", pex_pex_path]),
@@ -155,7 +155,9 @@ async def export_virtualenv(
 
 
 @rule
-async def export_tool(request: ExportPythonTool, pex_pex: PexPEX, pex_env: PexEnvironment) -> ExportResult:
+async def export_tool(
+    request: ExportPythonTool, pex_pex: PexPEX, pex_env: PexEnvironment
+) -> ExportResult:
     assert request.pex_request is not None
 
     # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
@@ -195,7 +197,7 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX, pex_env: PexEn
                 ],
                 {
                     **complete_pex_env.environment_dict(python_configured=True),
-                    "PEX_MODULE": "pex.tools"
+                    "PEX_MODULE": "pex.tools",
                 },
             ),
             PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
