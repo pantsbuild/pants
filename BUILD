@@ -17,8 +17,5 @@ docker_environment(
 
 remote_environment(
     name="buildgrid_remote",
-    extra_platform_properties=[
-        "OSFamily=linux",
-    ],
     python_bootstrap_search_path=["<PATH>"],
 )
