@@ -345,8 +345,6 @@ async def fix(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fix:
-    # @TODO: re-order requests so "fixers first"
-
     return await _do_fix(
         sorted(
             (
