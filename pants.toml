@@ -99,6 +99,8 @@ root_patterns = [
 [environments-preview.names]
 # We don't define any local environments because the options system covers our cases adequately.
 docker = "//:docker_env"
+# Used for iterating on remote-execution.
+remote = "//:buildgrid_remote"
 
 [tailor]
 build_file_header = """\

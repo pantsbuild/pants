@@ -1,0 +1,11 @@
+[GLOBAL]
+remote_execution = true
+remote_cache_read = true
+remote_cache_write = true
+
+remote_store_address = "grpc://127.0.0.1:50051"
+remote_execution_address = "grpc://127.0.0.1:50051"
+remote_instance_name = ""
+
+# TODO: See https://gitlab.com/BuildGrid/buildgrid/-/blob/master/buildgrid/server/server.py#L212-222
+process_execution_remote_parallelism = 8

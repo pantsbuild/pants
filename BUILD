@@ -14,3 +14,11 @@ docker_environment(
     name="docker_env",
     image="python:3.9",
 )
+
+remote_environment(
+    name="buildgrid_remote",
+    extra_platform_properties=[
+        "OSFamily=linux",
+    ],
+    python_bootstrap_search_path=["<PATH>"],
+)
