@@ -2,14 +2,13 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt;
-use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
 use bytes::{Bytes, BytesMut};
-use futures::Future;
-use futures::StreamExt;
+use futures::{future, Future};
+use futures::{stream, Stream, StreamExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
@@ -23,8 +22,6 @@ use remexec::{
 };
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
-
-use crate::StoreError;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -119,78 +116,14 @@ impl ByteStore {
     self.chunk_size_bytes
   }
 
-  pub async fn store_buffered<WriteToBuffer, WriteResult>(
-    &self,
-    digest: Digest,
-    mut write_to_buffer: WriteToBuffer,
-  ) -> Result<(), StoreError>
-  where
-    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), StoreError>>,
-  {
-    let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!(
-        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
-    })?;
-    let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!(
-        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
-    })?;
-    write_to_buffer(write_buffer).await?;
-
-    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
-    // could be mutated by another process. We guard against this by creating an anonymous
-    // temporary file and ensuring it is written to and closed via the only other handle to it in
-    // the code just above.
-    let mmap = Arc::new(unsafe {
-      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!(
-          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
-          digest = digest,
-          err = e
-        )
-      })?;
-      if let Err(err) = madvise::madvise(
-        mapping.as_ptr(),
-        mapping.len(),
-        madvise::AccessPattern::Sequential,
-      ) {
-        log::warn!(
-          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
-          {digest:?}. Continuing with possible reduced performance: {err}",
-          digest = digest,
-          err = err
-        )
-      }
-      Ok(mapping) as Result<memmap::Mmap, String>
-    }?);
-
-    retry_call(
-      mmap,
-      |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status).into(),
-      ByteStoreError::Other(msg) => msg.into(),
-    })
-  }
-
+  ///
+  /// Store the given bytes under their computed Digest.
+  ///
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
     retry_call(
       bytes,
-      |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
+      |bytes| self.store_bytes_source(digest, stream::once(future::ready(bytes))),
       |err| match err {
         ByteStoreError::Grpc(status) => status_is_retryable(status),
         _ => false,
@@ -203,14 +136,16 @@ impl ByteStore {
     })
   }
 
-  async fn store_bytes_source<ByteSource>(
+  ///
+  /// Store the given Stream of bytes under the given Digest. A too-short stream will be rejected
+  /// by all correctly implemented servers, and so a Stream which experiences an error can close
+  /// early to cancel the write.
+  ///
+  pub async fn store_bytes_source(
     &self,
     digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
-  where
-    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
-  {
+    bytes: impl Stream<Item = Bytes> + Send + Unpin + 'static,
+  ) -> Result<(), ByteStoreError> {
     let len = digest.size_bytes;
 
     let max_batch_total_size_bytes = {
@@ -248,19 +183,21 @@ impl ByteStore {
     .await
   }
 
-  async fn store_bytes_source_batch<ByteSource>(
+  async fn store_bytes_source_batch(
     &self,
     digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
-  where
-    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
-  {
+    bytes: impl Stream<Item = Bytes> + Send,
+  ) -> Result<(), ByteStoreError> {
+    let data = {
+      let mut data = BytesMut::with_capacity(digest.size_bytes);
+      data.extend(bytes.collect::<Vec<Bytes>>().await);
+      data.freeze()
+    };
     let request = BatchUpdateBlobsRequest {
       instance_name: self.instance_name.clone().unwrap_or_default(),
       requests: vec![remexec::batch_update_blobs_request::Request {
         digest: Some(digest.into()),
-        data: bytes(0..digest.size_bytes),
+        data,
       }],
     };
 
@@ -272,14 +209,11 @@ impl ByteStore {
     Ok(())
   }
 
-  async fn store_bytes_source_stream<ByteSource>(
+  async fn store_bytes_source_stream(
     &self,
     digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
-  where
-    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
-  {
+    bytes: impl Stream<Item = Bytes> + Send + Unpin + 'static,
+  ) -> Result<(), ByteStoreError> {
     let len = digest.size_bytes;
     let instance_name = self.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -290,27 +224,19 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
-
-    let chunk_size_bytes = store.chunk_size_bytes;
-
-    let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
-      if offset >= len && has_sent_any {
-        futures::future::ready(None)
-      } else {
-        let next_offset = min(offset + chunk_size_bytes, len);
-        let req = protos::gen::google::bytestream::WriteRequest {
-          resource_name: resource_name.clone(),
-          write_offset: offset as i64,
-          finish_write: next_offset == len,
-          // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
-          // https://github.com/danburkert/prost/pull/341
-          data: bytes(offset..next_offset),
-        };
-        futures::future::ready(Some((req, (next_offset, true))))
-      }
+    let mut offset = 0;
+    let stream = bound_chunk_size(self.chunk_size_bytes, bytes).map(move |chunk| {
+      let next_offset = min(offset + chunk.len(), len);
+      let req = protos::gen::google::bytestream::WriteRequest {
+        resource_name: resource_name.clone(),
+        write_offset: offset as i64,
+        finish_write: next_offset == len,
+        data: chunk,
+      };
+      offset = next_offset;
+      req
     });
 
     // NB: We must box the future to avoid a stack overflow.
@@ -510,5 +436,25 @@ impl ByteStore {
       .capabilities_cell
       .get_or_try_init(capabilities_fut)
       .await
+  }
+}
+
+///
+/// Given a Stream<Bytes>, bounds the size of each chunk to at most the given chunk_size (and
+/// possibly smaller at chunk boundaries).
+///
+fn bound_chunk_size(
+  chunk_size: usize,
+  mut bytes: impl Stream<Item = Bytes> + Send + Unpin + 'static,
+) -> impl Stream<Item = Bytes> + Send + 'static {
+  async_stream::stream! {
+    while let Some(mut chunk) = bytes.next().await {
+      while chunk.len() > chunk_size {
+          yield chunk.split_to(chunk_size);
+      }
+      if !chunk.is_empty() {
+        yield chunk
+      }
+    }
   }
 }

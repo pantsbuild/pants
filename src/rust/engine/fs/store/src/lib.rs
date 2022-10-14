@@ -35,6 +35,7 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
+use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
@@ -794,8 +795,6 @@ impl Store {
               remote_store
                 .clone()
                 .maybe_upload(digest, async move {
-                  // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
-                  // to disk to be independent of the remote store wire chunk size.
                   if digest.size_bytes > remote_store.store.chunk_size_bytes() {
                     Self::store_large_blob_remote(local, remote_store.store, entry_type, digest)
                       .await
@@ -860,33 +859,50 @@ impl Store {
     entry_type: EntryType,
     digest: Digest,
   ) -> Result<(), StoreError> {
-    remote
-      .store_buffered(digest, |mut buffer| async {
-        let result = local
-          .load_bytes_with(entry_type, digest, move |bytes| {
-            buffer.write_all(bytes).map_err(|e| {
-              format!(
-                "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
-                entry_type = entry_type,
-                digest = digest,
-                err = e
-              )
-            })
-          })
-          .await?;
-        match result {
-          None => Err(StoreError::MissingDigest(
-            format!(
-              "Failed to upload {entry_type:?}: Not found in local store",
-              entry_type = entry_type,
-            ),
-            digest,
-          )),
-          Some(Err(err)) => Err(err.into()),
-          Some(Ok(())) => Ok(()),
+    // We eagerly return a MissingDigest error here for an attempt to upload a missing digest,
+    // rather than starting an empty stream which would result in a less helpful "short stream"
+    // error.
+    if !local
+      .get_missing_digests(entry_type, [digest].into_iter().collect())
+      .await?
+      .is_empty()
+    {
+      return Err(StoreError::MissingDigest(
+        format!(
+          "Failed to upload {entry_type:?}: Not found in local store",
+          entry_type = entry_type,
+        ),
+        digest,
+      ));
+    }
+
+    let chunk_size_bytes = remote.chunk_size_bytes();
+    let stream = futures::stream::unfold(0, move |offset| {
+      let local = local.clone();
+      async move {
+        if offset >= digest.size_bytes {
+          return None;
         }
-      })
+
+        let next_offset = min(offset + chunk_size_bytes, digest.size_bytes);
+        // NB: If this read returns an error, the stream will be short, and will be rejected by the
+        // server.
+        let chunk = local
+          .load_bytes_with(entry_type, digest, move |bytes| {
+            Bytes::copy_from_slice(&bytes[offset..next_offset])
+          })
+          .await
+          .ok()
+          .flatten()?;
+
+        Some((chunk, next_offset))
+      }
+    });
+
+    remote
+      .store_bytes_source(digest, Box::pin(stream))
       .await
+      .map_err(|e| StoreError::Unclassified(e.to_string()))
   }
 
   ///

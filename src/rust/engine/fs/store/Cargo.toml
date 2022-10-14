@@ -25,7 +25,6 @@ itertools = "0.10"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4"
 madvise = "0.1"
-memmap = "0.7"
 parking_lot = "0.12"
 prost = "0.9"
 prost-types = "0.9"
