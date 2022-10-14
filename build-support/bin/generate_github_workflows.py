@@ -38,6 +38,22 @@ class Platform(Enum):
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
+def gha_expr(expr: str) -> str:
+    """Properly quote GitHub Actions expressions.
+
+    Because we use f-strings often, but not always, in this script, it is very easy to get the
+    quoting of the double curly braces wrong, especially when changing a non-f-string to an f-string
+    or vice versa. So instead we universally delegate to this function.
+    """
+    # Here we use simple string concat instead of getting tangled up with escaping in f-strings.
+    return "${{ " + expr + " }}"
+
+
+def hashFiles(path: str) -> str:
+    """Generate a properly quoted hashFiles call for the given path."""
+    return gha_expr(f"hashFiles('{path}')")
+
+
 # ----------------------------------------------------------------------
 # Constants
 # ----------------------------------------------------------------------
@@ -71,43 +87,54 @@ IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 # Actions
 # ----------------------------------------------------------------------
 
-_DOCS_ONLY_TEXT = "DOCS_ONLY"
 
-
-def _docs_only_cond(docs_only: bool) -> str:
-    op = "==" if docs_only else "!="
-    return f"needs.docs_only_check.outputs.docs_only {op} '{_DOCS_ONLY_TEXT}'"
-
-
-def is_docs_only() -> Jobs:
-    """Check if this change only involves docs."""
+def classify_changes() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
-    docs_files = ["docs/**"]
     return {
-        "docs_only_check": {
-            "name": "Check for docs-only change",
+        "classify_changes": {
+            "name": "Classify changes",
             "runs-on": linux_x86_64_helper.runs_on(),
             "if": IS_PANTS_OWNER,
-            "outputs": {"docs_only": "${{ steps.docs_only_check.outputs.docs_only }}"},
+            "outputs": {
+                "docs_only": gha_expr("steps.classify.outputs.docs_only"),
+                "docs": gha_expr("steps.classify.outputs.docs"),
+                "rust": gha_expr("steps.classify.outputs.rust"),
+                "release": gha_expr("steps.classify.outputs.release"),
+                "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+            },
             "steps": [
                 *checkout(get_commit_msg=False),
                 {
                     "id": "files",
                     "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v23.1",
-                    "with": {"files_ignore_separator": "|", "files_ignore": "|".join(docs_files)},
+                    "uses": "tj-actions/changed-files@v32",
+                    "with": {"separator": "|"},
                 },
                 {
-                    "id": "docs_only_check",
-                    "name": "Check for docs-only changes",
-                    # Note that if no changes were detected in the step above, the string
-                    # may be empty, not 'false', so we check for != 'true'.
-                    "if": "steps.files.outputs.any_changed != 'true'",
-                    "run": f"echo '::set-output name=docs_only::{_DOCS_ONLY_TEXT}'",
+                    "id": "classify",
+                    "name": "Classify changed files",
+                    "run": dedent(
+                        """\
+                        affected=$(python build-support/bin/classify_changed_files.py \
+                          '${{ steps.files.outputs.all_modified_files }}')
+                        echo "Affected:\n${affected}"
+                        if [[ "${affected}" == "docs" ]]; then
+                          echo '::set-output name=docs_only::true'
+                        fi
+                        for i in ${affected}; do
+                          echo "::set-output name=${i}::true"
+                        done
+                        """
+                    ),
                 },
             ],
         },
     }
+
+
+def _docs_only_cond(docs_only: bool) -> str:
+    op = "==" if docs_only else "!="
+    return f"needs.classify_changes.outputs.docs_only {op} true"
 
 
 def ensure_category_label() -> Sequence[Step]:
@@ -116,8 +143,8 @@ def ensure_category_label() -> Sequence[Step]:
         {
             "if": "github.event_name == 'pull_request'",
             "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v1",
-            "env": {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"},
+            "uses": "mheap/github-action-required-labels@v2.1.0",
+            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "exactly",
                 "count": 1,
@@ -195,8 +222,8 @@ def setup_toolchain_auth() -> Step:
         "name": "Setup toolchain auth",
         "if": "github.event_name != 'pull_request'",
         "run": dedent(
-            """\
-            echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+            f"""\
+            echo TOOLCHAIN_AUTH_TOKEN="{gha_expr('secrets.TOOLCHAIN_AUTH_TOKEN')}" >> $GITHUB_ENV
             """
         ),
     }
@@ -227,28 +254,6 @@ def install_rustup() -> Step:
     }
 
 
-def rust_caches() -> Sequence[Step]:
-    return [
-        {
-            "name": "Cache Rust toolchain",
-            "uses": "actions/cache@v3",
-            "with": {
-                "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1",
-            },
-        },
-        {
-            "name": "Cache Cargo",
-            "uses": "actions/cache@v3",
-            "with": {
-                "path": "~/.cargo/registry\n~/.cargo/git\n",
-                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}-v1\n",
-                "restore-keys": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
-            },
-        },
-    ]
-
-
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
@@ -274,8 +279,8 @@ def deploy_to_s3() -> Step:
         "run": "./build-support/bin/deploy_to_s3.py",
         "if": "github.event_name == 'push'",
         "env": {
-            "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
-            "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
+            "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
+            "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
         },
     }
 
@@ -285,18 +290,18 @@ def setup_primary_python(install_python: bool = True) -> Sequence[Step]:
     if install_python:
         ret.append(
             {
-                "name": "Set up Python ${{ matrix.python-version }}",
+                "name": f"Set up Python {gha_expr('matrix.python-version')}",
                 "uses": "actions/setup-python@v3",
-                "with": {"python-version": "${{ matrix.python-version }}"},
+                "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
             }
         )
     ret.append(
         {
-            "name": "Tell Pants to use Python ${{ matrix.python-version }}",
+            "name": f"Tell Pants to use Python {gha_expr('matrix.python-version')}",
             "run": dedent(
-                """\
-                echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-                echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['==${{ matrix.python-version }}.*']" >> $GITHUB_ENV
+                f"""\
+                echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
+                echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
                 """
             ),
         }
@@ -366,7 +371,7 @@ class Helper:
             "name": "Upload native binaries",
             "uses": "actions/upload-artifact@v3",
             "with": {
-                "name": f"native_binaries.${{ matrix.python-version }}.{self.platform_name()}",
+                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
                 "path": "\n".join(NATIVE_FILES),
             },
         }
@@ -376,7 +381,7 @@ class Helper:
             "name": "Download native binaries",
             "uses": "actions/download-artifact@v3",
             "with": {
-                "name": f"native_binaries.${{ matrix.python-version }}.{self.platform_name()}",
+                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
             },
         }
 
@@ -387,16 +392,22 @@ class Helper:
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-${{ hashFiles('rust-toolchain') }}-v1",
+                    "key": f"{self.platform_name()}-rustup-{hashFiles('rust-toolchain')}-v2",
                 },
             },
             {
                 "name": "Cache Cargo",
-                "uses": "actions/cache@v3",
+                "uses": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
                 "with": {
-                    "path": "~/.cargo/registry\n~/.cargo/git\n",
-                    "key": f"{self.platform_name()}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}-v1\n",
-                    "restore-keys": f"{self.platform_name()}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
+                    # If set, replaces the job id in the cache key, so that the cache is stable across jobs.
+                    # If we don't set this, each job may restore from a previous job's cache entry (via a
+                    # restore key) but will write its own entry, even if there were no rust changes.
+                    # This will cause us to hit the 10GB limit much sooner, and also spend time uploading
+                    # identical cache entries unnecessarily.
+                    "shared-key": "engine",
+                    "workspaces": "src/rust/engine",
+                    # A custom option from our fork of the action.
+                    "cache-bin": "false",
                 },
             },
         ]
@@ -419,7 +430,7 @@ class Helper:
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": "\n".join(NATIVE_FILES),
-                    "key": f"{self.platform_name()}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
+                    "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1\n",
                 },
             },
         ]
@@ -575,6 +586,8 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     **helper.build_wheels_common,
                     "steps": [
                         *checkout(containerized=True),
+                        # TODO: Why is this necessary? the hosted container is
+                        #  supposed to come with rustup preinstalled.
                         install_rustup(),
                         {
                             "name": "Expose Pythons",
@@ -614,7 +627,7 @@ def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
                     # pass on GHA MacOS containers.
                     "run": helper.wrap_cmd("./cargo test --tests -- --nocapture"),
-                    "env": {"TMPDIR": "${{ runner.temp }}"},
+                    "env": {"TMPDIR": f"{gha_expr('runner.temp')}"},
                     "if": DONT_SKIP_RUST,
                 },
             ],
@@ -795,9 +808,7 @@ def workflow_dispatch_inputs(
         }
         for wi in workflow_inputs
     }
-    env = {
-        wi.name: ("${{ github.event.inputs." + wi.name.lower() + " }}") for wi in workflow_inputs
-    }
+    env = {wi.name: gha_expr("github.event.inputs." + wi.name.lower()) for wi in workflow_inputs}
     return inputs, env
 
 
@@ -918,8 +929,8 @@ def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
             # If in the future we have any docs-related checks, we can make both "Set Merge OK"
             # jobs depend on them here (it has to be both since some changes may modify docs
             # as well as code, and so are not "docs only").
-            "needs": ["docs_only_check"] + sorted(needs),
-            "outputs": {"merge_ok": "${{ steps.set_merge_ok.outputs.merge_ok }}"},
+            "needs": ["classify_changes", "check_labels"] + sorted(needs),
+            "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
                     "id": "set_merge_ok",
@@ -946,10 +957,10 @@ def merge_ok(non_docs_only_jobs: list[str]) -> Jobs:
                 "steps": [
                     {
                         "run": dedent(
-                            """\
-                    merge_ok_docs_only="${{ needs.set_merge_ok_docs_only.outputs.merge_ok }}"
-                    merge_ok_not_docs_only="${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok }}"
-                    if [[ "${merge_ok_docs_only}" == "true" || "${merge_ok_not_docs_only}" == "true" ]]; then
+                            f"""\
+                    merge_ok_docs_only="{gha_expr('needs.set_merge_ok_docs_only.outputs.merge_ok')}"
+                    merge_ok_not_docs_only="{gha_expr('needs.set_merge_ok_not_docs_only.outputs.merge_ok')}"
+                    if [[ "${{merge_ok_docs_only}}" == "true" || "${{merge_ok_not_docs_only}}" == "true" ]]; then
                         echo "Merge OK"
                         exit 0
                     else
@@ -971,14 +982,14 @@ def generate() -> dict[Path, str]:
 
     not_docs_only = _docs_only_cond(docs_only=False)
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
-    pr_jobs.update(**is_docs_only())
+    pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "docs_only_check"}:
+        if key in {"check_labels", "classify_changes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.extend(["check_labels", "docs_only_check"])
+        needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
@@ -1027,8 +1038,8 @@ def generate() -> dict[Path, str]:
                         {
                             "uses": "styfle/cancel-workflow-action@0.9.1",
                             "with": {
-                                "workflow_id": "${{ github.event.workflow.id }}",
-                                "access_token": "${{ github.token }}",
+                                "workflow_id": f"{gha_expr('github.event.workflow.id')}",
+                                "access_token": f"{gha_expr('github.token')}",
                             },
                         }
                     ],
