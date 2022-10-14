@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import pkgutil
-import re
+import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
@@ -207,27 +207,19 @@ async def setup_post_renderer_launcher(
 
     # Generate a temporary PEX process that uses the previously created configuration file.
     post_renderer_cfg_file = os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME)
-    post_renderer_stdin_file = os.path.join(".", "__stdin.yaml")
+    post_renderer_input_file = os.path.join(".", "__helm_stdout.yaml")
     post_renderer_process = await Get(
         Process,
         VenvPexProcess(
             post_renderer_tool.pex,
-            argv=[post_renderer_cfg_file, post_renderer_stdin_file],
+            argv=[post_renderer_cfg_file, post_renderer_input_file],
             input_digest=post_renderer_cfg_digest,
             description="",
         ),
     )
 
-    def shell_escape(arg: str) -> str:
-        """Escape the shell argument by wrapping it around single quotes.
-
-        Found at:
-        https://stackoverflow.com/questions/15783701/which-characters-need-to-be-escaped-when-using-bash
-        """
-        return re.sub(r"/'\\\\''", r"1s/^/'/; \$s/\$/'/", arg)
-
     def shell_cmd(args: Iterable[str]) -> str:
-        return " ".join([shell_escape(arg) for arg in args])
+        return " ".join([shlex.quote(arg) for arg in args])
 
     # Build a shell wrapper script which will be the actual entry-point sent to Helm as the post-renderer.
     # Extra post-renderers are plugged by piping the output of one into the next one in the order they
@@ -243,14 +235,16 @@ async def setup_post_renderer_launcher(
             *[shell_cmd(post_renderer.args) for post_renderer in extra_post_renderers],
         ]
     )
-    logger.debug(f"Built post-renderer process CLI: {post_renderer_process_cli}")
+    logger.debug(
+        f'Using post-renderer pipeline "{post_renderer_process_cli}" in {request.description_of_origin}.'
+    )
 
     postrenderer_wrapper_script = dedent(
         f"""\
         #!/bin/bash
 
         # Output stdin into a file in disk
-        {cat_binary.path} <&0 > {post_renderer_stdin_file}
+        {cat_binary.path} <&0 > {post_renderer_input_file}
 
         {post_renderer_process_cli}
         """

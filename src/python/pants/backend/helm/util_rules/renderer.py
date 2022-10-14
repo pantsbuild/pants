@@ -173,6 +173,8 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
 
     def cacheable(self) -> bool:
+        # When using post-renderers it may not be safe to cache the generated files as the final result
+        # may contain secrets or other kind of sensitive information.
         return not self.post_processed
 
 
@@ -314,6 +316,9 @@ async def setup_render_helm_deployment_process(
             return f'"{value}"'
         return value
 
+    # If using a post-renderer we are only going to keep the process result cached in
+    # memory to prevent storing in disk, either locally or remotely, secrets or other
+    # sensitive values that may been added in by the post-renderer.
     process_cache = (
         ProcessCacheScope.PER_RESTART_SUCCESSFUL
         if request.post_renderer
