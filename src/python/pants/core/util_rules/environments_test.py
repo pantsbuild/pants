@@ -467,7 +467,7 @@ def test_executable_search_path_cache_scope() -> None:
         assert_cache(tgt, cache_failures=False, expected=ProcessCacheScope.PER_RESTART_SUCCESSFUL)
         assert_cache(tgt, cache_failures=True, expected=ProcessCacheScope.PER_RESTART_ALWAYS)
 
-    for tgt in (
+    for tgt in (  # type: ignore[assignment]
         DockerEnvironmentTarget({DockerImageField.alias: "img"}, addr),
         RemoteEnvironmentTarget({RemoteEnvironmentCacheBinaryDiscovery.alias: True}, addr),
     ):

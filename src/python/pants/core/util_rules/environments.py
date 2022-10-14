@@ -321,15 +321,15 @@ class RemoteEnvironmentCacheBinaryDiscovery(BoolField):
         f"""
         If true, will cache system binary discovery, e.g. finding Python interpreters.
 
-        When safe to do, it is preferable to set this option to `true` for faster performance by
-        avoiding wasted work. Otherwise, Pants will research for system binaries whenever the
+        When safe to do, it is preferable to set this option to `True` for faster performance by
+        avoiding wasted work. Otherwise, Pants will search for system binaries whenever the
         Pants daemon is restarted.
 
-        However, it is only safe to set this to true if the remote execution environment has a
+        However, it is only safe to set this to `True` if the remote execution environment has a
         stable environment, e.g. the server will not change versions of installed system binaries.
         Otherwise, you risk caching results that become stale when the server changes its
-        environment, which may break your builds. Often, with remote execution servers you can
-        specify a Docker container to run with via the field
+        environment, which may break your builds. With some remote execution servers, you can
+        specify a Docker image to run with via the field
         `{RemoteExtraPlatformPropertiesField.alias}`; if you are able to specify what Docker image
         to use, and also use a pinned tag of the image, it is likely safe to set this field to true.
         """
