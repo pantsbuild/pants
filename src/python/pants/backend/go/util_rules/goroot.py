@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import go_bootstrap
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
@@ -16,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -52,7 +53,9 @@ class GoRoot:
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
-async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootstrap) -> GoRoot:
+async def setup_goroot(
+    golang_subsystem: GolangSubsystem, go_bootstrap: GoBootstrap, env_target: EnvironmentTarget
+) -> GoRoot:
     search_paths = go_bootstrap.go_search_paths
     all_go_binary_paths = await Get(
         BinaryPaths,
@@ -86,7 +89,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootst
                 (binary_path.path, "version"),
                 description=f"Determine Go version for {binary_path.path}",
                 level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                cache_scope=env_target.executable_search_path_cache_scope(),
             ),
         )
         for binary_path in all_go_binary_paths.paths
@@ -117,7 +120,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem, go_bootstrap: GoBootst
                     (binary_path.path, "env", "-json"),
                     description=f"Determine Go SDK metadata for {binary_path.path}",
                     level=LogLevel.DEBUG,
-                    cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+                    cache_scope=env_target.executable_search_path_cache_scope(),
                     env={"GOPATH": "/does/not/matter"},
                 ),
             )
