@@ -6,7 +6,7 @@
 # NB: We disable the `toolchain` plugin to avoid it overriding remote execution settings,
 # and disable config verification to ignore `toolchain` related settings.
 plugins = []
-no_verify_config = true
+verify_config = false
 
 remote_execution = true
 remote_cache_read = true
