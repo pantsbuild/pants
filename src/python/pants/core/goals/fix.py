@@ -1,4 +1,4 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -39,35 +39,35 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class FmtResult(EngineAwareReturnType):
+class FixResult(EngineAwareReturnType):
     input: Snapshot
     output: Snapshot
     stdout: str
     stderr: str
-    formatter_name: str
+    tool_name: str
 
     @staticmethod
     @rule_helper(_public=True)
     async def create(
-        request: FmtRequest.SubPartition,
+        request: FixRequest.SubPartition,
         process_result: ProcessResult | FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
-    ) -> FmtResult:
+    ) -> FixResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return FmtResult(
+        return FixResult(
             input=request.snapshot,
             output=await Get(Snapshot, Digest, process_result.output_digest),
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            formatter_name=request.tool_name,
+            tool_name=request.tool_name,
         )
 
     def __post_init__(self):
         # NB: We debug log stdout/stderr because `message` doesn't log it.
-        log = f"Output from {self.formatter_name}"
+        log = f"Output from {self.tool_name}"
         if self.stdout:
             log += f"\n{self.stdout}"
         if self.stderr:
@@ -86,11 +86,8 @@ class FmtResult(EngineAwareReturnType):
 
         # NB: Instead of printing out `stdout` and `stderr`, we just print a list of files which
         # were changed/added/removed. We do this for two reasons:
-        #   1. This is run as part of both `fmt` and `lint`, and we want consistent output between both
-        #   2. Different formatters have different stdout/stderr. This way is consistent across all
-        #       formatters.
-        # We also allow added/removed files because the `fmt` goal is more like a `fix` goal.
-        # (See https://github.com/pantsbuild/pants/issues/13504)
+        #   1. This is run as part of both `fmt`/`fix` and `lint`, and we want consistent output between both
+        #   2. Different tools have different stdout/stderr. This way is consistent across all tools.
         if self.did_change:
             snapshot_diff = SnapshotDiff.from_snapshots(self.input, self.output)
             output = "".join(
@@ -106,7 +103,7 @@ class FmtResult(EngineAwareReturnType):
         else:
             output = ""
 
-        return f"{self.formatter_name} {message}{output}"
+        return f"{self.tool_name} {message}{output}"
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -117,8 +114,8 @@ Partitions = UntypedPartitions[PartitionKeyT, str]
 
 
 @union
-class FmtRequest(LintRequest):
-    is_formatter = True
+class FixRequest(LintRequest):
+    is_fixer = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @frozen_after_init
@@ -133,11 +130,11 @@ class FmtRequest(LintRequest):
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_rules()
-        yield UnionRule(FmtRequest, cls)
-        yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
+        yield UnionRule(FixRequest, cls)
+        yield UnionRule(FixRequest.SubPartition, cls.SubPartition)
 
 
-class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
+class FixTargetsRequest(FixRequest, LintTargetsRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
@@ -149,134 +146,134 @@ class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
             # NB: We don't want to yield `lint.py`'s default partitioner
             if isinstance(rule, UnionRule)
         )
-        yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
+        yield UnionRule(FixTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FmtFilesRequest(FmtRequest, LintFilesRequest):
+class FixFilesRequest(FixRequest, LintFilesRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is not PartitionerType.CUSTOM:
             raise ValueError(
-                "Pants does not provide default partitioners for `FmtFilesRequest`."
+                "Pants does not provide default partitioners for `FixFilesRequest`."
                 + " You will need to provide your own partitioner rule."
             )
 
         yield from super()._get_rules()
-        yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
+        yield UnionRule(FixFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class _FmtSubpartitionBatchElement(NamedTuple):
-    request_type: type[FmtRequest.SubPartition]
+class _FixSubpartitionBatchElement(NamedTuple):
+    request_type: type[FixRequest.SubPartition]
     tool_name: str
     files: tuple[str, ...]
     key: Any
 
 
-class _FmtSubpartitionBatchRequest(Collection[_FmtSubpartitionBatchElement]):
-    """Request to serially format all the subpartitions in the given batch."""
+class _FixSubpartitionBatchRequest(Collection[_FixSubpartitionBatchElement]):
+    """Request to serially fix all the subpartitions in the given batch."""
 
 
 @dataclass(frozen=True)
-class _FmtBatchResult:
-    results: tuple[FmtResult, ...]
+class _FixBatchResult:
+    results: tuple[FixResult, ...]
 
     @property
     def did_change(self) -> bool:
         return any(result.did_change for result in self.results)
 
 
-class FmtSubsystem(GoalSubsystem):
-    name = "fmt"
-    help = "Autoformat source code."
+class FixSubsystem(GoalSubsystem):
+    name = "fix"
+    help = "Autofix source code."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtRequest in union_membership
+        return FixRequest in union_membership
 
-    only = OnlyOption("formatter", "isort", "shfmt")
-    batch_size = BatchSizeOption(uppercase="Formatter", lowercase="formatter")
+    only = OnlyOption("fixer", "autoflake", "pyupgrade")
+    batch_size = BatchSizeOption(uppercase="Fixer", lowercase="fixer")
 
 
-class Fmt(Goal):
-    subsystem_cls = FmtSubsystem
+class Fix(Goal):
+    subsystem_cls = FixSubsystem
 
 
 @rule_helper
-async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtBatchResult]):
+async def _write_files(workspace: Workspace, batched_results: Iterable[_FixBatchResult]):
     if any(batched_result.did_change for batched_result in batched_results):
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practice, this should never
-        # happen due to us grouping each file's formatters into a single digest.
-        merged_formatted_digest = await Get(
+        # happen due to us grouping each file's tools into a single digest.
+        merged_digest = await Get(
             Digest,
             MergeDigests(
                 batched_result.results[-1].output.digest for batched_result in batched_results
             ),
         )
-        workspace.write_digest(merged_formatted_digest)
+        workspace.write_digest(merged_digest)
 
 
 def _print_results(
     console: Console,
-    results: Iterable[FmtResult],
+    results: Iterable[FixResult],
 ):
     if results:
         console.print_stderr("")
 
-    # We group all results for the same formatter so that we can give one final status in the
+    # We group all results for the same tool so that we can give one final status in the
     # summary. This is only relevant if there were multiple results because of
     # `--per-file-caching`.
-    formatter_to_results = defaultdict(set)
+    tool_to_results = defaultdict(set)
     for result in results:
-        formatter_to_results[result.formatter_name].add(result)
+        tool_to_results[result.tool_name].add(result)
 
-    for formatter, results in sorted(formatter_to_results.items()):
+    for tool, results in sorted(tool_to_results.items()):
         if any(result.did_change for result in results):
             sigil = console.sigil_succeeded_with_edits()
             status = "made changes"
         else:
             sigil = console.sigil_succeeded()
             status = "made no changes"
-        console.print_stderr(f"{sigil} {formatter} {status}.")
+        console.print_stderr(f"{sigil} {tool} {status}.")
 
 
 @goal_rule
-async def fmt(
+async def fix(
     console: Console,
     specs: Specs,
-    fmt_subsystem: FmtSubsystem,
+    fix_subsystem: FixSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
-) -> Fmt:
-    fmt_request_types = list(union_membership.get(FmtRequest))
-    target_partitioners = list(union_membership.get(FmtTargetsRequest.PartitionRequest))
-    file_partitioners = list(union_membership.get(FmtFilesRequest.PartitionRequest))
+) -> Fix:
+    core_request_types = list(union_membership.get(FixRequest))
+    target_partitioners = list(union_membership.get(FixTargetsRequest.PartitionRequest))
+    file_partitioners = list(union_membership.get(FixFilesRequest.PartitionRequest))
 
     partitions_by_request_type = await _get_partitions_by_request_type(
-        fmt_request_types,
+        core_request_types,
         target_partitioners,
         file_partitioners,
-        fmt_subsystem,
+        fix_subsystem,
         specs,
-        lambda request_type: Get(Partitions, FmtTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, FmtFilesRequest.PartitionRequest, request_type),
+        lambda request_type: Get(Partitions, FixTargetsRequest.PartitionRequest, request_type),
+        lambda request_type: Get(Partitions, FixFilesRequest.PartitionRequest, request_type),
     )
 
     if not partitions_by_request_type:
-        return Fmt(exit_code=0)
+        return Fix(exit_code=0)
 
     def batch(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
-            size_target=fmt_subsystem.batch_size,
-            size_max=4 * fmt_subsystem.batch_size,
+            size_target=fix_subsystem.batch_size,
+            size_max=4 * fix_subsystem.batch_size,
         )
         for batch in batches:
             yield tuple(batch)
 
-    def _make_disjoint_subpartition_batch_requests() -> Iterable[_FmtSubpartitionBatchRequest]:
-        partition_infos: Sequence[Tuple[Type[FmtRequest], Any]]
+    def _make_disjoint_subpartition_batch_requests() -> Iterable[_FixSubpartitionBatchRequest]:
+        partition_infos: Sequence[Tuple[Type[FixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)
@@ -292,8 +289,8 @@ async def fmt(
 
         for partition_infos, files in files_by_partition_info.items():
             for subpartition in batch(files):
-                yield _FmtSubpartitionBatchRequest(
-                    _FmtSubpartitionBatchElement(
+                yield _FixSubpartitionBatchRequest(
+                    _FixSubpartitionBatchElement(
                         request_type.SubPartition,
                         request_type.tool_name,
                         subpartition,
@@ -303,7 +300,7 @@ async def fmt(
                 )
 
     all_results = await MultiGet(
-        Get(_FmtBatchResult, _FmtSubpartitionBatchRequest, request)
+        Get(_FixBatchResult, _FixSubpartitionBatchRequest, request)
         for request in _make_disjoint_subpartition_batch_requests()
     )
 
@@ -314,37 +311,37 @@ async def fmt(
     await _write_files(workspace, all_results)
     _print_results(console, individual_results)
 
-    # Since the rules to produce FmtResult should use ExecuteRequest, rather than
-    # FallibleProcess, we assume that there were no failures.
-    return Fmt(exit_code=0)
+    # Since the rules to produce FixResult should use ProcessResult, rather than
+    # FallibleProcessResult, we assume that there were no failures.
+    return Fix(exit_code=0)
 
 
 @rule
-async def fmt_batch(
-    request: _FmtSubpartitionBatchRequest,
-) -> _FmtBatchResult:
+async def fix_batch(
+    request: _FixSubpartitionBatchRequest,
+) -> _FixBatchResult:
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
     for request_type, tool_name, files, key in request:
         subpartition = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
+        result = await Get(FixResult, FixRequest.SubPartition, subpartition)
         results.append(result)
 
         assert set(result.output.files) == set(
             subpartition.files
         ), f"Expected {result.output.files} to match {subpartition.files}"
         current_snapshot = result.output
-    return _FmtBatchResult(tuple(results))
+    return _FixBatchResult(tuple(results))
 
 
 @rule(level=LogLevel.DEBUG)
-async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
+async def convert_fix_result_to_lint_result(fix_result: FixResult) -> LintResult:
     return LintResult(
-        1 if fmt_result.did_change else 0,
-        fmt_result.stdout,
-        fmt_result.stderr,
-        linter_name=fmt_result.formatter_name,
+        1 if fix_result.did_change else 0,
+        fix_result.stdout,
+        fix_result.stderr,
+        linter_name=fix_result.tool_name,
         _render_message=False,  # Don't re-render the message
     )
 

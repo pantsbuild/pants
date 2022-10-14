@@ -652,6 +652,11 @@ impl Process {
     self.remote_cache_speculation_delay = delay;
     self
   }
+
+  pub fn cache_scope(mut self, cache_scope: ProcessCacheScope) -> Process {
+    self.cache_scope = cache_scope;
+    self
+  }
 }
 
 ///

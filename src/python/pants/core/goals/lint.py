@@ -58,6 +58,7 @@ class LintResult(EngineAwareReturnType):
     linter_name: str
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
+    _render_message: bool = True
 
     @classmethod
     def create(
@@ -84,7 +85,11 @@ class LintResult(EngineAwareReturnType):
         return {"partition": self.partition_description}
 
     def level(self) -> LogLevel | None:
-        return LogLevel.ERROR if self.exit_code != 0 else LogLevel.INFO
+        if not self._render_message:
+            return LogLevel.TRACE
+        if self.exit_code != 0:
+            return LogLevel.ERROR
+        return LogLevel.INFO
 
     def message(self) -> str | None:
         message = self.linter_name
@@ -156,6 +161,12 @@ class LintRequest:
     partitioner_type: ClassVar[PartitionerType] = PartitionerType.CUSTOM
 
     is_formatter: ClassVar[bool] = False
+    is_fixer: ClassVar[bool] = False
+
+    @final
+    @classproperty
+    def _requires_snapshot(cls) -> bool:
+        return cls.is_formatter or cls.is_fixer
 
     @classproperty
     def tool_name(cls) -> str:
@@ -221,7 +232,7 @@ REPORT_DIR = "reports"
 
 class LintSubsystem(GoalSubsystem):
     name = "lint"
-    help = "Run all linters and/or formatters in check mode."
+    help = "Run linters/formatters/fixers in check mode."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -240,6 +251,18 @@ class LintSubsystem(GoalSubsystem):
             """
         ),
     )
+    skip_fixers = BoolOption(
+        default=False,
+        help=softwrap(
+            f"""
+            If true, skip running all fixers in check-only mode.
+
+            FYI: when running `{bin_name()} fix lint ::`, there should be diminishing performance
+            benefit to using this flag. Pants attempts to reuse the results from `fix` when running
+            `lint` where possible.
+            """
+        ),
+    )
     batch_size = BatchSizeOption(uppercase="Linter", lowercase="linter")
 
 
@@ -251,6 +274,7 @@ def _print_results(
     console: Console,
     results_by_tool: dict[str, list[LintResult]],
     formatter_failed: bool,
+    fixer_failed: bool,
 ) -> None:
     if results_by_tool:
         console.print_stderr("")
@@ -265,9 +289,14 @@ def _print_results(
             status = "succeeded"
         console.print_stderr(f"{sigil} {tool_name} {status}.")
 
-    if formatter_failed:
+    if formatter_failed or fixer_failed:
         console.print_stderr("")
+
+    if formatter_failed:
         console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
+
+    if fixer_failed:
+        console.print_stderr(f"(One or more fixers failed. Run `{bin_name()} fix` to fix.)")
 
 
 def _get_error_code(results: Sequence[LintResult]) -> int:
@@ -379,6 +408,7 @@ async def lint(
             request_type
             for request_type in lint_request_types
             if not (request_type.is_formatter and lint_subsystem.skip_formatters)
+            and not (request_type.is_fixer and lint_subsystem.skip_fixers)
         ],
         target_partitioners,
         file_partitioners,
@@ -417,7 +447,7 @@ async def lint(
         Get(Snapshot, PathGlobs(elements))
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, _ in batch
-        if request_type.is_formatter
+        if request_type._requires_snapshot
     )
     snapshots_iter = iter(formatter_snapshots)
 
@@ -426,7 +456,7 @@ async def lint(
             request_type.tool_name,
             elements,
             key,
-            **{"snapshot": next(snapshots_iter)} if request_type.is_formatter else {},
+            **{"snapshot": next(snapshots_iter)} if request_type._requires_snapshot else {},
         )
         for request_type, batch in lint_batches_by_request_type.items()
         for elements, key in batch
@@ -446,6 +476,12 @@ async def lint(
         if core_request_types_by_subpartition_type[type(subpartition)].is_formatter
     )
 
+    fixer_failed = any(
+        result.exit_code
+        for subpartition, result in zip(subpartitions, all_batch_results)
+        if core_request_types_by_subpartition_type[type(subpartition)].is_fixer
+    )
+
     results_by_tool = defaultdict(list)
     for result in all_batch_results:
         results_by_tool[result.linter_name].append(result)
@@ -461,6 +497,7 @@ async def lint(
         console,
         results_by_tool,
         formatter_failed,
+        fixer_failed,
     )
     return Lint(_get_error_code(all_batch_results))
 
