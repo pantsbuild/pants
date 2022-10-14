@@ -468,7 +468,7 @@ class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
     alias = "post_renderers"
     help = softwrap(
         """
-        List of runnable targets to be used to post-process the helm chart after being renderer by Helm.
+        List of runnable targets to be used to post-process the helm chart after being rendered by Helm.
 
         This is equivalent to the same post-renderer feature already available in Helm with the difference
         that this supports a list of executables instead of a single one.
