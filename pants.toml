@@ -146,9 +146,9 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
-  "flake8-2020>=1.6.0,<1.7.0",
+  "flake8-2020>=1.7.0,<2",
   "flake8-no-implicit-concat",
-  "flake8-comprehensions>=3.8.0,<4.0",
+  "flake8-comprehensions>=3.10.0,<4.0",
 ]
 lockfile = "3rdparty/python/flake8.lock"
 source_plugins = ["build-support/flake8"]
