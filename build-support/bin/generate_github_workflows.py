@@ -598,7 +598,6 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
         # For manylinux compatibility, we build wheels in a container rather than directly
         # on the Ubuntu runner. As a result, we have custom steps here to check out
         # the code, install rustup and expose Pythons.
-        # TODO: Run tests etc. using this container image, so we can reuse the rust engine build?
         # TODO: Apply rust caching here.
         container = "quay.io/pypa/manylinux2014_x86_64:latest"
         initial_steps = [
@@ -825,6 +824,8 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
         "set_merge_ok": {
             "name": "Set Merge OK",
             "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            # NB: This always() condition is critical, as it ensures that this job is run even if
+            #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
             "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
