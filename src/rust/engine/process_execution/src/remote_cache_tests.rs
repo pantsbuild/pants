@@ -21,8 +21,8 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessError, ProcessResultMetadata,
-  ProcessResultSource, RemoteCacheWarningsBehavior,
+  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessResultMetadata, ProcessResultSource, RemoteCacheWarningsBehavior,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -319,6 +319,8 @@ async fn cache_read_speculation() {
     remote_delay_ms: u64,
     remote_cache_speculation_delay_ms: u64,
     cache_hit: bool,
+    cached_exit_code: i32,
+    cache_scope: ProcessCacheScope,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
     let store_setup = StoreSetup::new_with_stub_cas(
@@ -331,53 +333,130 @@ async fn cache_read_speculation() {
       create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
 
     let (process, action_digest) = create_process(&store_setup).await;
+    let process = process.cache_scope(cache_scope);
     let process = process.remote_cache_speculation_delay(std::time::Duration::from_millis(
       remote_cache_speculation_delay_ms,
     ));
     if cache_hit {
-      store_setup
-        .cas
-        .action_cache
-        .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+      store_setup.cas.action_cache.insert(
+        action_digest,
+        cached_exit_code,
+        EMPTY_DIGEST,
+        EMPTY_DIGEST,
+      );
     }
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
-    let remote_result = cache_runner
+    let result = cache_runner
       .run(Context::default(), workunit, process.into())
       .await
       .unwrap();
 
     let final_local_count = local_runner_call_counter.load(Ordering::SeqCst);
-    (remote_result.exit_code, final_local_count)
+    (result.exit_code, final_local_count)
   }
 
   // Case 1: remote is faster than local.
-  let (exit_code, local_call_count) = run_process(200, 0, 0, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    200,
+    0,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
   // Case 2: local is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 200, 0, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    0,
+    200,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
   // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(200, 0, 0, false, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    200,
+    0,
+    0,
+    false,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
-  // Case 4: remote is faster than speculation read delay.
-  let (exit_code, local_call_count) = run_process(0, 0, 200, true, &mut workunit).await;
+  // Case 4: the remote lookup wins, but it was a failed process with cache scope Successful.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    true,
+    5,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 5: the remote lookup wins, and even though it was a failed process, cache scope was Always.
+  let (exit_code, local_call_count) =
+    run_process(0, 0, 200, true, 5, ProcessCacheScope::Always, &mut workunit).await;
+  assert_eq!(exit_code, 5);
+  assert_eq!(local_call_count, 0);
+
+  // Case 6: remote is faster than speculation read delay.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
-  // Case 5: remote is faster than speculation read delay, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(0, 0, 200, false, &mut workunit).await;
+  // Case 7: remote is faster than speculation read delay, but there is no cache entry so we fallback to local execution.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    false,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
-  // Case 6: local with speculation read delay is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 200, 0, true, &mut workunit).await;
+  // Case 8: local with speculation read delay is faster than remote.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    200,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 }

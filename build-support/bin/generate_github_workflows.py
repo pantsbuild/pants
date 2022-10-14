@@ -243,28 +243,6 @@ def install_rustup() -> Step:
     }
 
 
-def rust_caches() -> Sequence[Step]:
-    return [
-        {
-            "name": "Cache Rust toolchain",
-            "uses": "actions/cache@v3",
-            "with": {
-                "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                "key": f"{gha_expr('runner.os')}-rustup-{hashFiles('rust-toolchain')}-v1",
-            },
-        },
-        {
-            "name": "Cache Cargo",
-            "uses": "actions/cache@v3",
-            "with": {
-                "path": "~/.cargo/registry\n~/.cargo/git\n",
-                "key": f"{gha_expr('runner.os')}-cargo-{hashFiles('rust-toolchain')}-{hashFiles('src/rust/engine/Cargo.*')}-v1\n",
-                "restore-keys": f"{gha_expr('runner.os')}-cargo-{hashFiles('rust-toolchain')}-\n",
-            },
-        },
-    ]
-
-
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
@@ -403,16 +381,22 @@ class Helper:
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hashFiles('rust-toolchain')}-v1",
+                    "key": f"{self.platform_name()}-rustup-{hashFiles('rust-toolchain')}-v2",
                 },
             },
             {
                 "name": "Cache Cargo",
-                "uses": "actions/cache@v3",
+                "uses": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
                 "with": {
-                    "path": "~/.cargo/registry\n~/.cargo/git\n",
-                    "key": f"{self.platform_name()}-cargo-{hashFiles('rust-toolchain')}-{hashFiles('src/rust/engine/Cargo.*')}-v1\n",
-                    "restore-keys": f"{self.platform_name()}-cargo-{hashFiles('rust-toolchain')}-\n",
+                    # If set, replaces the job id in the cache key, so that the cache is stable across jobs.
+                    # If we don't set this, each job may restore from a previous job's cache entry (via a
+                    # restore key) but will write its own entry, even if there were no rust changes.
+                    # This will cause us to hit the 10GB limit much sooner, and also spend time uploading
+                    # identical cache entries unnecessarily.
+                    "shared-key": "engine",
+                    "workspaces": "src/rust/engine",
+                    # A custom option from our fork of the action.
+                    "cache-bin": "false",
                 },
             },
         ]
@@ -591,6 +575,8 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     **helper.build_wheels_common,
                     "steps": [
                         *checkout(containerized=True),
+                        # TODO: Why is this necessary? the hosted container is
+                        #  supposed to come with rustup preinstalled.
                         install_rustup(),
                         {
                             "name": "Expose Pythons",
