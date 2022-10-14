@@ -24,6 +24,7 @@ from pants.core.goals.fix import (
     Partitions,
 )
 from pants.core.goals.fix import rules as fix_rules
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import (
@@ -71,10 +72,23 @@ class FortranFixRequest(FixTargetsRequest):
         return "FortranConditionallyDidChange"
 
 
+class FortranFmtRequest(FmtTargetsRequest):
+    field_set_type = FortranFieldSet
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FortranFormatter"
+
+
 @rule
-async def fortran_partition(request: FortranFixRequest.PartitionRequest) -> Partitions:
+async def fortran_fix_partition(request: FortranFixRequest.PartitionRequest) -> Partitions:
     if not any(fs.address.target_name == "needs_fixing" for fs in request.field_sets):
         return Partitions()
+    return Partitions.single_partition(fs.sources.file_path for fs in request.field_sets)
+
+
+@rule
+async def fortran_fmt_partition(request: FortranFmtRequest.PartitionRequest) -> Partitions:
     return Partitions.single_partition(fs.sources.file_path for fs in request.field_sets)
 
 
@@ -86,6 +100,20 @@ async def fortran_fix(request: FortranFixRequest.SubPartition) -> FixResult:
     )
     return FixResult(
         input=input, output=output, stdout="", stderr="", tool_name=FortranFixRequest.tool_name
+    )
+
+
+@rule
+async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
+    output = await Get(
+        Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+    )
+    return FmtResult(
+        input=request.snapshot,
+        output=output,
+        stdout="",
+        stderr="",
+        tool_name=FortranFmtRequest.tool_name,
     )
 
 
@@ -246,6 +274,7 @@ def test_summary() -> None:
         target_types=[FortranTarget, SmalltalkTarget],
         request_types=[
             FortranFixRequest,
+            FortranFmtRequest,
             SmalltalkSkipRequest,
             SmalltalkNoopRequest,
             BrickyBuildFileFixer,
@@ -261,6 +290,7 @@ def test_summary() -> None:
 
         + BrickyBobby made changes.
         + FortranConditionallyDidChange made changes.
+        ✓ FortranFormatter made no changes.
         ✓ SmalltalkDidNotChange made no changes.
         """
     )
@@ -283,50 +313,39 @@ def test_summary() -> None:
     )
 
 
-def test_build_spec_matching() -> None:
+def test_skip_formatters() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[],
-        request_types=[BrickyBuildFileFixer],
+        target_types=[FortranTarget, SmalltalkTarget],
+        request_types=[FortranFmtRequest],
     )
-    original_contents = "build_file_dir"  # just choose something built-in that'll be replaced
 
-    # Added type to workaround https://github.com/python/typing/issues/445
-    build_files: dict[str | PurePath, str] = {
-        "BUILD": original_contents,
-        "dirA/BUILD": original_contents,
-        "dirA/subdirX/BUILD": original_contents,
-        "dirA/subdirY/BUILD": original_contents,
-        "dirB/BUILD": original_contents,
-        "dirC/BUILD": original_contents,
-    }
+    write_files(rule_runner)
 
-    def assert_only_changed(*paths):
-        all_paths = set(build_files.keys())
-        for path in paths:
-            assert Path(rule_runner.build_root, path).read_text() != original_contents
-            all_paths.remove(path)
-        for path in all_paths:
-            assert Path(rule_runner.build_root, path).read_text() == original_contents
+    stderr = run_fix(rule_runner, target_specs=["::"], extra_args=["--fix-skip-formatters"])
 
-    rule_runner.write_files(build_files)
-    run_fix(rule_runner, target_specs=["::"])
-    assert_only_changed(*build_files)
+    assert not stderr
 
-    rule_runner.write_files(build_files)
-    run_fix(rule_runner, target_specs=["dirA:"])
-    assert_only_changed("dirA/BUILD")
 
-    rule_runner.write_files(build_files)
-    run_fix(rule_runner, target_specs=["dirA::"])
-    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD")
+def test_fixers_first() -> None:
+    rule_runner = fix_rule_runner(
+        target_types=[FortranTarget, SmalltalkTarget],
+        # NB: Order is important here
+        request_types=[FortranFmtRequest, FortranFixRequest],
+    )
 
-    rule_runner.write_files(build_files)
-    run_fix(rule_runner, target_specs=["dirA::", "dirB/BUILD"])
-    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD", "dirB/BUILD")
+    write_files(rule_runner)
 
-    rule_runner.write_files(build_files)
-    run_fix(rule_runner, target_specs=["dirA::", "!dirA/subdirX:"])
-    assert_only_changed("dirA/BUILD", "dirA/subdirY/BUILD")
+    stderr = run_fix(rule_runner, target_specs=["::"])
+
+    # NB Since both rules have the same body, if the fixer runs first, it'll make changes. Then the
+    # formatter will have nothing to change.
+    assert stderr == dedent(
+        """\
+
+        + FortranConditionallyDidChange made changes.
+        ✓ FortranFormatter made no changes.
+        """
+    )
 
 
 def test_only() -> None:

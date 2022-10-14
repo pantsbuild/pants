@@ -350,7 +350,7 @@ async def fix(
             (
                 request_type
                 for request_type in union_membership.get(FixRequest)
-                if not (request_type.is_formatter and not fix_subsystem.skip_formatters)
+                if not (request_type.is_formatter and fix_subsystem.skip_formatters)
             ),
             # NB: We sort the core request types to fixers are first. This is to ensure that, between
             # fixers and formatters, re-running isn't necessary due to tool conflicts (re-running may
