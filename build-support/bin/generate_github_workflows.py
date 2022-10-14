@@ -115,15 +115,16 @@ def classify_changes() -> Jobs:
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        """\
-                        affected=$(python build-support/bin/classify_changed_files.py \
-                          '${{ steps.files.outputs.all_modified_files }}')
-                        echo "Affected:\n${affected}"
-                        if [[ "${affected}" == "docs" ]]; then
-                          echo '::set-output name=docs_only::true'
+                        f"""\
+                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
+                        echo "Affected:"
+                        if [[ "${{affected}}" == "docs" ]]; then
+                          echo "::set-output name=docs_only::true"
+                          echo "docs_only"
                         fi
-                        for i in ${affected}; do
-                          echo "::set-output name=${i}::true"
+                        for i in ${{affected}}; do
+                          echo "::set-output name=${{i}}::true"
+                          echo "XX ${{i}} XX"
                         done
                         """
                     ),

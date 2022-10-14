@@ -529,13 +529,11 @@ jobs:
         separator: '|'
     - id: classify
       name: Classify changed files
-      run: "                        affected=$(python build-support/bin/classify_changed_files.py\
-        \                           '${{ steps.files.outputs.all_modified_files }}')\n\
-        \                        echo \"Affected:\n${affected}\"\n               \
-        \         if [[ \"${affected}\" == \"docs\" ]]; then\n                   \
-        \       echo '::set-output name=docs_only::true'\n                       \
-        \ fi\n                        for i in ${affected}; do\n                 \
-        \         echo \"::set-output name=${i}::true\"\n                        done\n"
+      run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files\
+        \ }}\")\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n\
+        \  echo \"::set-output name=docs_only::true\"\n  echo \"docs_only\"\nfi\n\
+        for i in ${affected}; do\n  echo \"::set-output name=${i}::true\"\n  echo\
+        \ \"XX ${i} XX\"\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != true)
