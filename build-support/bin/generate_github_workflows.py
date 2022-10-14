@@ -76,7 +76,7 @@ PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
 ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
 
-DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == true"
+DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == true"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
@@ -102,6 +102,7 @@ def classify_changes() -> Jobs:
                 "rust": gha_expr("steps.classify.outputs.rust"),
                 "release": gha_expr("steps.classify.outputs.release"),
                 "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+                "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
                 *checkout(),
@@ -124,7 +125,7 @@ def classify_changes() -> Jobs:
                         fi
                         for i in ${{affected}}; do
                           echo "::set-output name=${{i}}::true"
-                          echo "XX ${{i}} XX"
+                          echo "${{i}}"
                         done
                         """
                     ),
@@ -507,6 +508,19 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
+                {
+                    "name": "Debug inputs",
+                    "run": dedent(
+                        """\
+                        echo "rust: ${{ needs.classify_changes.outputs.rust }}"
+                        echo "ci_config: ${{ needs.classify_changes.outputs.ci_config }}"
+                        echo "release: ${{ needs.classify_changes.outputs.release }}"
+                        echo "docs: ${{ needs.classify_changes.outputs.docs }}"
+                        echo "docs_only: ${{ needs.classify_changes.outputs.docs_only }}"
+                        echo "other: ${{ needs.classify_changes.outputs.other }}"
+                        """
+                    ),
+                },
                 *helper.bootstrap_pants(install_python=True),
                 {
                     "name": "Validate CI config",

@@ -16,6 +16,20 @@ jobs:
     runs-on:
     - ubuntu-20.04
     steps:
+    - name: Debug inputs
+      run: 'echo "rust: ${{ needs.classify_changes.outputs.rust }}"
+
+        echo "ci_config: ${{ needs.classify_changes.outputs.ci_config }}"
+
+        echo "release: ${{ needs.classify_changes.outputs.release }}"
+
+        echo "docs: ${{ needs.classify_changes.outputs.docs }}"
+
+        echo "docs_only: ${{ needs.classify_changes.outputs.docs_only }}"
+
+        echo "other: ${{ needs.classify_changes.outputs.other }}"
+
+        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
@@ -106,7 +120,7 @@ jobs:
       run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
-    - if: needs.classify_changes.outputs.rust == true
+    - if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
@@ -220,7 +234,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
-      if: needs.classify_changes.outputs.rust == true
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
       run: ./cargo test --tests -- --nocapture
     strategy:
