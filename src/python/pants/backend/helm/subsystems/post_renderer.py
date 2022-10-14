@@ -245,7 +245,7 @@ async def setup_post_renderer_launcher(
         ),
     )
 
-    # Combine all required settings from the internal and extra post-postrenders
+    # Combine all required settings for the internal and extra post-renderers
     launcher_digest = await Get(
         Digest,
         MergeDigests(
