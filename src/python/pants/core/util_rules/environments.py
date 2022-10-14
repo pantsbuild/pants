@@ -24,6 +24,7 @@ from pants.engine.process import ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    BoolField,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -313,6 +314,28 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
     )
 
 
+class RemoteEnvironmentCacheBinaryDiscovery(BoolField):
+    alias = "cache_binary_discovery"
+    default = False
+    help = softwrap(
+        f"""
+        If true, will cache system binary discovery, e.g. finding Python interpreters.
+
+        When safe to do, it is preferable to set this option to `true` for faster performance by
+        avoiding wasted work. Otherwise, Pants will research for system binaries whenever the
+        Pants daemon is restarted.
+
+        However, it is only safe to set this to true if the remote execution environment has a
+        stable environment, e.g. the server will not change versions of installed system binaries.
+        Otherwise, you risk caching results that become stale when the server changes its
+        environment, which may break your builds. Often, with remote execution servers you can
+        specify a Docker container to run with via the field
+        `{RemoteExtraPlatformPropertiesField.alias}`; if you are able to specify what Docker image
+        to use, and also use a pinned tag of the image, it is likely safe to set this field to true.
+        """
+    )
+
+
 class RemoteEnvironmentTarget(Target):
     alias = "remote_environment"
     core_fields = (
@@ -320,6 +343,7 @@ class RemoteEnvironmentTarget(Target):
         RemotePlatformField,
         RemoteExtraPlatformPropertiesField,
         RemoteFallbackEnvironmentField,
+        RemoteEnvironmentCacheBinaryDiscovery,
     )
     help = softwrap(
         """
@@ -381,7 +405,7 @@ class EnvironmentTarget:
     def executable_search_path_cache_scope(
         self, *, cache_failures: bool = False
     ) -> ProcessCacheScope:
-        """Whether it's safe to cache exectuable search path discovery or not.
+        """Whether it's safe to cache executable search path discovery or not.
 
         If the environment may change on us, e.g. the user upgrades a binary, then it's not safe to
         cache the discovery to disk. Technically, in that case, we should recheck the binary every
@@ -390,11 +414,28 @@ class EnvironmentTarget:
 
         Meanwhile, when running with Docker, we already invalidate whenever the image changes
         thanks to https://github.com/pantsbuild/pants/pull/17101.
+
+        Remote execution often is safe to cache, but depends on the remote execution server.
+        So, we rely on the user telling us what is safe.
         """
-        docker = self.val and self.val.has_field(DockerImageField)
+        caching_allowed = self.val and (
+            self.val.has_field(DockerImageField)
+            or (
+                self.val.has_field(RemoteEnvironmentCacheBinaryDiscovery)
+                and self.val[RemoteEnvironmentCacheBinaryDiscovery].value
+            )
+        )
         if cache_failures:
-            return ProcessCacheScope.ALWAYS if docker else ProcessCacheScope.PER_RESTART_ALWAYS
-        return ProcessCacheScope.SUCCESSFUL if docker else ProcessCacheScope.PER_RESTART_SUCCESSFUL
+            return (
+                ProcessCacheScope.ALWAYS
+                if caching_allowed
+                else ProcessCacheScope.PER_RESTART_ALWAYS
+            )
+        return (
+            ProcessCacheScope.SUCCESSFUL
+            if caching_allowed
+            else ProcessCacheScope.PER_RESTART_SUCCESSFUL
+        )
 
 
 @dataclass(frozen=True)
