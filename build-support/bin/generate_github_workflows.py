@@ -77,7 +77,7 @@ PYTHON39_VERSION = "3.9"
 ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == true"
+DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -508,19 +508,6 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
-                {
-                    "name": "Debug inputs",
-                    "run": dedent(
-                        """\
-                        echo "rust: ${{ needs.classify_changes.outputs.rust }}"
-                        echo "ci_config: ${{ needs.classify_changes.outputs.ci_config }}"
-                        echo "release: ${{ needs.classify_changes.outputs.release }}"
-                        echo "docs: ${{ needs.classify_changes.outputs.docs }}"
-                        echo "docs_only: ${{ needs.classify_changes.outputs.docs_only }}"
-                        echo "other: ${{ needs.classify_changes.outputs.other }}"
-                        """
-                    ),
-                },
                 *helper.bootstrap_pants(install_python=True),
                 {
                     "name": "Validate CI config",
@@ -892,7 +879,7 @@ def generate() -> dict[Path, str]:
         needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
-        not_docs_only = "needs.classify_changes.outputs.docs_only != true"
+        not_docs_only = "needs.classify_changes.outputs.docs_only != 'true'"
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 

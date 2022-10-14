@@ -1,8 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-deliberately breaking rust tests to see what happens
-
 use crate::glob_matching::PathGlob;
 use crate::{GitignoreStyleExcludes, GlobExpansionConjunction, PathGlobs, StrictGlobMatching};
 

@@ -12,27 +12,13 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
     - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
-    - name: Debug inputs
-      run: 'echo "rust: ${{ needs.classify_changes.outputs.rust }}"
-
-        echo "ci_config: ${{ needs.classify_changes.outputs.ci_config }}"
-
-        echo "release: ${{ needs.classify_changes.outputs.release }}"
-
-        echo "docs: ${{ needs.classify_changes.outputs.docs }}"
-
-        echo "docs_only: ${{ needs.classify_changes.outputs.docs_only }}"
-
-        echo "other: ${{ needs.classify_changes.outputs.other }}"
-
-        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
@@ -144,7 +130,7 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Bootstrap Pants, test Rust (macOS11-x86_64)
     needs:
     - classify_changes
@@ -253,8 +239,8 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == true)) && (needs.classify_changes.outputs.docs_only
-      != true)
+      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -313,8 +299,8 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == true)) && (needs.classify_changes.outputs.docs_only
-      != true)
+      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -379,8 +365,8 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == true)) && (needs.classify_changes.outputs.docs_only
-      != true)
+      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -441,8 +427,8 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == true)) && (needs.classify_changes.outputs.docs_only
-      != true)
+      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS11-x86_64)
     needs:
     - classify_changes
@@ -551,7 +537,7 @@ jobs:
         \ \"${i}\"\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
@@ -639,7 +625,7 @@ jobs:
       run: echo '::set-output name=merge_ok::true'
   test_python_linux_x86_64_0:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Test Python (Linux-x86_64) Shard 0/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -712,7 +698,7 @@ jobs:
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Test Python (Linux-x86_64) Shard 1/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -785,7 +771,7 @@ jobs:
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Test Python (Linux-x86_64) Shard 2/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -860,7 +846,7 @@ jobs:
     env:
       ARCHFLAGS: -arch x86_64
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != true)
+      != 'true')
     name: Test Python (macOS11-x86_64)
     needs:
     - bootstrap_pants_macos11_x86_64

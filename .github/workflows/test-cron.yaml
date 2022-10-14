@@ -16,20 +16,6 @@ jobs:
     runs-on:
     - ubuntu-20.04
     steps:
-    - name: Debug inputs
-      run: 'echo "rust: ${{ needs.classify_changes.outputs.rust }}"
-
-        echo "ci_config: ${{ needs.classify_changes.outputs.ci_config }}"
-
-        echo "release: ${{ needs.classify_changes.outputs.release }}"
-
-        echo "docs: ${{ needs.classify_changes.outputs.docs }}"
-
-        echo "docs_only: ${{ needs.classify_changes.outputs.docs_only }}"
-
-        echo "other: ${{ needs.classify_changes.outputs.other }}"
-
-        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
