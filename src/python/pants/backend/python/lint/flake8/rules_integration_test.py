@@ -132,7 +132,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--flake8-lockfile=<none>"]
+    extra_args = ["--flake8-lockfile=<none>", "--flake8-version=flake8<4.0,>=3.9.2"]
 
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
