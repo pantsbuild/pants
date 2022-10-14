@@ -137,6 +137,7 @@ async fn make_execute_request() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -225,6 +226,7 @@ async fn make_execute_request_with_instance_name() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -311,6 +313,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -370,6 +373,7 @@ async fn make_execute_request_with_jdk() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -453,6 +457,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -533,6 +538,7 @@ async fn make_execute_request_with_timeout() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
@@ -639,6 +645,7 @@ async fn make_execute_request_using_immutable_inputs() {
       ))
         .into(),
     ),
+    skip_cache_lookup: true,
     ..Default::default()
   };
 
