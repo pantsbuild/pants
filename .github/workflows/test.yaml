@@ -11,12 +11,11 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -56,7 +55,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
@@ -65,20 +64,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'Linux-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -88,7 +78,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -127,7 +117,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -157,12 +147,11 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Bootstrap Pants, test Rust (macOS11-x86_64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - macos-11
     steps:
@@ -202,7 +191,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
@@ -211,20 +200,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -234,7 +214,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -273,7 +253,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -294,12 +274,11 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Build wheels and fs_util (Linux-x86_64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -380,12 +359,11 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Build wheels and fs_util (macOS10-15-x86_64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - macOS-10.15-X64
     steps:
@@ -419,7 +397,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
@@ -428,20 +406,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS10-15-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - env:
         ARCHFLAGS: -arch x86_64
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
@@ -483,12 +452,11 @@ jobs:
       ARCHFLAGS: -arch arm64
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Bootstrap Pants, build wheels and fs_util (macOS11-ARM64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - macOS-11-ARM64
     steps:
@@ -524,7 +492,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
@@ -533,20 +501,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-ARM64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-ARM64-cargo-${ hashFiles(''rust-toolchain'') }-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -556,7 +515,7 @@ jobs:
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-ARM64-engine-${ steps.get-engine-hash.outputs.hash }-v1
+        key: 'macOS11-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -595,7 +554,7 @@ jobs:
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-ARM64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-ARM64
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -623,12 +582,11 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Build wheels and fs_util (macOS11-x86_64)
     needs:
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - macos-11
     steps:
@@ -664,7 +622,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${ hashFiles('rust-toolchain') }-v1
+        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.63.0-*
 
           ~/.rustup/update-hashes
@@ -673,20 +631,11 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v3
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
       with:
-        key: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-${ hashFiles(''src/rust/engine/Cargo.*'')
-          }-v1
-
-          '
-        path: '~/.cargo/registry
-
-          ~/.cargo/git
-
-          '
-        restore-keys: 'macOS11-x86_64-cargo-${ hashFiles(''rust-toolchain'') }-
-
-          '
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
     - env:
         ARCHFLAGS: -arch x86_64
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
@@ -733,17 +682,21 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request'
       name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
+      uses: mheap/github-action-required-labels@v2.1.0
       with:
         count: 1
         labels: category:new feature, category:user api change, category:plugin api
           change, category:performance, category:bugfix, category:documentation, category:internal
         mode: exactly
-  docs_only_check:
+  classify_changes:
     if: github.repository_owner == 'pantsbuild'
-    name: Check for docs-only change
+    name: Classify changes
     outputs:
-      docs_only: ${{ steps.docs_only_check.outputs.docs_only }}
+      ci_config: ${{ steps.classify.outputs.ci_config }}
+      docs: ${{ steps.classify.outputs.docs }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      release: ${{ steps.classify.outputs.release }}
+      rust: ${{ steps.classify.outputs.rust }}
     runs-on:
     - ubuntu-20.04
     steps:
@@ -753,22 +706,25 @@ jobs:
         fetch-depth: 10
     - id: files
       name: Get changed files
-      uses: tj-actions/changed-files@v23.1
+      uses: tj-actions/changed-files@v32
       with:
-        files_ignore: docs/**
-        files_ignore_separator: '|'
-    - id: docs_only_check
-      if: steps.files.outputs.any_changed != 'true'
-      name: Check for docs-only changes
-      run: echo '::set-output name=docs_only::DOCS_ONLY'
+        separator: '|'
+    - id: classify
+      name: Classify changed files
+      run: "                        affected=$(python build-support/bin/classify_changed_files.py\
+        \                           '${{ steps.files.outputs.all_modified_files }}')\n\
+        \                        echo \"Affected:\n${affected}\"\n               \
+        \         if [[ \"${affected}\" == \"docs\" ]]; then\n                   \
+        \       echo '::set-output name=docs_only::true'\n                       \
+        \ fi\n                        for i in ${affected}; do\n                 \
+        \         echo \"::set-output name=${i}::true\"\n                        done\n"
   lint_python:
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -808,7 +764,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -845,10 +801,11 @@ jobs:
         \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
         \ \"Merge NOT OK\"\n    exit 1\nfi\n"
   set_merge_ok_docs_only:
-    if: needs.docs_only_check.outputs.docs_only == 'DOCS_ONLY'
+    if: needs.classify_changes.outputs.docs_only == true
     name: Set Merge OK
     needs:
-    - docs_only_check
+    - classify_changes
+    - check_labels
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
@@ -857,10 +814,11 @@ jobs:
     - id: set_merge_ok
       run: echo '::set-output name=merge_ok::true'
   set_merge_ok_not_docs_only:
-    if: needs.docs_only_check.outputs.docs_only != 'DOCS_ONLY'
+    if: needs.classify_changes.outputs.docs_only != true
     name: Set Merge OK
     needs:
-    - docs_only_check
+    - classify_changes
+    - check_labels
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos11_x86_64
     - build_wheels_linux_x86_64
@@ -868,7 +826,7 @@ jobs:
     - build_wheels_macos11_arm64
     - build_wheels_macos11_x86_64
     - check_labels
-    - docs_only_check
+    - classify_changes
     - lint_python
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
@@ -882,13 +840,12 @@ jobs:
     - id: set_merge_ok
       run: echo '::set-output name=merge_ok::true'
   test_python_linux_x86_64_0:
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Test Python (Linux-x86_64) Shard 0/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -951,7 +908,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -974,13 +931,12 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Test Python (Linux-x86_64) Shard 1/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -1043,7 +999,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1066,13 +1022,12 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Test Python (Linux-x86_64) Shard 2/3
     needs:
     - bootstrap_pants_linux_x86_64
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - ubuntu-20.04
     steps:
@@ -1135,7 +1090,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.Linux-x86_64
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1160,13 +1115,12 @@ jobs:
   test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
-    if: (github.repository_owner == 'pantsbuild') && (needs.docs_only_check.outputs.docs_only
-      != 'DOCS_ONLY')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != true)
     name: Test Python (macOS11-x86_64)
     needs:
     - bootstrap_pants_macos11_x86_64
-    - check_labels
-    - docs_only_check
+    - classify_changes
     runs-on:
     - macos-11
     steps:
@@ -1213,7 +1167,7 @@ jobs:
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
-        name: native_binaries.${ matrix.python-version }.macOS11-x86_64
+        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
