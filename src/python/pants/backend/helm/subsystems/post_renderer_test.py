@@ -73,6 +73,6 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
         elif file.path == "post_renderer_wrapper.sh":
             script_lines = file.content.decode().splitlines()
             assert (
-                "./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml ./__stdin.yaml"
+                "./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml ./__helm_stdout.yaml"
                 in script_lines
             )
