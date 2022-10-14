@@ -26,7 +26,7 @@ class ListSubsystem(LineOriented, GoalSubsystem):
 
 class List(Goal):
     subsystem_cls = ListSubsystem
-    environment_migrated = True
+    enviroment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

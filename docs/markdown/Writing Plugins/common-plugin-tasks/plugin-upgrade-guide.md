@@ -19,11 +19,11 @@ is now required in order to:
 
 Some deprecations are in place to reduce the burden on `@rule` authors:
 
-#### `Goal.environment_migrated`
+#### `Goal.environment_behavior`
 
-The `Goal` class has an `environment_migrated` property, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. When `environment_migrated=False` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName`.
+The `Goal` class has an `environment_behavior` property, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. When `environment_behavior=UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation error.
 
-To migrate a `Goal`, set `environment_migrated=True`, select an `EnvironmentName` to use for (different portions of) your `Goal`, and then provide the `EnvironmentName` to the relevant callsites. In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+To migrate a `Goal`, select an `EnvironmentName` to use for (different portions of) your `Goal`, and then provide the `EnvironmentName` to the relevant callsites. In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
 ```python
 Get(
     EnvironmentName,
@@ -32,6 +32,8 @@ Get(
 )
 ```
 If rather than using the environment configured by a target your `Goal` should always be pinned to run in the local environment, you can instead request the `ChosenLocalEnvironmentName` and use its content as the `EnvironmentName`.
+
+To silence the deprecation warning, set `environment_behavior` to either `LOCAL_ONLY` or `USES_ENVIRONMENTS` depending on whether you use `ChosenLocalEnvironmentName` or `EnvironmentNameRequest` to request your `EnvironmentName`.
 
 Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
 ```python
