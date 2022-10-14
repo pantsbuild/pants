@@ -133,11 +133,6 @@ def classify_changes() -> Jobs:
     }
 
 
-def _docs_only_cond(docs_only: bool) -> str:
-    op = "==" if docs_only else "!="
-    return f"needs.classify_changes.outputs.docs_only {op} true"
-
-
 def ensure_category_label() -> Sequence[Step]:
     """Check that exactly one category label is present on a pull request."""
     return [
@@ -818,29 +813,20 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
-# We have two copies of this job, one for the docs-only case and one for all other cases.
-# Each job runs conditionally (see the "if" condition below), so exactly one will run and
-# the other will be skipped.
-#
-# But - note that a job skipped due to an "if" condition, or due to a failed dependency,
-# counts as successful (!) in GitHub Actions (as opposed to jobs skipped due to branch or path
-# filtering, which count as pending).
-
-# Therefore we can't have a branch protection check directly on this job name - it will always
-# be successful. So instead we use this job to set an output that a "Merge OK" job can act on,
-# and we check for that job in branch protection.  Only a truly successful (non-skipped)
-# trigger job will actually set that output.
-def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
-    key = "set_merge_ok_docs_only" if docs_only else "set_merge_ok_not_docs_only"
+def merge_ok(pr_jobs: list[str]) -> Jobs:
+    # Generate the "Merge OK" job that branch protection can monitor.
+    # Note: A job skipped due to an "if" condition, or due to a failed dependency, counts as
+    # successful (!) for the purpose of branch protection. Therefore we can't have the "Merge OK"
+    # job depend directly on the other jobs - it will always be successful.
+    # So instead we have a "Set merge OK" job to set an output that the "Merge OK" job can act on,
+    # and we check for that job in branch protection.  Only a truly successful (non-skipped)
+    # job will actually set that output.
     return {
-        key: {
+        "set_merge_ok": {
             "name": "Set Merge OK",
             "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-            "if": f"always() && {_docs_only_cond(docs_only)} && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            # If in the future we have any docs-related checks, we can make both "Set Merge OK"
-            # jobs depend on them here (it has to be both since some changes may modify docs
-            # as well as code, and so are not "docs only").
-            "needs": ["classify_changes", "check_labels"] + sorted(needs),
+            "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
+            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -848,50 +834,37 @@ def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
                     "run": "echo '::set-output name=merge_ok::true'",
                 },
             ],
-        }
+        },
+        "merge_ok": {
+            "name": "Merge OK",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            # NB: This always() condition is critical, as it ensures that this job is never
+            # skipped (if it were skipped it would be treated as vacuously successful by branch protection).
+            "if": "always()",
+            "needs": ["set_merge_ok"],
+            "steps": [
+                {
+                    "run": dedent(
+                        f"""\
+                merge_ok="{gha_expr('needs.set_merge_ok.outputs.merge_ok')}"
+                if [[ "${{merge_ok}}" == "true" ]]; then
+                    echo "Merge OK"
+                    exit 0
+                else
+                    echo "Merge NOT OK"
+                    exit 1
+                fi
+                """
+                    )
+                }
+            ],
+        },
     }
-
-
-def merge_ok(non_docs_only_jobs: list[str]) -> Jobs:
-    jobs = {}
-    jobs.update(set_merge_ok(needs=non_docs_only_jobs, docs_only=False))
-    jobs.update(set_merge_ok(needs=[], docs_only=True))
-    jobs.update(
-        {
-            "merge_ok": {
-                "name": "Merge OK",
-                "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-                # NB: This always() condition is critical, as it ensures that this job is never
-                # skipped (if it were skipped it would be treated as vacuously successful).
-                "if": "always()",
-                "needs": ["set_merge_ok_docs_only", "set_merge_ok_not_docs_only"],
-                "steps": [
-                    {
-                        "run": dedent(
-                            f"""\
-                    merge_ok_docs_only="{gha_expr('needs.set_merge_ok_docs_only.outputs.merge_ok')}"
-                    merge_ok_not_docs_only="{gha_expr('needs.set_merge_ok_not_docs_only.outputs.merge_ok')}"
-                    if [[ "${{merge_ok_docs_only}}" == "true" || "${{merge_ok_not_docs_only}}" == "true" ]]; then
-                        echo "Merge OK"
-                        exit 0
-                    else
-                        echo "Merge NOT OK"
-                        exit 1
-                    fi
-                    """
-                        )
-                    }
-                ],
-            }
-        }
-    )
-    return jobs
 
 
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
-    not_docs_only = _docs_only_cond(docs_only=False)
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
@@ -903,6 +876,7 @@ def generate() -> dict[Path, str]:
         needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
+        not_docs_only = "needs.classify_changes.outputs.docs_only != true"
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 

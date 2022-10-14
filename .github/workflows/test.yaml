@@ -590,33 +590,16 @@ jobs:
     if: always()
     name: Merge OK
     needs:
-    - set_merge_ok_docs_only
-    - set_merge_ok_not_docs_only
+    - set_merge_ok
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: "merge_ok_docs_only=\"${{ needs.set_merge_ok_docs_only.outputs.merge_ok\
-        \ }}\"\nmerge_ok_not_docs_only=\"${{ needs.set_merge_ok_not_docs_only.outputs.merge_ok\
-        \ }}\"\nif [[ \"${merge_ok_docs_only}\" == \"true\" || \"${merge_ok_not_docs_only}\"\
+    - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\"\
         \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
         \ \"Merge NOT OK\"\n    exit 1\nfi\n"
-  set_merge_ok_docs_only:
-    if: always() && needs.classify_changes.outputs.docs_only == true && !contains(needs.*.result,
-      'failure') && !contains(needs.*.result, 'cancelled')
-    name: Set Merge OK
-    needs:
-    - classify_changes
-    - check_labels
-    outputs:
-      merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - id: set_merge_ok
-      run: echo '::set-output name=merge_ok::true'
-  set_merge_ok_not_docs_only:
-    if: always() && needs.classify_changes.outputs.docs_only != true && !contains(needs.*.result,
-      'failure') && !contains(needs.*.result, 'cancelled')
+  set_merge_ok:
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result,
+      'cancelled')
     name: Set Merge OK
     needs:
     - classify_changes
