@@ -33,10 +33,11 @@ from pants.backend.helm.util_rules.renderer import (
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.backend.shell import shell_command
-from pants.backend.shell.target_types import ShellCommandTarget, ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
 from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Target
@@ -63,7 +64,7 @@ def rule_runner() -> RuleRunner:
             HelmDeploymentTarget,
             DockerImageTarget,
             ShellSourcesGeneratorTarget,
-            ShellCommandTarget,
+            ShellCommandRunTarget,
         ],
         rules=[
             *infer_deployment.rules(),
@@ -273,18 +274,11 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
                 """\
               shell_sources(name="scripts")
 
-              experimental_shell_command(
+              experimental_run_shell_command(
                 name="custom_post_renderer",
-                tools=["cat"],
-                command="./my-script.sh",
+                command="src/shell/my-script.sh",
                 dependencies=[":scripts"]
               )
-              """
-            ),
-            "src/shell/script.sh": dedent(
-                """\
-              #!/bin/bash
-              cat <&0
               """
             ),
             "src/deployment/BUILD": dedent(
@@ -298,6 +292,29 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+    # We need to create the post-renderer script as a digest to ensure it has running permissions.
+    post_renderer_script_digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    FileContent(
+                        path="src/shell/my-script.sh",
+                        content=dedent(
+                            """\
+                            #!/bin/bash
+                            cat <&0
+                            """
+                        ).encode(),
+                        is_executable=True,
+                    )
+                ]
+            )
+        ],
+    )
+
+    rule_runner.write_digest(post_renderer_script_digest)
 
     deployment_addr = Address("src/deployment", target_name="test")
     tgt = rule_runner.get_target(deployment_addr)

@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.helm import HelmSubsystem
@@ -284,12 +284,12 @@ async def setup_render_helm_deployment_process(
     input_digests = [output_digest]
 
     # Additional process values in case a post_renderer has been requested.
-    env: Mapping[str, str] = {}
+    env: dict[str, str] = {}
     immutable_input_digests: dict[str, Digest] = {
         **chart.immutable_input_digests,
         value_files_prefix: value_files.snapshot.digest,
     }
-    append_only_caches: Mapping[str, str] = {}
+    append_only_caches: dict[str, str] = {}
     if request.post_renderer:
         logger.debug(f"Using post-renderer stage in deployment {request.field_set.address}")
         input_digests.append(request.post_renderer.digest)

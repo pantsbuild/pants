@@ -279,16 +279,9 @@ data:
 type: Opaque
 ```
 ```python src/deploy/BUILD
-experimental_shell_command(
+experimental_run_shell_command(
   name="vals",
   command="vals eval -f -",
-  extra_env_vars=[
-    "VAULT_ADDR",
-    "VAULT_NAMESPACE",
-    "VAULT_TOKEN",
-    ...
-  ],
-  tools=["vals"],
 )
 
 helm_deployment(

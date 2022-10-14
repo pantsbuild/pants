@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import pkgutil
+import re
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
@@ -36,6 +37,7 @@ from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +167,16 @@ class HelmPostRenderer(EngineAwareReturnType):
 async def _resolve_post_renderers(
     address_inputs: UnparsedAddressInputs,
 ) -> Iterable[RunRequest]:
+    logger.debug(
+        softwrap(
+            f"""
+            Resolving {pluralize(len(address_inputs.values), 'post-renderer')} from {address_inputs.description_of_origin}:
+
+            {bullet_list(address_inputs.values, 5)}
+            """
+        )
+    )
+
     targets = await Get(Targets, UnparsedAddressInputs, address_inputs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, targets)
@@ -206,6 +218,12 @@ async def setup_post_renderer_launcher(
         ),
     )
 
+    def shell_escape(arg: str) -> str:
+        return re.sub(r"/'\\\\''", r"1s/^/'/; \$s/\$/'/", arg)
+
+    def shell_cmd(args: Iterable[str]) -> str:
+        return " ".join([shell_escape(arg) for arg in args])
+
     # Build a shell wrapper script which will be the actual entry-point sent to Helm as the post-renderer.
     # Extra post-renderers are plugged by piping the output of one into the next one in the order they
     # have been defined.
@@ -216,8 +234,8 @@ async def setup_post_renderer_launcher(
     )
     post_renderer_process_cli = " | ".join(
         [
-            " ".join(post_renderer_process.argv),
-            *[" ".join(post_renderer.args) for post_renderer in extra_post_renderers],
+            shell_cmd(post_renderer_process.argv),
+            *[shell_cmd(post_renderer.args) for post_renderer in extra_post_renderers],
         ]
     )
     logger.debug(f"Built post-renderer process CLI: {post_renderer_process_cli}")
