@@ -219,6 +219,11 @@ async def setup_post_renderer_launcher(
     )
 
     def shell_escape(arg: str) -> str:
+        """Escape the shell argument by wrapping it around single quotes.
+
+        Found at:
+        https://stackoverflow.com/questions/15783701/which-characters-need-to-be-escaped-when-using-bash
+        """
         return re.sub(r"/'\\\\''", r"1s/^/'/; \$s/\$/'/", arg)
 
     def shell_cmd(args: Iterable[str]) -> str:
