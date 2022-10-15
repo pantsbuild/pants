@@ -10,11 +10,15 @@ from typing import Iterable
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
+from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+)
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -39,6 +43,15 @@ async def pyright_typecheck(request: PyrightRequest, pyright: Pyright) -> CheckR
     if pyright.skip:
         return CheckResults([], checker_name=request.tool_name)
 
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+
+    coarsened_sources = await Get(
+        PythonSourceFiles, PythonSourceFilesRequest(coarsened_targets.closure())
+    )
+
     source_files = await Get(
         SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
     )
@@ -51,7 +64,7 @@ async def pyright_typecheck(request: PyrightRequest, pyright: Pyright) -> CheckR
                 *pyright.args,  # User-added arguments
                 *source_files.snapshot.files,
             ),
-            input_digest=source_files.snapshot.digest,
+            input_digest=coarsened_sources.source_files.snapshot.digest,
             description=f"Run Pyright on {pluralize(len(source_files.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
