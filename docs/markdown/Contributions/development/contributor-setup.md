@@ -24,21 +24,20 @@ We use the popular forking workflow typically used by open source projects. See 
 > 
 > (If you don't have `brew` installed, see <https://brew.sh.>)
 
-Step 2: Set up Git hooks
-------------------------
+Step 2: (Optional) Set up a Git hook
+------------------------------------
 
-We use two [Git hooks](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks):
+We have a [Git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that runs some useful checks and lints when you `git commit`.
 
-1. If you didn't touch any Rust code, we add `[ci skip-rust]` to your commit message. If you didn't touch any of our release-related code, we add `[ci skip-build-wheels]` to your commit message.
-2. Every time you run `git commit`, we run some checks and lints.
-
-To install these, run:
+To install this, run:
 
 ```bash
 $ build-support/bin/setup.sh
 ```
 
-You can manually run the pre-commit check by running:
+If you commit frequently as part of your workflow you may find it annoying to have these run every time, so installing this hook is not required.
+
+You can manually run the pre-commit check with:
 
 ```bash
 $ build-support/githooks/pre-commit
