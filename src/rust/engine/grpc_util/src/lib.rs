@@ -49,12 +49,13 @@ use tower::util::{BoxService, MapRequest};
 use tower::ServiceBuilder;
 use tower_service::Service;
 use workunit_store::ObservationMetric;
+use crate::boxed::BoxServiceSync;
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
 // use crate::boxed::BoxServiceSync;
 
-// pub mod boxed;
+pub mod boxed;
 pub mod headers;
 pub mod hyper_util;
 pub mod metrics;
@@ -82,14 +83,13 @@ pub fn layered_service(
   http_headers: HeaderMap,
 ) -> LayeredService {
   let service = ServiceBuilder::new()
-    // .layer(BoxServiceSync::layer())
-    .boxed()
+    .layer(BoxServiceSync::layer())
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .layer(NetworkMetricsLayer::new(&METRIC_FOR_REAPI_PATH))
     .service(service);
 
-  Box::pin(service) as LayeredService
+  Box::pin(service) as _
 }
 
 lazy_static! {
@@ -153,7 +153,7 @@ pub fn create_endpoint(
     })
     .service(client);
 
-  Ok(Box::new(svc) as LayeredService)
+  Ok(Box::pin(svc) as _)
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {

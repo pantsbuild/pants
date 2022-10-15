@@ -12,7 +12,7 @@ pub struct BoxServiceSync<T, U, E> {
   >,
 }
 
-type BoxFutureSync<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send + Sync + 'static>>;
+pub type BoxFutureSync<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send + Sync + 'static>>;
 
 impl<T, U, E> BoxServiceSync<T, U, E> {
   pub fn new<S>(inner: S) -> Self
@@ -37,7 +37,7 @@ impl<T, U, E> BoxServiceSync<T, U, E> {
   }
 }
 
-impl<T, U, E> Service<T> for BoxServiceSync<T, U, E> {
+impl<T: Send, U, E> Service<T> for BoxServiceSync<T, U, E> {
   type Response = U;
   type Error = E;
   type Future = futures::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;

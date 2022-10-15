@@ -1258,11 +1258,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "parking_lot 0.11.2",
-<<<<<<< HEAD
  "pin-project 1.0.12",
-=======
- "pin-project 1.0.10",
->>>>>>> 15dd07196 (checkpoint)
  "prost",
  "prost-build",
  "prost-types",
