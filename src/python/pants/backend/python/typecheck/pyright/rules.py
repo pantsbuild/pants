@@ -10,16 +10,22 @@ from typing import Iterable
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
 from pants.engine.unions import UnionRule
+from pants.option.global_options import NamedCachesDirOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -39,7 +45,9 @@ class PyrightRequest(CheckRequest):
 
 
 @rule(desc="Typecheck using Pyright", level=LogLevel.DEBUG)
-async def pyright_typecheck(request: PyrightRequest, pyright: Pyright) -> CheckResults:
+async def pyright_typecheck(
+    request: PyrightRequest, pyright: Pyright, named_cache_dir: NamedCachesDirOption
+) -> CheckResults:
     if pyright.skip:
         return CheckResults([], checker_name=request.tool_name)
 
@@ -56,15 +64,61 @@ async def pyright_typecheck(request: PyrightRequest, pyright: Pyright) -> CheckR
         SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
     )
 
+    # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
+    requirements_pex = await Get(
+        Pex,
+        RequirementsPexRequest(
+            (fs.address for fs in request.field_sets),
+            # TODO: Setup the correct interpreter constraints after partitioning
+            # hardcoded_interpreter_constraints=partition.interpreter_constraints,
+        ),
+    )
+
+    requirements_venv_pex = await Get(
+        VenvPex,
+        PexRequest(
+            output_filename="requirements_venv.pex",
+            internal_only=True,
+            pex_path=[requirements_pex],
+            # TODO: Setup the correct interpreter constraints after partitioning
+            interpreter_constraints=InterpreterConstraints(["==3.9.15"]),
+        ),
+    )
+
+    # venv workaround as per: https://github.com/microsoft/pyright/issues/4051
+    dummy_config_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    "pyrightconfig.json",
+                    f'{{ "venv": "{requirements_venv_pex.venv_rel_dir}" }}'.encode(),
+                )
+            ]
+        ),
+    )
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                coarsened_sources.source_files.snapshot.digest,
+                requirements_venv_pex.digest,
+                dummy_config_digest,
+            ]
+        ),
+    )
+
     process = await Get(
         Process,
         NpxProcess(
             npm_package=pyright.default_version,
             args=(
+                f"--venv-path={named_cache_dir.val}/pex_root/",
                 *pyright.args,  # User-added arguments
                 *source_files.snapshot.files,
             ),
-            input_digest=coarsened_sources.source_files.snapshot.digest,
+            input_digest=input_digest,
             description=f"Run Pyright on {pluralize(len(source_files.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
