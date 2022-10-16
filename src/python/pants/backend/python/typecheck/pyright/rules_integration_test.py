@@ -9,7 +9,11 @@ import pytest
 
 from pants.backend.javascript.subsystems.nodejs import rules as nodejs_rules
 from pants.backend.python import target_types_rules
-from pants.backend.python.target_types import PythonSourcesGeneratorTarget, PythonSourceTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.backend.python.typecheck.pyright.rules import PyrightFieldSet, PyrightRequest
 from pants.backend.python.typecheck.pyright.rules import rules as pyright_rules
 from pants.core.goals.check import CheckResult, CheckResults
@@ -29,7 +33,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(CheckResults, (PyrightRequest,)),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonSourceTarget],
+        target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonSourceTarget],
     )
 
 
@@ -102,3 +106,26 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
     assert "Found 2 source files" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
+
+
+def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": (
+                "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
+            ),
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                from more_itertools import flatten
+
+                assert flatten(42) == [4, 2]
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_pyright(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert f"{PACKAGE}/f.py:3" in result[0].stdout

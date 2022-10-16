@@ -10,6 +10,7 @@ from typing import Iterable
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
@@ -114,7 +115,7 @@ async def pyright_typecheck(
         NpxProcess(
             npm_package=pyright.default_version,
             args=(
-                f"--venv-path={named_cache_dir.val}/pex_root/",
+                f"--venv-path={named_cache_dir.val}/pex_root/",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
                 *source_files.snapshot.files,
             ),
@@ -137,5 +138,6 @@ async def pyright_typecheck(
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
+        *pex_from_targets.rules(),
         UnionRule(CheckRequest, PyrightRequest),
     )
