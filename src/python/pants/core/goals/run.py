@@ -150,6 +150,7 @@ class RunSubsystem(GoalSubsystem):
 
 class Run(Goal):
     subsystem_cls = RunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 class RankedFieldSets(NamedTuple):
@@ -228,6 +229,8 @@ async def run(
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
+
+    # TODO: Warn if request is for non-local environment file
 
     request = await (
         Get(RunRequest, RunFieldSet, field_set)
