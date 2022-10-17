@@ -93,6 +93,15 @@ Sept 3, 2020
 
 ## Talks
 
+### AWS Community Day Bay Area 2022
+
+#### When Projects Grow: CI/CD at scale
+
+September 9, 2022
+<https://www.youtube.com/watch?v=bLBpM3I3GHw>
+
+> Pants maintainer Josh Reed gives a talk about the challenges about running CI on a large monolith codebase, and mentions Pants as part of the ensemble of soultions to help wrangle the complexity that comes with scale.
+
 ### Pycon 2022
 
 #### "Hermetic Environments in Pantsbuild" aka "Fast and Reproducible Tests, Packaging, and Deploys with Pantsbuild"
