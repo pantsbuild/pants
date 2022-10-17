@@ -64,6 +64,7 @@ class ReplSubsystem(GoalSubsystem):
 
 class Repl(Goal):
     subsystem_cls = ReplSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @frozen_after_init
@@ -102,6 +103,9 @@ async def run_repl(
     union_membership: UnionMembership,
     complete_env: CompleteEnvironmentVars,
 ) -> Repl:
+
+    # TODO: Warn if request is for non-local environment file
+
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
