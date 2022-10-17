@@ -374,6 +374,41 @@ class RemoteEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
+@rule_helper
+async def _warn_on_non_local_environments(specified_targets: Iterable[Target], source: str) -> None:
+    """Raise a warning when the user runs a local-only operation against a target that expects a
+    non-local environment.
+
+    The `source` will be used to explain which goal is causing the issue.
+    """
+
+    env_names = [
+        (target, target[EnvironmentField].value)
+        for target in specified_targets
+        if target.has_field(EnvironmentField)
+    ]
+
+    env_tgts = await MultiGet(
+        Get(
+            EnvironmentTarget,
+            EnvironmentNameRequest(
+                name,
+                description_of_origin=f"the `environment` field of the target at `{target.address}`",
+            ),
+        )
+        for target, name in env_names
+    )
+
+    for (tgt, env_name), env_tgt in zip(env_names, env_tgts):
+        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget):
+            logger.warning(
+                f"{source.capitalize()} was called with the target `{tgt.address}`, which "
+                f"specifies the environment `{env_name}`, which is a `{env_tgt.val.alias}`. "
+                f"{source.capitalize()} only runs in the local environment. You may experience "
+                "unexpected behavior."
+            )
+
+
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
     local_env = cast(
         ChosenLocalEnvironmentName,
