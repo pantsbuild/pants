@@ -551,6 +551,11 @@ async fn extract_request_from_action_digest(
     env: command
       .environment_variables
       .iter()
+      .filter(|env| {
+        // Filter out environment variables which will be (re-)set by ExecutionRequest
+        // construction.
+        env.name != process_execution::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      })
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
     working_directory,
