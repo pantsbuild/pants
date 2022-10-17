@@ -30,13 +30,13 @@ In cases where the environment needs to be factored into to rule execution, you'
 
 2.15 adds the `environment_behavior` property to the `Goal` class, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. 
 
-When `environment_behavior=UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
+When `environment_behavior=Goal.EnvironmentBehavior.UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
 
-If your Goal only ever needs to use the local target environment, use `environment_behavior=LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
+If your Goal only ever needs to use the local target environment, use `environment_behavior=Goal.EnvironmentBehavior.LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
 
 ##### For goals that need to respect `EnvironmentField`s
 
-If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
+If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=Goal.EnvironmentBehavior.USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
 
  In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
 ```python
