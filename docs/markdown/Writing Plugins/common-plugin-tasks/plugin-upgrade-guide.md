@@ -11,19 +11,34 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 
 ### `EnvironmentName` is now required to run processes, get environment variables, etc
 
-In order to support the new [environments](doc:environments) feature, an `EnvironmentName` parameter
-is now required in order to:
+Pants 2.15 introduces the concept of ["Target Environments"](doc:environments), which allow Pants to execute processes in remote or local containerized environments (using Docker), and to specify configuration values for those environments. 
+
+In order to support the new environments feature, an `EnvironmentName` parameter is now required in order to:
 * Run a `Process`
 * Get environment variables
 * Inspect the current `Platform`
 
-Some deprecations are in place to reduce the burden on `@rule` authors:
+This parameter is often provided automatically from a transitive value provided earlier in the call graph. The choice of whether to use a local or alternative environment must be made at a `@goal_rule` level.
+
+In many cases, the local execution environment is sufficient. If so, your rules will not require significant work to migrate, and execution will behave similarly to pre-2.15 versions of Pants.
+
+In cases where the environment needs to be factored into to rule execution, you'll need to do some work. 
+
+2.15 adds a deprecation warning for all goals that have not considered whether they need to use the execution environment.
 
 #### `Goal.environment_behavior`
 
-The `Goal` class has an `environment_behavior` property, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. When `environment_behavior=UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation error.
+2.15 adds the `environment_behavior` property to the `Goal` class, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. 
 
-To migrate a `Goal`, select an `EnvironmentName` to use for (different portions of) your `Goal`, and then provide the `EnvironmentName` to the relevant callsites. In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+When `environment_behavior=UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
+
+If your Goal only ever needs to use the local target environment, use `environment_behavior=LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
+
+##### For goals that need to respect `EnvironmentField`s
+
+If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
+
+ In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
 ```python
 Get(
     EnvironmentName,
@@ -31,15 +46,13 @@ Get(
     EnvironmentNameRequest.from_field_set(field_set),
 )
 ```
-If rather than using the environment configured by a target your `Goal` should always be pinned to run in the local environment, you can instead request the `ChosenLocalEnvironmentName` and use its content as the `EnvironmentName`.
-
-To silence the deprecation warning, set `environment_behavior` to either `LOCAL_ONLY` or `USES_ENVIRONMENTS` depending on whether you use `ChosenLocalEnvironmentName` or `EnvironmentNameRequest` to request your `EnvironmentName`.
 
 Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
 ```python
 Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
 ```
 The multi-parameter `Get` syntax provides the value transitively, and so will need to be used in many `Get` callsites in `@goal_rule`s which transitively run processes, consume the platform, etc. One exception is that (most of) the APIs provided by `pants.engine.target` are pinned to running in the `__local__` environment, and so do not require an `EnvironmentName` to use.
+
 
 #### `RuleRunner.inherent_environment`
 
