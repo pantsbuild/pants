@@ -294,7 +294,8 @@ class EngineInitializer:
             )
         )
 
-        environment_migrated_goal_param_types = [
+        # param types for goals with the `USES_ENVIRONMENT` behaviour (see `goal.py`)
+        environment_selecting_goal_param_types = [
             t for t in GraphSession.goal_param_types if t != EnvironmentName
         ]
         rules = FrozenOrderedSet(
@@ -304,8 +305,8 @@ class EngineInitializer:
                 *(
                     QueryRule(
                         goal_type,
-                        environment_migrated_goal_param_types
-                        if goal_type._get_environment_migrated()
+                        environment_selecting_goal_param_types
+                        if goal_type._selects_environments()
                         else GraphSession.goal_param_types,
                     )
                     for goal_type in goal_map.values()
