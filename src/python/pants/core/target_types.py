@@ -722,7 +722,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 
 
 # -----------------------------------------------------------------------------------------------
-# `lockfile` and `lockfiles` target
+# `lockfile` and `lockfiles` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -749,7 +749,7 @@ class LockfileTarget(Target):
 
 
 class LockfilesGeneratorSourcesField(MultipleSourcesField):
-    pass
+    help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):
