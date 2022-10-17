@@ -272,7 +272,7 @@ async def setup_user_lockfile_requests(
 
 @dataclass(frozen=True)
 class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
-    path: str = ""  # Indicate that all targets are provided with a single request.
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
 
 @rule
@@ -280,7 +280,10 @@ async def python_lockfile_synthetic_targets(
     request: PythonSyntheticLockfileTargetsRequest,
     python_setup: PythonSetup,
 ) -> SyntheticAddressMaps:
-    if not python_setup.enable_resolves:
+    if (
+        not python_setup.enable_resolves
+        or request.path != SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+    ):
         return SyntheticAddressMaps()
 
     resolves = [
