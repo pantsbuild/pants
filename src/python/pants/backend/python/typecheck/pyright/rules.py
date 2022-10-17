@@ -13,6 +13,7 @@ from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -26,7 +27,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
 from pants.engine.unions import UnionRule
-from pants.option.global_options import NamedCachesDirOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -47,7 +47,9 @@ class PyrightRequest(CheckRequest):
 
 @rule(desc="Typecheck using Pyright", level=LogLevel.DEBUG)
 async def pyright_typecheck(
-    request: PyrightRequest, pyright: Pyright, named_cache_dir: NamedCachesDirOption
+    request: PyrightRequest,
+    pyright: Pyright,
+    pex_env: PexEnvironment,
 ) -> CheckResults:
     if pyright.skip:
         return CheckResults([], checker_name=request.tool_name)
@@ -110,12 +112,13 @@ async def pyright_typecheck(
         ),
     )
 
+    complete_pex_env = pex_env.in_workspace()
     process = await Get(
         Process,
         NpxProcess(
             npm_package=pyright.default_version,
             args=(
-                f"--venv-path={named_cache_dir.val}/pex_root/",  # Used with `venv` in config
+                f"--venv-path={complete_pex_env}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
                 *source_files.snapshot.files,
             ),
