@@ -118,7 +118,7 @@ class Goal:
     environment_behavior: ClassVar[EnvironmentBehavior] = EnvironmentBehavior.UNMIGRATED
 
     @classmethod
-    def _get_environment_migrated(cls) -> bool:
+    def _selects_environments(cls) -> bool:
         deprecated_conditional(
             lambda: cls.environment_behavior == Goal.EnvironmentBehavior.UNMIGRATED,
             "2.17.0.dev0",
@@ -126,7 +126,7 @@ class Goal:
             f"`{cls.name}`",
             hint=f"See {doc_url('plugin-upgrade-guide')}\n",
         )
-        return cls.environment_behavior != Goal.EnvironmentBehavior.UNMIGRATED
+        return cls.environment_behavior == Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     @final
     @classproperty
