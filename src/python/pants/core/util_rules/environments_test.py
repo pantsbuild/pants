@@ -27,6 +27,7 @@ from pants.core.util_rules.environments import (
     FallbackEnvironmentField,
     LocalEnvironmentTarget,
     NoFallbackEnvironmentError,
+    RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
     RemoteExtraPlatformPropertiesField,
     UnrecognizedEnvironmentError,
@@ -35,6 +36,7 @@ from pants.core.util_rules.environments import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.platform import Platform
+from pants.engine.process import ProcessCacheScope
 from pants.engine.target import FieldSet, OptionalSingleSourceField, Target
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
@@ -444,3 +446,30 @@ def test_environment_name_request_from_field_set() -> None:
     assert EnvironmentNameRequest.from_field_set(EnvFS.create(tgt)) == EnvironmentNameRequest(
         "my_env", description_of_origin="the `the_env_field` field from the target dir:dir"
     )
+
+
+def test_executable_search_path_cache_scope() -> None:
+    def assert_cache(
+        tgt: Target | None, *, cache_failures: bool, expected: ProcessCacheScope
+    ) -> None:
+        assert (
+            EnvironmentTarget(tgt).executable_search_path_cache_scope(cache_failures=cache_failures)
+            == expected
+        )
+
+    addr = Address("envs")
+
+    for tgt in (
+        None,
+        LocalEnvironmentTarget({}, addr),
+        RemoteEnvironmentTarget({RemoteEnvironmentCacheBinaryDiscovery.alias: False}, addr),
+    ):
+        assert_cache(tgt, cache_failures=False, expected=ProcessCacheScope.PER_RESTART_SUCCESSFUL)
+        assert_cache(tgt, cache_failures=True, expected=ProcessCacheScope.PER_RESTART_ALWAYS)
+
+    for tgt in (  # type: ignore[assignment]
+        DockerEnvironmentTarget({DockerImageField.alias: "img"}, addr),
+        RemoteEnvironmentTarget({RemoteEnvironmentCacheBinaryDiscovery.alias: True}, addr),
+    ):
+        assert_cache(tgt, cache_failures=False, expected=ProcessCacheScope.SUCCESSFUL)
+        assert_cache(tgt, cache_failures=True, expected=ProcessCacheScope.ALWAYS)

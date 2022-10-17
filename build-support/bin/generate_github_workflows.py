@@ -38,6 +38,10 @@ class Platform(Enum):
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
+GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
+SELF_HOSTED = {Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+
+
 def gha_expr(expr: str) -> str:
     """Properly quote GitHub Actions expressions.
 
@@ -70,18 +74,15 @@ NATIVE_FILES = [
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
+ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
 
-DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
-DONT_SKIP_WHEELS = (
-    "github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')"
-)
-
+DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
+DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
+IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
 DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
 
-
-IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # ----------------------------------------------------------------------
 # Actions
@@ -101,9 +102,10 @@ def classify_changes() -> Jobs:
                 "rust": gha_expr("steps.classify.outputs.rust"),
                 "release": gha_expr("steps.classify.outputs.release"),
                 "ci_config": gha_expr("steps.classify.outputs.ci_config"),
+                "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                *checkout(get_commit_msg=False),
+                *checkout(),
                 {
                     "id": "files",
                     "name": "Get changed files",
@@ -114,15 +116,16 @@ def classify_changes() -> Jobs:
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        """\
-                        affected=$(python build-support/bin/classify_changed_files.py \
-                          '${{ steps.files.outputs.all_modified_files }}')
-                        echo "Affected:\n${affected}"
-                        if [[ "${affected}" == "docs" ]]; then
-                          echo '::set-output name=docs_only::true'
+                        f"""\
+                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
+                        echo "Affected:"
+                        if [[ "${{affected}}" == "docs" ]]; then
+                          echo "::set-output name=docs_only::true"
+                          echo "docs_only"
                         fi
-                        for i in ${affected}; do
-                          echo "::set-output name=${i}::true"
+                        for i in ${{affected}}; do
+                          echo "::set-output name=${{i}}::true"
+                          echo "${{i}}"
                         done
                         """
                     ),
@@ -130,11 +133,6 @@ def classify_changes() -> Jobs:
             ],
         },
     }
-
-
-def _docs_only_cond(docs_only: bool) -> str:
-    op = "==" if docs_only else "!="
-    return f"needs.classify_changes.outputs.docs_only {op} true"
 
 
 def ensure_category_label() -> Sequence[Step]:
@@ -160,7 +158,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Sequence[Step]:
+def checkout(*, containerized: bool = False) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -182,37 +180,6 @@ def checkout(*, containerized: bool = False, get_commit_msg: bool = True) -> Seq
                 "name": "Configure Git",
                 "run": 'git config --global safe.directory "$GITHUB_WORKSPACE"',
             }
-        )
-    if get_commit_msg:
-        steps.extend(
-            [
-                # For a push event, the commit we care about is HEAD itself.
-                # This CI currently only runs on PRs, so this is future-proofing.
-                {
-                    "name": "Get commit message for branch builds",
-                    "if": "github.event_name == 'push'",
-                    "run": dedent(
-                        """\
-                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                    echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
-                    echo "EOF" >> $GITHUB_ENV
-                    """
-                    ),
-                },
-                # For a pull_request event, the commit we care about is the second parent of the
-                # merge commit. This CI currently only runs on PRs, so this is future-proofing.
-                {
-                    "name": "Get commit message for PR builds",
-                    "if": "github.event_name == 'pull_request'",
-                    "run": dedent(
-                        """\
-                    echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
-                    echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
-                    echo "EOF" >> $GITHUB_ENV
-                    """
-                    ),
-                },
-            ]
         )
     return steps
 
@@ -458,35 +425,35 @@ class Helper:
             self.native_binaries_upload(),
         ]
 
-    def build_steps(self) -> list[Step]:
+    def build_wheels(self, python_versions: list[str]) -> list[Step]:
+        cmd = dedent(
+            # We use MODE=debug on PR builds to speed things up, given that those are
+            # only smoke tests of our release process.
+            # Note that the build-local-pex run is just for smoke-testing that pex
+            # builds work, and it must come *before* the build-wheels runs, since
+            # it cleans out `dist/deploy`, which the build-wheels runs populate for
+            # later attention by deploy_to_s3.py.
+            """\
+            [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+            USE_PY39=true ./build-support/bin/release.sh build-local-pex
+            """
+        )
+
+        def build_wheels_for(env_var: str) -> str:
+            env_setting = f"{env_var}=true " if env_var else ""
+            return f"\n{env_setting}./build-support/bin/release.sh build-wheels"
+
+        if PYTHON37_VERSION in python_versions:
+            cmd += build_wheels_for("")
+        if PYTHON38_VERSION in python_versions:
+            cmd += build_wheels_for("USE_PY38")
+        if PYTHON39_VERSION in python_versions:
+            cmd += build_wheels_for("USE_PY39")
+
         return [
             {
                 "name": "Build wheels",
-                "run": dedent(
-                    # We use MODE=debug on PR builds to speed things up, given that those are
-                    # only smoke tests of our release process.
-                    # Note that the build-local-pex run is just for smoke-testing that pex
-                    # builds work, and it must come *before* the build-wheels runs, since
-                    # it cleans out `dist/deploy`, which the build-wheels runs populate for
-                    # later attention by deploy_to_s3.py.
-                    """\
-                    [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-                    ./build-support/bin/release.sh build-local-pex
-                    ./build-support/bin/release.sh build-wheels
-                    USE_PY38=true ./build-support/bin/release.sh build-wheels
-                    USE_PY39=true ./build-support/bin/release.sh build-wheels
-                    ./build-support/bin/release.sh build-fs-util
-                    """
-                ),
-                "if": DONT_SKIP_WHEELS,
-                "env": self.platform_env(),
-            },
-            {
-                "name": "Build fs_util",
-                "run": "./build-support/bin/release.sh build-fs-util",
-                # We only build fs_util on branch builds, given that Pants compilation already
-                # checks the code compiles and the release process is simple and low-stakes.
-                "if": "github.event_name == 'push'",
+                "run": cmd,
                 "env": self.platform_env(),
             },
         ]
@@ -503,13 +470,8 @@ class Helper:
             },
         }
 
-    build_wheels_common = {
-        "env": DISABLE_REMOTE_CACHE_ENV,
-        "if": IS_PANTS_OWNER,
-    }
 
-
-def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
@@ -575,41 +537,10 @@ def linux_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         "test_python_linux_x86_64_1": test_python_linux("1/3"),
         "test_python_linux_x86_64_2": test_python_linux("2/3"),
     }
-    if not cron:
-        jobs.update(
-            {
-                "build_wheels_linux_x86_64": {
-                    "name": f"Build wheels and fs_util ({helper.platform_name()})",
-                    "runs-on": helper.runs_on(),
-                    "container": "quay.io/pypa/manylinux2014_x86_64:latest",
-                    "timeout-minutes": 90,
-                    **helper.build_wheels_common,
-                    "steps": [
-                        *checkout(containerized=True),
-                        # TODO: Why is this necessary? the hosted container is
-                        #  supposed to come with rustup preinstalled.
-                        install_rustup(),
-                        {
-                            "name": "Expose Pythons",
-                            "run": (
-                                'echo "PATH=${PATH}:'
-                                "/opt/python/cp37-cp37m/bin:"
-                                "/opt/python/cp38-cp38/bin:"
-                                '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
-                            ),
-                        },
-                        setup_toolchain_auth(),
-                        *helper.build_steps(),
-                        helper.upload_log_artifacts(name="wheels"),
-                        deploy_to_s3(),
-                    ],
-                },
-            }
-        )
     return jobs
 
 
-def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
         "bootstrap_pants_macos11_x86_64": {
@@ -660,50 +591,55 @@ def macos11_x86_64_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             ],
         },
     }
-    if not cron:
-        jobs.update(
-            {
-                "build_wheels_macos11_x86_64": {
-                    "name": f"Build wheels and fs_util ({helper.platform_name()})",
-                    "runs-on": helper.runs_on(),
-                    "timeout-minutes": 120,
-                    **helper.build_wheels_common,
-                    "steps": [
-                        *checkout(),
-                        setup_toolchain_auth(),
-                        expose_all_pythons(),
-                        # NB: We only cache Rust, but not `native_engine.so` and the Pants
-                        # virtualenv. This is because we must build both these things with
-                        # multiple Python versions, whereas that caching assumes only one primary
-                        # Python version (marked via matrix.strategy).
-                        *helper.rust_caches(),
-                        *helper.build_steps(),
-                        helper.upload_log_artifacts(name="wheels"),
-                        deploy_to_s3(),
-                    ],
-                },
-            }
-        )
     return jobs
 
 
-def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
-    helper = Helper(Platform.MACOS10_15_X86_64)
+def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
+    helper = Helper(platform)
+    if platform == Platform.LINUX_X86_64:
+        # For manylinux compatibility, we build wheels in a container rather than directly
+        # on the Ubuntu runner. As a result, we have custom steps here to check out
+        # the code, install rustup and expose Pythons.
+        # TODO: Apply rust caching here.
+        container = "quay.io/pypa/manylinux2014_x86_64:latest"
+        initial_steps = [
+            *checkout(containerized=True),
+            install_rustup(),
+            {
+                "name": "Expose Pythons",
+                "run": (
+                    'echo "PATH=${PATH}:'
+                    "/opt/python/cp37-cp37m/bin:"
+                    "/opt/python/cp38-cp38/bin:"
+                    '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
+                ),
+            },
+        ]
+    else:
+        container = None
+        initial_steps = [
+            *checkout(),
+            # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
+            # only run expose_all_pythons() on the GitHub-hosted platforms.
+            *([expose_all_pythons()] if platform in GITHUB_HOSTED else []),
+            # NB: We only cache Rust, but not `native_engine.so` and the Pants
+            # virtualenv. This is because we must build both these things with
+            # multiple Python versions, whereas that caching assumes only one primary
+            # Python version (marked via matrix.strategy).
+            *helper.rust_caches(),
+        ]
     return {
-        "build_wheels_macos10_15_x86_64": {
-            "name": f"Build wheels and fs_util ({helper.platform_name()})",
+        f"build_wheels_{str(platform.value).lower().replace('-', '_')}": {
+            "if": f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})",
+            "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
-            "timeout-minutes": 120,
-            **helper.build_wheels_common,
-            "steps": [
-                *checkout(),
+            **({"container": container} if container else {}),
+            "timeout-minutes": 90,
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "steps": initial_steps
+            + [
                 setup_toolchain_auth(),
-                # NB: We only cache Rust, but not `native_engine.so` and the Pants
-                # virtualenv. This is because we must build both these things with
-                # multiple Python versions, whereas that caching assumes only one primary
-                # Python version (marked via matrix.strategy).
-                *helper.rust_caches(),
-                *helper.build_steps(),
+                *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
                 deploy_to_s3(),
             ],
@@ -711,40 +647,12 @@ def macos_10_15_x86_64_jobs(python_versions: list[str]) -> Jobs:
     }
 
 
-def macos11_arm64_jobs() -> Jobs:
-    helper = Helper(Platform.MACOS11_ARM64)
-    # The setup-python action doesn't yet support installing ARM64 Pythons.
-    # Instead we pre-install Python 3.9 on the self-hosted runner.
-    steps = list(helper.bootstrap_pants(install_python=False))
-    # TODO: Build local pex? Will require some changes to _release_helper.py to qualify
-    #  the .pex file name with the architecture, intead of just "darwin".
-    steps.append(
-        {
-            "name": "Build wheels",
-            "run": f"USE_PY39=true {helper.wrap_cmd('./build-support/bin/release.sh build-wheels')}",
-            "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
-        }
-    )
-    steps.append(
-        {
-            "name": "Build fs_util",
-            "run": f"USE_PY39=true {helper.wrap_cmd('./build-support/bin/release.sh build-fs-util')}",
-            # We only build fs_util on branch builds, given that Pants compilation already
-            # checks the code compiles and the release process is simple and low-stakes.
-            "if": "github.event_name == 'push'",
-        }
-    )
-    steps.append(deploy_to_s3())
+def build_wheels_jobs() -> Jobs:
     return {
-        "build_wheels_macos11_arm64": {
-            "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
-            "runs-on": helper.runs_on(),
-            "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
-            "timeout-minutes": 120,
-            "if": IS_PANTS_OWNER,
-            "steps": steps,
-            "env": {**helper.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
-        },
+        **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
+        **build_wheels_job(Platform.MACOS11_X86_64, ALL_PYTHON_VERSIONS),
+        **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
+        **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
     }
 
 
@@ -758,11 +666,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": ensure_category_label(),
         },
     }
-    jobs.update(**linux_x86_64_jobs(python_versions, cron=cron))
-    jobs.update(**macos11_x86_64_jobs(python_versions, cron=cron))
+    jobs.update(**linux_x86_64_test_jobs(python_versions))
+    jobs.update(**macos11_x86_64_test_jobs(python_versions))
     if not cron:
-        jobs.update(**macos_10_15_x86_64_jobs(python_versions))
-        jobs.update(**macos11_arm64_jobs())
+        jobs.update(**build_wheels_jobs())
     jobs.update(
         {
             "lint_python": {
@@ -907,29 +814,22 @@ class NoAliasDumper(yaml.SafeDumper):
         return True
 
 
-# We have two copies of this job, one for the docs-only case and one for all other cases.
-# Each job runs conditionally (see the "if" condition below), so exactly one will run and
-# the other will be skipped.
-#
-# But - note that a job skipped due to an "if" condition, or due to a failed dependency,
-# counts as successful (!) in GitHub Actions (as opposed to jobs skipped due to branch or path
-# filtering, which count as pending).
-
-# Therefore we can't have a branch protection check directly on this job name - it will always
-# be successful. So instead we use this job to set an output that a "Merge OK" job can act on,
-# and we check for that job in branch protection.  Only a truly successful (non-skipped)
-# trigger job will actually set that output.
-def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
-    key = "set_merge_ok_docs_only" if docs_only else "set_merge_ok_not_docs_only"
+def merge_ok(pr_jobs: list[str]) -> Jobs:
+    # Generate the "Merge OK" job that branch protection can monitor.
+    # Note: A job skipped due to an "if" condition, or due to a failed dependency, counts as
+    # successful (!) for the purpose of branch protection. Therefore we can't have the "Merge OK"
+    # job depend directly on the other jobs - it will always be successful.
+    # So instead we have a "Set merge OK" job to set an output that the "Merge OK" job can act on,
+    # and we check for that job in branch protection.  Only a truly successful (non-skipped)
+    # job will actually set that output.
     return {
-        key: {
+        "set_merge_ok": {
             "name": "Set Merge OK",
             "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-            "if": _docs_only_cond(docs_only),
-            # If in the future we have any docs-related checks, we can make both "Set Merge OK"
-            # jobs depend on them here (it has to be both since some changes may modify docs
-            # as well as code, and so are not "docs only").
-            "needs": ["classify_changes", "check_labels"] + sorted(needs),
+            # NB: This always() condition is critical, as it ensures that this job is run even if
+            #   jobs it depends on are skipped.
+            "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
+            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -937,50 +837,37 @@ def set_merge_ok(needs: list[str], docs_only: bool) -> Jobs:
                     "run": "echo '::set-output name=merge_ok::true'",
                 },
             ],
-        }
+        },
+        "merge_ok": {
+            "name": "Merge OK",
+            "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
+            # NB: This always() condition is critical, as it ensures that this job is never
+            # skipped (if it were skipped it would be treated as vacuously successful by branch protection).
+            "if": "always()",
+            "needs": ["set_merge_ok"],
+            "steps": [
+                {
+                    "run": dedent(
+                        f"""\
+                merge_ok="{gha_expr('needs.set_merge_ok.outputs.merge_ok')}"
+                if [[ "${{merge_ok}}" == "true" ]]; then
+                    echo "Merge OK"
+                    exit 0
+                else
+                    echo "Merge NOT OK"
+                    exit 1
+                fi
+                """
+                    )
+                }
+            ],
+        },
     }
-
-
-def merge_ok(non_docs_only_jobs: list[str]) -> Jobs:
-    jobs = {}
-    jobs.update(set_merge_ok(needs=non_docs_only_jobs, docs_only=False))
-    jobs.update(set_merge_ok(needs=[], docs_only=True))
-    jobs.update(
-        {
-            "merge_ok": {
-                "name": "Merge OK",
-                "runs-on": Helper(Platform.LINUX_X86_64).runs_on(),
-                # NB: This always() condition is critical, as it ensures that this job is never
-                # skipped (if it were skipped it would be treated as vacuously successful).
-                "if": "always()",
-                "needs": ["set_merge_ok_docs_only", "set_merge_ok_not_docs_only"],
-                "steps": [
-                    {
-                        "run": dedent(
-                            f"""\
-                    merge_ok_docs_only="{gha_expr('needs.set_merge_ok_docs_only.outputs.merge_ok')}"
-                    merge_ok_not_docs_only="{gha_expr('needs.set_merge_ok_not_docs_only.outputs.merge_ok')}"
-                    if [[ "${{merge_ok_docs_only}}" == "true" || "${{merge_ok_not_docs_only}}" == "true" ]]; then
-                        echo "Merge OK"
-                        exit 0
-                    else
-                        echo "Merge NOT OK"
-                        exit 1
-                    fi
-                    """
-                        )
-                    }
-                ],
-            }
-        }
-    )
-    return jobs
 
 
 def generate() -> dict[Path, str]:
     """Generate all YAML configs with repo-relative paths."""
 
-    not_docs_only = _docs_only_cond(docs_only=False)
     pr_jobs = test_workflow_jobs([PYTHON37_VERSION], cron=False)
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
@@ -992,6 +879,7 @@ def generate() -> dict[Path, str]:
         needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
+        not_docs_only = "needs.classify_changes.outputs.docs_only != 'true'"
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
     pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
