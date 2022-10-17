@@ -390,7 +390,7 @@ def test_build_files_share_globals() -> None:
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
-                input_types=(PathGlobs,),
+                input_type=PathGlobs,
                 mock=lambda _: DigestContents(
                     [
                         FileContent(
