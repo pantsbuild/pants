@@ -32,8 +32,12 @@ from pants.backend.helm.util_rules.renderer import (
 )
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.shell import shell_command
+from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
+from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Target
@@ -54,12 +58,20 @@ async def custom_test_image_tags(_: CustomTestImageTagRequest) -> DockerImageTag
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        target_types=[HelmChartTarget, HelmDeploymentTarget, DockerImageTarget],
+    rule_runner = RuleRunner(
+        target_types=[
+            HelmChartTarget,
+            HelmDeploymentTarget,
+            DockerImageTarget,
+            ShellSourcesGeneratorTarget,
+            ShellCommandRunTarget,
+        ],
         rules=[
             *infer_deployment.rules(),
             *source_files.rules(),
             *post_renderer.rules(),
+            *run_rules(),
+            *shell_command.rules(),
             custom_test_image_tags,
             UnionRule(DockerImageTagsRequest, CustomTestImageTagRequest),
             QueryRule(HelmPostRenderer, (HelmDeploymentPostRendererRequest,)),
@@ -67,6 +79,34 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
+    source_root_patterns = ("src/*",)
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    return rule_runner
+
+
+_TEST_GIVEN_CONFIGMAP_FILE = dedent(
+    """\
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: foo-config
+    data:
+      foo_key: foo_value
+    """
+)
+
+_TEST_EXPECTED_CONFIGMAP_FILE = (
+    dedent(
+        """\
+      ---
+      # Source: mychart/templates/configmap.yaml
+      """
+    )
+    + _TEST_GIVEN_CONFIGMAP_FILE
+)
 
 
 def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
@@ -80,16 +120,7 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
                 """
             ),
             "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/mychart/templates/configmap.yaml": dedent(
-                """\
-              apiVersion: v1
-              kind: ConfigMap
-              metadata:
-                name: foo-config
-              data:
-                foo_key: foo_value
-              """
-            ),
+            "src/mychart/templates/configmap.yaml": _TEST_GIVEN_CONFIGMAP_FILE,
             "src/mychart/templates/pod.yaml": dedent(
                 """\
                 {{- $root := . -}}
@@ -137,12 +168,6 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
             "src/image/Dockerfile.init": "FROM busybox:1.28",
             "src/image/Dockerfile.app": "FROM busybox:1.28",
         }
-    )
-
-    source_root_patterns = ("src/*",)
-    rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
     expected_config_file = dedent(
@@ -225,7 +250,97 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     assert "mychart/templates/pod.yaml" in rendered_output.snapshot.files
     assert "mychart/templates/configmap.yaml" in rendered_output.snapshot.files
 
+    rendered_configmap_file = _read_file_from_digest(
+        rule_runner,
+        digest=rendered_output.snapshot.digest,
+        filename="mychart/templates/configmap.yaml",
+    )
+    assert rendered_configmap_file == _TEST_EXPECTED_CONFIGMAP_FILE
+
     rendered_pod_file = _read_file_from_digest(
         rule_runner, digest=rendered_output.snapshot.digest, filename="mychart/templates/pod.yaml"
     )
     assert rendered_pod_file == expected_rendered_pod
+
+
+def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/mychart/templates/configmap.yaml": _TEST_GIVEN_CONFIGMAP_FILE,
+            "src/shell/BUILD": dedent(
+                """\
+              shell_sources(name="scripts")
+
+              experimental_run_shell_command(
+                name="custom_post_renderer",
+                command="src/shell/my-script.sh",
+                dependencies=[":scripts"]
+              )
+              """
+            ),
+            "src/deployment/BUILD": dedent(
+                """\
+              helm_deployment(
+                name="test",
+                dependencies=["//src/mychart"],
+                post_renderers=["//src/shell:custom_post_renderer"]
+              )
+              """
+            ),
+        }
+    )
+
+    # We need to create the post-renderer script as a digest to ensure it has running permissions.
+    post_renderer_script_digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    FileContent(
+                        path="src/shell/my-script.sh",
+                        content=dedent(
+                            """\
+                            #!/bin/bash
+                            cat <&0
+                            """
+                        ).encode(),
+                        is_executable=True,
+                    )
+                ]
+            )
+        ],
+    )
+
+    rule_runner.write_digest(post_renderer_script_digest)
+
+    deployment_addr = Address("src/deployment", target_name="test")
+    tgt = rule_runner.get_target(deployment_addr)
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    post_renderer = rule_runner.request(
+        HelmPostRenderer,
+        [HelmDeploymentPostRendererRequest(field_set)],
+    )
+
+    rendered_output = rule_runner.request(
+        RenderedHelmFiles,
+        [
+            HelmDeploymentRequest(
+                field_set=field_set,
+                cmd=HelmDeploymentCmd.RENDER,
+                description="Test post-renderer output",
+                post_renderer=post_renderer,
+            )
+        ],
+    )
+    assert "mychart/templates/configmap.yaml" in rendered_output.snapshot.files
+
+    rendered_configmap_file = _read_file_from_digest(
+        rule_runner,
+        digest=rendered_output.snapshot.digest,
+        filename="mychart/templates/configmap.yaml",
+    )
+    assert rendered_configmap_file == _TEST_EXPECTED_CONFIGMAP_FILE
