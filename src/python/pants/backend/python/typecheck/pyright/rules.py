@@ -118,7 +118,7 @@ async def pyright_typecheck(
         NpxProcess(
             npm_package=pyright.default_version,
             args=(
-                f"--venv-path={complete_pex_env}",  # Used with `venv` in config
+                f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
                 *source_files.snapshot.files,
             ),
