@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-import dataclasses
 import tokenize
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
-from pants.backend.build_files.fix.deprecations.base import FixBUILDRequest
+from pants.backend.build_files.fix.deprecations.base import FixBUILDRequest, FixedBUILDFile
 from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
@@ -46,7 +45,7 @@ class RenameRequest(FixBUILDRequest):
 def fix_single(
     request: RenameRequest,
     renamed_target_types: RenamedTargetTypes,
-) -> FileContent:
+) -> FixedBUILDFile:
     tokens = request.tokenize()
 
     def should_be_renamed(token: tokenize.TokenInfo) -> bool:
@@ -72,7 +71,7 @@ def fix_single(
         new_symbol = renamed_target_types[token.string]
         updated_text_lines[line_index] = f"{new_symbol}{suffix}"
 
-    return dataclasses.replace(request.content, content="".join(updated_text_lines).encode("utf-8"))
+    return FixedBUILDFile(request.path, content="".join(updated_text_lines).encode("utf-8"))
 
 
 @rule(desc="Fix deprecated target type names", level=LogLevel.DEBUG)
@@ -81,9 +80,13 @@ async def fix(
 ) -> FixResult:
     digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
     fixed_contents = await MultiGet(
-        Get(FileContent, RenameRequest(file_content)) for file_content in digest_contents
+        Get(FixedBUILDFile, RenameRequest(file_content.path, file_content.content))
+        for file_content in digest_contents
     )
-    snapshot = await Get(Snapshot, CreateDigest(fixed_contents))
+    snapshot = await Get(
+        Snapshot,
+        CreateDigest(FileContent(content.path, content.content) for content in fixed_contents),
+    )
     return FixResult(request.snapshot, snapshot, "", "", tool_name=Request.tool_name)
 
 

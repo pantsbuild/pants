@@ -11,7 +11,6 @@ from pants.backend.build_files.fix.deprecations.renamed_fields_rules import (
     determine_renamed_field_types,
     fix_single,
 )
-from pants.engine.fs import FileContent
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
@@ -62,7 +61,7 @@ def test_determine_renamed_fields() -> None:
 def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
     result = fix_single(
-        RenameRequest(FileContent("BUILD", content=content)),
+        RenameRequest("BUILD", content=content),
         RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
     )
     assert result.content == content
@@ -79,7 +78,7 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
 )
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = fix_single(
-        RenameRequest(FileContent("BUILD", content="\n".join(lines).encode("utf-8"))),
+        RenameRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )
     assert result.content == "\n".join(expected).encode("utf-8")

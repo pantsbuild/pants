@@ -10,7 +10,6 @@ from pants.backend.build_files.fix.deprecations.renamed_targets_rules import (
     RenameRequest,
     fix_single,
 )
-from pants.engine.fs import FileContent
 
 
 @pytest.mark.parametrize(
@@ -30,7 +29,7 @@ from pants.engine.fs import FileContent
 def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
     result = fix_single(
-        RenameRequest(FileContent("BUILD", content=content)),
+        RenameRequest("BUILD", content=content),
         RenamedTargetTypes({"deprecated_name": "new_name"}),
     )
     assert result.content == content
@@ -47,7 +46,7 @@ def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
 )
 def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = fix_single(
-        RenameRequest(FileContent("BUILD", content="\n".join(lines).encode("utf-8"))),
+        RenameRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedTargetTypes({"deprecated_name": "new_name"}),
     )
     assert result.content == "\n".join(expected).encode("utf-8")

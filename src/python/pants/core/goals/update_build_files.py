@@ -16,6 +16,7 @@ from typing import DefaultDict, cast
 from colors import green, red
 
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
+from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.lint.black.rules import _run_black
@@ -372,8 +373,8 @@ async def maybe_rename_deprecated_targets(
 ) -> RewrittenBuildFile:
     old_bytes = "\n".join(request.lines).encode("utf-8")
     new_content = await Get(
-        FileContent,
-        renamed_fields_rules.RenameRequest(FileContent(path=request.path, content=old_bytes)),
+        FixedBUILDFile,
+        renamed_fields_rules.RenameRequest(path=request.path, content=old_bytes),
     )
 
     return RewrittenBuildFile(
@@ -400,8 +401,8 @@ async def maybe_rename_deprecated_fields(
 ) -> RewrittenBuildFile:
     old_bytes = "\n".join(request.lines).encode("utf-8")
     new_content = await Get(
-        FileContent,
-        renamed_fields_rules.RenameRequest(FileContent(path=request.path, content=old_bytes)),
+        FixedBUILDFile,
+        renamed_fields_rules.RenameRequest(path=request.path, content=old_bytes),
     )
 
     return RewrittenBuildFile(

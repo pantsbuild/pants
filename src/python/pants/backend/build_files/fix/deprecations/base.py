@@ -7,20 +7,26 @@ import tokenize
 from dataclasses import dataclass
 from io import BytesIO
 
-from pants.engine.fs import FileContent
 from pants.engine.internals.parser import ParseError
 
 
 @dataclass(frozen=True)
 class FixBUILDRequest:
-    content: FileContent
+    path: str
+    content: bytes
 
     @property
     def lines(self) -> list[str]:
-        return self.content.content.decode("utf-8").splitlines(keepends=True)
+        return self.content.decode("utf-8").splitlines(keepends=True)
 
     def tokenize(self) -> list[tokenize.TokenInfo]:
         try:
-            return list(tokenize.tokenize(BytesIO(self.content.content).readline))
+            return list(tokenize.tokenize(BytesIO(self.content).readline))
         except tokenize.TokenError as e:
-            raise ParseError(f"Failed to parse {self.content.path}: {e}")
+            raise ParseError(f"Failed to parse {self.path}: {e}")
+
+
+@dataclass(frozen=True)
+class FixedBUILDFile:
+    path: str
+    content: bytes
