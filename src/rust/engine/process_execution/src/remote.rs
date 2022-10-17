@@ -1010,6 +1010,11 @@ pub fn make_execute_request(
   let execute_request = remexec::ExecuteRequest {
     action_digest: Some((&digest(&action)?).into()),
     instance_name: instance_name.unwrap_or_else(|| "".to_owned()),
+    // We rely on the RemoteCache command runner for caching with remote execution. We always
+    // disable remote servers from doing caching themselves not only to avoid wasted work, but
+    // more importantly because they do not have our same caching semantics, e.g.
+    // `ProcessCacheScope.SUCCESSFUL` vs `ProcessCacheScope.ALWAYS`.
+    skip_cache_lookup: true,
     ..remexec::ExecuteRequest::default()
   };
 
