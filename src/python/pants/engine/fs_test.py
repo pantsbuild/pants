@@ -38,6 +38,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
+    SymlinkEntry,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -434,6 +435,20 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
             Directory("a/b"),
             FileEntry(
                 "a/foo.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+        ]
+    )
+
+
+def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(Digest, [CreateDigest([SymlinkEntry("a.ln", "b.txt")])])
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            SymlinkEntry("a.ln", "b.txt"),
+            FileEntry(
+                "b.txt",
                 FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
             ),
         ]

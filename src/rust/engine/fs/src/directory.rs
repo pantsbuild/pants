@@ -386,7 +386,6 @@ impl<'a> From<&'a PathStat> for TypedPath<'a> {
         path,
         is_executable: stat.is_executable,
       },
-      PathStat::Link { path, .. } => TypedPath::Link(path),
       PathStat::Dir { path, .. } => TypedPath::Dir(path),
     }
   }

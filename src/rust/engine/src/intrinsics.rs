@@ -27,7 +27,7 @@ use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
-use fs::{DigestTrie, DirectoryDigest, PathStat, RelativePath};
+use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
@@ -433,7 +433,7 @@ fn create_digest_to_digest(
       .collect()
   };
 
-  let mut path_stats: Vec<PathStat> = Vec::with_capacity(items.len());
+  let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
   let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
   let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
 
@@ -442,37 +442,35 @@ fn create_digest_to_digest(
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
         let digest = Digest::of_bytes(&bytes);
         bytes_to_store.push((Some(digest), bytes));
-        let stat = fs::File {
-          path: path.to_path_buf(),
+        typed_paths.push(TypedPath::File {
+          path: &path,
           is_executable,
-        };
-        path_stats.push(PathStat::file(path.to_path_buf(), stat));
+        });
         file_digests.insert(path.to_path_buf(), digest);
       }
       CreateDigestItem::FileEntry(path, digest, is_executable) => {
-        let stat = fs::File {
-          path: path.to_path_buf(),
+        typed_paths.push(TypedPath::File {
+          path: &path,
           is_executable,
-        };
-        path_stats.push(PathStat::file(path.to_path_buf(), stat));
+        });
         file_digests.insert(path.to_path_buf(), digest);
       }
-      CreateDigestItem::SymlinkEntry(_path, _target) => {}
+      CreateDigestItem::SymlinkEntry(path, target) => {
+        typed_paths.push(TypedPath::Link(&target));
+        file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
+      }
       CreateDigestItem::Dir(path) => {
-        let stat = fs::Dir(path.to_path_buf());
-        path_stats.push(PathStat::dir(path.to_path_buf(), stat));
+        typed_paths.push(TypedPath::Dir(&path));
         file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
       }
     }
   }
 
   let store = context.core.store();
+  let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
   async move {
     // The digests returned here are already in the `file_digests` map.
     let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
-    let trie =
-      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
-
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)
