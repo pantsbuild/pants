@@ -162,10 +162,9 @@ impl PySnapshot {
     py_digest: PyDigest,
     files: Vec<String>,
     dirs: Vec<String>,
-    symlinks: Vec<String>,
   ) -> PyResult<Self> {
     let snapshot =
-      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs, symlinks) };
+      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs) };
     Ok(Self(snapshot.map_err(PyException::new_err)?))
   }
 
@@ -175,7 +174,7 @@ impl PySnapshot {
 
   fn __repr__(&self) -> PyResult<String> {
     Ok(format!(
-      "Snapshot(digest=({}, {}), dirs=({}), files=({}), symlinks=({}))",
+      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
       self.0.digest.hash.to_hex(),
       self.0.digest.size_bytes,
       self
@@ -190,14 +189,6 @@ impl PySnapshot {
         .0
         .tree
         .files()
-        .into_iter()
-        .map(|d| d.display().to_string())
-        .collect::<Vec<_>>()
-        .join(","),
-      self
-        .0
-        .tree
-        .symlinks()
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
@@ -242,18 +233,6 @@ impl PySnapshot {
     )
   }
 
-  #[getter]
-  fn symlinks<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let symlinks = self.0.tree.symlinks();
-    PyTuple::new(
-      py,
-      symlinks
-        .into_iter()
-        .map(|path| PyString::new(py, &path.to_string_lossy()))
-        .collect::<Vec<_>>(),
-    )
-  }
-
   // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
   // richer type.
   fn _diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
@@ -272,13 +251,10 @@ impl PySnapshot {
       py,
       vec![
         into_tuple(&result.our_unique_files),
-        into_tuple(&result.our_unique_symlinks),
         into_tuple(&result.our_unique_dirs),
         into_tuple(&result.their_unique_files),
-        into_tuple(&result.their_unique_symlinks),
         into_tuple(&result.their_unique_dirs),
         into_tuple(&result.changed_files),
-        into_tuple(&result.changed_symlinks),
       ],
     )
   }

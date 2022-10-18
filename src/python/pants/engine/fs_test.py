@@ -38,7 +38,6 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
-    SymlinkEntry,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -1162,7 +1161,7 @@ def test_digest_is_not_file_digest() -> None:
 
 def test_snapshot_properties() -> None:
     digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
-    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"], [])
+    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
     assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
@@ -1177,9 +1176,7 @@ def test_snapshot_hash() -> None:
         dirs: Optional[List[str]] = None,
     ) -> None:
         digest = Digest(digest_char * 64, 1000)
-        snapshot = Snapshot._unsafe_create(
-            digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"], []
-        )
+        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
         assert hash(snapshot) == expected
 
     # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
@@ -1192,19 +1189,17 @@ def test_snapshot_hash() -> None:
 
 def test_snapshot_equality() -> None:
     # Only the digest is used for equality.
-    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"], [])
+    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"], []
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"], []
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
     )
-    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"], [])
+    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
+    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot != Snapshot._unsafe_create(
-        Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"], []
-    )
-    assert snapshot != Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"], []
+        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     with pytest.raises(TypeError):
         snapshot < snapshot  # type: ignore[operator]
@@ -1270,13 +1265,10 @@ def test_snapshot_diff(
     )
 
     assert diff.our_unique_files == expected_diff.our_unique_files
-    assert diff.our_unique_symlinks == expected_diff.our_unique_symlinks
     assert diff.our_unique_dirs == expected_diff.our_unique_dirs
     assert diff.their_unique_files == expected_diff.their_unique_files
-    assert diff.their_unique_symlinks == expected_diff.their_unique_symlinks
     assert diff.their_unique_dirs == expected_diff.their_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
-    assert diff.changed_symlinks == expected_diff.changed_symlinks
 
     # test with the arguments reversed
     diff = SnapshotDiff.from_snapshots(
@@ -1284,10 +1276,7 @@ def test_snapshot_diff(
     )
 
     assert diff.our_unique_files == expected_diff.their_unique_files
-    assert diff.our_unique_symlinks == expected_diff.their_unique_symlinks
     assert diff.our_unique_dirs == expected_diff.their_unique_dirs
     assert diff.their_unique_files == expected_diff.our_unique_files
-    assert diff.their_unique_symlinks == expected_diff.our_unique_symlinks
     assert diff.their_unique_dirs == expected_diff.our_unique_dirs
     assert diff.changed_files == expected_diff.changed_files
-    assert diff.changed_symlinks == expected_diff.changed_symlinks

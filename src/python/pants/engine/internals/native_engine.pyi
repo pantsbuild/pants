@@ -81,7 +81,7 @@ class Snapshot:
 
     @classmethod
     def _unsafe_create(
-        cls, digest: Digest, files: Sequence[str], dirs: Sequence[str], symlinks: Sequence[str]
+        cls, digest: Digest, files: Sequence[str], dirs: Sequence[str]
     ) -> Snapshot: ...
     @property
     def digest(self) -> Digest: ...
@@ -89,15 +89,10 @@ class Snapshot:
     def dirs(self) -> tuple[str, ...]: ...
     @property
     def files(self) -> tuple[str, ...]: ...
-    @property
-    def symlinks(self) -> tuple[str, ...]: ...
     # Don't call this, call pants.engine.fs.SnapshotDiff instead
     def _diff(
         self, other: Snapshot
     ) -> tuple[
-        tuple[str, ...],
-        tuple[str, ...],
-        tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],
         tuple[str, ...],

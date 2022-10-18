@@ -156,7 +156,6 @@ impl Snapshot {
     digest: Digest,
     files: Vec<String>,
     dirs: Vec<String>,
-    _symlinks: Vec<String>,
   ) -> Result<Self, String> {
     // NB: All files receive the EMPTY_DIGEST.
     let file_digests = files

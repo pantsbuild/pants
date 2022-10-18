@@ -467,10 +467,10 @@ impl DigestTrie {
               is_executable,
             }));
           }
-          TypedPath::Link {
+          TypedPath::Link(target) => {
             entries.push(Entry::Symlink(Symlink {
               name,
-              target,
+              target: RelativePath::new(prefix.join(target).as_path()).unwrap(),
             }));
           }
           TypedPath::Dir { .. } => {
@@ -581,7 +581,7 @@ impl DigestTrie {
     files
   }
 
-  /// Returns the files in the trie, not including directories pointing to files.
+  /// Returns the directories in the trie, not including symlinks pointing to files.
   pub fn directories(&self) -> Vec<PathBuf> {
     let mut directories = Vec::new();
     self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
