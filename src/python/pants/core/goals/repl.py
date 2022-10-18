@@ -7,6 +7,7 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
+from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -64,6 +65,7 @@ class ReplSubsystem(GoalSubsystem):
 
 class Repl(Goal):
     subsystem_cls = ReplSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @frozen_after_init
@@ -102,6 +104,9 @@ async def run_repl(
     union_membership: UnionMembership,
     complete_env: CompleteEnvironmentVars,
 ) -> Repl:
+
+    await _warn_on_non_local_environments(specified_targets, "the `repl` goal")
+
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
