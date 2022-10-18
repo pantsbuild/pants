@@ -173,7 +173,7 @@ async def partition_scalafmt(
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
 async def scalafmt_fmt(
-    request: ScalafmtRequest.SubPartition, jdk: InternalJdk, tool: ScalafmtSubsystem
+    request: ScalafmtRequest.Batch, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
     partition_info = cast(PartitionInfo, request.key)
     merged_digest = await Get(

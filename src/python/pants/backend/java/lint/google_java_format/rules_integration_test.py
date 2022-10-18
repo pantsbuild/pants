@@ -46,7 +46,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *gjf_fmt_rules.rules(),
             *skip_field.rules(),
-            QueryRule(FmtResult, (GoogleJavaFormatRequest.SubPartition,)),
+            QueryRule(FmtResult, (GoogleJavaFormatRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JavaSourceTarget, JavaSourcesGeneratorTarget],
@@ -94,7 +94,7 @@ def run_google_java_format(rule_runner: RuleRunner, targets: list[Target]) -> Fm
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GoogleJavaFormatRequest.SubPartition(
+            GoogleJavaFormatRequest.Batch(
                 "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],

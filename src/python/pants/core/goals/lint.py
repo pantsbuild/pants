@@ -22,10 +22,10 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
+    _BatchBase,
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
     _single_partition_field_sets_partitioner_rules,
-    _SubPartitionBase,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -63,7 +63,7 @@ class LintResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: LintRequest.SubPartition,
+        request: LintRequest.Batch,
         process_result: FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -139,12 +139,12 @@ class LintRequest:
                     # One possible implementation
                     return Partitions.single_partition(request.field_sets)
 
-        2. A rule which takes an instance of your request type's `SubPartition` class property, and
+        2. A rule which takes an instance of your request type's `Batch` class property, and
             returns a `LintResult instance.
             E.g.
                 @rule
                 async def dry_clean(
-                    request: DryCleaningRequest.SubPartition,
+                    request: DryCleaningRequest.Batch,
                 ) -> LintResult:
                     ...
 
@@ -173,7 +173,7 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class SubPartition(_SubPartitionBase[PartitionKeyT, PartitionElementT]):
+    class Batch(_BatchBase[PartitionKeyT, PartitionElementT]):
         pass
 
     @final
@@ -184,7 +184,7 @@ class LintRequest:
     @classmethod
     def _get_rules(cls) -> Iterable:
         yield UnionRule(LintRequest, cls)
-        yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
+        yield UnionRule(LintRequest.Batch, cls.Batch)
 
 
 class LintTargetsRequest(LintRequest):
@@ -435,10 +435,10 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (subpartition, key)
+            (Batch, key)
             for partitions in partitions_list
             for key, partition in partitions.items()
-            for subpartition in batch(partition)
+            for Batch in batch(partition)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
     }
@@ -451,8 +451,8 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    subpartitions = [
-        request_type.SubPartition(
+    Batchs = [
+        request_type.Batch(
             request_type.tool_name,
             elements,
             key,
@@ -463,23 +463,23 @@ async def lint(
     ]
 
     all_batch_results = await MultiGet(
-        Get(LintResult, LintRequest.SubPartition, request) for request in subpartitions
+        Get(LintResult, LintRequest.Batch, request) for request in Batchs
     )
 
-    core_request_types_by_subpartition_type = {
-        request_type.SubPartition: request_type for request_type in lint_request_types
+    core_request_types_by_Batch_type = {
+        request_type.Batch: request_type for request_type in lint_request_types
     }
 
     formatter_failed = any(
         result.exit_code
-        for subpartition, result in zip(subpartitions, all_batch_results)
-        if core_request_types_by_subpartition_type[type(subpartition)].is_formatter
+        for Batch, result in zip(Batchs, all_batch_results)
+        if core_request_types_by_Batch_type[type(Batch)].is_formatter
     )
 
     fixer_failed = any(
         result.exit_code
-        for subpartition, result in zip(subpartitions, all_batch_results)
-        if core_request_types_by_subpartition_type[type(subpartition)].is_fixer
+        for Batch, result in zip(Batchs, all_batch_results)
+        if core_request_types_by_Batch_type[type(Batch)].is_fixer
     )
 
     results_by_tool = defaultdict(list)

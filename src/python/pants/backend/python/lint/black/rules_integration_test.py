@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, (BlackRequest.PartitionRequest,)),
-            QueryRule(FmtResult, (BlackRequest.SubPartition,)),
+            QueryRule(FmtResult, (BlackRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -95,7 +95,7 @@ def run_black(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest.SubPartition("", partition, key=key, snapshot=input_sources.snapshot),
+            BlackRequest.Batch("", partition, key=key, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

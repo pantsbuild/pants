@@ -35,7 +35,7 @@ class AutoflakeRequest(FixTargetsRequest):
 
 
 @rule(desc="Fix with Autoflake", level=LogLevel.DEBUG)
-async def autoflake_fix(request: AutoflakeRequest.SubPartition, autoflake: Autoflake) -> FixResult:
+async def autoflake_fix(request: AutoflakeRequest.Batch, autoflake: Autoflake) -> FixResult:
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     result = await Get(

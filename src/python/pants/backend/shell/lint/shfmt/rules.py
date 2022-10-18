@@ -37,9 +37,7 @@ class ShfmtRequest(FmtTargetsRequest):
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(
-    request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform
-) -> FmtResult:
+async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platform) -> FmtResult:
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
     )

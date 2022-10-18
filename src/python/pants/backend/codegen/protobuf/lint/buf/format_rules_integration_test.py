@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(FmtResult, [BufFormatRequest.SubPartition]),
+            QueryRule(FmtResult, [BufFormatRequest.Batch]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
@@ -62,7 +62,7 @@ def run_buf(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BufFormatRequest.SubPartition(
+            BufFormatRequest.Batch(
                 "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],

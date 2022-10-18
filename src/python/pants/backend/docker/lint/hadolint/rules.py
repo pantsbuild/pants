@@ -52,7 +52,7 @@ def generate_argv(
 
 @rule(desc="Lint with Hadolint", level=LogLevel.DEBUG)
 async def run_hadolint(
-    request: HadolintRequest.SubPartition[Any, HadolintFieldSet],
+    request: HadolintRequest.Batch[Any, HadolintFieldSet],
     hadolint: Hadolint,
     platform: Platform,
 ) -> LintResult:

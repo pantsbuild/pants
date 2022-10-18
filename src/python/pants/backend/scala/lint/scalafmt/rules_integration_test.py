@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             *scalafmt_rules(),
             *skip_field.rules(),
             QueryRule(Partitions, (ScalafmtRequest.PartitionRequest,)),
-            QueryRule(FmtResult, (ScalafmtRequest.SubPartition,)),
+            QueryRule(FmtResult, (ScalafmtRequest.Batch,)),
             QueryRule(Snapshot, (PathGlobs,)),
             QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
@@ -140,7 +140,7 @@ def run_scalafmt(
         rule_runner.request(
             FmtResult,
             [
-                ScalafmtRequest.SubPartition(
+                ScalafmtRequest.Batch(
                     "",
                     partition,
                     key=key,

@@ -47,7 +47,7 @@ async def partition_helm_lint(
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
-    request: HelmLintRequest.SubPartition[HelmChart, HelmLintFieldSet],
+    request: HelmLintRequest.Batch[HelmChart, HelmLintFieldSet],
     helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1

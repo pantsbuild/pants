@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *skip_field.rules(),
             *system_binaries.rules(),
             *source_files.rules(),
-            QueryRule(FmtResult, (KtlintRequest.SubPartition,)),
+            QueryRule(FmtResult, (KtlintRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[KotlinSourceTarget, KotlinSourcesGeneratorTarget],
@@ -93,7 +93,7 @@ def run_ktlint(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            KtlintRequest.SubPartition(
+            KtlintRequest.Batch(
                 "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],

@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (IsortRequest.SubPartition,)),
+            QueryRule(FmtResult, (IsortRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -67,7 +67,7 @@ def run_isort(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            IsortRequest.SubPartition(
+            IsortRequest.Batch(
                 "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],

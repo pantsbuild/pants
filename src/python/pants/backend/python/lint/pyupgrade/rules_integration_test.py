@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FixResult, (PyUpgradeRequest.SubPartition,)),
+            QueryRule(FixResult, (PyUpgradeRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -73,7 +73,7 @@ def run_pyupgrade(
     fix_result = rule_runner.request(
         FixResult,
         [
-            PyUpgradeRequest.SubPartition(
+            PyUpgradeRequest.Batch(
                 "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
