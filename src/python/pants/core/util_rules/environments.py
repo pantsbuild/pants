@@ -388,9 +388,10 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
         for target in specified_targets
         if target.has_field(EnvironmentField)
     ]
+    sorted_env_names = sorted(env_names, key=lambda en: (en[0], en[1].address.spec))
 
     env_names_and_targets = [
-        (i[0], tuple(j[1] for j in i[1])) for i in groupby(sorted(env_names), lambda x: x[0])
+        (i[0], tuple(j[1] for j in i[1])) for i in groupby(sorted_env_names, lambda x: x[0])
     ]
 
     env_tgts = await MultiGet(
@@ -416,13 +417,14 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     for (env_name, tgts, env_tgt) in error_cases:
         # "Blah was called with target `//foo` which specifies…"
         # "Blah was called with targets `//foo`, `//bar` which specify…"
-        # "Blah was called with targets `//foo`, `//bar`, `//baz` (and others) which specify…"
+        # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
         plural = len(tgts) > 1
         is_long = len(tgts) > 3
         tgt_specs = [tgt.address.spec for tgt in tgts[:3]]
 
         tgts_str = (
-            ("s including " if plural > 1 else " ")
+            ("s " if plural else " ")
+            + ("including " if is_long else "")
             + ", ".join(f"`{i}`" for i in tgt_specs)
             + (" (and others)" if is_long else "")
         )
