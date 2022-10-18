@@ -457,9 +457,7 @@ fn create_digest_to_digest(
         path_stats.push(PathStat::file(path.to_path_buf(), stat));
         file_digests.insert(path.to_path_buf(), digest);
       }
-      CreateDigestItem::SymlinkEntry(_path, _target) => {
-
-      }
+      CreateDigestItem::SymlinkEntry(_path, _target) => {}
       CreateDigestItem::Dir(path) => {
         let stat = fs::Dir(path.to_path_buf());
         path_stats.push(PathStat::dir(path.to_path_buf(), stat));

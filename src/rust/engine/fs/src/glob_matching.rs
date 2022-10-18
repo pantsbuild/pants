@@ -694,6 +694,9 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           PathGlob::parse_globs(stat, path, &remainder, link_depth)
             .map_err(|e| Self::mk_error(e.as_str())),
         ),
+        PathStat::Link { .. } => {
+          todo!();
+        }
         PathStat::File { .. } => None,
       })
       .collect::<Result<Vec<_>, E>>()?;
@@ -736,6 +739,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
     Ok(path_stats.pop().map(|ps| match ps {
       PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
+      PathStat::Link { stat, .. } => PathStat::link(symbolic_path, stat),
       PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
     }))
   }

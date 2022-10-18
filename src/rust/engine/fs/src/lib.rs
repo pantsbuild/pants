@@ -210,8 +210,8 @@ pub enum PathStat {
     // The symbolic name of some filesystem Path, which is context specific.
     path: PathBuf,
     // The canonical Stat that underlies the Path.
-    stat: Link
-  }
+    stat: Link,
+  },
 }
 
 impl PathStat {

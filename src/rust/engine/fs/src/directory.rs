@@ -1120,6 +1120,9 @@ fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
           path: path.strip_prefix(name.as_ref()).unwrap(),
           is_executable,
         },
+        TypedPath::Link { .. } => {
+          todo!();
+        }
         TypedPath::Dir(path) => TypedPath::Dir(path.strip_prefix(name.as_ref()).unwrap()),
       })
     })

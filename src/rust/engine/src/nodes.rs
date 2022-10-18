@@ -677,6 +677,9 @@ impl Paths {
         &PathStat::File { ref path, .. } => {
           files.push(Snapshot::store_path(py, path)?);
         }
+        &PathStat::Link { .. } => {
+          todo!();
+        }
         &PathStat::Dir { ref path, .. } => {
           dirs.push(Snapshot::store_path(py, path)?);
         }
