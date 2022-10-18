@@ -391,7 +391,8 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
     sorted_env_names = sorted(env_names, key=lambda en: (en[0], en[1].address.spec))
 
     env_names_and_targets = [
-        (i[0], tuple(j[1] for j in i[1])) for i in groupby(sorted_env_names, lambda x: x[0])
+        (env_name, tuple(target for _, target in group))
+        for env_name, group in groupby(sorted_env_names, lambda x: x[0])
     ]
 
     env_tgts = await MultiGet(
