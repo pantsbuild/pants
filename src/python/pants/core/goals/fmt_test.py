@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import logging
 import re
 from dataclasses import dataclass
@@ -11,9 +12,20 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterable, List, Type
 
-from pants.core.goals.fmt import Fmt, FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
+import pytest
+
+from pants.build_graph.address import Address
+from pants.core.goals.fmt import (
+    Fmt,
+    FmtFilesRequest,
+    FmtRequest,
+    FmtResult,
+    FmtTargetsRequest,
+    Partitions,
+)
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -23,11 +35,13 @@ from pants.engine.fs import (
     FileContent,
     Snapshot,
 )
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, SingleSourceField, Target
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Get, QueryRule, collect_rules, rule
+from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField, Target
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
 SMALLTALK_FILE = FileContent("formatted.st", b"y := self size + super size.')\n")
@@ -51,16 +65,27 @@ class FortranFieldSet(FieldSet):
 
 class FortranFmtRequest(FmtTargetsRequest):
     field_set_type = FortranFieldSet
-    name = "FortranConditionallyDidChange"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FortranConditionallyDidChange"
 
 
 @rule
-async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
+async def fortran_partition(request: FortranFmtRequest.PartitionRequest) -> Partitions:
     if not any(fs.address.target_name == "needs_formatting" for fs in request.field_sets):
-        return FmtResult.skip(formatter_name=request.name)
-    output = await Get(Snapshot, CreateDigest([FORTRAN_FILE]))
+        return Partitions()
+    return Partitions.single_partition(fs.sources.file_path for fs in request.field_sets)
+
+
+@rule
+async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
+    input = request.snapshot
+    output = await Get(
+        Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
+    )
     return FmtResult(
-        input=request.snapshot, output=output, stdout="", stderr="", formatter_name=request.name
+        input=input, output=output, stdout="", stderr="", formatter_name=FortranFmtRequest.tool_name
     )
 
 
@@ -82,40 +107,64 @@ class SmalltalkFieldSet(FieldSet):
 
 class SmalltalkNoopRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    name = "SmalltalkDidNotChange"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SmalltalkDidNotChange"
 
 
 @rule
-async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
+async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionRequest) -> Partitions:
+    return Partitions.single_partition(fs.source.file_path for fs in request.field_sets)
+
+
+@rule
+async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResult:
     assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult(
         input=request.snapshot,
         output=request.snapshot,
         stdout="",
         stderr="",
-        formatter_name=request.name,
+        formatter_name=SmalltalkNoopRequest.tool_name,
     )
 
 
 class SmalltalkSkipRequest(FmtTargetsRequest):
     field_set_type = SmalltalkFieldSet
-    name = "SmalltalkSkipped"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SmalltalkSkipped"
 
 
 @rule
-async def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
-    assert request.snapshot != EMPTY_SNAPSHOT
-    return FmtResult.skip(formatter_name=request.name)
+async def smalltalk_skip_partition(request: SmalltalkSkipRequest.PartitionRequest) -> Partitions:
+    return Partitions()
 
 
-class BrickyBuildFileFormatter(_FmtBuildFilesRequest):
+@rule
+async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FmtResult:
+    assert False
+
+
+class BrickyBuildFileFormatter(FmtFilesRequest):
     """Ensures all non-comment lines only consist of the word 'brick'."""
 
-    name = "BrickyBobby"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BrickyBobby"
 
 
 @rule
-async def fmt_with_bricky(request: BrickyBuildFileFormatter) -> FmtResult:
+async def bricky_partition(request: BrickyBuildFileFormatter.PartitionRequest) -> Partitions:
+    return Partitions.single_partition(
+        file for file in request.files if PurePath(file).name == "BUILD"
+    )
+
+
+@rule
+async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> FmtResult:
     def brickify(contents: bytes) -> bytes:
         content_str = contents.decode("ascii")
         new_lines = []
@@ -125,7 +174,8 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter) -> FmtResult:
             new_lines.append(line)
         return "".join(new_lines).encode()
 
-    digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
+    snapshot = request.snapshot
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     new_contents = [
         dataclasses.replace(file_content, content=brickify(file_content.content))
         for file_content in digest_contents
@@ -133,26 +183,24 @@ async def fmt_with_bricky(request: BrickyBuildFileFormatter) -> FmtResult:
     output_snapshot = await Get(Snapshot, CreateDigest(new_contents))
 
     return FmtResult(
-        input=request.snapshot,
+        input=snapshot,
         output=output_snapshot,
         stdout="",
         stderr="",
-        formatter_name=request.name,
+        formatter_name=BrickyBuildFileFormatter.tool_name,
     )
 
 
 def fmt_rule_runner(
     target_types: List[Type[Target]],
-    fmt_targets_request_types: List[Type[FmtTargetsRequest]] = [],
-    fmt_build_files_request_types: List[Type[_FmtBuildFilesRequest]] = [],
+    request_types: List[Type[FmtRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
             *collect_rules(),
             *source_files.rules(),
             *fmt_rules(),
-            *(UnionRule(FmtTargetsRequest, ftr) for ftr in fmt_targets_request_types),
-            *(UnionRule(_FmtBuildFilesRequest, fbfr) for fbfr in fmt_build_files_request_types),
+            *itertools.chain.from_iterable(request_type.rules() for request_type in request_types),
         ],
         target_types=target_types,
     )
@@ -196,11 +244,12 @@ def write_files(rule_runner: RuleRunner) -> None:
 def test_summary() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[FortranTarget, SmalltalkTarget],
-        # NB: Keep SmalltalkSkipRequest before SmalltalkNoopRequest so it runs first. This helps test
-        # a bug where a formatter run after a skipped formatter was receiving an empty snapshot.
-        # See https://github.com/pantsbuild/pants/issues/15406
-        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
-        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+        request_types=[
+            FortranFmtRequest,
+            SmalltalkSkipRequest,
+            SmalltalkNoopRequest,
+            BrickyBuildFileFormatter,
+        ],
     )
 
     write_files(rule_runner)
@@ -237,8 +286,7 @@ def test_summary() -> None:
 def test_build_spec_matching() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[],
-        fmt_targets_request_types=[],
-        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+        request_types=[BrickyBuildFileFormatter],
     )
     original_contents = "build_file_dir"  # just choose something built-in that'll be replaced
 
@@ -247,7 +295,7 @@ def test_build_spec_matching() -> None:
         "BUILD": original_contents,
         "dirA/BUILD": original_contents,
         "dirA/subdirX/BUILD": original_contents,
-        "dirA/subdirY/BUILD.pants": original_contents,
+        "dirA/subdirY/BUILD": original_contents,
         "dirB/BUILD": original_contents,
         "dirC/BUILD": original_contents,
     }
@@ -270,42 +318,26 @@ def test_build_spec_matching() -> None:
 
     rule_runner.write_files(build_files)
     run_fmt(rule_runner, target_specs=["dirA::"])
-    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants")
+    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD")
 
     rule_runner.write_files(build_files)
     run_fmt(rule_runner, target_specs=["dirA::", "dirB/BUILD"])
-    assert_only_changed(
-        "dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD.pants", "dirB/BUILD"
-    )
+    assert_only_changed("dirA/BUILD", "dirA/subdirX/BUILD", "dirA/subdirY/BUILD", "dirB/BUILD")
 
     rule_runner.write_files(build_files)
     run_fmt(rule_runner, target_specs=["dirA::", "!dirA/subdirX:"])
-    assert_only_changed("dirA/BUILD", "dirA/subdirY/BUILD.pants")
-
-    rule_runner.write_files(build_files)
-    run_fmt(
-        rule_runner,
-        target_specs=["::", "!dirB::"],
-        extra_args=["--build-ignore=dirA/**"],
-    )
-    assert_only_changed("BUILD", "dirC/BUILD")
-
-    # Keep this near the end, as it modified build_files
-    build_files.update({"funnyname/PANTS": original_contents})
-    rule_runner.write_files(build_files)
-    run_fmt(
-        rule_runner,
-        target_specs=["::"],
-        extra_args=["--build-patterns=PANTS"],
-    )
-    assert_only_changed(*build_files)
+    assert_only_changed("dirA/BUILD", "dirA/subdirY/BUILD")
 
 
 def test_only() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[FortranTarget, SmalltalkTarget],
-        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
-        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+        request_types=[
+            FortranFmtRequest,
+            SmalltalkSkipRequest,
+            SmalltalkNoopRequest,
+            BrickyBuildFileFormatter,
+        ],
     )
 
     write_files(rule_runner)
@@ -313,7 +345,7 @@ def test_only() -> None:
     stderr = run_fmt(
         rule_runner,
         target_specs=["::"],
-        only=[SmalltalkNoopRequest.name],
+        only=[SmalltalkNoopRequest.tool_name],
     )
     assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
 
@@ -321,8 +353,12 @@ def test_only() -> None:
 def test_no_targets() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[FortranTarget, SmalltalkTarget],
-        fmt_targets_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
-        fmt_build_files_request_types=[BrickyBuildFileFormatter],
+        request_types=[
+            FortranFmtRequest,
+            SmalltalkSkipRequest,
+            SmalltalkNoopRequest,
+            BrickyBuildFileFormatter,
+        ],
     )
 
     write_files(rule_runner)
@@ -387,10 +423,79 @@ def test_message_lists_files() -> None:
     assert result.message() == "formatter made changes.\n  added.ext\n  removed.ext"
 
 
-def test_streaming_output_skip() -> None:
-    result = FmtResult.skip(formatter_name="formatter")
-    assert result.level() == LogLevel.DEBUG
-    assert result.message() == "formatter skipped."
+@dataclass(frozen=True)
+class KitchenSingleUtensilFieldSet(FieldSet):
+    required_fields = (FortranSource,)
+
+    utensil: SingleSourceField
+
+
+@dataclass(frozen=True)
+class KitchenMultipleUtensilsFieldSet(FieldSet):
+    required_fields = (FortranSource,)
+
+    utensils: MultipleSourcesField
+
+
+@pytest.mark.parametrize(
+    "kitchen_field_set_type, field_sets",
+    [
+        (
+            KitchenSingleUtensilFieldSet,
+            (
+                KitchenSingleUtensilFieldSet(
+                    Address("//:bowl"), SingleSourceField("bowl.utensil", Address(""))
+                ),
+                KitchenSingleUtensilFieldSet(
+                    Address("//:knife"), SingleSourceField("knife.utensil", Address(""))
+                ),
+            ),
+        ),
+        (
+            KitchenMultipleUtensilsFieldSet,
+            (
+                KitchenMultipleUtensilsFieldSet(
+                    Address("//:utensils"),
+                    MultipleSourcesField(["*.utensil"], Address("")),
+                ),
+            ),
+        ),
+    ],
+)
+def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets) -> None:
+    class KitchenSubsystem(Subsystem):
+        options_scope = "kitchen"
+        help = "a cookbook might help"
+        name = "The Kitchen"
+        skip = SkipOption("lint")
+
+    class FmtKitchenRequest(FmtTargetsRequest):
+        field_set_type = kitchen_field_set_type
+        tool_subsystem = KitchenSubsystem
+        partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+
+    rules = [
+        *FmtKitchenRequest._get_rules(),
+        QueryRule(Partitions, [FmtKitchenRequest.PartitionRequest]),
+    ]
+    rule_runner = RuleRunner(rules=rules)
+    print(rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""}))
+    partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions(
+        [
+            (
+                None,
+                (
+                    "bowl.utensil",
+                    "knife.utensil",
+                ),
+            )
+        ]
+    )
+
+    rule_runner.set_options(["--kitchen-skip"])
+    partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([])
 
 
 def test_streaming_output_changed(caplog) -> None:

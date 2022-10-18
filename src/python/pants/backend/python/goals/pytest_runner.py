@@ -12,6 +12,7 @@ from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.subsystems import pytest
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -40,7 +41,8 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -217,7 +219,7 @@ async def setup_pytest_for_target(
     field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.source]))
 
     field_set_extra_env_get = Get(
-        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
     )
 
     (
@@ -475,6 +477,7 @@ async def setup_runtime_packages(request: RuntimePackagesPluginRequest) -> Pytes
 def rules():
     return [
         *collect_rules(),
+        *pytest.rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
     ]

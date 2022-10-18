@@ -269,9 +269,9 @@ def test_get_all_help_info():
         args=["./pants"],
         bootstrap_option_values=None,
     )
-    Global.register_options_on_scope(options)
-    Foo.register_options_on_scope(options)
-    Bar.register_options_on_scope(options)
+    Global.register_options_on_scope(options, UnionMembership({}))
+    Foo.register_options_on_scope(options, UnionMembership({}))
+    Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
     def rule_info_test(foo: Foo) -> Target:
@@ -325,6 +325,7 @@ def test_get_all_help_info():
                         "removal_hint": None,
                         "choices": None,
                         "comma_separated_choices": None,
+                        "target_field_name": None,
                     },
                     {
                         "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
@@ -348,6 +349,7 @@ def test_get_all_help_info():
                         "removal_hint": None,
                         "choices": ("trace", "debug", "info", "warn", "error"),
                         "comma_separated_choices": "trace, debug, info, warn, error",
+                        "target_field_name": None,
                     },
                 ),
                 "advanced": tuple(),
@@ -383,6 +385,7 @@ def test_get_all_help_info():
                         "removal_hint": None,
                         "choices": None,
                         "comma_separated_choices": None,
+                        "target_field_name": None,
                     },
                 ),
                 "deprecated": tuple(),

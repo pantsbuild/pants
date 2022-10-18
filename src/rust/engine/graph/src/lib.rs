@@ -46,13 +46,14 @@ use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use futures::future;
 use log::info;
 use parking_lot::Mutex;
+use petgraph::dot;
 use petgraph::graph::DiGraph;
 use petgraph::visit::{EdgeRef, VisitMap, Visitable};
 use petgraph::Direction;
 use task_executor::Executor;
 use tokio::time::sleep;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
+pub use crate::node::{EntryId, Node, NodeContext, NodeError, Stats};
 
 type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
@@ -277,6 +278,12 @@ impl<N: Node> InnerGraph<N> {
       dirtied: transitive_ids.len(),
     };
 
+    // If there were no roots, then nothing will be invalidated. Return early to avoid scanning all
+    // edges in `retain_edges`.
+    if root_ids.is_empty() {
+      return invalidation_result;
+    }
+
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
@@ -306,53 +313,38 @@ impl<N: Node> InnerGraph<N> {
     invalidation_result
   }
 
-  fn visualize<V: NodeVisualizer<N>>(
-    &self,
-    mut visualizer: V,
-    roots: &[N],
-    path: &Path,
-    context: &N::Context,
-  ) -> io::Result<()> {
+  fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
     let file = File::create(path)?;
     let mut f = BufWriter::new(file);
 
-    f.write_all(b"digraph plans {\n")?;
-    f.write_fmt(format_args!(
-      "  node[colorscheme={}];\n",
-      visualizer.color_scheme()
-    ))?;
-    f.write_all(b"  concentrate=true;\n")?;
-    f.write_all(b"  rankdir=TB;\n")?;
-
-    let mut format_color = |entry: &Entry<N>| visualizer.color(entry, context);
-
-    let root_entries = roots
+    let root_ids = roots
       .iter()
-      .filter_map(|n| self.entry_id(n))
+      .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
+    let included = self
+      .walk(root_ids, Direction::Outgoing, |_| false)
+      .collect::<HashSet<_>>();
 
-    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
-      let entry = self.unsafe_entry_for_id(eid);
-      let node_str = entry.format(context);
+    let graph = self.pg.filter_map(
+      |node_id, node| {
+        if included.contains(&node_id) {
+          Some(node.format(context))
+        } else {
+          None
+        }
+      },
+      |_, _| Some("".to_owned()),
+    );
 
-      // Write the node header.
-      f.write_fmt(format_args!(
-        "  \"{}\" [style=filled, fillcolor={}];\n",
-        node_str,
-        format_color(entry)
-      ))?;
+    f.write_all(
+      format!(
+        "{}",
+        dot::Dot::with_config(&graph, &[dot::Config::EdgeNoLabel],)
+      )
+      .as_bytes(),
+    )?;
 
-      for dep_id in self.pg.neighbors(eid) {
-        let dep_entry = self.unsafe_entry_for_id(dep_id);
-
-        // Write an entry per edge.
-        let dep_str = dep_entry.format(context);
-        f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str))?;
-      }
-    }
-
-    f.write_all(b"}\n")?;
     Ok(())
   }
 
@@ -380,11 +372,11 @@ impl<N: Node> InnerGraph<N> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
-  fn live_internal<'g>(
-    &'g self,
+  fn live_internal(
+    &self,
     entryids: Vec<EntryId>,
     context: N::Context,
-  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> + '_ {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
@@ -752,15 +744,9 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(log_dirtied, predicate)
   }
 
-  pub fn visualize<V: NodeVisualizer<N>>(
-    &self,
-    visualizer: V,
-    roots: &[N],
-    path: &Path,
-    context: &N::Context,
-  ) -> io::Result<()> {
+  pub fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
     let inner = self.inner.lock();
-    inner.visualize(visualizer, roots, path, context)
+    inner.visualize(roots, path, context)
   }
 
   pub fn visit_live_reachable(

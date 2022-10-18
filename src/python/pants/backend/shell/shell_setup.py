@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import os
 
-from pants.engine.environment import Environment
 from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
@@ -17,19 +16,6 @@ class ShellSetup(Subsystem):
     options_scope = "shell-setup"
     help = "Options for Pants's Shell support."
 
-    _executable_search_path = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used to find shells and to run certain processes
-            like the shunit2 test runner.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-    )
     dependency_inference = BoolOption(
         default=True,
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
@@ -45,15 +31,32 @@ class ShellSetup(Subsystem):
         advanced=True,
     )
 
-    @memoized_method
-    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_path:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("PATH",)
 
-        return tuple(OrderedSet(iter_path_entries()))
+        _executable_search_path = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                The PATH value that will be used to find shells and to run certain processes
+                like the shunit2 test runner.
+
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @memoized_property
+        def executable_search_path(self) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_path:
+                    if entry == "<PATH>":
+                        path = self._options_env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))

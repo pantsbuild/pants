@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.util_rules import external_tool
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
@@ -181,7 +181,7 @@ def plugin_resolution(
         args = [f"--pants-config-files=['{configpath}']"]
 
         options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
-        complete_env = CompleteEnvironment(
+        complete_env = CompleteEnvironmentVars(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
         bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)

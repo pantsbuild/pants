@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(FmtResult, [BufFormatRequest]),
+            QueryRule(FmtResult, [BufFormatRequest.SubPartition]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
@@ -62,7 +62,9 @@ def run_buf(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BufFormatRequest(field_sets, snapshot=input_sources.snapshot),
+            BufFormatRequest.SubPartition(
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ),
         ],
     )
 
@@ -113,12 +115,4 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-args=--debug"])
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
-    assert fmt_result.did_change is False
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-skip"])
-    assert fmt_result.skipped is True
     assert fmt_result.did_change is False

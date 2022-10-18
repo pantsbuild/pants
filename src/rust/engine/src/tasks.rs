@@ -80,10 +80,16 @@ impl rule_graph::Rule for Rule {
   }
 
   fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
-    // TODO: The singular `Get::input` below will become plural as part of #7490/#12946.
     match self {
       Rule::Task(task) => task.args.iter().chain(task.gets.iter()).collect(),
       Rule::Intrinsic(intrinsic) => intrinsic.inputs.iter().collect(),
+    }
+  }
+
+  fn masked_params(&self) -> Vec<Self::TypeId> {
+    match self {
+      Rule::Task(task) => task.masked_types.clone(),
+      Rule::Intrinsic(_) => vec![],
     }
   }
 
@@ -142,6 +148,7 @@ pub struct Task {
   pub engine_aware_return_type: bool,
   pub args: Vec<DependencyKey<TypeId>>,
   pub gets: Vec<DependencyKey<TypeId>>,
+  pub masked_types: Vec<TypeId>,
   pub func: Function,
   pub cacheable: bool,
   pub display_info: DisplayInfo,
@@ -176,7 +183,6 @@ impl Intrinsic {
 pub struct Tasks {
   rules: IndexSet<Rule>,
   queries: IndexSet<Query<TypeId>>,
-  query_inputs_filter: IndexSet<TypeId>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
 }
@@ -197,7 +203,6 @@ impl Tasks {
       rules: IndexSet::default(),
       preparing: None,
       queries: IndexSet::default(),
-      query_inputs_filter: IndexSet::default(),
     }
   }
 
@@ -209,20 +214,12 @@ impl Tasks {
     &self.queries
   }
 
-  pub fn query_inputs_filter(&self) -> &IndexSet<TypeId> {
-    &self.query_inputs_filter
-  }
-
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
       self
         .rules
         .insert(Rule::Intrinsic(Intern::new(intrinsic.clone())));
     }
-  }
-
-  pub fn add_query_inputs_filter(&mut self, type_id: TypeId) {
-    self.query_inputs_filter.insert(type_id);
   }
 
   ///
@@ -234,6 +231,8 @@ impl Tasks {
     return_type: TypeId,
     side_effecting: bool,
     engine_aware_return_type: bool,
+    arg_types: Vec<TypeId>,
+    masked_types: Vec<TypeId>,
     cacheable: bool,
     name: String,
     desc: Option<String>,
@@ -243,14 +242,16 @@ impl Tasks {
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
+    let args = arg_types.into_iter().map(DependencyKey::new).collect();
 
     self.preparing = Some(Task {
       cacheable,
       product: return_type,
       side_effecting,
       engine_aware_return_type,
-      args: Vec::new(),
+      args,
       gets: Vec::new(),
+      masked_types,
       func,
       display_info: DisplayInfo { name, desc, level },
     });
@@ -276,15 +277,6 @@ impl Tasks {
           .provided_params(inputs)
           .in_scope_params(in_scope),
       );
-  }
-
-  pub fn add_select(&mut self, type_id: TypeId) {
-    self
-      .preparing
-      .as_mut()
-      .expect("Must `begin()` a task creation before adding positional arguments!")
-      .args
-      .push(DependencyKey::new(type_id));
   }
 
   pub fn task_end(&mut self) {

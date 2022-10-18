@@ -32,7 +32,7 @@ fn combinations_of_one_test() {
 
 #[test]
 fn basic() {
-  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey::new("b")])];
+  let rules = indexset![Rule::new("a", "a_from_b", vec![DependencyKey::new("b")])];
   let queries = indexset![Query::new("a", vec!["b"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
@@ -42,7 +42,7 @@ fn basic() {
 
 #[test]
 fn singleton() {
-  let rules = indexset![Rule("a", "a_singleton", vec![])];
+  let rules = indexset![Rule::new("a", "a_singleton", vec![])];
   let queries = indexset![Query::new("a", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
@@ -52,7 +52,7 @@ fn singleton() {
 
 #[test]
 fn insufficient_query() {
-  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey::new("b")])];
+  let rules = indexset![Rule::new("a", "a_from_b", vec![DependencyKey::new("b")])];
   let queries = indexset![Query::new("a", vec![])];
 
   assert!(RuleGraph::new(rules, queries)
@@ -75,8 +75,8 @@ fn no_rules() {
 #[test]
 fn ambiguity() {
   let rules = indexset![
-    Rule("a", "a_from_b", vec![DependencyKey::new("b")]),
-    Rule("a", "a_from_c", vec![DependencyKey::new("c")]),
+    Rule::new("a", "a_from_b", vec![DependencyKey::new("b")]),
+    Rule::new("a", "a_from_c", vec![DependencyKey::new("c")]),
   ];
   let queries = indexset![Query::new("a", vec!["b", "c"])];
 
@@ -87,14 +87,47 @@ fn ambiguity() {
 }
 
 #[test]
-fn nested_single() {
+fn masked_params() {
+  // The middle rule masks "e", so even though the query provides it, construction should fail.
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b").provided_params(vec!["c"])]
     ),
-    Rule(
+    Rule::new(
+      "b",
+      "b_from_c",
+      vec![
+        DependencyKey::new("c"),
+        DependencyKey::new("c").provided_params(vec!["d"])
+      ],
+    )
+    .masked_params(vec!["e"]),
+    Rule::new(
+      "c",
+      "c_from_d",
+      vec![DependencyKey::new("d"), DependencyKey::new("e")],
+    ),
+  ];
+  let queries = indexset![Query::new("a", vec!["e"])];
+
+  let res = RuleGraph::new(rules, queries).err().unwrap();
+  assert!(res.contains(
+    "Encountered 1 rule graph error:\n  \
+     Rule `b_from_c(2) -> b (for c+e)` masked the parameter type `e`, but it"
+  ));
+}
+
+#[test]
+fn nested_single() {
+  let rules = indexset![
+    Rule::new(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new("b").provided_params(vec!["c"])]
+    ),
+    Rule::new(
       "b",
       "b_from_c",
       vec![DependencyKey::new("c"), DependencyKey::new("d")],
@@ -110,17 +143,17 @@ fn nested_single() {
 #[test]
 fn nested_multiple() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b").provided_params(vec!["c"])]
     ),
-    Rule(
+    Rule::new(
       "b",
       "b_from_c",
       vec![DependencyKey::new("c"), DependencyKey::new("d")],
     ),
-    Rule(
+    Rule::new(
       "b",
       "b_from_other_unreachable",
       vec![DependencyKey::new("d")],
@@ -135,7 +168,7 @@ fn nested_multiple() {
 
 #[test]
 fn self_cycle_simple() {
-  let rules = indexset![Rule(
+  let rules = indexset![Rule::new(
     "Fib",
     "fib",
     vec![
@@ -157,7 +190,7 @@ fn self_cycle_simple() {
 #[test]
 fn self_cycle_with_external_dep() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "Thing",
       "transitive_thing",
       vec![
@@ -168,7 +201,7 @@ fn self_cycle_with_external_dep() {
         DependencyKey::new("int").provided_params(vec!["ExternalDep"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "int",
       "external_dep",
       vec![DependencyKey::new("ExternalDep")],
@@ -184,12 +217,12 @@ fn self_cycle_with_external_dep() {
 #[test]
 fn multiple_provided() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b").provided_params(vec!["c", "d"])]
     ),
-    Rule(
+    Rule::new(
       "b",
       "b_from_c_and_d",
       vec![DependencyKey::new("c"), DependencyKey::new("d"),],
@@ -205,14 +238,14 @@ fn multiple_provided() {
 #[test]
 fn in_scope_basic() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b")
         .provided_params(vec!["c"])
         .in_scope_params(vec!["d"])]
     ),
-    Rule("b", "b_from_c_and_d", vec![DependencyKey::new("c")],),
+    Rule::new("b", "b_from_c_and_d", vec![DependencyKey::new("c")],),
   ];
 
   // Valid when the param is in scope at the callsite (even if it isn't consumed).
@@ -229,14 +262,14 @@ fn in_scope_basic() {
 #[test]
 fn in_scope_filtered() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b")
         .provided_params(vec!["c"])
         .in_scope_params(vec!["d"])]
     ),
-    Rule(
+    Rule::new(
       "b",
       "b_from_c_and_d",
       vec![DependencyKey::new("c"), DependencyKey::new("e")],
@@ -253,15 +286,40 @@ fn in_scope_filtered() {
 fn in_scope_computed() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "a",
       "a_from_b",
       vec![DependencyKey::new("b")
         .provided_params(vec!["c"])
         .in_scope_params(vec!["d"])]
     ),
-    Rule("b", "b_from_c", vec![DependencyKey::new("c")],),
-    Rule("d", "d", vec![],),
+    Rule::new("b", "b_from_c", vec![DependencyKey::new("c")],),
+    Rule::new("d", "d", vec![],),
+  ];
+
+  // Valid when the `in_scope` param can be computed or is a singleton.
+  let queries = indexset![Query::new("a", vec![])];
+  let graph = RuleGraph::new(rules.clone(), queries).unwrap();
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec![], "a").unwrap();
+}
+
+#[test]
+fn in_scope_provided() {
+  let _logger = env_logger::try_init();
+  let rules = indexset![
+    Rule::new(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::new("b")
+        .provided_params(vec!["c", "d"])
+        .in_scope_params(vec!["d"])]
+    ),
+    Rule::new(
+      "b",
+      "b_from_c",
+      vec![DependencyKey::new("c"), DependencyKey::new("d")],
+    ),
   ];
 
   // Valid when the `in_scope` param can be computed or is a singleton.
@@ -275,7 +333,7 @@ fn in_scope_computed() {
 fn ambiguous_cycle() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "Root",
       "me",
       vec![
@@ -283,16 +341,16 @@ fn ambiguous_cycle() {
         DependencyKey::new("ME").provided_params(vec!["MPP"]),
       ],
     ),
-    Rule("ME", "me", vec![DependencyKey::new("FERR")]),
-    Rule(
+    Rule::new("ME", "me", vec![DependencyKey::new("FERR")]),
+    Rule::new(
       "FERR",
       "ferr",
       vec![DependencyKey::new("PD"), DependencyKey::new("FPR")],
     ),
-    Rule("PD", "pd_for_p", vec![DependencyKey::new("P")]),
-    Rule("PD", "pd_for_mpp", vec![DependencyKey::new("MPP")]),
-    Rule("FPR", "fpr_for_p", vec![DependencyKey::new("P")]),
-    Rule("FPR", "fpr_for_mpp", vec![DependencyKey::new("MPP")]),
+    Rule::new("PD", "pd_for_p", vec![DependencyKey::new("P")]),
+    Rule::new("PD", "pd_for_mpp", vec![DependencyKey::new("MPP")]),
+    Rule::new("FPR", "fpr_for_p", vec![DependencyKey::new("P")]),
+    Rule::new("FPR", "fpr_for_mpp", vec![DependencyKey::new("MPP")]),
   ];
   let queries = indexset![Query::new("Root", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
@@ -304,7 +362,7 @@ fn ambiguous_cycle() {
 #[test]
 fn natural_loop() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "A",
       "a",
       vec![
@@ -312,7 +370,7 @@ fn natural_loop() {
         DependencyKey::new("B").provided_params(vec!["E"])
       ],
     ),
-    Rule(
+    Rule::new(
       "B",
       "b",
       vec![
@@ -320,7 +378,7 @@ fn natural_loop() {
         DependencyKey::new("C").provided_params(vec!["F"])
       ],
     ),
-    Rule(
+    Rule::new(
       "C",
       "c",
       vec![
@@ -340,7 +398,7 @@ fn natural_loop() {
 fn multi_path_cycle() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "A",
       "sao",
       vec![
@@ -348,8 +406,8 @@ fn multi_path_cycle() {
         DependencyKey::new("AWO").provided_params(vec!["FS"]),
       ],
     ),
-    Rule("AWO", "awofs", vec![DependencyKey::new("FS")]),
-    Rule(
+    Rule::new("AWO", "awofs", vec![DependencyKey::new("FS")]),
+    Rule::new(
       "AWO",
       "awoas",
       vec![DependencyKey::new("AS"), DependencyKey::new("A")],
@@ -365,7 +423,7 @@ fn multi_path_cycle() {
 #[test]
 fn mutual_recursion() {
   let rules = indexset![
-    Rule(
+    Rule::new(
       "IsEven",
       "is_even",
       vec![
@@ -373,7 +431,7 @@ fn mutual_recursion() {
         DependencyKey::new("IsOdd").provided_params(vec!["int"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "IsOdd",
       "is_odd",
       vec![
@@ -397,12 +455,12 @@ fn mutual_recursion() {
 fn wide() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "Output",
       "one",
       vec![DependencyKey::new("Output").provided_params(vec!["A"])]
     ),
-    Rule(
+    Rule::new(
       "Output",
       "two",
       vec![
@@ -410,7 +468,7 @@ fn wide() {
         DependencyKey::new("Output").provided_params(vec!["B"])
       ],
     ),
-    Rule(
+    Rule::new(
       "Output",
       "three",
       vec![
@@ -418,7 +476,7 @@ fn wide() {
         DependencyKey::new("Output").provided_params(vec!["C"])
       ],
     ),
-    Rule(
+    Rule::new(
       "Output",
       "four",
       vec![DependencyKey::new("C"), DependencyKey::new("D")],
@@ -435,8 +493,8 @@ fn wide() {
 fn reduced_source_roots() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule("SourceRootConfig", "construct_scope_source", vec![]),
-    Rule(
+    Rule::new("SourceRootConfig", "construct_scope_source", vec![]),
+    Rule::new(
       "OptionalSourceRootsResult",
       "get_optional_source_roots",
       vec![
@@ -444,32 +502,32 @@ fn reduced_source_roots() {
         DependencyKey::new("OptionalSourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("RemovePrefix")],
     ),
-    Rule(
+    Rule::new(
       "Snapshot",
       "<intrinsic>",
       vec![DependencyKey::new("Digest")],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("DigestSubset")],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("PathGlobs")],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("MergeDigests")],
     ),
-    Rule(
+    Rule::new(
       "SourceRootsResult",
       "get_source_roots",
       vec![
@@ -477,7 +535,7 @@ fn reduced_source_roots() {
         DependencyKey::new("OptionalSourceRootsResult").provided_params(vec!["SourceRootsRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "OptionalSourceRoot",
       "get_optional_source_root",
       vec![
@@ -487,7 +545,7 @@ fn reduced_source_roots() {
         DependencyKey::new("OptionalSourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "StrippedSourceFiles",
       "strip_source_roots",
       vec![
@@ -511,7 +569,7 @@ fn reduced_source_roots() {
 fn reduced_codegen_cycle() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "Process",
       "setup_pex_cli_process",
       vec![
@@ -519,7 +577,7 @@ fn reduced_codegen_cycle() {
         DependencyKey::new("ProcessResult").provided_params(vec!["Process"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "ProcessResult",
       "fallible_to_exec_result_or_raise",
       vec![
@@ -527,17 +585,17 @@ fn reduced_codegen_cycle() {
         DependencyKey::new("ProductDescription"),
       ],
     ),
-    Rule(
+    Rule::new(
       "MultiPlatformProcess",
       "upcast_process",
       vec![DependencyKey::new("Process")],
     ),
-    Rule(
+    Rule::new(
       "ProductDescription",
       "get_multi_platform_request_description",
       vec![DependencyKey::new("MultiPlatformProcess")],
     ),
-    Rule(
+    Rule::new(
       "FallibleProcessResult",
       "remove_platform_information",
       vec![DependencyKey::new("MultiPlatformProcess")],
@@ -553,7 +611,7 @@ fn reduced_codegen_cycle() {
 fn full_scale_target() {
   let _logger = env_logger::try_init();
   let rules = indexset![
-    Rule(
+    Rule::new(
       "InferredDependencies",
       "infer_python_conftest_dependencies",
       vec![
@@ -563,12 +621,12 @@ fn full_scale_target() {
         DependencyKey::new("Owners").provided_params(vec!["OwnersRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "ThirdPartyModuleToAddressMapping",
       "map_third_party_modules_to_addresses",
       vec![DependencyKey::new("Targets").provided_params(vec!["AddressSpecs"])],
     ),
-    Rule(
+    Rule::new(
       "Targets",
       "resolve_targets",
       vec![
@@ -576,7 +634,7 @@ fn full_scale_target() {
         DependencyKey::new("Subtargets").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "Owners",
       "find_owners",
       vec![
@@ -586,7 +644,7 @@ fn full_scale_target() {
         DependencyKey::new("BuildFileAddress").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "AddressesWithOrigins",
       "resolve_addresses_with_origins",
       vec![
@@ -595,7 +653,7 @@ fn full_scale_target() {
         DependencyKey::new("AddressesWithOrigins").provided_params(vec!["FilesystemSpecs"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "InferredDependencies",
       "infer_python_dependencies",
       vec![
@@ -604,7 +662,7 @@ fn full_scale_target() {
         DependencyKey::new("PythonModuleOwner").provided_params(vec!["PythonModule"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "InferredDependencies",
       "infer_python_init_dependencies",
       vec![
@@ -614,7 +672,7 @@ fn full_scale_target() {
         DependencyKey::new("Owners").provided_params(vec!["OwnersRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "PythonModuleOwner",
       "map_module_to_address",
       vec![
@@ -623,7 +681,7 @@ fn full_scale_target() {
         DependencyKey::new("ThirdPartyModuleToAddressMapping"),
       ],
     ),
-    Rule(
+    Rule::new(
       "DownloadedExternalTool",
       "download_external_tool",
       vec![
@@ -632,17 +690,17 @@ fn full_scale_target() {
         DependencyKey::new("ExtractedDigest").provided_params(vec!["MaybeExtractable"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "GlobalOptions",
       "construct_scope_",
       vec![DependencyKey::new("ScopedOptions").provided_params(vec!["Scope"])],
     ),
-    Rule(
+    Rule::new(
       "PexEnvironment",
       "find_pex_python",
       vec![DependencyKey::new("BinaryPaths").provided_params(vec!["BinaryPathRequest"])],
     ),
-    Rule(
+    Rule::new(
       "ProcessResult",
       "fallible_to_exec_result_or_raise",
       vec![
@@ -650,7 +708,7 @@ fn full_scale_target() {
         DependencyKey::new("ProductDescription"),
       ],
     ),
-    Rule(
+    Rule::new(
       "HydratedSources",
       "hydrate_sources",
       vec![
@@ -660,12 +718,12 @@ fn full_scale_target() {
           .provided_params(vec!["GeneratePythonFromProtobufRequest"],),
       ],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("MergeDigests")],
     ),
-    Rule(
+    Rule::new(
       "SourceFiles",
       "determine_source_files",
       vec![
@@ -673,7 +731,7 @@ fn full_scale_target() {
         DependencyKey::new("HydratedSources").provided_params(vec!["HydrateSourcesRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "UnexpandedTargets",
       "resolve_unexpanded_targets",
       vec![
@@ -681,7 +739,7 @@ fn full_scale_target() {
         DependencyKey::new("WrappedTarget").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "ExtractedDigest",
       "maybe_extract",
       vec![
@@ -689,7 +747,7 @@ fn full_scale_target() {
         DependencyKey::new("ProcessResult").provided_params(vec!["Process"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "AddressesWithOrigins",
       "addresses_with_origins_from_address_specs",
       vec![
@@ -700,7 +758,7 @@ fn full_scale_target() {
         DependencyKey::new("AddressFamily").provided_params(vec!["Dir"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "BuildFileAddress",
       "find_build_file",
       vec![
@@ -708,17 +766,17 @@ fn full_scale_target() {
         DependencyKey::new("AddressFamily").provided_params(vec!["Dir"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "AncestorFiles",
       "find_missing_ancestor_files",
       vec![DependencyKey::new("AncestorFilesRequest")],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("DownloadFile")],
     ),
-    Rule(
+    Rule::new(
       "BinaryPaths",
       "find_binary",
       vec![
@@ -726,7 +784,7 @@ fn full_scale_target() {
         DependencyKey::new("FallibleProcessResult").provided_params(vec!["Process"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "OptionalSourceRootsResult",
       "get_optional_source_roots",
       vec![
@@ -734,7 +792,7 @@ fn full_scale_target() {
         DependencyKey::new("OptionalSourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "AddressesWithOrigins",
       "addresses_with_origins_from_filesystem_specs",
       vec![
@@ -742,27 +800,27 @@ fn full_scale_target() {
         DependencyKey::new("Owners").provided_params(vec!["OwnersRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "RegisteredTargetTypes",
       "registered_target_types_singleton",
       vec![],
     ),
-    Rule(
+    Rule::new(
       "Addresses",
       "strip_address_origins",
       vec![DependencyKey::new("AddressesWithOrigins")],
     ),
-    Rule(
+    Rule::new(
       "FallibleProcessResult",
       "remove_platform_information",
       vec![DependencyKey::new("FallibleProcessResultWithPlatform")],
     ),
-    Rule(
+    Rule::new(
       "ScopedOptions",
       "scope_options",
       vec![DependencyKey::new("Scope"), DependencyKey::new("_Options"),],
     ),
-    Rule(
+    Rule::new(
       "TransitiveTargets",
       "transitive_targets",
       vec![
@@ -770,7 +828,7 @@ fn full_scale_target() {
         DependencyKey::new("Targets").provided_params(vec!["DependenciesRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "FirstPartyModuleToAddressMapping",
       "map_first_party_modules_to_addresses",
       vec![
@@ -778,17 +836,17 @@ fn full_scale_target() {
         DependencyKey::new("StrippedSourceFiles").provided_params(vec!["SourceFilesRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "Digest",
       "<intrinsic>",
       vec![DependencyKey::new("DigestSubset")],
     ),
-    Rule(
+    Rule::new(
       "_Options",
       "parse_options",
       vec![DependencyKey::new("OptionsBootstrapper")],
     ),
-    Rule(
+    Rule::new(
       "GeneratedSources",
       "generate_python_from_protobuf",
       vec![
@@ -801,7 +859,7 @@ fn full_scale_target() {
         DependencyKey::new("SourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "SourceRoot",
       "get_source_root",
       vec![
@@ -809,12 +867,12 @@ fn full_scale_target() {
         DependencyKey::new("OptionalSourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "MultiPlatformProcess",
       "upcast_process",
       vec![DependencyKey::new("Process")],
     ),
-    Rule(
+    Rule::new(
       "TargetAdaptor",
       "find_target_adaptor",
       vec![
@@ -822,17 +880,17 @@ fn full_scale_target() {
         DependencyKey::new("AddressFamily").provided_params(vec!["Dir"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "Address",
       "resolve_address",
       vec![DependencyKey::new("AddressInput")],
     ),
-    Rule(
+    Rule::new(
       "FallibleProcessResultWithPlatform",
       "<intrinsic>",
       vec![DependencyKey::new("MultiPlatformProcess")],
     ),
-    Rule(
+    Rule::new(
       "SourceRootsResult",
       "get_source_roots",
       vec![
@@ -840,7 +898,7 @@ fn full_scale_target() {
         DependencyKey::new("OptionalSourceRootsResult").provided_params(vec!["SourceRootsRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "OptionalSourceRoot",
       "get_optional_source_root",
       vec![
@@ -848,7 +906,7 @@ fn full_scale_target() {
         DependencyKey::new("OptionalSourceRoot").provided_params(vec!["SourceRootRequest"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "StrippedSourceFiles",
       "strip_source_roots",
       vec![
@@ -857,7 +915,7 @@ fn full_scale_target() {
         DependencyKey::new("Digest").provided_params(vec!["DigestSubset"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "Subtargets",
       "generate_subtargets",
       vec![
@@ -865,12 +923,12 @@ fn full_scale_target() {
         DependencyKey::new("WrappedTarget").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "ProductDescription",
       "get_multi_platform_request_description",
       vec![DependencyKey::new("MultiPlatformProcess")],
     ),
-    Rule(
+    Rule::new(
       "Addresses",
       "resolve_dependencies",
       vec![
@@ -885,7 +943,7 @@ fn full_scale_target() {
         DependencyKey::new("Subtargets").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "WrappedTarget",
       "resolve_target",
       vec![
@@ -895,7 +953,7 @@ fn full_scale_target() {
         DependencyKey::new("TargetAdaptor").provided_params(vec!["Address"]),
       ],
     ),
-    Rule(
+    Rule::new(
       "AddressFamily",
       "parse_address_family",
       vec![
@@ -938,23 +996,51 @@ impl super::TypeId for &'static str {
   }
 }
 
-// A name and vec of DependencyKeys. Abbreviated for simpler construction and matching.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct Rule(&'static str, &'static str, Vec<DependencyKey<&'static str>>);
+struct Rule {
+  product: &'static str,
+  name: &'static str,
+  dependency_keys: Vec<DependencyKey<&'static str>>,
+  masked_params: Vec<&'static str>,
+}
+
+impl Rule {
+  fn new(
+    product: &'static str,
+    name: &'static str,
+    dependency_keys: Vec<DependencyKey<&'static str>>,
+  ) -> Self {
+    Self {
+      product,
+      name,
+      dependency_keys,
+      masked_params: vec![],
+    }
+  }
+
+  fn masked_params(mut self, masked_params: Vec<&'static str>) -> Self {
+    self.masked_params = masked_params;
+    self
+  }
+}
 
 impl super::Rule for Rule {
   type TypeId = &'static str;
 
   fn product(&self) -> Self::TypeId {
-    self.0
+    self.product
   }
 
-  fn dependency_keys(&self) -> Vec<&DependencyKey<&'static str>> {
-    self.2.iter().collect()
+  fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
+    self.dependency_keys.iter().collect()
+  }
+
+  fn masked_params(&self) -> Vec<Self::TypeId> {
+    self.masked_params.clone()
   }
 
   fn require_reachable(&self) -> bool {
-    !self.1.ends_with("_unreachable")
+    !self.name.ends_with("_unreachable")
   }
 
   fn color(&self) -> Option<Palette> {
@@ -970,6 +1056,12 @@ impl super::DisplayForGraph for Rule {
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    write!(f, "{}({}) -> {}", self.1, self.2.len(), self.0)
+    write!(
+      f,
+      "{}({}) -> {}",
+      self.name,
+      self.dependency_keys.len(),
+      self.product
+    )
   }
 }

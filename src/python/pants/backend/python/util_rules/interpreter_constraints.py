@@ -93,6 +93,10 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def debug_hint(self) -> str:
         return str(self)
 
+    @property
+    def description(self) -> str:
+        return str(sorted(str(c) for c in self))
+
     @classmethod
     def merge(cls, ics: Iterable[InterpreterConstraints]) -> InterpreterConstraints:
         return InterpreterConstraints(

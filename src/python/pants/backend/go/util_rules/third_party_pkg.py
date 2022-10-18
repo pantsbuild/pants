@@ -13,7 +13,9 @@ from typing import Any
 import ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
@@ -61,6 +63,14 @@ class ThirdPartyPkgAnalysis:
     # tests directly on a third-party package.
     imports: tuple[str, ...]
     go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
+    cgo_flags: CGoCompilerFlags
+
+    c_files: tuple[str, ...]
+    cxx_files: tuple[str, ...]
+    m_files: tuple[str, ...]
+    h_files: tuple[str, ...]
+    f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
     minimum_go_version: str | None
@@ -265,7 +275,9 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 
 @rule
 async def analyze_go_third_party_module(
-    request: AnalyzeThirdPartyModuleRequest, analyzer: PackageAnalyzerSetup
+    request: AnalyzeThirdPartyModuleRequest,
+    analyzer: PackageAnalyzerSetup,
+    golang_subsystem: GolangSubsystem,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -332,7 +344,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
         ),
     )
 
@@ -401,13 +413,7 @@ async def analyze_go_third_party_package(
     maybe_error: GoThirdPartyPkgError | None = None
 
     for key in (
-        "CgoFiles",
         "CompiledGoFiles",
-        "CFiles",
-        "CXXFiles",
-        "MFiles",
-        "HFiles",
-        "FFiles",
         "SwigFiles",
         "SwigCXXFiles",
         "SysoFiles",
@@ -440,12 +446,26 @@ async def analyze_go_third_party_package(
         dir_path=request.package_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
+        c_files=tuple(request.pkg_json.get("CFiles", ())),
+        cxx_files=tuple(request.pkg_json.get("CXXFiles", ())),
+        m_files=tuple(request.pkg_json.get("MFiles", ())),
+        h_files=tuple(request.pkg_json.get("HFiles", ())),
+        f_files=tuple(request.pkg_json.get("FFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
+        cgo_files=tuple(request.pkg_json.get("CgoFiles", ())),
         minimum_go_version=request.minimum_go_version,
         embed_patterns=tuple(request.pkg_json.get("EmbedPatterns", [])),
         test_embed_patterns=tuple(request.pkg_json.get("TestEmbedPatterns", [])),
         xtest_embed_patterns=tuple(request.pkg_json.get("XTestEmbedPatterns", [])),
         error=maybe_error,
+        cgo_flags=CGoCompilerFlags(
+            cflags=tuple(request.pkg_json.get("CgoCFLAGS", [])),
+            cppflags=tuple(request.pkg_json.get("CgoCPPFLAGS", [])),
+            cxxflags=tuple(request.pkg_json.get("CgoCXXFLAGS", [])),
+            fflags=tuple(request.pkg_json.get("CgoFFLAGS", [])),
+            ldflags=tuple(request.pkg_json.get("CgoLDFLAGS", [])),
+            pkg_config=tuple(request.pkg_json.get("CgoPkgConfig", [])),
+        ),
     )
 
     if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
@@ -592,12 +612,26 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),
+            c_files=(),
+            cxx_files=(),
+            h_files=(),
+            m_files=(),
+            f_files=(),
             s_files=(),
             minimum_go_version=None,
             embed_patterns=(),
             test_embed_patterns=(),
             xtest_embed_patterns=(),
             error=error,
+            cgo_files=(),
+            cgo_flags=CGoCompilerFlags(
+                cflags=(),
+                cppflags=(),
+                cxxflags=(),
+                fflags=(),
+                ldflags=(),
+                pkg_config=(),
+            ),
         )
 
     if "Error" in go_list_json:

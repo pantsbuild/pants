@@ -43,7 +43,7 @@ python_tests(name="prelude_integration", sources=["prelude_integration_test.py"]
 python_tests(
     name="remote_cache_integration",
     sources=["remote_cache_integration_test.py"],
-    dependencies=["testprojects/src/python:hello_directory"],
+    dependencies=["testprojects/src/jvm:lib_directory"],
     timeout=180,
 )
 

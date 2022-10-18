@@ -5,49 +5,35 @@ from __future__ import annotations
 
 import itertools
 import logging
-import os
-from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterable, Iterator, TypeVar, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type
 
 from pants.base.specs import Specs
-from pants.core.goals.style_request import (
-    StyleRequest,
-    determine_specified_tool_names,
-    only_option_help,
-    style_batch_size_help,
+from pants.core.goals.lint import (
+    LintFilesRequest,
+    LintRequest,
+    LintResult,
+    LintTargetsRequest,
+    _get_partitions_by_request_type,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
+from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import Partitions as UntypedPartitions
+from pants.core.util_rules.partitions import _single_partition_field_sets_by_file_partitioner_rules
+from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    Digest,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-    SnapshotDiff,
-    SpecsPaths,
-    Workspace,
-)
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.build_files import BuildFileOptions
-from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
-from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Target, Targets
-from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import IntOption, StrListOption
-from pants.source.filespec import FilespecMatcher
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
-
-_F = TypeVar("_F", bound="FmtResult")
-_FS = TypeVar("_FS", bound=FieldSet)
-_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -60,24 +46,23 @@ class FmtResult(EngineAwareReturnType):
     stderr: str
     formatter_name: str
 
-    @classmethod
-    def create(
-        cls,
-        request: FmtTargetsRequest | _FmtBuildFilesRequest,
+    @staticmethod
+    @rule_helper(_public=True)
+    async def create(
+        request: FmtRequest.SubPartition,
         process_result: ProcessResult | FallibleProcessResult,
-        output: Snapshot,
         *,
         strip_chroot_path: bool = False,
     ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return cls(
+        return FmtResult(
             input=request.snapshot,
-            output=output,
+            output=await Get(Snapshot, Digest, process_result.output_digest),
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            formatter_name=request.name,
+            formatter_name=request.tool_name,
         )
 
     def __post_init__(self):
@@ -89,37 +74,14 @@ class FmtResult(EngineAwareReturnType):
             log += f"\n{self.stderr}"
         logger.debug(log)
 
-    @classmethod
-    def skip(cls: type[_F], *, formatter_name: str) -> _F:
-        return cls(
-            input=EMPTY_SNAPSHOT,
-            output=EMPTY_SNAPSHOT,
-            stdout="",
-            stderr="",
-            formatter_name=formatter_name,
-        )
-
-    @property
-    def skipped(self) -> bool:
-        return (
-            self.input == EMPTY_SNAPSHOT
-            and self.output == EMPTY_SNAPSHOT
-            and not self.stdout
-            and not self.stderr
-        )
-
     @property
     def did_change(self) -> bool:
         return self.output != self.input
 
     def level(self) -> LogLevel | None:
-        if self.skipped:
-            return LogLevel.DEBUG
         return LogLevel.WARN if self.did_change else LogLevel.INFO
 
     def message(self) -> str | None:
-        if self.skipped:
-            return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
 
         # NB: Instead of printing out `stdout` and `stderr`, we just print a list of files which
@@ -151,56 +113,76 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-@union(in_scope_types=[EnvironmentName])
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class FmtTargetsRequest(StyleRequest[_FS]):
-    snapshot: Snapshot
-
-    def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
-        self.snapshot = snapshot
-        super().__init__(field_sets)
+Partitions = UntypedPartitions[PartitionKeyT, str]
 
 
-@union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
-# Prefixed with `_` because we aren't sure if this union will stick long-term, or be subsumed when
-# we implement https://github.com/pantsbuild/pants/issues/16480.
-class _FmtBuildFilesRequest(EngineAwareParameter, metaclass=ABCMeta):
-    name: ClassVar[str]
+@union
+class FmtRequest(LintRequest):
+    is_formatter = True
 
-    snapshot: Snapshot
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    @frozen_after_init
+    @dataclass(unsafe_hash=True)
+    class SubPartition(LintRequest.SubPartition):
+        snapshot: Snapshot
 
+        @property
+        def files(self) -> tuple[str, ...]:
+            return self.elements
 
-@dataclass(frozen=True)
-class _FmtTargetBatchRequest:
-    """Format all the targets in the given batch.
-
-    NOTE: Several requests can be made in parallel (via `MultiGet`) iff the target batches are
-        non-overlapping. Within the request, the FmtTargetsRequests will be issued sequentially
-        with the result of each run fed into the next run. To maximize parallel performance, the
-        targets in a batch should share a FieldSet.
-    """
-
-    request_types: tuple[type[FmtTargetsRequest], ...]
-    targets: Targets
+    @classmethod
+    def _get_rules(cls) -> Iterable[UnionRule]:
+        yield from super()._get_rules()
+        yield UnionRule(FmtRequest, cls)
+        yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
 
 
-@dataclass(frozen=True)
-class _FmtBuildFilesBatchRequest:
-    request_types: tuple[type[_FmtBuildFilesRequest], ...]
-    paths: tuple[str, ...]
+class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
+    @classmethod
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
+            yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
+
+        yield from (
+            rule
+            for rule in super()._get_rules()
+            # NB: We don't want to yield `lint.py`'s default partitioner
+            if isinstance(rule, UnionRule)
+        )
+        yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
+
+
+class FmtFilesRequest(FmtRequest, LintFilesRequest):
+    @classmethod
+    def _get_rules(cls) -> Iterable:
+        if cls.partitioner_type is not PartitionerType.CUSTOM:
+            raise ValueError(
+                "Pants does not provide default partitioners for `FmtFilesRequest`."
+                + " You will need to provide your own partitioner rule."
+            )
+
+        yield from super()._get_rules()
+        yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
+
+
+class _FmtSubpartitionBatchElement(NamedTuple):
+    request_type: type[FmtRequest.SubPartition]
+    tool_name: str
+    files: tuple[str, ...]
+    key: Any
+
+
+class _FmtSubpartitionBatchRequest(Collection[_FmtSubpartitionBatchElement]):
+    """Request to serially format all the subpartitions in the given batch."""
 
 
 @dataclass(frozen=True)
 class _FmtBatchResult:
     results: tuple[FmtResult, ...]
-    input: Digest
-    output: Digest
 
     @property
     def did_change(self) -> bool:
-        return self.input != self.output
+        return any(result.did_change for result in self.results)
 
 
 class FmtSubsystem(GoalSubsystem):
@@ -209,106 +191,28 @@ class FmtSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtTargetsRequest in union_membership
+        return FmtRequest in union_membership
 
-    only = StrListOption(
-        help=only_option_help("fmt", "formatter", "isort", "shfmt"),
-    )
-    batch_size = IntOption(
-        advanced=True,
-        default=128,
-        help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
-    )
+    only = OnlyOption("formatter", "isort", "shfmt")
+    batch_size = BatchSizeOption(uppercase="Formatter", lowercase="formatter")
 
 
 class Fmt(Goal):
     subsystem_cls = FmtSubsystem
 
 
-def _get_request_types(
-    fmt_subsystem: FmtSubsystem,
-    union_membership: UnionMembership,
-) -> tuple[tuple[type[FmtTargetsRequest], ...], tuple[type[_FmtBuildFilesRequest], ...]]:
-    fmt_target_request_types = union_membership.get(FmtTargetsRequest)
-    fmt_build_files_request_types = union_membership.get(_FmtBuildFilesRequest)
-
-    # NOTE: Unlike lint.py, we don't check for ambiguous names between target formatters and BUILD
-    # formatters, since BUILD files are Python and we re-use Python formatters for BUILD files
-    # (like `black`).
-
-    formatters_to_run = determine_specified_tool_names(
-        "fmt",
-        fmt_subsystem.only,
-        fmt_target_request_types,
-        extra_valid_names=(fbfrt.name for fbfrt in fmt_build_files_request_types),
-    )
-
-    filtered_fmt_target_request_types = tuple(
-        request_type
-        for request_type in fmt_target_request_types
-        if request_type.name in formatters_to_run
-    )
-    filtered_fmt_build_files_request_types = tuple(
-        request_type
-        for request_type in fmt_build_files_request_types
-        if request_type.name in formatters_to_run
-    )
-
-    return filtered_fmt_target_request_types, filtered_fmt_build_files_request_types
-
-
-def _batch(
-    iterable: Iterable[_T], batch_size: int, key: Callable[[_T], str] = lambda x: str(x)
-) -> Iterator[list[_T]]:
-    partitions = partition_sequentially(
-        iterable,
-        key=key,
-        size_target=batch_size,
-        size_max=4 * batch_size,
-    )
-    for partition in partitions:
-        yield partition
-
-
-def _batch_targets(
-    request_types: Iterable[type[FmtTargetsRequest]],
-    targets: Iterable[Target],
-    batch_size: int,
-) -> dict[Targets, tuple[type[FmtTargetsRequest], ...]]:
-    """Groups targets by the relevant Request types, then batches them.
-
-    Returns a mapping from batch -> Request types.
-    """
-
-    targets_by_request_order = defaultdict(list)
-
-    for target in targets:
-        applicable_request_types = []
-        for request_type in request_types:
-            if request_type.field_set_type.is_applicable(target):
-                applicable_request_types.append(request_type)
-        if applicable_request_types:
-            targets_by_request_order[tuple(applicable_request_types)].append(target)
-
-    target_batches_by_fmt_request_order = {
-        Targets(target_batch): applicable_request_types
-        for applicable_request_types, targets in targets_by_request_order.items()
-        for target_batch in _batch(targets, batch_size, key=lambda t: t.address.spec)
-    }
-
-    return target_batches_by_fmt_request_order
-
-
 @rule_helper
 async def _write_files(workspace: Workspace, batched_results: Iterable[_FmtBatchResult]):
-    changed_digests = tuple(
-        batched_result.output for batched_result in batched_results if batched_result.did_change
-    )
-    if changed_digests:
+    if any(batched_result.did_change for batched_result in batched_results):
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practice, this should never
-        # happen due to us grouping each language's formatters into a single digest.
-        merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
+        # happen due to us grouping each file's formatters into a single digest.
+        merged_formatted_digest = await Get(
+            Digest,
+            MergeDigests(
+                batched_result.results[-1].output.digest for batched_result in batched_results
+            ),
+        )
         workspace.write_digest(merged_formatted_digest)
 
 
@@ -330,8 +234,6 @@ def _print_results(
         if any(result.did_change for result in results):
             sigil = console.sigil_succeeded_with_edits()
             status = "made changes"
-        elif all(result.skipped for result in results):
-            continue
         else:
             sigil = console.sigil_succeeded()
             status = "made no changes"
@@ -343,64 +245,73 @@ async def fmt(
     console: Console,
     specs: Specs,
     fmt_subsystem: FmtSubsystem,
-    build_file_options: BuildFileOptions,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
-    fmt_target_request_types, fmt_build_files_request_types = _get_request_types(
-        fmt_subsystem, union_membership
+    fmt_request_types = list(union_membership.get(FmtRequest))
+    target_partitioners = list(union_membership.get(FmtTargetsRequest.PartitionRequest))
+    file_partitioners = list(union_membership.get(FmtFilesRequest.PartitionRequest))
+
+    partitions_by_request_type = await _get_partitions_by_request_type(
+        fmt_request_types,
+        target_partitioners,
+        file_partitioners,
+        fmt_subsystem,
+        specs,
+        lambda request_type: Get(Partitions, FmtTargetsRequest.PartitionRequest, request_type),
+        lambda request_type: Get(Partitions, FmtFilesRequest.PartitionRequest, request_type),
     )
 
-    _get_targets = Get(
-        FilteredTargets,
-        Specs,
-        specs if fmt_target_request_types else Specs.empty(),
-    )
-    _get_specs_paths = Get(
-        SpecsPaths, Specs, specs if fmt_build_files_request_types else Specs.empty()
-    )
-
-    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
-    specified_build_files = FilespecMatcher(
-        includes=[os.path.join("**", p) for p in build_file_options.patterns],
-        excludes=build_file_options.ignores,
-    ).matches(specs_paths.files)
-
-    targets_to_request_types = _batch_targets(
-        fmt_target_request_types,
-        targets,
-        fmt_subsystem.batch_size,
-    )
-
-    all_requests = [
-        *(
-            Get(
-                _FmtBatchResult,
-                _FmtTargetBatchRequest(fmt_request_types, target_batch),
-            )
-            for target_batch, fmt_request_types in targets_to_request_types.items()
-        ),
-        *(
-            Get(
-                _FmtBatchResult,
-                _FmtBuildFilesBatchRequest(fmt_build_files_request_types, tuple(paths_batch)),
-            )
-            for paths_batch in _batch(
-                specified_build_files,
-                fmt_subsystem.batch_size,
-            )
-        ),
-    ]
-    target_batch_results = cast("tuple[_FmtBatchResult, ...]", await MultiGet(all_requests))
-
-    individual_results = list(
-        itertools.chain.from_iterable(result.results for result in target_batch_results)
-    )
-
-    if not individual_results:
+    if not partitions_by_request_type:
         return Fmt(exit_code=0)
 
-    await _write_files(workspace, target_batch_results)
+    def batch(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
+        batches = partition_sequentially(
+            files,
+            key=lambda x: str(x),
+            size_target=fmt_subsystem.batch_size,
+            size_max=4 * fmt_subsystem.batch_size,
+        )
+        for batch in batches:
+            yield tuple(batch)
+
+    def _make_disjoint_subpartition_batch_requests() -> Iterable[_FmtSubpartitionBatchRequest]:
+        partition_infos: Sequence[Tuple[Type[FmtRequest], Any]]
+        files: Sequence[str]
+
+        partition_infos_by_files = defaultdict(list)
+        for request_type, partitions_list in partitions_by_request_type.items():
+            for partitions in partitions_list:
+                for key, files in partitions.items():
+                    for file in files:
+                        partition_infos_by_files[file].append((request_type, key))
+
+        files_by_partition_info = defaultdict(list)
+        for file, partition_infos in partition_infos_by_files.items():
+            files_by_partition_info[tuple(partition_infos)].append(file)
+
+        for partition_infos, files in files_by_partition_info.items():
+            for subpartition in batch(files):
+                yield _FmtSubpartitionBatchRequest(
+                    _FmtSubpartitionBatchElement(
+                        request_type.SubPartition,
+                        request_type.tool_name,
+                        subpartition,
+                        partition_key,
+                    )
+                    for request_type, partition_key in partition_infos
+                )
+
+    all_results = await MultiGet(
+        Get(_FmtBatchResult, _FmtSubpartitionBatchRequest, request)
+        for request in _make_disjoint_subpartition_batch_requests()
+    )
+
+    individual_results = list(
+        itertools.chain.from_iterable(result.results for result in all_results)
+    )
+
+    await _write_files(workspace, all_results)
     _print_results(console, individual_results)
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
@@ -409,57 +320,32 @@ async def fmt(
 
 
 @rule
-async def fmt_build_files(
-    request: _FmtBuildFilesBatchRequest,
+async def fmt_batch(
+    request: _FmtSubpartitionBatchRequest,
 ) -> _FmtBatchResult:
-    original_snapshot = await Get(Snapshot, PathGlobs(request.paths))
-    prior_snapshot = original_snapshot
+    current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
-    for fmt_build_files_request_type in request.request_types:
-        fmt_build_files_request = fmt_build_files_request_type(
-            snapshot=prior_snapshot,
-        )
-        result = await Get(FmtResult, _FmtBuildFilesRequest, fmt_build_files_request)
+    for request_type, tool_name, files, key in request:
+        subpartition = request_type(tool_name, files, key, current_snapshot)
+        result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
         results.append(result)
-        prior_snapshot = result.output
-    return _FmtBatchResult(
-        tuple(results),
-        input=original_snapshot.digest,
-        output=prior_snapshot.digest,
-    )
+
+        assert set(result.output.files) == set(
+            subpartition.files
+        ), f"Expected {result.output.files} to match {subpartition.files}"
+        current_snapshot = result.output
+    return _FmtBatchResult(tuple(results))
 
 
-@rule
-async def fmt_target_batch(
-    request: _FmtTargetBatchRequest,
-) -> _FmtBatchResult:
-    original_sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(target[SourcesField] for target in request.targets),
-    )
-    prior_snapshot = original_sources.snapshot
-
-    results = []
-    for fmt_targets_request_type in request.request_types:
-        fmt_targets_request = fmt_targets_request_type(
-            (
-                fmt_targets_request_type.field_set_type.create(target)
-                for target in request.targets
-                if fmt_targets_request_type.field_set_type.is_applicable(target)
-            ),
-            snapshot=prior_snapshot,
-        )
-        if not fmt_targets_request.field_sets:
-            continue
-        result = await Get(FmtResult, FmtTargetsRequest, fmt_targets_request)
-        results.append(result)
-        if not result.skipped:
-            prior_snapshot = result.output
-    return _FmtBatchResult(
-        tuple(results),
-        input=original_sources.snapshot.digest,
-        output=prior_snapshot.digest,
+@rule(level=LogLevel.DEBUG)
+async def convert_fmt_result_to_lint_result(fmt_result: FmtResult) -> LintResult:
+    return LintResult(
+        1 if fmt_result.did_change else 0,
+        fmt_result.stdout,
+        fmt_result.stderr,
+        linter_name=fmt_result.formatter_name,
+        _render_message=False,  # Don't re-render the message
     )
 
 

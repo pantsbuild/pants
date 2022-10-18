@@ -36,6 +36,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.strutil import softwrap
 
 
 class MockPutativeTargetsRequest:
@@ -529,9 +530,11 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(AssertionError) as excinfo:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
-    expected_msg = (
-        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
-        "but this target type does not have a `source` or `sources` field."
+    expected_msg = softwrap(
+        """
+        A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90,
+        but this target type does not have a `source` or `sources` field.
+        """
     )
     assert str(excinfo.value) == expected_msg
 

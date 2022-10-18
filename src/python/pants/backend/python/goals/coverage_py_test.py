@@ -51,14 +51,18 @@ def resolve_config(path: str | None, content: str | None) -> str:
 
     mock_gets = [
         MockGet(
-            output_type=ConfigFiles, input_type=ConfigFilesRequest, mock=mock_find_existing_config
+            output_type=ConfigFiles,
+            input_types=(ConfigFilesRequest,),
+            mock=mock_find_existing_config,
         ),
-        MockGet(output_type=DigestContents, input_type=Digest, mock=mock_read_existing_config),
-        MockGet(output_type=Digest, input_type=CreateDigest, mock=mock_create_final_config),
+        MockGet(output_type=DigestContents, input_types=(Digest,), mock=mock_read_existing_config),
+        MockGet(output_type=Digest, input_types=(CreateDigest,), mock=mock_create_final_config),
     ]
 
     result = run_rule_with_mocks(
-        create_or_update_coverage_config, rule_args=[coverage_subsystem], mock_gets=mock_gets
+        create_or_update_coverage_config,
+        rule_args=[coverage_subsystem],
+        mock_gets=mock_gets,  # type: ignore[arg-type]
     )
     assert result.digest == EMPTY_DIGEST
     assert len(resolved_config) == 1

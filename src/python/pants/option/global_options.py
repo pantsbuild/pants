@@ -25,7 +25,8 @@ from pants.base.build_environment import (
 )
 from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
@@ -306,7 +307,7 @@ class DynamicRemoteOptions:
     def from_options(
         cls,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
@@ -370,11 +371,10 @@ class DynamicRemoteOptions:
         cls,
         bootstrap_options: OptionValueContainer,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None,
         remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        auth_plugin_result: AuthPluginResult | None = None
         if not remote_auth_plugin_func_from_entry_point:
             remote_auth_plugin_func = cls._get_auth_plugin_from_option(
                 bootstrap_options.remote_auth_plugin
@@ -509,7 +509,6 @@ class ExecutionOptions:
     remote_cache_read_timeout_millis: int
 
     remote_execution_address: str | None
-    remote_execution_extra_platform_properties: list[str]
     remote_execution_headers: dict[str, str]
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
@@ -553,7 +552,6 @@ class ExecutionOptions:
             remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
@@ -639,7 +637,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_extra_platform_properties=[],
     remote_execution_headers={
         "user-agent": f"pants/{VERSION}",
     },
@@ -1212,9 +1209,16 @@ class BootstrapOptions:
         advanced=True,
         default=None,
         help=softwrap(
-            """
+            f"""
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+
+            Even when using the `docker_environment` and `remote_environment` targets, this path
+            will be read from the local host, and those certs will be used in the environment.
+
+            This option cannot be overridden via environment targets, so if you need a different
+            value than what the rest of your organization is using, override the value via an
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('options')}.
             """
         ),
     )
@@ -1301,6 +1305,16 @@ class BootstrapOptions:
             """
         ),
         advanced=True,
+    )
+    session_end_tasks_timeout = FloatOption(
+        default=3.0,
+        help=softwrap(
+            """
+            The time in seconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
     )
     remote_execution = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
@@ -1510,17 +1524,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_execution_extra_platform_properties = StrListOption(
-        advanced=True,
-        help=softwrap(
-            """
-            Platform properties to set on remote execution requests.
-            Format: property=value. Multiple values should be specified as multiple
-            occurrences of this flag. Pants itself may add additional platform properties.
-            """
-        ),
-        default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
-    )
     remote_execution_headers = DictOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
@@ -1706,6 +1709,40 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+    )
+
+    docker_execution = BoolOption(
+        default=True,
+        advanced=True,
+        help=softwrap(
+            """
+            If true, `docker_environment` targets can be used to run builds inside a Docker
+            container.
+
+            If false, anytime a `docker_environment` target is used, Pants will instead fallback to
+            whatever the target's `fallback_environment` field is set to.
+
+            This can be useful, for example, if you want to always use Docker locally, but disable
+            it in CI, or vice versa.
+            """
+        ),
+    )
+    remote_execution_extra_platform_properties = StrListOption(
+        advanced=True,
+        help=softwrap(
+            """
+            Platform properties to set on remote execution requests.
+
+            Format: property=value. Multiple values should be specified as multiple
+            occurrences of this flag.
+
+            Pants itself may add additional platform properties.
+
+            If you are using the remote_environment target mechanism, set this value as a field
+            on the target instead. This option will be ignored.
+            """
+        ),
+        default=[],
     )
 
     @classmethod
@@ -1929,3 +1966,21 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+def ca_certs_path_to_file_content(path: str) -> FileContent:
+    """Set up FileContent for using the ca_certs_path locally in a process sandbox.
+
+    This helper can be used when setting up a Process so that the certs are included in the process.
+    Use `Get(Digest, CreateDigest)`, and then include this in the `input_digest` for the Process.
+    Typically, you will also need to configure the invoking tool to load those certs, via its argv
+    or environment variables.
+
+    Note that the certs are always read on the localhost, even when using Docker and remote
+    execution. Then, those certs can be copied into the process.
+
+    Warning: this will not detect when the contents of cert files changes, because we use
+    `pathlib.Path.read_bytes()`. Better would be
+    # https://github.com/pantsbuild/pants/issues/10842
+    """
+    return FileContent(os.path.basename(path), Path(path).read_bytes())

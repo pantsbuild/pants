@@ -57,6 +57,7 @@ def test_equality(cls: OrderedSetCls) -> None:
     assert set1 == cls([1, 2])
     assert set1 == cls([1, 1, 2, 2])
 
+    assert set1 != cls([1, 2, None])
     assert set1 != cls([2, 1])
     assert set1 != [2, 1]
     assert set1 != [2, 1, 1]

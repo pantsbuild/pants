@@ -37,9 +37,11 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentNameRequest
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
@@ -197,7 +199,9 @@ def run_test_rule(
             return TargetRootsToFieldSets({})
         return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
 
-    def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
+    def mock_debug_request(
+        _field_set: TestFieldSet, _environment_name: EnvironmentName
+    ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
     def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
@@ -207,6 +211,7 @@ def run_test_rule(
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
+        _: EnvironmentName,
     ) -> CoverageReports:
         addresses = ", ".join(
             coverage_data.address.spec for coverage_data in coverage_data_collection
@@ -227,48 +232,54 @@ def run_test_rule(
                 union_membership,
                 DistDir(relpath=Path("dist")),
                 run_id,
+                ChosenLocalEnvironmentName(EnvironmentName(None)),
             ],
             mock_gets=[
                 MockGet(
                     output_type=TargetRootsToFieldSets,
-                    input_type=TargetRootsToFieldSetsRequest,
+                    input_types=(TargetRootsToFieldSetsRequest,),
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda _: EnvironmentName(None),
+                ),
+                MockGet(
                     output_type=TestResult,
-                    input_type=TestFieldSet,
-                    mock=lambda fs: fs.test_result,
+                    input_types=(TestFieldSet, EnvironmentName),
+                    mock=lambda fs, _env: fs.test_result,
                 ),
                 MockGet(
                     output_type=TestDebugRequest,
-                    input_type=TestFieldSet,
+                    input_types=(TestFieldSet, EnvironmentName),
                     mock=mock_debug_request,
                 ),
                 MockGet(
                     output_type=TestDebugAdapterRequest,
-                    input_type=TestFieldSet,
+                    input_types=(TestFieldSet,),
                     mock=mock_debug_adapter_request,
                 ),
                 # Merge XML results.
                 MockGet(
                     output_type=Digest,
-                    input_type=MergeDigests,
+                    input_types=(MergeDigests,),
                     mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     output_type=CoverageReports,
-                    input_type=CoverageDataCollection,
+                    input_types=(CoverageDataCollection, EnvironmentName),
                     mock=mock_coverage_report_generation,
                 ),
                 MockGet(
                     output_type=OpenFiles,
-                    input_type=OpenFilesRequest,
+                    input_types=(OpenFilesRequest,),
                     mock=lambda _: OpenFiles(()),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
-                    mock=lambda _: InteractiveProcessResult(0),
+                    input_types=(InteractiveProcess, EnvironmentName),
+                    mock=lambda _p, _e: InteractiveProcessResult(0),
                 ),
             ],
             union_membership=union_membership,
@@ -464,7 +475,7 @@ def test_streaming_output_skip() -> None:
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message="demo_test:demo_test skipped.",
+        expected_message="skipped.",
     )
 
 
@@ -475,19 +486,15 @@ def test_streaming_output_success() -> None:
     assert_success_streamed(
         expected_message=dedent(
             """\
-            demo_test:demo_test succeeded.
+            succeeded.
             stdout
             stderr
 
             """
         ),
     )
-    assert_success_streamed(
-        output_setting=ShowOutput.FAILED, expected_message="demo_test:demo_test succeeded."
-    )
-    assert_success_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test succeeded."
-    )
+    assert_success_streamed(output_setting=ShowOutput.FAILED, expected_message="succeeded.")
+    assert_success_streamed(output_setting=ShowOutput.NONE, expected_message="succeeded.")
 
 
 def test_streaming_output_failure() -> None:
@@ -496,7 +503,7 @@ def test_streaming_output_failure() -> None:
     )
     message = dedent(
         """\
-        demo_test:demo_test failed (exit code 1).
+        failed (exit code 1).
         stdout
         stderr
 
@@ -505,7 +512,7 @@ def test_streaming_output_failure() -> None:
     assert_failure_streamed(expected_message=message)
     assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
     assert_failure_streamed(
-        output_setting=ShowOutput.NONE, expected_message="demo_test:demo_test failed (exit code 1)."
+        output_setting=ShowOutput.NONE, expected_message="failed (exit code 1)."
     )
 
 

@@ -32,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (PrettierFmtRequest,)),
+            QueryRule(FmtResult, (PrettierFmtRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[JSSourcesGeneratorTarget],
@@ -102,7 +102,9 @@ def run_prettier(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            PrettierFmtRequest(field_sets, snapshot=input_sources.snapshot),
+            PrettierFmtRequest.SubPartition(
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -134,7 +136,6 @@ def test_success_on_unformatted_file(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"main.js": DEFAULT_FORMATTED_FILE})
     assert fmt_result.did_change is True
 
@@ -171,14 +172,5 @@ def test_config(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"main.js": CONFIG_FORMATTED_FILE})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"main.js": UNFORMATTED_FILE, "BUILD": "javascript_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="main.js"))
-    fmt_result = run_prettier(rule_runner, [tgt], extra_args=["--prettier-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

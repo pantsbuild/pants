@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (IsortRequest,)),
+            QueryRule(FmtResult, (IsortRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -67,7 +67,9 @@ def run_isort(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            IsortRequest(field_sets, snapshot=input_sources.snapshot),
+            IsortRequest.SubPartition(
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -147,14 +149,6 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert fmt_result.stdout == "Fixing f.py\n"
     assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_isort(rule_runner, [tgt], extra_args=["--isort-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:

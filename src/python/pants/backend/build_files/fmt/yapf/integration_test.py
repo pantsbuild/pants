@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *yapf_fmt_rules(),
             *yapf_subsystem_rules(),
             *config_files.rules(),
-            QueryRule(FmtResult, (YapfRequest,)),
+            QueryRule(FmtResult, (YapfRequest.SubPartition,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -39,7 +39,12 @@ def run_yapf(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/BUILD"])])
-    fmt_result = rule_runner.request(FmtResult, [YapfRequest(snapshot)])
+    fmt_result = rule_runner.request(
+        FmtResult,
+        [
+            YapfRequest.SubPartition("", snapshot.files, key=None, snapshot=snapshot),
+        ],
+    )
     return fmt_result
 
 

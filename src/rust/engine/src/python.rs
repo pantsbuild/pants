@@ -377,6 +377,15 @@ impl From<PyObject> for Value {
   }
 }
 
+///
+/// A short required name, and optional human readable description for a single frame of a Failure.
+///
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FailureFrame {
+  pub name: String,
+  pub desc: Option<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
@@ -391,8 +400,8 @@ pub enum Failure {
     val: Value,
     // A pre-formatted python exception traceback.
     python_traceback: String,
-    // A stack of engine-side "frame" information generated from Nodes.
-    engine_traceback: Vec<String>,
+    // A stack of FailureFrames.
+    engine_traceback: Vec<FailureFrame>,
   },
 }
 
@@ -400,7 +409,7 @@ impl Failure {
   ///
   /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
   ///
-  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+  pub fn with_pushed_frame(self, name: &str, desc: Option<String>) -> Failure {
     match self {
       Failure::Invalidated => Failure::Invalidated,
       md @ Failure::MissingDigest { .. } => {
@@ -408,14 +417,17 @@ impl Failure {
         // producer of the missing digest. So a Failure will only end up with a new frame if it
         // traversed the node boundary for some reason, in which case it is safe to discard the
         // type information and convert into a Throw.
-        throw(md.to_string()).with_pushed_frame(frame)
+        throw(md.to_string()).with_pushed_frame(name, desc)
       }
       Failure::Throw {
         val,
         python_traceback,
         mut engine_traceback,
       } => {
-        engine_traceback.push(format!("{}", frame));
+        engine_traceback.push(FailureFrame {
+          name: name.to_owned(),
+          desc,
+        });
         Failure::Throw {
           val,
           python_traceback,

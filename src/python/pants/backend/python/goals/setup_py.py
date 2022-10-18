@@ -57,7 +57,8 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.environment import Environment, EnvironmentName, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -431,9 +432,11 @@ async def package_python_dist(
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
     backend_env_vars = dist_tgt.get(BuildBackendEnvVarsField).value
     if backend_env_vars:
-        extra_build_time_env = await Get(Environment, EnvironmentRequest(sorted(backend_env_vars)))
+        extra_build_time_env = await Get(
+            EnvironmentVars, EnvironmentVarsRequest(sorted(backend_env_vars))
+        )
     else:
-        extra_build_time_env = Environment()
+        extra_build_time_env = EnvironmentVars()
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
@@ -450,7 +453,12 @@ async def package_python_dist(
     source_roots_result = await Get(
         SourceRootsResult,
         SourceRootsRequest(
-            files=[], dirs={PurePath(tgt.address.spec_path) for tgt in transitive_targets.closure}
+            files=[],
+            dirs={
+                PurePath(tgt.address.spec_path)
+                for tgt in transitive_targets.closure
+                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+            },
         ),
     )
     source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))

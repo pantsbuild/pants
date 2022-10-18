@@ -11,6 +11,7 @@ from pants.core.goals import (
     check,
     deploy,
     export,
+    fix,
     fmt,
     generate_lockfiles,
     lint,
@@ -36,14 +37,17 @@ from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
     archive,
     config_files,
-    distdir,
     external_tool,
     source_files,
     stripped_source_files,
     subprocess_environment,
     system_binaries,
 )
-from pants.core.util_rules.environments import DockerEnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import (
+    DockerEnvironmentTarget,
+    LocalEnvironmentTarget,
+    RemoteEnvironmentTarget,
+)
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
@@ -57,6 +61,7 @@ def rules():
         *deploy.rules(),
         *export.rules(),
         *fmt.rules(),
+        *fix.rules(),
         *generate_lockfiles.rules(),
         *lint.rules(),
         *update_build_files.rules(),
@@ -71,7 +76,6 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *distdir.rules(),
         *external_tool.rules(),
         *git.rules(),
         *source_files.rules(),
@@ -95,6 +99,7 @@ def target_types():
         RelocatedFiles,
         LocalEnvironmentTarget,
         DockerEnvironmentTarget,
+        RemoteEnvironmentTarget,
     ]
 
 

@@ -10,11 +10,10 @@ from enum import Enum
 from typing import Any, Iterable
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
+from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption, EnumOption
+from pants.option.option_types import DictOption, EnumOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -73,6 +72,7 @@ class ValidationConfig:
 
 class RegexLintSubsystem(Subsystem):
     options_scope = "regex-lint"
+    name = "regex-lint"
     help = softwrap(
         """
         Lint your code using regex patterns, e.g. to check for copyright headers.
@@ -83,6 +83,7 @@ class RegexLintSubsystem(Subsystem):
         """
     )
 
+    skip = SkipOption("lint")
     _config = DictOption[Any](
         help=softwrap(
             """
@@ -255,22 +256,37 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    name = RegexLintSubsystem.options_scope
+    tool_subsystem = RegexLintSubsystem
+
+
+@rule
+async def partition_inputs(
+    request: RegexLintRequest.PartitionRequest, regex_lint_subsystem: RegexLintSubsystem
+) -> Partitions[Any, str]:
+    multi_matcher = regex_lint_subsystem.get_multi_matcher()
+    if multi_matcher is None:
+        return Partitions()
+
+    applicable_file_paths = []
+    for fp in request.files:
+        content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
+        if content_pattern_names and encoding:
+            applicable_file_paths.append(fp)
+
+    return Partitions.single_partition(applicable_file_paths)
 
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)
 async def lint_with_regex_patterns(
-    request: RegexLintRequest, regex_lint_subsystem: RegexLintSubsystem
-) -> LintResults:
+    request: RegexLintRequest.SubPartition[Any, str], regex_lint_subsystem: RegexLintSubsystem
+) -> LintResult:
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
-    if multi_matcher is None:
-        return LintResults((), linter_name=request.name)
-
+    assert multi_matcher is not None
     file_to_content_pattern_names_and_encoding = {}
-    for fp in request.file_paths:
+    for fp in request.elements:
         content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
-        if content_pattern_names and encoding:
-            file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
+        assert content_pattern_names and encoding
+        file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
 
     digest_contents = await Get(
         DigestContents, PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys())
@@ -319,8 +335,8 @@ async def lint_with_regex_patterns(
         stdout += f"{num_nonmatched_some} files failed to match at least one required pattern."
 
     exit_code = PANTS_FAILED_EXIT_CODE if num_nonmatched_some else PANTS_SUCCEEDED_EXIT_CODE
-    return LintResults((LintResult(exit_code, stdout, ""),), linter_name=request.name)
+    return LintResult(exit_code, stdout, "", RegexLintSubsystem.options_scope)
 
 
 def rules():
-    return (*collect_rules(), UnionRule(LintFilesRequest, RegexLintRequest))
+    return (*collect_rules(), *RegexLintRequest.rules())

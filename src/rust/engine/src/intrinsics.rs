@@ -23,13 +23,15 @@ use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
+use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use fs::{DigestTrie, DirectoryDigest, PathStat, RelativePath};
 use hashing::{Digest, EMPTY_DIGEST};
+use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
-use process_execution::ManagedChild;
+use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
 use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
@@ -121,6 +123,13 @@ impl Intrinsics {
         ],
       },
       Box::new(interactive_process),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.docker_resolve_image_result,
+        inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
+      },
+      Box::new(docker_resolve_image),
     );
     Intrinsics { intrinsics }
   }
@@ -463,7 +472,8 @@ fn create_digest_to_digest(
   async move {
     // The digests returned here are already in the `file_digests` map.
     let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
-    let trie = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+    let trie =
+      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
 
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
@@ -522,9 +532,10 @@ fn interactive_process(
         .unwrap();
       (py_interactive_process.extract().unwrap(), py_process, process_config)
     });
-    if let Some(docker_image) = process_config.docker_image {
-      panic!("InteractiveProcess should not run with a docker environment, but set to {docker_image}")
-    }
+    match process_config.execution_strategy {
+      ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => Err("InteractiveProcess should not set docker_image or remote_execution".to_owned()),
+      _ => Ok(())
+    }?;
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config).await?.process;
     let (run_in_workspace, restartable, keep_sandboxes) = Python::with_gil(|py| {
       let py_interactive_process_obj = py_interactive_process.to_object(py);
@@ -649,4 +660,60 @@ fn interactive_process(
     };
     Ok(result)
   }.boxed()
+}
+
+fn docker_resolve_image(
+  context: Context,
+  args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let types = &context.core.types;
+    let docker_resolve_image_result = types.docker_resolve_image_result;
+
+    let (image_name, platform) = Python::with_gil(|py| {
+      let py_docker_request = (*args[0]).as_ref(py);
+      let image_name: String = externs::getattr(py_docker_request, "image_name").unwrap();
+      let platform: String = externs::getattr(py_docker_request, "platform").unwrap();
+      (image_name, platform)
+    });
+
+    let platform = Platform::try_from(platform)?;
+
+    let docker = DOCKER.get().await?;
+    let image_pull_scope = ImagePullScope::new(context.session.build_id());
+
+    // Ensure that the image has been pulled.
+    IMAGE_PULL_CACHE
+      .pull_image(
+        docker,
+        &image_name,
+        &platform,
+        image_pull_scope,
+        ImagePullPolicy::OnlyIfLatestOrMissing,
+      )
+      .await
+      .map_err(|err| format!("Failed to pull image `{}`: {}", image_name, err))?;
+
+    let image_metadata = docker.inspect_image(&image_name).await.map_err(|err| {
+      format!(
+        "Failed to resolve image ID for image `{}`: {:?}",
+        &image_name, err
+      )
+    })?;
+    let image_id = image_metadata
+      .id
+      .ok_or_else(|| format!("Image does not exist: `{}`", &image_name))?;
+
+    let result = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      externs::unsafe_call(
+        py,
+        docker_resolve_image_result,
+        &[Value::from(PyString::new(py, &image_id).to_object(py))],
+      )
+    };
+    Ok(result)
+  }
+  .boxed()
 }

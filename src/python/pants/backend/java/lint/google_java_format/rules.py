@@ -8,8 +8,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -38,7 +37,8 @@ class GoogleJavaFormatFieldSet(FieldSet):
 
 class GoogleJavaFormatRequest(FmtTargetsRequest):
     field_set_type = GoogleJavaFormatFieldSet
-    name = GoogleJavaFormatSubsystem.options_scope
+    tool_subsystem = GoogleJavaFormatSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -47,12 +47,10 @@ class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_fmt(
-    request: GoogleJavaFormatRequest,
+    request: GoogleJavaFormatRequest.SubPartition,
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> FmtResult:
-    if tool.skip:
-        return FmtResult.skip(formatter_name=request.name)
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )
@@ -78,7 +76,7 @@ async def google_java_format_fmt(
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
         "--replace",
-        *request.snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -91,13 +89,12 @@ async def google_java_format_fmt(
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=request.snapshot.files,
-            description=f"Run Google Java Format on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run Google Java Format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 @rule
@@ -111,6 +108,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        UnionRule(FmtTargetsRequest, GoogleJavaFormatRequest),
+        *GoogleJavaFormatRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]

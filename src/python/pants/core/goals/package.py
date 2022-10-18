@@ -8,7 +8,9 @@ import os
 from abc import ABCMeta
 from dataclasses import dataclass
 
+from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -100,6 +102,7 @@ class PackageSubsystem(GoalSubsystem):
 
 class Package(Goal):
     subsystem_cls = PackageSubsystem
+    enviroment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 class AllPackageableTargets(Targets):
@@ -131,10 +134,21 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     if not target_roots_to_field_sets.field_sets:
         return Package(exit_code=0)
 
-    packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+    environment_names_per_field_set = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
         for field_set in target_roots_to_field_sets.field_sets
     )
+    packages = await MultiGet(
+        Get(BuiltPackage, {field_set: PackageFieldSet, environment_name: EnvironmentName})
+        for field_set, environment_name in zip(
+            target_roots_to_field_sets.field_sets, environment_names_per_field_set
+        )
+    )
+
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
     workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
     for pkg in packages:
@@ -149,4 +163,4 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *distdir.rules())

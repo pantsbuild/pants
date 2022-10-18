@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from typing import overload
 
 import pytest
 
@@ -11,6 +12,7 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint.scalafmt import skip_field
 from pants.backend.scala.lint.scalafmt.rules import (
     GatherScalafmtConfigFilesRequest,
+    PartitionInfo,
     ScalafmtConfigFiles,
     ScalafmtFieldSet,
     ScalafmtRequest,
@@ -19,10 +21,9 @@ from pants.backend.scala.lint.scalafmt.rules import (
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -52,8 +53,8 @@ def rule_runner() -> RuleRunner:
             *target_types.rules(),
             *scalafmt_rules(),
             *skip_field.rules(),
-            QueryRule(FmtResult, (ScalafmtRequest,)),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
+            QueryRule(Partitions, (ScalafmtRequest.PartitionRequest,)),
+            QueryRule(FmtResult, (ScalafmtRequest.SubPartition,)),
             QueryRule(Snapshot, (PathGlobs,)),
             QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
@@ -103,21 +104,53 @@ runner.dialect = scala213
 """
 
 
-def run_scalafmt(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
+@overload
+def run_scalafmt(
+    rule_runner: RuleRunner, targets: list[Target], expected_partitions: None = None
+) -> FmtResult:
+    ...
+
+
+@overload
+def run_scalafmt(
+    rule_runner: RuleRunner, targets: list[Target], expected_partitions: dict[str, tuple[str, ...]]
+) -> list[FmtResult]:
+    ...
+
+
+def run_scalafmt(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    expected_partitions: dict[str, tuple[str, ...]] | None = None,
+) -> FmtResult | list[FmtResult]:
     field_sets = [ScalafmtFieldSet.create(tgt) for tgt in targets]
-    input_sources = rule_runner.request(
-        SourceFiles,
+    partitions = rule_runner.request(
+        Partitions[PartitionInfo],
         [
-            SourceFilesRequest(field_set.source for field_set in field_sets),
+            ScalafmtRequest.PartitionRequest(tuple(field_sets)),
         ],
     )
-    fmt_result = rule_runner.request(
-        FmtResult,
-        [
-            ScalafmtRequest(field_sets, snapshot=input_sources.snapshot),
-        ],
-    )
-    return fmt_result
+    if expected_partitions:
+        assert {
+            key.config_snapshot.files[0]: files for key, files in partitions.items()
+        } == expected_partitions
+    else:
+        assert len(partitions.items()) == 1
+    fmt_results = [
+        rule_runner.request(
+            FmtResult,
+            [
+                ScalafmtRequest.SubPartition(
+                    "",
+                    partition,
+                    key=key,
+                    snapshot=rule_runner.request(Snapshot, [PathGlobs(partition)]),
+                )
+            ],
+        )
+        for key, partition in partitions.items()
+    ]
+    return fmt_results if expected_partitions else fmt_results[0]
 
 
 def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
@@ -196,11 +229,20 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
             Address("foo/bar", target_name="bar", relative_file_path="Bar.scala")
         ),
     ]
-    fmt_result = run_scalafmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"foo/Foo.scala": GOOD_FILE, "foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
+    fmt_results = run_scalafmt(
+        rule_runner,
+        tgts,
+        expected_partitions={
+            SCALAFMT_CONF_FILENAME: ("foo/Foo.scala",),
+            "foo/bar/" + SCALAFMT_CONF_FILENAME: ("foo/bar/Bar.scala",),
+        },
     )
-    assert fmt_result.did_change is True
+    assert not fmt_results[0].did_change
+    assert fmt_results[0].output == get_snapshot(rule_runner, {"foo/Foo.scala": GOOD_FILE})
+    assert fmt_results[1].did_change
+    assert fmt_results[1].output == get_snapshot(
+        rule_runner, {"foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
+    )
 
 
 def test_find_nearest_ancestor_file() -> None:
@@ -243,7 +285,9 @@ def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
     )
 
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot)])
+    request = rule_runner.request(
+        ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot.files)]
+    )
     assert sorted(request.source_dir_to_config_file.items()) == [
         ("foo/bar", "foo/bar/.scalafmt.conf"),
         ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),

@@ -30,6 +30,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Eric Arellano**          | "Migrating Pants to Python 3 for my internship project"                                               |
 | **Henry Fuller**           | "Working on replacing watchman with a kernel based file watcher in the V2 engine"                     |
 | **John Sirois**            |                                                                                                       |
+| **Josh Reed**          | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                     |
 | **Joshua Cannon**          | "I'm proud and thankful my voice can and is being used to shape Pants inside and out"                 |
 | **Kris Wilson**            | "Helping lay the foundation for the v2 engine and realizing the power of Rust + Python for perf".     |
 | **Patrick Lawson**         | Formalized targets, BUILD files, and fingerprinting in v.1                                            |
@@ -44,16 +45,16 @@ Pants open source project has had many team members in over a decade. The curren
 | ---------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Chris Williams**     |                                                                                                         |
 | **Dan Moran**          | "Enabling automatic usage of `pytest-xdist` in `./pants test`"                                          |
-| **Doron Somech**       |                                                                                                         |
+| **Doron Somech**       | "Improving Scala dependency inference to support our codebase"                                                                                                        |
 | **Jacob Floyd**        | Gave the idea for skip_flake8 et al, which grew into a flagship feature: incremental adoption           |
 | **Jonas Stendahl**     | "Adding formatting and linting support for Protobuf"                                                                                                        |
-| **Josh Reed**          | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                     |
+| **Marcelo Trylesinski**            | "Improving onboarding experience"     |
 | **Nick Grisafi**       | "Participating in podcasts with maintainers (Eric and Josh) on developer experience and Pants!"         |
 | **Raúl Cuza**          | "The first time I was able to help someone else with pants on the Slack <https://pantsbuild.slack.com>." |
 | **Rhys Madigan**       | "Making unit test run times easier to understand"                                                       |
 | **Suresh Joshi (SJ)**  | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                              |
 | **Tansy Arron-Walker** | "Writing my first task in the new engine was really exciting!"                                          |
-| **Thales Menato**      |                                                                                                         |
+| **Thales Menato**      | "Making sure Pants can run even under heavily secured work environments!"                                                                                                        |
 
 ***
 

@@ -8,8 +8,7 @@ from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.kotlin.target_types import KotlinSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -38,7 +37,8 @@ class KtlintFieldSet(FieldSet):
 
 class KtlintRequest(FmtTargetsRequest):
     field_set_type = KtlintFieldSet
-    name = KtlintSubsystem.options_scope
+    tool_subsystem = KtlintSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -46,10 +46,9 @@ class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 
 @rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
-async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: InternalJdk) -> FmtResult:
-    if tool.skip:
-        return FmtResult.skip(formatter_name=request.name)
-
+async def ktlint_fmt(
+    request: KtlintRequest.SubPartition, tool: KtlintSubsystem, jdk: InternalJdk
+) -> FmtResult:
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
@@ -61,7 +60,7 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: Interna
     args = [
         "com.pinterest.ktlint.Main",
         "-F",
-        *request.snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -74,14 +73,13 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: Interna
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
-            output_files=request.snapshot.files,
-            description=f"Run Ktlint on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run Ktlint on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
 
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 @rule
@@ -95,6 +93,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_tool.rules(),
-        UnionRule(FmtTargetsRequest, KtlintRequest),
+        *KtlintRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, KtlintToolLockfileSentinel),
     ]

@@ -32,4 +32,6 @@ pub struct Types {
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
   pub engine_aware_parameter: TypeId,
+  pub docker_resolve_image_request: TypeId,
+  pub docker_resolve_image_result: TypeId,
 }

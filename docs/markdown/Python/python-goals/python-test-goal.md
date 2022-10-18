@@ -67,9 +67,28 @@ python_tests(
 )
 ```
 
-> 🚧 Avoid the `pytest-xdist` plugin
+> 📘 Tip: Using the `pytest-xdist` plugin
 >
-> We do not recommend using this plugin because its concurrency conflicts with Pants' own parallelism. Using Pants will bring you similar benefits to `pytest-xdist` already: Pants will run each test target in parallel.
+> Pants' default concurrency will run each test target in parallel. If you want to additionally parallelize _within_  each of your targets, you can do so by enabling built-in support for the `pytest-xdist` plugin:
+>
+> ```toml pants.toml
+> [pytest]
+> xdist_enabled = True
+> ```
+>
+> This will cause Pants to pass `-n <concurrency>` when running `pytest`.
+>
+> By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded upper limit on the concurrency per target:
+>
+> ```python BUILD
+> python_test(name="tests", source="tests.py", xdist_concurrency=4)
+> ```
+>
+> To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`. This can be necessary for tests that are not safe to run in parallel.
+>
+> When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values to avoid collisions between parallel tests (i.e. by using `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
+>
+> Note that use of `pytest-xdist` may cause high-level `pytest` fixtures to execute more often than expected. See the `pytest-xdist` docs [here](https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once) for more details, and tips on how to mitigate this.
 
 Controlling output
 ------------------

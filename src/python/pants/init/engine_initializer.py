@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Sequence, cast
+from typing import Any, ClassVar, Iterable, Mapping, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -16,12 +16,19 @@ from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.engine import desktop, environment, fs, platform, process
+from pants.engine import desktop, fs, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing, specs_rules
+from pants.engine.internals import (
+    build_files,
+    graph,
+    options_parsing,
+    platform_rules,
+    specs_rules,
+    synthetic_targets,
+)
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -157,8 +164,8 @@ class EngineInitializer:
         """Raised when a goal cannot be mapped to an @rule."""
 
     @staticmethod
-    def _make_goal_map_from_rules(rules):
-        goal_map = {}
+    def _make_goal_map_from_rules(rules) -> Mapping[str, type[Goal]]:
+        goal_map: dict[str, type[Goal]] = {}
         for r in rules:
             output_type = getattr(r, "output_type", None)
             if not output_type or not issubclass(output_type, Goal):
@@ -221,7 +228,6 @@ class EngineInitializer:
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
         ignore_unrecognized_build_file_symbols: bool = False,
-        query_inputs_filter: Sequence[type] = tuple(),
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -262,7 +268,6 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
-                *environment.rules(),
                 *desktop.rules(),
                 *git_rules(),
                 *graph.rules(),
@@ -271,10 +276,11 @@ class EngineInitializer:
                 *process.rules(),
                 *environments.rules(),
                 *system_binaries.rules(),
-                *platform.rules(),
+                *platform_rules.rules(),
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
+                *synthetic_targets.rules(),
                 *rules,
             )
         )
@@ -288,12 +294,21 @@ class EngineInitializer:
             )
         )
 
+        # param types for goals with the `USES_ENVIRONMENT` behaviour (see `goal.py`)
+        environment_selecting_goal_param_types = [
+            t for t in GraphSession.goal_param_types if t != EnvironmentName
+        ]
         rules = FrozenOrderedSet(
             (
                 *rules,
                 # Install queries for each Goal.
                 *(
-                    QueryRule(goal_type, GraphSession.goal_param_types)
+                    QueryRule(
+                        goal_type,
+                        environment_selecting_goal_param_types
+                        if goal_type._selects_environments()
+                        else GraphSession.goal_param_types,
+                    )
                     for goal_type in goal_map.values()
                 ),
                 # Install queries for each request/response pair used by the BSP support.
@@ -326,7 +341,6 @@ class EngineInitializer:
             union_membership=union_membership,
             executor=executor,
             execution_options=execution_options,
-            query_inputs_filter=query_inputs_filter,
             local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=engine_visualize_to,

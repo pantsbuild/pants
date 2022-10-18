@@ -23,6 +23,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -69,7 +70,10 @@ logger = logging.getLogger(__name__)
 
 @rule_helper
 async def _determine_literal_addresses_from_raw_specs(
-    literal_specs: tuple[AddressLiteralSpec, ...], *, description_of_origin: str
+    literal_specs: tuple[AddressLiteralSpec, ...],
+    local_environment_name: ChosenLocalEnvironmentName,
+    *,
+    description_of_origin: str,
 ) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
         Get(
@@ -93,10 +97,13 @@ async def _determine_literal_addresses_from_raw_specs(
     literal_parametrizations = await MultiGet(
         Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                address.maybe_convert_to_target_generator(),
-                description_of_origin=description_of_origin,
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    address.maybe_convert_to_target_generator(),
+                    description_of_origin=description_of_origin,
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         for address in literal_addresses
     )
@@ -116,17 +123,20 @@ async def _determine_literal_addresses_from_raw_specs(
     )
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_without_file_owners(
     specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
 
     literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
-        specs.address_literals, description_of_origin=specs.description_of_origin
+        specs.address_literals,
+        local_environment_name,
+        description_of_origin=specs.description_of_origin,
     )
     matched_addresses.update(
         wrapped_tgt.target.address
@@ -157,9 +167,12 @@ async def addresses_from_raw_specs_without_file_owners(
     target_parametrizations_list = await MultiGet(
         Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                base_address, description_of_origin=specs.description_of_origin
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    base_address, description_of_origin=specs.description_of_origin
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         for base_address in base_addresses
     )
@@ -193,7 +206,7 @@ async def addresses_from_raw_specs_without_file_owners(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners,
 ) -> Addresses:
@@ -219,7 +232,7 @@ async def addresses_from_raw_specs_with_only_file_owners(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+@rule(_masked_types=[EnvironmentName])
 async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     without_file_owners, with_file_owners = await MultiGet(
         Get(Addresses, RawSpecsWithoutFileOwners, RawSpecsWithoutFileOwners.from_raw_specs(specs)),
@@ -231,7 +244,7 @@ async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     return Addresses(sorted({*without_file_owners, *with_file_owners}))
 
 
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+@rule(desc="Find targets from input specs", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     includes, ignores = await MultiGet(
         Get(Addresses, RawSpecs, specs.includes),
@@ -242,7 +255,7 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     return Addresses(FrozenOrderedSet(includes) - FrozenOrderedSet(ignores))
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
     return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
@@ -505,19 +518,8 @@ async def find_valid_field_sets_for_target_roots(
             for tgt, value in targets_to_applicable_field_sets.items()
             if request.is_in_shard(tgt.address.spec)
         }
-        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
-    else:
-        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
-
-    if not request.expect_single_field_set:
-        return result
-    if len(result.targets) > 1:
-        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-    if len(result.field_sets) > 1:
-        raise AmbiguousImplementationsException(
-            result.targets[0], result.field_sets, goal_description=request.goal_description
-        )
-    return result
+        return TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
+    return TargetRootsToFieldSets(targets_to_applicable_field_sets)
 
 
 def rules():

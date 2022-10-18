@@ -4,9 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
@@ -22,12 +20,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
@@ -39,9 +37,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.103"
+    default_version = "v2.1.108"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.103,<3.0"
+    version_constraints = ">=2.1.108,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,8 +48,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "4d45336511484100ae4e2bab24542a8b86b12c8cb89230463593c60d08c4b8d3",
-                    "3814407",
+                    "21d7803ef39203a6b2ae9f9e2678636e3c38ba17226ea33d6305f0683ab72e84",
+                    "3848678",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -124,27 +122,18 @@ async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_pex: PexPEX,
     pex_env: PexEnvironment,
-    python_native_code_subsystem: PythonNativeCodeSubsystem,
+    python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
 ) -> Process:
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
 
-    # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
-    # Instead, we manually create a FileContent for it.
     cert_args = []
     if global_options.ca_certs_path:
-        ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.basename(global_options.ca_certs_path)
-
-        gets.append(
-            Get(
-                Digest,
-                CreateDigest((FileContent(chrooted_ca_certs_path, ca_certs_content),)),
-            )
-        )
-        cert_args = ["--cert", chrooted_ca_certs_path]
+        ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
+        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        cert_args = ["--cert", ca_certs_fc.path]
 
     digests_to_merge = [pex_pex.digest]
     digests_to_merge.extend(await MultiGet(gets))
@@ -190,7 +179,7 @@ async def setup_pex_cli_process(
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
-        **python_native_code_subsystem.environment_dict,
+        **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
@@ -211,4 +200,8 @@ async def setup_pex_cli_process(
 
 
 def rules():
-    return [*collect_rules(), *external_tool.rules(), *pex_environment.rules()]
+    return [
+        *collect_rules(),
+        *external_tool.rules(),
+        *pex_environment.rules(),
+    ]

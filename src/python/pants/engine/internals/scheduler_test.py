@@ -36,7 +36,11 @@ def consumes_a_and_b(a: A, b: B) -> str:
 
 
 def test_use_params() -> None:
-    rule_runner = RuleRunner(rules=[consumes_a_and_b, QueryRule(str, [A, B])])
+    rule_runner = RuleRunner(
+        rules=[consumes_a_and_b, QueryRule(str, [A, B])],
+        inherent_environment=None,
+    )
+
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
@@ -83,7 +87,8 @@ def transitive_params_rule_runner() -> RuleRunner:
             QueryRule(str, [A, C]),
             transitive_coroutine_rule,
             QueryRule(D, [C]),
-        ]
+        ],
+        inherent_environment=None,
     )
 
 
@@ -269,13 +274,17 @@ def test_trace_includes_rule_exception_traceback() -> None:
 
          Engine traceback:
            in select
+             ..
            in {__name__}.{nested_raise.__name__}
+             Nested raise
+
          Traceback (most recent call last):
            File LOCATION-INFO, in nested_raise
              fn_raises()
            File LOCATION-INFO, in fn_raises
              raise Exception("An exception!")
          Exception: An exception!
+
          """
     )
 

@@ -20,7 +20,7 @@ from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -127,7 +127,7 @@ async def generate_scala_from_protobuf(
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
-        Get(Environment, EnvironmentRequest(requested=["PATH"])),
+        Get(EnvironmentVars, EnvironmentVarsRequest(requested=["PATH"])),
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`

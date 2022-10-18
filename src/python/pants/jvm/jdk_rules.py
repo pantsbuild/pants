@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
@@ -196,7 +196,13 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
 @rule
 async def prepare_jdk_environment(
-    jvm: JvmSubsystem, coursier: Coursier, nailgun_: Nailgun, bash: BashBinary, request: JdkRequest
+    jvm: JvmSubsystem,
+    jvm_env_aware: JvmSubsystem.EnvironmentAware,
+    coursier: Coursier,
+    nailgun_: Nailgun,
+    bash: BashBinary,
+    request: JdkRequest,
+    env_target: EnvironmentTarget,
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
@@ -242,7 +248,7 @@ async def prepare_jdk_environment(
             immutable_input_digests=coursier.immutable_input_digests,
             env=env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
             level=LogLevel.DEBUG,
         ),
     )
@@ -298,7 +304,7 @@ async def prepare_jdk_environment(
                 ]
             ),
         ),
-        global_jvm_options=jvm.global_options,
+        global_jvm_options=jvm_env_aware.global_options,
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
@@ -320,11 +326,11 @@ class JvmProcess:
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     timeout_seconds: int | float | None
-    platform: Platform | None
     extra_immutable_input_digests: FrozenDict[str, Digest]
     extra_env: FrozenDict[str, str]
     cache_scope: ProcessCacheScope | None
     use_nailgun: bool
+    remote_cache_speculation_delay: int | None
 
     def __init__(
         self,
@@ -341,9 +347,9 @@ class JvmProcess:
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         extra_env: Mapping[str, str] | None = None,
         timeout_seconds: int | float | None = None,
-        platform: Platform | None = None,
         cache_scope: ProcessCacheScope | None = None,
         use_nailgun: bool = True,
+        remote_cache_speculation_delay: int | None = None,
     ):
         self.jdk = jdk
         self.argv = tuple(argv)
@@ -356,11 +362,11 @@ class JvmProcess:
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
         self.timeout_seconds = timeout_seconds
-        self.platform = platform
         self.cache_scope = cache_scope
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.extra_env = FrozenDict(extra_env or {})
         self.use_nailgun = use_nailgun
+        self.remote_cache_speculation_delay = remote_cache_speculation_delay
 
         if not use_nailgun and extra_nailgun_keys:
             raise AssertionError(
@@ -374,7 +380,7 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 
 @rule
 async def jvm_process(
-    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+    bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
 
     jdk = request.jdk
@@ -418,6 +424,12 @@ async def jvm_process(
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
+    remote_cache_speculation_delay_millis = 0
+    if request.remote_cache_speculation_delay is not None:
+        remote_cache_speculation_delay_millis = request.remote_cache_speculation_delay
+    elif request.use_nailgun:
+        remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
+
     return Process(
         [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,
@@ -427,11 +439,11 @@ async def jvm_process(
         level=request.level,
         output_directories=request.output_directories,
         env=env,
-        platform=request.platform,
         timeout_seconds=request.timeout_seconds,
         append_only_caches=jdk.append_only_caches,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
+        remote_cache_speculation_delay_millis=remote_cache_speculation_delay_millis,
     )
 
 

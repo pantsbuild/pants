@@ -31,6 +31,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
@@ -44,6 +45,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use store::{SnapshotOps, Store, StoreError};
+use task_executor::TailTasks;
 use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -443,6 +445,15 @@ impl Default for InputDigests {
   }
 }
 
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub enum ProcessExecutionStrategy {
+  Local,
+  /// Stores the platform_properties.
+  RemoteExecution(Vec<(String, String)>),
+  /// Stores the image name.
+  Docker(String),
+}
+
 ///
 /// A process to be executed.
 ///
@@ -533,12 +544,13 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform_constraint: Option<Platform>,
+  pub platform: Platform,
 
   pub cache_scope: ProcessCacheScope,
 
-  /// The docker image to run the process with.
-  pub docker_image: Option<String>,
+  pub execution_strategy: ProcessExecutionStrategy,
+
+  pub remote_cache_speculation_delay: std::time::Duration,
 }
 
 impl Process {
@@ -565,11 +577,12 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform_constraint: None,
+      platform: Platform::current().unwrap(),
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
-      docker_image: None,
+      execution_strategy: ProcessExecutionStrategy::Local,
+      remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
 
@@ -617,24 +630,33 @@ impl Process {
   }
 
   ///
-  /// Replaces the docker_image used for this process.
+  /// Set the execution strategy to Docker, with the specified image.
   ///
-  pub fn docker_image(mut self, docker_image: String) -> Process {
-    self.docker_image = Some(docker_image);
+  pub fn docker(mut self, image: String) -> Process {
+    self.execution_strategy = ProcessExecutionStrategy::Docker(image);
     self
   }
-}
 
-///
-/// Metadata surrounding an Process which factors into its cache key when cached
-/// externally from the engine graph (e.g. when using remote execution or an external process
-/// cache).
-///
-#[derive(Clone, Debug, Default)]
-pub struct ProcessMetadata {
-  pub instance_name: Option<String>,
-  pub cache_key_gen_version: Option<String>,
-  pub platform_properties: Vec<(String, String)>,
+  ///
+  /// Set the execution strategy to remote execution with the provided platform properties.
+  ///
+  pub fn remote_execution_platform_properties(
+    mut self,
+    properties: Vec<(String, String)>,
+  ) -> Process {
+    self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
+    self
+  }
+
+  pub fn remote_cache_speculation_delay(mut self, delay: std::time::Duration) -> Process {
+    self.remote_cache_speculation_delay = delay;
+    self
+  }
+
+  pub fn cache_scope(mut self, cache_scope: ProcessCacheScope) -> Process {
+    self.cache_scope = cache_scope;
+    self
+  }
 }
 
 ///
@@ -839,6 +861,7 @@ pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
   run_id: RunId,
+  tail_tasks: TailTasks,
 }
 
 impl Default for Context {
@@ -847,16 +870,23 @@ impl Default for Context {
       workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
+      tail_tasks: TailTasks::new(),
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: RunId) -> Context {
+  pub fn new(
+    workunit_store: WorkunitStore,
+    build_id: String,
+    run_id: RunId,
+    tail_tasks: TailTasks,
+  ) -> Context {
     Context {
       workunit_store,
       build_id,
       run_id,
+      tail_tasks,
     }
   }
 }
@@ -873,6 +903,9 @@ pub trait CommandRunner: Send + Sync + Debug {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
+
+  /// Shutdown this CommandRunner cleanly.
+  async fn shutdown(&self) -> Result<(), String>;
 }
 
 #[async_trait]
@@ -885,12 +918,36 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Box<T> {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     (**self).run(context, workunit, req).await
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    (**self).shutdown().await
+  }
+}
+
+#[async_trait]
+impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    (**self).run(context, workunit, req).await
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    (**self).shutdown().await
+  }
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+pub fn digest(
+  process: &Process,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
+) -> Digest {
   let (_, _, execute_request) =
-    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

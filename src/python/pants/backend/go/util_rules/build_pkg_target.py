@@ -171,7 +171,13 @@ async def setup_build_go_package_target_request(
                     embed_config = embed_config.merge(_first_party_pkg_digest.test_embed_config)
                 else:
                     embed_config = _first_party_pkg_digest.test_embed_config
-        s_file_names = _first_party_pkg_analysis.s_files
+        s_files = _first_party_pkg_analysis.s_files
+        cgo_files = _first_party_pkg_analysis.cgo_files
+        cgo_flags = _first_party_pkg_analysis.cgo_flags
+        c_files = _first_party_pkg_analysis.c_files
+        cxx_files = _first_party_pkg_analysis.cxx_files
+        objc_files = _first_party_pkg_analysis.m_files
+        fortran_files = _first_party_pkg_analysis.f_files
 
     elif target.has_field(GoThirdPartyPackageDependenciesField):
         import_path = target[GoImportPathField].value
@@ -193,9 +199,14 @@ async def setup_build_go_package_target_request(
         digest = _third_party_pkg_info.digest
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
-        s_file_names = _third_party_pkg_info.s_files
+        s_files = _third_party_pkg_info.s_files
         embed_config = _third_party_pkg_info.embed_config
-
+        cgo_files = _third_party_pkg_info.cgo_files
+        cgo_flags = _third_party_pkg_info.cgo_flags
+        c_files = _third_party_pkg_info.c_files
+        cxx_files = _third_party_pkg_info.cxx_files
+        objc_files = _third_party_pkg_info.m_files
+        fortran_files = _third_party_pkg_info.f_files
     else:
         raise AssertionError(
             f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
@@ -228,8 +239,14 @@ async def setup_build_go_package_target_request(
         import_path="main" if request.is_main else import_path,
         pkg_name=pkg_name,
         dir_path=dir_path,
-        go_file_names=go_file_names,
-        s_file_names=s_file_names,
+        go_files=go_file_names,
+        s_files=s_files,
+        cgo_files=cgo_files,
+        cgo_flags=cgo_flags,
+        c_files=c_files,
+        cxx_files=cxx_files,
+        objc_files=objc_files,
+        fortran_files=fortran_files,
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(direct_dependencies),
         for_tests=request.for_tests,

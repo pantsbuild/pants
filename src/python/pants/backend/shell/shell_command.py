@@ -32,7 +32,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -104,7 +104,7 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
 
 @rule
 async def prepare_shell_command_process(
-    request: ShellCommandProcessRequest, shell_setup: ShellSetup, bash: BashBinary
+    request: ShellCommandProcessRequest, shell_setup: ShellSetup.EnvironmentAware, bash: BashBinary
 ) -> Process:
     shell_command = request.target
     interactive = shell_command.has_field(ShellCommandRunWorkdirField)
@@ -133,8 +133,7 @@ async def prepare_shell_command_process(
                 f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
 
-        env = await Get(Environment, EnvironmentRequest(["PATH"]))
-        search_path = shell_setup.executable_search_path(env)
+        search_path = shell_setup.executable_search_path
         tool_requests = [
             BinaryPathRequest(
                 binary_name=tool,
@@ -164,7 +163,7 @@ async def prepare_shell_command_process(
                     rationale=f"execute `{shell_command.alias}` {shell_command.address}",
                 )
 
-    extra_env = await Get(Environment, EnvironmentRequest(extra_env_vars))
+    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     command_env.update(extra_env)
 
     transitive_targets = await Get(

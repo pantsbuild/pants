@@ -53,10 +53,10 @@ def _find_root(
                 mock_gets=[
                     MockGet(
                         output_type=OptionalSourceRoot,
-                        input_type=SourceRootRequest,
+                        input_types=(SourceRootRequest,),
                         mock=_do_find_root,
                     ),
-                    MockGet(output_type=Paths, input_type=PathGlobs, mock=_mock_fs_check),
+                    MockGet(output_type=Paths, input_types=(PathGlobs,), mock=_mock_fs_check),
                 ],
             ),
         )
@@ -232,10 +232,10 @@ def test_all_roots() -> None:
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(output_type=Paths, input_type=PathGlobs, mock=provider_rule),
+            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
             MockGet(
                 output_type=OptionalSourceRoot,
-                input_type=SourceRootRequest,
+                input_types=(SourceRootRequest,),
                 mock=source_root_mock_rule,
             ),
         ],
@@ -270,10 +270,10 @@ def test_all_roots_with_root_at_buildroot() -> None:
         all_roots,
         rule_args=[source_root_config],
         mock_gets=[
-            MockGet(output_type=Paths, input_type=PathGlobs, mock=provider_rule),
+            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
             MockGet(
                 output_type=OptionalSourceRoot,
-                input_type=SourceRootRequest,
+                input_types=(SourceRootRequest,),
                 mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
             ),
         ],

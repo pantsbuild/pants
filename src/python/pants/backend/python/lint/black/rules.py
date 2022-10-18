@@ -3,30 +3,30 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
+from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    name = Black.options_scope
+    tool_subsystem = Black
 
 
 @rule_helper
 async def _run_black(
-    request: FmtTargetsRequest | _FmtBuildFilesRequest,
+    request: FmtRequest.SubPartition,
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
@@ -54,23 +54,25 @@ async def _run_black(
                 "-W",
                 "{pants_concurrency}",
                 *black.args,
-                *request.snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            concurrency_available=len(request.snapshot.files),
-            description=f"Run Black on {pluralize(len(request.snapshot.files), 'file')}.",
+            output_files=request.files,
+            concurrency_available=len(request.files),
+            description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
-@rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSetup) -> FmtResult:
+@rule
+async def partition_black(
+    request: BlackRequest.PartitionRequest, black: Black, python_setup: PythonSetup
+) -> Partitions:
     if black.skip:
-        return FmtResult.skip(formatter_name=request.name)
+        return Partitions()
+
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
@@ -101,12 +103,20 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
         ):
             tool_interpreter_constraints = all_interpreter_constraints
 
-    return await _run_black(request, black, tool_interpreter_constraints)
+    return Partitions.single_partition(
+        (field_set.source.file_path for field_set in request.field_sets),
+        key=tool_interpreter_constraints,
+    )
+
+
+@rule(desc="Format with Black", level=LogLevel.DEBUG)
+async def black_fmt(request: BlackRequest.SubPartition, black: Black) -> FmtResult:
+    return await _run_black(request, black, cast(InterpreterConstraints, request.key))
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, BlackRequest),
+        *BlackRequest.rules(),
         *pex.rules(),
     ]

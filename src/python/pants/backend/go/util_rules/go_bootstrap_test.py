@@ -8,7 +8,7 @@ from typing import Mapping
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
 from pants.backend.go.util_rules.go_bootstrap import rules as go_bootstrap_rules
 from pants.core.util_rules.asdf_test import fake_asdf_root, materialize_indices
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -96,7 +96,7 @@ def test_expand_search_paths() -> None:
         )
         rule_runner.set_session_values(
             {
-                CompleteEnvironment: CompleteEnvironment(
+                CompleteEnvironmentVars: CompleteEnvironmentVars(
                     {
                         "HOME": home_dir,
                         "PATH": "/env/path1:/env/path2",

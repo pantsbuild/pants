@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (ClangFormatRequest,)),
+            QueryRule(FmtResult, (ClangFormatRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[CCSourcesGeneratorTarget],
@@ -98,7 +98,9 @@ def run_clangformat(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ClangFormatRequest(field_sets, snapshot=input_sources.snapshot),
+            ClangFormatRequest.SubPartition(
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -128,7 +130,6 @@ def test_success_on_unformatted_file(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"main.cpp": DEFAULT_FORMATTED_FILE})
     assert fmt_result.did_change is True
 
@@ -165,14 +166,5 @@ def test_config(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
     )
-    assert fmt_result.skipped is False
     assert fmt_result.output == get_snapshot(rule_runner, {"main.cpp": MOZILLA_FORMATTED_FILE})
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"main.cpp": UNFORMATTED_FILE, "BUILD": "cc_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="main.cpp"))
-    fmt_result = run_clangformat(rule_runner, [tgt], extra_args=["--clang-format-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

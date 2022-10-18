@@ -9,13 +9,12 @@ from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -33,14 +32,14 @@ class ShfmtFieldSet(FieldSet):
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    name = Shfmt.options_scope
+    tool_subsystem = Shfmt
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> FmtResult:
-    if shfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-
+async def shfmt_fmt(
+    request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform
+) -> FmtResult:
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(platform)
     )
@@ -61,7 +60,7 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> 
         "-l",
         "-w",
         *shfmt.args,
-        *request.snapshot.files,
+        *request.files,
     ]
 
     result = await Get(
@@ -69,17 +68,16 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt, platform: Platform) -> 
         Process(
             argv=argv,
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run shfmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, ShfmtRequest),
+        *ShfmtRequest.rules(),
     ]

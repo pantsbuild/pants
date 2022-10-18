@@ -5,6 +5,10 @@ name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
+# NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
+# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
+# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
+
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
 # but enables profiling of optimized builds.
@@ -149,11 +153,12 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
-tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
+tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.1"
+url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 

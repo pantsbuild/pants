@@ -13,9 +13,10 @@ parser.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Tuple, Union
+from typing import Any, Callable, Iterable, Mapping, Tuple, Union
 
 from pants.engine.addresses import Address
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
     Field,
     ImmutableValue,
@@ -26,6 +27,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
+from pants.util.meta import frozen_after_init
 
 SetDefaultsValueT = Mapping[str, Any]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
@@ -34,6 +36,36 @@ SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
     """Map target types to default field values."""
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ParametrizeDefault(Parametrize):
+    """A frozen version of `Parametrize` for defaults.
+
+    This is needed since all defaults must be hashable, which the `Parametrize` class is not nor can
+    it be as it may get unhashable data as input and is unaware of the field type it is being
+    applied to.
+    """
+
+    args: tuple[str, ...]
+    kwargs: FrozenDict[str, ImmutableValue]  # type: ignore[assignment]
+
+    def __init__(self, *args: str, **kwargs: ImmutableValue) -> None:
+        self.args = args
+        self.kwargs = FrozenDict(kwargs)
+
+    @classmethod
+    def create(
+        cls, freeze: Callable[[Any], ImmutableValue], parametrize: Parametrize
+    ) -> ParametrizeDefault:
+        return cls(
+            *map(freeze, parametrize.args),
+            **{kw: freeze(arg) for kw, arg in parametrize.kwargs.items()},
+        )
+
+    def __repr__(self) -> str:
+        return super().__repr__()
 
 
 @dataclass
@@ -58,15 +90,25 @@ class BuildFileDefaultsParserState:
             union_membership=union_membership,
         )
 
+    def _freeze_field_value(self, field_type: type[Field], value: Any) -> ImmutableValue:
+        if isinstance(value, ParametrizeDefault):
+            return value
+        elif isinstance(value, Parametrize):
+
+            def freeze(v: Any) -> ImmutableValue:
+                return self._freeze_field_value(field_type, v)
+
+            return ParametrizeDefault.create(freeze, value)
+        else:
+            return field_type.compute_value(raw_value=value, address=self.address)
+
     def get_frozen_defaults(self) -> BuildFileDefaults:
         types = self.registered_target_types.aliases_to_types
         return BuildFileDefaults(
             {
                 target_alias: FrozenDict(
                     {
-                        field_type.alias: field_type.compute_value(
-                            raw_value=default, address=self.address
-                        )
+                        field_type.alias: self._freeze_field_value(field_type, default)
                         for field_alias, default in fields.items()
                         for field_type in self._target_type_field_types(types[target_alias])
                         if field_alias in (field_type.alias, field_type.deprecated_alias)
@@ -161,9 +203,6 @@ class BuildFileDefaultsParserState:
                                 f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
                                 f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
                             )
-
-                # TODO: support parametrization ? --needs special care due to Parametrize object not
-                # being hashable, and thus not acceptable in a FrozenDict instance.
 
                 # Merge all provided defaults for this call.
                 defaults.setdefault(target_type.alias, {}).update(raw_values)

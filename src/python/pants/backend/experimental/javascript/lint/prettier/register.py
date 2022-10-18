@@ -12,12 +12,14 @@ from typing import Iterable
 
 from pants.backend.javascript.lint.prettier import rules as prettier_rules
 from pants.backend.javascript.lint.prettier import skip_field
+from pants.backend.javascript.subsystems import nodejs
 from pants.engine.rules import Rule
 from pants.engine.unions import UnionRule
 
 
 def rules() -> Iterable[Rule | UnionRule]:
     return (
+        *nodejs.rules(),
         *prettier_rules.rules(),
         *skip_field.rules(),
     )

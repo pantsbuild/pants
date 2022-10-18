@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Mapping, MutableMapping
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 SOURCES = {
@@ -29,24 +31,30 @@ class _ToolConfig:
     version: str
     experimental: bool = False
     backend_prefix: str | None = "lint"
+    takes_ics: bool = True
+
+    @property
+    def package(self) -> str:
+        return self.name.replace("-", "_")
 
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
+    _ToolConfig(name="add-trailing-comma", version="2.2.3", experimental=True),
     _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
-    _ToolConfig(name="bandit", version="1.6.2"),
+    _ToolConfig(name="bandit", version="1.6.2", takes_ics=False),
     _ToolConfig(name="black", version="22.3.0"),
     _ToolConfig(name="docformatter", version="1.3.1"),
-    _ToolConfig(name="flake8", version="4.0.1"),
+    _ToolConfig(name="flake8", version="4.0.1", takes_ics=False),
     _ToolConfig(name="isort", version="5.10.1"),
-    _ToolConfig(name="pylint", version="2.13.1"),
+    _ToolConfig(name="pylint", version="2.13.1", takes_ics=False),
     _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
     _ToolConfig(name="yapf", version="0.32.0"),
     _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
-    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None),
+    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None, takes_ics=False),
 ]
 
 
-def build_config(tmpdir: str) -> Mapping:
+def build_config(tmpdir: str, symlink_python_virtualenv: bool) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
             "backend_packages": ["pants.backend.python"],
@@ -59,17 +67,20 @@ def build_config(tmpdir: str) -> Mapping:
                 "b": f"{tmpdir}/3rdparty/b.lock",
             },
         },
+        "export": {"symlink_python_virtualenv": symlink_python_virtualenv},
     }
     for tool_config in EXPORTED_TOOLS:
         cfg[tool_config.name] = {
             "version": f"{tool_config.name}=={tool_config.version}",
             "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
         }
+        if tool_config.takes_ics:
+            cfg[tool_config.name]["interpreter_constraints"] = (f"=={platform.python_version()}",)
 
         if not tool_config.backend_prefix:
             continue
 
-        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.name}"
+        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.package}"
 
         if tool_config.experimental:
             plugin_suffix = f"experimental.{plugin_suffix}"
@@ -79,10 +90,12 @@ def build_config(tmpdir: str) -> Mapping:
     return cfg
 
 
-def test_export() -> None:
+@pytest.mark.parametrize("symlink_python_virtualenv", [False, True])
+def test_export(symlink_python_virtualenv: bool) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
         run_pants(
-            ["generate-lockfiles", "export", f"{tmpdir}/::"], config=build_config(tmpdir)
+            ["generate-lockfiles", "export", f"{tmpdir}/::"],
+            config=build_config(tmpdir, symlink_python_virtualenv),
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
@@ -101,12 +114,15 @@ def test_export() -> None:
 
     for tool_config in EXPORTED_TOOLS:
         export_dir = os.path.join(export_prefix, "tools", tool_config.name)
+        if symlink_python_virtualenv:
+            export_dir = os.path.join(export_dir, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
 
         # NOTE: Not every tool implements --version so this is the best we can do.
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+
         expected_tool_dir = os.path.join(
-            lib_dir, f"{tool_config.name}-{tool_config.version}.dist-info"
+            lib_dir, f"{tool_config.package}-{tool_config.version}.dist-info"
         )
         assert os.path.isdir(
             expected_tool_dir

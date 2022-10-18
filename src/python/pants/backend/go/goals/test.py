@@ -33,6 +33,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
     FirstPartyPkgDigestRequest,
 )
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
@@ -46,7 +47,7 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
@@ -164,6 +165,7 @@ async def run_go_tests(
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
     test_extra_env: TestExtraEnv,
+    goroot: GoRoot,
 ) -> TestResult:
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
@@ -264,8 +266,8 @@ async def run_go_tests(
             pkg_name=f"{pkg_analysis.name}_test",
             digest=pkg_digest.digest,
             dir_path=pkg_analysis.dir_path,
-            go_file_names=pkg_analysis.xtest_go_files,
-            s_file_names=(),  # TODO: Are there .s files for xtest?
+            go_files=pkg_analysis.xtest_go_files,
+            s_files=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_analysis.minimum_go_version,
             embed_config=pkg_digest.xtest_embed_config,
@@ -311,8 +313,8 @@ async def run_go_tests(
             pkg_name="main",
             digest=testmain_input_digest,
             dir_path="",
-            go_file_names=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
-            s_file_names=(),
+            go_files=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
+            s_files=(),
             direct_dependencies=tuple(main_direct_deps),
             minimum_go_version=pkg_analysis.minimum_go_version,
         ),
@@ -347,7 +349,7 @@ async def run_go_tests(
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
     field_set_extra_env_get = Get(
-        Environment, EnvironmentRequest(field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
     )
     binary_with_prefix, files_sources, field_set_extra_env = await MultiGet(
         Get(Digest, AddPrefix(binary.digest, working_dir)),
@@ -371,6 +373,14 @@ async def run_go_tests(
         # `go_package`.
         **field_set_extra_env,
     }
+
+    # Add $GOROOT/bin to the PATH just as `go test` does.
+    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/test/test.go#L1384
+    goroot_bin_path = os.path.join(goroot.path, "bin")
+    if "PATH" in extra_env:
+        extra_env["PATH"] = f"{goroot_bin_path}:{extra_env['PATH']}"
+    else:
+        extra_env["PATH"] = goroot_bin_path
 
     cache_scope = (
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
@@ -410,6 +420,8 @@ async def run_go_tests(
         coverage_data = GoCoverageData(
             coverage_digest=result.output_digest,
             import_path=import_path,
+            sources_digest=pkg_digest.digest,
+            sources_dir_path=pkg_analysis.dir_path,
         )
 
     return TestResult.from_fallible_process_result(

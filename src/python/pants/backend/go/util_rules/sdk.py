@@ -11,10 +11,9 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -32,7 +31,6 @@ class GoSdkProcess:
     working_dir: str | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
-    platform: Platform | None
     replace_sandbox_root_in_args: bool
 
     def __init__(
@@ -46,7 +44,6 @@ class GoSdkProcess:
         output_files: Iterable[str] = (),
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
-        platform: Platform | None = None,
         replace_sandbox_root_in_args: bool = False,
     ) -> None:
         self.command = tuple(command)
@@ -60,7 +57,6 @@ class GoSdkProcess:
         self.working_dir = working_dir
         self.output_files = tuple(output_files)
         self.output_directories = tuple(output_directories)
-        self.platform = platform
         self.replace_sandbox_root_in_args = replace_sandbox_root_in_args
 
 
@@ -108,12 +104,15 @@ async def setup_go_sdk_process(
     request: GoSdkProcess,
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
-    golang_subsystem: GolangSubsystem,
+    golang_env_aware: GolangSubsystem.EnvironmentAware,
     goroot: GoRoot,
 ) -> Process:
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
-        Get(Environment, EnvironmentRequest(golang_subsystem.env_vars_to_pass_to_subprocesses)),
+        Get(
+            EnvironmentVars,
+            EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
+        ),
     )
     maybe_replace_sandbox_root_env = (
         {GoSdkRunSetup.SANDBOX_ROOT_ENV: "1"} if request.replace_sandbox_root_in_args else {}
@@ -133,7 +132,6 @@ async def setup_go_sdk_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
-        platform=request.platform,
     )
 
 

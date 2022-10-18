@@ -229,24 +229,34 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             rule_args=[pex_from_targets_request, python_setup],
             mock_gets=[
                 MockGet(
-                    PexRequirements, _PexRequirementsRequest, lambda _: resolved_pex_requirements
+                    output_type=PexRequirements,
+                    input_types=(_PexRequirementsRequest,),
+                    mock=lambda _: resolved_pex_requirements,
                 ),
                 MockGet(
-                    ChosenPythonResolve, ChosenPythonResolveRequest, lambda _: Mock(lockfile=Mock())
+                    output_type=ChosenPythonResolve,
+                    input_types=(ChosenPythonResolveRequest,),
+                    mock=lambda _: Mock(lockfile=Mock()),
                 ),
                 MockGet(
-                    LoadedLockfile,
-                    LoadedLockfileRequest,
-                    lambda _: (
+                    output_type=LoadedLockfile,
+                    input_types=(LoadedLockfileRequest,),
+                    mock=lambda _: (
                         loaded_lockfile__pex
                         if mode == RequirementMode.PEX_LOCKFILE
                         else loaded_lockfile__not_pex
                     ),
                 ),
                 MockGet(
-                    OptionalPexRequest, _RepositoryPexRequest, lambda _: mock_repository_pex_request
+                    output_type=OptionalPexRequest,
+                    input_types=(_RepositoryPexRequest,),
+                    mock=lambda _: mock_repository_pex_request,
                 ),
-                MockGet(OptionalPex, OptionalPexRequest, lambda _: mock_repository_pex),
+                MockGet(
+                    output_type=OptionalPex,
+                    input_types=(OptionalPexRequest,),
+                    mock=lambda _: mock_repository_pex,
+                ),
             ],
         )
         if expected:

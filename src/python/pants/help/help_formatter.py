@@ -135,6 +135,13 @@ class HelpFormatter(MaybeColor):
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
         description_lines = wrap(ohi.help)
+        if ohi.target_field_name:
+            description_lines.extend(
+                wrap(
+                    f"\nCan be overriden by field `{ohi.target_field_name}` on "
+                    "`local_environment`, `docker_environment`, or `remote_environment` targets."
+                )
+            )
         lines = [
             *arg_lines,
             *choices_lines,

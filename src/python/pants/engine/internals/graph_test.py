@@ -15,6 +15,7 @@ import pytest
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
@@ -49,6 +50,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -150,6 +152,10 @@ def transitive_targets_rule_runner() -> RuleRunner:
         ],
         target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
     )
 
 
@@ -704,6 +710,10 @@ def owners_rule_runner() -> RuleRunner:
             MockGeneratedTarget,
             MockSecondaryOwnerTarget,
         ],
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
     )
 
 
@@ -864,12 +874,16 @@ def generated_targets_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
             UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
             resolve_field_default_factory,
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
     )
 
 
@@ -890,7 +904,10 @@ def assert_generated(
     )
     parametrizations = rule_runner.request(
         _TargetParametrizations,
-        [_TargetParametrizationsRequest(address, description_of_origin="tests")],
+        [
+            _TargetParametrizationsRequest(address, description_of_origin="tests"),
+            EnvironmentName(None),
+        ],
     )
     if expected_targets is not None:
         assert expected_targets == {
@@ -1326,6 +1343,7 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
         rules=generated_targets_rule_runner.rules,
         target_types=[ParentTarget, ChildTarget],
         objects={"parametrize": Parametrize},
+        inherent_environment=None,
     )
     build_content = dedent(
         """\
@@ -1347,6 +1365,23 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "field_content",
+    [
+        "tagz=['tag']",
+        "tagz=parametrize(['tag1'], ['tag2'])",
+    ],
+)
+def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
+    with engine_error(InvalidFieldException, contains=f"Unrecognized field `{field_content}`"):
+        assert_generated(
+            generated_targets_rule_runner,
+            Address("demo"),
+            f"generator({field_content}, sources=['*.ext'])",
+            ["f1.ext", "f2.ext"],
+        )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `SourcesField`. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
@@ -1358,7 +1393,11 @@ def sources_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(SourcesPaths, [SourcesPathsRequest]),
-        ]
+        ],
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
     )
 
 
@@ -1587,8 +1626,8 @@ def codegen_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             generate_smalltalk_from_avro,
-            QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [GenerateSmalltalkFromAvroRequest]),
+            QueryRule(HydratedSources, [HydrateSourcesRequest, EnvironmentName]),
+            QueryRule(GeneratedSources, [GenerateSmalltalkFromAvroRequest, EnvironmentName]),
             UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
         ],
         target_types=[AvroLibrary],
@@ -1825,6 +1864,10 @@ def dependencies_rule_runner() -> RuleRunner:
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
     )
 
 

@@ -113,7 +113,7 @@ def test_build_package_with_assembly(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg")
+                go_package(name="pkg", sources=["*.go", "*.s"])
                 go_binary(name="bin")
                 """
             ),
@@ -135,7 +135,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
         import_path="example.com/assembly",
         pkg_name="main",
         dir_path="",
-        go_file_names=("add_amd64.go", "add_arm64.go"),
+        go_files=("add_amd64.go", "add_arm64.go"),
         digest=rule_runner.make_snapshot(
             {
                 "add_amd64.go": "package main\nfunc add(x, y int64) int64",
@@ -144,7 +144,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
                 "add_arm64.s": "INVALID!!!",
             }
         ).digest,
-        s_file_names=("add_amd64.s", "add_arm64.s"),
+        s_files=("add_amd64.s", "add_arm64.s"),
         direct_dependencies=(),
         minimum_go_version=None,
     )

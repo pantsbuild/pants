@@ -7,9 +7,8 @@ import inspect
 import itertools
 import logging
 import sys
-import types
 from functools import partial
-from typing import Callable, List, Sequence, cast
+from typing import Any, Callable, List
 
 from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
 from pants.util.memo import memoized
@@ -29,18 +28,6 @@ def _get_starting_indent(source: str) -> int:
     return 0
 
 
-def _get_lookup_names(attr: ast.expr) -> list[str]:
-    names = []
-    while isinstance(attr, ast.Attribute):
-        names.append(attr.attr)
-        attr = attr.value
-    # NB: attr could be a constant, like `",".join()`
-    id = getattr(attr, "id", None)
-    if id is not None:
-        names.append(id)
-    return names
-
-
 class _AwaitableCollector(ast.NodeVisitor):
     def __init__(self, func: Callable):
         self.func = func
@@ -55,41 +42,47 @@ class _AwaitableCollector(ast.NodeVisitor):
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
-    def _expect_dict_value_is_name(
-        self, call_node_name: ast.Name, call_node_args: Sequence[ast.expr], value_expr: ast.expr
-    ) -> ast.Name:
-        lineno = value_expr.lineno + self.func.__code__.co_firstlineno - 1
-        if not isinstance(value_expr, ast.Name):
-            raise GetParseError(
-                f"All values of the input dict should be literal type names, but got "
-                f"{value_expr} (type `{type(value_expr).__name__}`)`) "
-                f"in {self.source_file}:{lineno}",
-                get_args=call_node_args,
-                source_file_name=(self.source_file or "<none>"),
-            )
-        return value_expr
+    def _lookup(self, attr: ast.expr) -> Any:
+        names = []
+        while isinstance(attr, ast.Attribute):
+            names.append(attr.attr)
+            attr = attr.value
+        # NB: attr could be a constant, like `",".join()`
+        id = getattr(attr, "id", None)
+        if id is not None:
+            names.append(id)
 
-    def _resolve_constraint_arg_type(self, name: str, lineno: int) -> type:
-        lineno += self.func.__code__.co_firstlineno - 1
-        resolved = (
-            getattr(self.owning_module, name, None)
-            or self.owning_module.__builtins__.get(name, None)
-        )  # fmt: skip
+        if not names:
+            return attr
+
+        name = names.pop()
+        result = (
+            getattr(self.owning_module, name)
+            if hasattr(self.owning_module, name)
+            else self.owning_module.__builtins__.get(name, None)
+        )
+        while result is not None and names:
+            result = getattr(result, names.pop(), None)
+
+        return result
+
+    def _check_constraint_arg_type(self, resolved: Any, node: ast.AST) -> type:
+        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
         if resolved is None:
             raise ValueError(
-                f"Could not resolve type `{name}` in top level of module "
+                f"Could not resolve type `{node}` in top level of module "
                 f"{self.owning_module.__name__} defined in {self.source_file}:{lineno}"
             )
         elif not isinstance(resolved, type):
             raise ValueError(
-                f"Expected a `type` constructor for `{name}`, but got: {resolved} (type "
-                f"`{type(resolved).__name__}`) in {self.source_file}:{lineno}"
+                f"Expected a `type`, but got: {resolved}"
+                + f" (type `{type(resolved).__name__}`) in {self.source_file}:{lineno}"
             )
         return resolved
 
     def _get_awaitable(self, call_node: ast.Call) -> AwaitableConstraints:
-        assert isinstance(call_node.func, ast.Name)
-        is_effect = call_node.func.id == "Effect"
+        func = self._lookup(call_node.func)
+        is_effect = func.__name__ == "Effect"
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
@@ -98,53 +91,29 @@ class _AwaitableCollector(ast.NodeVisitor):
                 f"Expected either two or three arguments, but got {len(get_args)} arguments."
             )
 
-        output_expr = get_args[0]
-        if not isinstance(output_expr, ast.Name):
-            raise parse_error(
-                "The first argument should be the output type, like `Digest` or `ProcessResult`."
-            )
-        output_type = output_expr
+        output_node = get_args[0]
+        output_type = self._lookup(output_node)
 
-        input_args = get_args[1:]
-        input_types: List[ast.Name]
-        if len(input_args) == 1:
-            input_constructor = input_args[0]
+        input_nodes = get_args[1:]
+        input_types: List[Any]
+        if len(input_nodes) == 1:
+            input_constructor = input_nodes[0]
             if isinstance(input_constructor, ast.Call):
-                if not isinstance(input_constructor.func, ast.Name):
-                    raise parse_error(
-                        f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
-                        "InputType(constructor args)), the second argument should be a top-level "
-                        "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
-                        "than a method call."
-                    )
-                input_types = [input_constructor.func]
+                input_nodes = [input_constructor.func]
+                input_types = [self._lookup(input_constructor.func)]
             elif isinstance(input_constructor, ast.Dict):
-                input_types = [
-                    self._expect_dict_value_is_name(call_node.func, get_args, v)
-                    for v in input_constructor.values
-                ]
+                input_nodes = input_constructor.values
+                input_types = [self._lookup(v) for v in input_constructor.values]
             else:
-                raise parse_error(
-                    f"Because you are using the two-argument form {call_node.func.id}(OutputType, "
-                    "$input), the $input argument should either be a "
-                    "constructor call, like `MergeDigest(...)` or `Process(...)`, or a dict "
-                    "literal mapping inputs to their declared types, like "
-                    "`{merge_digest: MergeDigest}`."
-                )
+                input_types = [self._lookup(n) for n in input_nodes]
         else:
-            if not isinstance(input_args[0], ast.Name):
-                raise parse_error(
-                    f"Because you are using the longhand form {call_node.func.id}(OutputType, "
-                    "InputType, input), the second argument should be a type, like `MergeDigests` or "
-                    "`Process`."
-                )
-            input_types = [input_args[0]]
+            input_types = [self._lookup(input_nodes[0])]
 
         return AwaitableConstraints(
-            self._resolve_constraint_arg_type(output_type.id, output_type.lineno),
+            self._check_constraint_arg_type(output_type, output_node),
             tuple(
-                self._resolve_constraint_arg_type(input_type.id, input_type.lineno)
-                for input_type in input_types
+                self._check_constraint_arg_type(input_type, input_node)
+                for input_type, input_node in zip(input_types, input_nodes)
             ),
             is_effect,
         )
@@ -153,12 +122,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         if _is_awaitable_constraint(call_node):
             self.awaitables.append(self._get_awaitable(call_node))
         else:
-            func_node = call_node.func
-            lookup_names = _get_lookup_names(func_node)
-            attr = cast(types.FunctionType, self.func).__globals__.get(lookup_names.pop(), None)
-            while attr is not None and lookup_names:
-                attr = getattr(attr, lookup_names.pop(), None)
-
+            attr = self._lookup(call_node.func)
             if hasattr(attr, "rule_helper"):
                 self.awaitables.extend(collect_awaitables(attr))
 

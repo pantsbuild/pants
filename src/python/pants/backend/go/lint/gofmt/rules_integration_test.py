@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            QueryRule(FmtResult, (GofmtRequest,)),
+            QueryRule(FmtResult, (GofmtRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
@@ -120,7 +120,9 @@ def run_gofmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GofmtRequest(field_sets, snapshot=input_sources.snapshot),
+            GofmtRequest.SubPartition(
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -188,13 +190,3 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner, {"good/f.go": GOOD_FILE, "bad/f.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}
-    )
-    tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    fmt_result = run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

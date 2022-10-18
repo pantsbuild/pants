@@ -13,14 +13,13 @@ from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import Environment
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, softwrap
 
@@ -29,21 +28,39 @@ class PexSubsystem(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
-    # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
-    #  per-process override.
-    _executable_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used by the PEX subprocess and any subprocesses it
-            spawns.
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
+        #  per-process override.
 
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
-    )
+        env_vars_used_by_options = ("PATH",)
+
+        _executable_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                The PATH value that will be used by the PEX subprocess and any subprocesses it
+                spawns.
+
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @memoized_property
+        def path(self) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_paths:
+                    if entry == "<PATH>":
+                        path = self._options_env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))
+
     _verbosity = IntOption(
         default=0,
         help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
@@ -63,19 +80,6 @@ class PexSubsystem(Subsystem):
         ),
         advanced=True,
     )
-
-    @memoized_method
-    def path(self, env: Environment) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
-
-        return tuple(OrderedSet(iter_path_entries()))
 
     @property
     def verbosity(self) -> int:
@@ -161,12 +165,13 @@ async def find_pex_python(
     python_bootstrap: PythonBootstrap,
     python_binary: PythonBinary,
     pex_subsystem: PexSubsystem,
+    pex_environment_aware: PexSubsystem.EnvironmentAware,
     subprocess_env_vars: SubprocessEnvironmentVars,
     named_caches_dir: NamedCachesDirOption,
 ) -> PexEnvironment:
     return PexEnvironment(
-        path=pex_subsystem.path(python_bootstrap.environment),
-        interpreter_search_paths=tuple(python_bootstrap.interpreter_search_paths()),
+        path=pex_environment_aware.path,
+        interpreter_search_paths=python_bootstrap.interpreter_search_paths,
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
         bootstrap_python=PythonExecutable.from_python_binary(python_binary),

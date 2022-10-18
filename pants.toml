@@ -6,9 +6,9 @@ pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
-  "pants.backend.experimental.python.lint.autoflake",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.explorer",
+  "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -34,7 +34,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.22.0",
+  "toolchain.pants.plugin==0.24.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -97,11 +97,10 @@ root_patterns = [
 ]
 
 [environments-preview.names]
-default_env = "//:default_env"
-# TODO(#7735): Define `//:macos_local_env` after figuring out why our Build Wheels Mac job is
-#  failing when this is set:
-#  https://github.com/pantsbuild/pants/runs/8082954359?check_suite_focus=true#step:9:657
+# We don't define any local environments because the options system covers our cases adequately.
 docker = "//:docker_env"
+# Used for iterating on remote-execution.
+remote = "//:buildgrid_remote"
 
 [tailor]
 build_file_header = """\
@@ -149,9 +148,9 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
-  "flake8-2020>=1.6.0,<1.7.0",
+  "flake8-2020>=1.7.0,<2",
   "flake8-no-implicit-concat",
-  "flake8-comprehensions>=3.8.0,<4.0",
+  "flake8-comprehensions>=3.10.0,<4.0",
 ]
 lockfile = "3rdparty/python/flake8.lock"
 source_plugins = ["build-support/flake8"]

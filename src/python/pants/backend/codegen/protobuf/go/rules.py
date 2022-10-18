@@ -322,7 +322,7 @@ async def setup_full_package_build_request(
             input_digest=input_digest,
             description=f"Determine metadata for generated Go package for {request.import_path}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "0"},  # protobuf files should not have cgo!
         ),
     )
 
@@ -380,8 +380,8 @@ async def setup_full_package_build_request(
             pkg_name=analysis.name,
             digest=gen_sources.digest,
             dir_path=analysis.dir_path,
-            go_file_names=analysis.go_files,
-            s_file_names=analysis.s_files,
+            go_files=analysis.go_files,
+            s_files=analysis.s_files,
             direct_dependencies=dep_build_requests,
             minimum_go_version=analysis.minimum_go_version,
         ),
@@ -557,7 +557,7 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 
 @rule
-async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
+async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
     go_mod_digest = await Get(
         Digest,
         CreateDigest(
@@ -587,7 +587,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
         Get(
@@ -600,7 +599,6 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
                 input_digest=download_sources_result.output_digest,
                 output_files=["gopath/bin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
-                platform=platform,
             ),
         ),
     )

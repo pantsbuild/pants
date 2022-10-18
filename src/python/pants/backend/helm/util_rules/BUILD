@@ -6,6 +6,6 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "post_renderer_test.py": {"timeout": 120},
+        ("chart_test.py", "post_renderer_test.py"): {"timeout": 120},
     },
 )

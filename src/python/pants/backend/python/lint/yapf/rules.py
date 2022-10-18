@@ -11,14 +11,13 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, _FmtBuildFilesRequest
+from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -36,12 +35,13 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
-    name = Yapf.options_scope
+    tool_subsystem = Yapf
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule_helper
 async def _run_yapf(
-    request: FmtTargetsRequest | _FmtBuildFilesRequest,
+    request: FmtRequest.SubPartition,
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:
@@ -65,28 +65,25 @@ async def _run_yapf(
                 *yapf.args,
                 "--in-place",
                 *(("--style", yapf.config) if yapf.config else ()),
-                *request.snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run yapf on {pluralize(len(request.snapshot.files), 'file')}.",
+            output_files=request.files,
+            description=f"Run yapf on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result)
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
-async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
-    if yapf.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
     return await _run_yapf(request, yapf)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtTargetsRequest, YapfRequest),
+        *YapfRequest.rules(),
         *pex.rules(),
     ]

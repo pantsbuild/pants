@@ -138,17 +138,25 @@ class PutativeTarget:
         )
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
-                "`source` or `sources` passed to PutativeTarget.for_target_type(kwargs=)`, but "
-                "it was not the correct type. `source` must be `str` and `sources` must be "
-                f"`tuple[str, ...]`. Was `{explicit_sources}` with type `{type(explicit_sources)}`."
+                softwrap(
+                    f"""
+                    `source` or `sources` passed to PutativeTarget.for_target_type(kwargs=)`, but
+                    it was not the correct type. `source` must be `str` and `sources` must be
+                    `tuple[str, ...]`. Was `{explicit_sources}` with type `{type(explicit_sources)}`.
+                    """
+                )
             )
 
         default_sources = default_sources_for_target_type(target_type)
         if (explicit_sources or triggering_sources) and not default_sources:
             raise AssertionError(
-                f"A target of type {target_type.__name__} was proposed at "
-                f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
-                "but this target type does not have a `source` or `sources` field."
+                softwrap(
+                    f"""
+                    A target of type {target_type.__name__} was proposed at
+                    address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)},
+                    but this target type does not have a `source` or `sources` field.
+                    """
+                )
             )
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
@@ -349,11 +357,15 @@ class TailorSubsystem(GoalSubsystem):
         filespec_matcher = FilespecMatcher(build_file_patterns, ())
         if not bool(filespec_matcher.matches([self.build_file_name])):
             raise ValueError(
-                f"The option `[{self.options_scope}].build_file_name` is set to "
-                f"`{self.build_file_name}`, which is not compatible with "
-                f"`[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that "
-                "generated BUILD files would be ignored.\n\n"
-                "To fix, please update the options so that they are compatible."
+                softwrap(
+                    f"""
+                The option `[{self.options_scope}].build_file_name` is set to
+                `{self.build_file_name}`, which is not compatible with
+                `[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that
+                generated BUILD files would be ignored.\n\n
+                To fix, please update the options so that they are compatible.
+                """
+                )
             )
 
     def filter_by_ignores(

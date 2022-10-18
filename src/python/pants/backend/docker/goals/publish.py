@@ -20,7 +20,7 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
 
@@ -51,7 +51,10 @@ class PublishDockerImageFieldSet(PublishFieldSet):
 
 @rule
 async def push_docker_images(
-    request: PublishDockerImageRequest, docker: DockerBinary, options: DockerOptions
+    request: PublishDockerImageRequest,
+    docker: DockerBinary,
+    options: DockerOptions,
+    options_env_aware: DockerOptions.EnvironmentAware,
 ) -> PublishProcesses:
     tags = tuple(
         chain.from_iterable(
@@ -71,7 +74,7 @@ async def push_docker_images(
             ]
         )
 
-    env = await Get(Environment, EnvironmentRequest(options.env_vars))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars))
     skip_push = defaultdict(set)
     jobs: list[PublishPackages] = []
     refs: list[str] = []

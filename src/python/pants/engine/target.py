@@ -50,14 +50,14 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -239,12 +239,11 @@ class AsyncFieldMixin(Field):
         super().__init__(raw_value, address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
-        self._unfreeze_instance()  # type: ignore[attr-defined]
-        # N.B.: We store the address here and not in the Field base class, because the memory usage
-        # of storing this value in every field was shown to be excessive / lead to performance
-        # issues.
-        self.address = address
-        self._freeze_instance()  # type: ignore[attr-defined]
+        with self._unfrozen():  # type: ignore[attr-defined]
+            # N.B.: We store the address here and not in the Field base class, because the memory usage
+            # of storing this value in every field was shown to be excessive / lead to performance
+            # issues.
+            self.address = address
 
     def __repr__(self) -> str:
         return (
@@ -476,14 +475,9 @@ class Target:
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
-    @final
-    @memoized_classproperty
-    def _plugin_field_cls(cls) -> type:
-        @union
-        class PluginField:
-            pass
-
-        return PluginField
+    @distinct_union_type_per_subclass
+    class PluginField:
+        pass
 
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
@@ -522,7 +516,7 @@ class Target:
             cls = classes.pop()
             classes.extend(cls.__bases__)
             if issubclass(cls, Target):
-                result.update(union_membership.get(cls._plugin_field_cls))
+                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
 
         return tuple(result)
 
@@ -700,7 +694,7 @@ class Target:
         `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
         citizen. Plugins can use this new field like any other.
         """
-        return UnionRule(cls._plugin_field_cls, field)
+        return UnionRule(cls.PluginField, field)
 
     def validate(self) -> None:
         """Validate the target, such as checking for mutually exclusive fields.
@@ -1057,14 +1051,6 @@ class TargetGenerator(Target):
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
 
-    @classmethod
-    def register_plugin_field(cls, field: Type[Field], *, copy_field: bool = False) -> UnionRule:
-        if copy_field:
-            cls.copied_fields = cls.copied_fields + (field,)
-        else:
-            cls.moved_fields = cls.moved_fields + (field,)
-        return super().register_plugin_field(field)
-
 
 class TargetFilesGenerator(TargetGenerator):
     """A TargetGenerator which generates a Target per file matched by the generator.
@@ -1314,16 +1300,18 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
+def _get_field_set_fields(field_set: Type[FieldSet]) -> Dict[str, Type[Field]]:
+    return {
+        name: field_type
+        for name, field_type in get_type_hints(field_set).items()
+        if isinstance(field_type, type) and issubclass(field_type, Field)
+    }
 
 
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
+    all_expected_fields = _get_field_set_fields(field_set)
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -1486,7 +1474,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
-    expect_single_field_set: bool
     shard: int
     num_shards: int
 
@@ -1496,19 +1483,12 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
-        expect_single_field_set: bool = False,
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        if expect_single_field_set and num_shards != -1:
-            raise ValueError(
-                "At most one of shard_spec and expect_single_field_set may be set"
-                " on a TargetRootsToFieldSetsRequest instance"
-            )
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.expect_single_field_set = expect_single_field_set
         self.shard = shard
         self.num_shards = num_shards
 

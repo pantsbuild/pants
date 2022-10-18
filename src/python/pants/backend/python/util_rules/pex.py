@@ -48,6 +48,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -55,7 +56,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
@@ -287,7 +287,9 @@ class OptionalPex:
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(
-    interpreter_constraints: InterpreterConstraints, pex_subsystem: PexSubsystem
+    interpreter_constraints: InterpreterConstraints,
+    pex_subsystem: PexSubsystem,
+    env_target: EnvironmentTarget,
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
@@ -326,10 +328,7 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
-            # NB: We want interpreter discovery to re-run fairly frequently
-            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
-            # per-Session). See #10769 for a solution that is less of a tradeoff.
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
@@ -502,7 +501,7 @@ async def _setup_pex_requirements(
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
-    request: PexRequest, python_setup: PythonSetup, platform: Platform, pex_subsystem: PexSubsystem
+    request: PexRequest, python_setup: PythonSetup, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
     argv = [
@@ -555,8 +554,8 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             python=pex_python_setup.python,
             subcommand=(),
@@ -568,13 +567,6 @@ async def build_pex(
             concurrency_available=requirements_setup.concurrency_available,
         ),
     )
-
-    process = dataclasses.replace(process, platform=platform)
-
-    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
-    # without cross-building, we specify that our PEX command should be run on the current local
-    # platform.
-    result = await Get(ProcessResult, Process, process)
 
     if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()
@@ -756,8 +748,7 @@ class VenvScriptWriter:
 
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
-            if [ ! -e "${{target_venv_executable}}" ]; then
-                rm -rf "${{venv_dir}}" || true
+            if [ ! -e "${{venv_dir}}" ]; then
                 PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
             fi
 

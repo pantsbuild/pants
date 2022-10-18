@@ -27,12 +27,12 @@ from pants.backend.go.util_rules.coverage import GoCoverageData
 from pants.backend.go.util_rules.coverage_output import GoCoverageDataCollection
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
+    CoverageReport,
     CoverageReports,
     FilesystemCoverageReport,
     TestResult,
     get_filtered_environment,
 )
-from pants.core.goals.test import rules as core_test_rules
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents
@@ -60,7 +60,6 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
-            *core_test_rules(),
             QueryRule(TestResult, (GoTestFieldSet,)),
             QueryRule(CoverageReports, (GoCoverageDataCollection,)),
             QueryRule(DigestContents, (Digest,)),
@@ -110,9 +109,17 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
     coverage_reports = rule_runner.request(
         CoverageReports, [GoCoverageDataCollection([coverage_data])]
     )
-    assert len(coverage_reports.reports) == 1
-    coverage_report = coverage_reports.reports[0]
-    assert isinstance(coverage_report, FilesystemCoverageReport)
-    digest_contents = rule_runner.request(DigestContents, (coverage_report.result_snapshot.digest,))
+    assert len(coverage_reports.reports) == 2
+    reports: list[CoverageReport] = list(coverage_reports.reports)
+
+    go_report = reports[0]
+    assert isinstance(go_report, FilesystemCoverageReport)
+    digest_contents = rule_runner.request(DigestContents, (go_report.result_snapshot.digest,))
     assert len(digest_contents) == 1
     assert digest_contents[0].path == "cover.out"
+
+    html_report = reports[1]
+    assert isinstance(html_report, FilesystemCoverageReport)
+    digest_contents = rule_runner.request(DigestContents, (html_report.result_snapshot.digest,))
+    assert len(digest_contents) == 1
+    assert digest_contents[0].path == "coverage.html"

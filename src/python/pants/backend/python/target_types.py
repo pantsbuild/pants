@@ -35,6 +35,7 @@ from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestSubsystem,
 )
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -52,6 +53,7 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
+    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -290,7 +292,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -610,6 +612,18 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class PexVenvSitePackagesCopies(BoolField):
+    alias = "venv_site_packages_copies"
+    default = False
+    help = softwrap(
+        """
+        If execution_mode is venv, populate the venv site packages using hard links or copies of resolved PEX dependencies instead of symlinks.
+
+        This can be used to work around problems with tools or libraries that are confused by symlinked source files.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -627,6 +641,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeRequirementsField,
     PexIncludeSourcesField,
     PexIncludeToolsField,
+    PexVenvSitePackagesCopies,
     RestartableField,
 )
 
@@ -879,6 +894,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,
     SkipPythonTestsField,
+    EnvironmentField,
 )
 
 

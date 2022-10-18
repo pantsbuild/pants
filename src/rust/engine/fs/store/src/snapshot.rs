@@ -80,7 +80,10 @@ impl Snapshot {
       .zip(file_digests)
       .collect::<HashMap<_, _>>();
 
-    let tree = DigestTrie::from_path_stats(path_stats, &file_digests_map)?;
+    let tree = DigestTrie::from_unique_paths(
+      path_stats.iter().map(|p| p.into()).collect(),
+      &file_digests_map,
+    )?;
     Ok(Self {
       digest: tree.compute_root_digest(),
       tree,
@@ -177,8 +180,14 @@ impl Snapshot {
       .map(|s| PathStat::dir(PathBuf::from(&s), Dir(PathBuf::from(s))))
       .collect();
 
-    let tree =
-      DigestTrie::from_path_stats([file_path_stats, dir_path_stats].concat(), &file_digests)?;
+    let tree = DigestTrie::from_unique_paths(
+      [file_path_stats, dir_path_stats]
+        .concat()
+        .iter()
+        .map(|p| p.into())
+        .collect(),
+      &file_digests,
+    )?;
     Ok(Self {
       // NB: The DigestTrie's computed digest is ignored in favor of the given Digest.
       digest,

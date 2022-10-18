@@ -24,7 +24,7 @@ use workunit_store::{
 use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessMetadata, ProcessResultSource,
+  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
 };
 use tonic::{Code, Request, Status};
 
@@ -47,11 +47,11 @@ pub enum RemoteCacheWarningsBehavior {
 #[derive(Clone)]
 pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
-  metadata: ProcessMetadata,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
-  platform: Platform,
   cache_read: bool,
   cache_write: bool,
   cache_content_behavior: CacheContentBehavior,
@@ -64,13 +64,13 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     inner: Arc<dyn crate::CommandRunner>,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     executor: task_executor::Executor,
     store: Store,
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
     mut headers: BTreeMap<String, String>,
-    platform: Platform,
     cache_read: bool,
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
@@ -99,11 +99,11 @@ impl CommandRunner {
 
     Ok(CommandRunner {
       inner,
-      metadata,
+      instance_name,
+      process_cache_namespace,
       executor,
       store,
       action_cache_client,
-      platform,
       cache_read,
       cache_write,
       cache_content_behavior,
@@ -261,6 +261,7 @@ impl CommandRunner {
     context: Context,
     cache_lookup_start: Instant,
     action_digest: Digest,
+    failures_cached: bool,
     request: &Process,
     mut local_execution_future: BoxFuture<
       '_,
@@ -268,12 +269,12 @@ impl CommandRunner {
     >,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
-    let cache_read_future = async {
+    let mut cache_read_future = async {
       let response = check_action_cache(
         action_digest,
         &request.description,
-        &self.metadata,
-        self.platform,
+        self.instance_name.clone(),
+        request.platform,
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
@@ -282,14 +283,25 @@ impl CommandRunner {
       )
       .await;
       match response {
-        Ok(cached_response_opt) => {
-          log::debug!(
-            "remote cache response: digest={:?}: {:?}",
-            action_digest,
+        Ok(cached_response_opt) => match &cached_response_opt {
+          Some(cached_response) if cached_response.exit_code == 0 || failures_cached => {
+            log::debug!(
+              "remote cache hit for: {:?} digest={:?} response={:?}",
+              request.description,
+              action_digest,
+              cached_response
+            );
             cached_response_opt
-          );
-          cached_response_opt
-        }
+          }
+          _ => {
+            log::debug!(
+              "remote cache miss for: {:?} digest={:?}",
+              request.description,
+              action_digest
+            );
+            None
+          }
+        },
         Err(err) => {
           self.log_cache_error(err.to_string(), CacheErrorType::ReadError);
           None
@@ -304,49 +316,70 @@ impl CommandRunner {
       Level::Trace,
       |workunit| async move {
         tokio::select! {
-          cache_result = cache_read_future => {
-            if let Some(cached_response) = cache_result {
-              let lookup_elapsed = cache_lookup_start.elapsed();
-              workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-              if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
-                let time_saved = time_saved.as_millis() as u64;
-                workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-                workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
-              }
-              // When we successfully use the cache, we change the description and increase the level
-              // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| {
-                initial.map(|(initial, _)|
-                (WorkunitMetadata {
-                  desc: initial
-                    .desc
-                    .as_ref()
-                    .map(|desc| format!("Hit: {}", desc)),
-                  ..initial
-                }, Level::Debug))
-              });
-              Ok((cached_response, true))
-            } else {
-              // Note that we don't increment a counter here, as there is nothing of note in this
-              // scenario: the remote cache did not save unnecessary local work, nor was the remote
-              // trip unusually slow such that local execution was faster.
-              local_execution_future.await.map(|res| (res, false))
-            }
+          cache_result = &mut cache_read_future => {
+            self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
           }
-          local_result = &mut local_execution_future => {
-            workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
-            local_result.map(|res| (res, false))
+          _ = tokio::time::sleep(request.remote_cache_speculation_delay) => {
+            tokio::select! {
+              cache_result = cache_read_future => {
+                self.handle_cache_read_completed(workunit, cache_lookup_start, cache_result, local_execution_future).await
+              }
+              local_result = &mut local_execution_future => {
+                workunit.increment_counter(Metric::RemoteCacheSpeculationLocalCompletedFirst, 1);
+                local_result.map(|res| (res, false))
+              }
+            }
           }
         }
       }
     ).await
   }
 
+  async fn handle_cache_read_completed(
+    &self,
+    workunit: &mut RunningWorkunit,
+    cache_lookup_start: Instant,
+    cache_result: Option<FallibleProcessResultWithPlatform>,
+    local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, ProcessError>>,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
+    if let Some(cached_response) = cache_result {
+      let lookup_elapsed = cache_lookup_start.elapsed();
+      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+      if let Some(time_saved) = cached_response
+        .metadata
+        .time_saved_from_cache(lookup_elapsed)
+      {
+        let time_saved = time_saved.as_millis() as u64;
+        workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
+        workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+      }
+      // When we successfully use the cache, we change the description and increase the level
+      // (but not so much that it will be logged by default).
+      workunit.update_metadata(|initial| {
+        initial.map(|(initial, _)| {
+          (
+            WorkunitMetadata {
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              ..initial
+            },
+            Level::Debug,
+          )
+        })
+      });
+      Ok((cached_response, true))
+    } else {
+      // Note that we don't increment a counter here, as there is nothing of note in this
+      // scenario: the remote cache did not save unnecessary local work, nor was the remote
+      // trip unusually slow such that local execution was faster.
+      local_execution_future.await.map(|res| (res, false))
+    }
+  }
+
   /// Stores an execution result into the remote Action Cache.
   async fn update_action_cache(
     &self,
     result: &FallibleProcessResultWithPlatform,
-    metadata: &ProcessMetadata,
+    instance_name: Option<String>,
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
@@ -372,11 +405,7 @@ impl CommandRunner {
       client,
       move |mut client| {
         let update_action_cache_request = remexec::UpdateActionResultRequest {
-          instance_name: metadata
-            .instance_name
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| "".to_owned()),
+          instance_name: instance_name.clone().unwrap_or_else(|| "".to_owned()),
           action_digest: Some(action_digest.into()),
           action_result: Some(action_result.clone()),
           ..remexec::UpdateActionResultRequest::default()
@@ -450,20 +479,27 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, _execute_request) =
-      make_execute_request(&request, self.metadata.clone())?;
-    let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
+    let (action, command, _execute_request) = make_execute_request(
+      &request,
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
+    )?;
+    let failures_cached = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
       crate::remote::ensure_action_stored_locally(&self.store, &command, &action).await?;
 
-    let (result, hit_cache) = if self.cache_read {
+    let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
+      || request.cache_scope == ProcessCacheScope::Successful;
+
+    let (result, hit_cache) = if self.cache_read && use_remote_cache {
       self
         .speculate_read_action_cache(
           context.clone(),
           cache_lookup_start,
           action_digest,
+          failures_cached,
           &request.clone(),
           self.inner.run(context.clone(), workunit, request),
         )
@@ -475,37 +511,45 @@ impl crate::CommandRunner for CommandRunner {
       )
     };
 
-    if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
+    if !hit_cache
+      && (result.exit_code == 0 || failures_cached)
+      && self.cache_write
+      && use_remote_cache
+    {
       let command_runner = self.clone();
       let result = result.clone();
-      let _write_join = self.executor.spawn(in_workunit!(
-        "remote_cache_write",
-        Level::Trace,
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
-          let write_result = command_runner
-            .update_action_cache(
-              &result,
-              &command_runner.metadata,
-              &command,
-              action_digest,
-              command_digest,
-            )
-            .await;
-          match write_result {
-            Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
-            Err(err) => {
-              command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
-              workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
-            }
-          };
-        }
-        // NB: We must box the future to avoid a stack overflow.
-        .boxed()
-      ));
+      let write_fut = in_workunit!("remote_cache_write", Level::Trace, |workunit| async move {
+        workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
+        let write_result = command_runner
+          .update_action_cache(
+            &result,
+            command_runner.instance_name.clone(),
+            &command,
+            action_digest,
+            command_digest,
+          )
+          .await;
+        match write_result {
+          Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+          Err(err) => {
+            command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
+            workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
+          }
+        };
+      }
+      // NB: We must box the future to avoid a stack overflow.
+      .boxed());
+      let task_name = format!("remote cache write {:?}", action_digest);
+      context
+        .tail_tasks
+        .spawn_on(&task_name, self.executor.handle(), write_fut.boxed());
     }
 
     Ok(result)
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    self.inner.shutdown().await
   }
 }
 
@@ -519,7 +563,7 @@ impl crate::CommandRunner for CommandRunner {
 async fn check_action_cache(
   action_digest: Digest,
   command_description: &str,
-  metadata: &ProcessMetadata,
+  instance_name: Option<String>,
   platform: Platform,
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -541,7 +585,7 @@ async fn check_action_cache(
         move |mut client| {
           let request = remexec::GetActionResultRequest {
             action_digest: Some(action_digest.into()),
-            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
+            instance_name: instance_name.clone().unwrap_or_default(),
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);

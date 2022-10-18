@@ -12,7 +12,7 @@ from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
@@ -51,6 +51,7 @@ class LocalPantsRunner:
 
     options: Options
     options_bootstrapper: OptionsBootstrapper
+    session_end_tasks_timeout: float
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
@@ -63,7 +64,7 @@ class LocalPantsRunner:
         options_initializer: OptionsInitializer,
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         run_id: str,
         options: Options,
         scheduler: GraphScheduler | None = None,
@@ -98,7 +99,7 @@ class LocalPantsRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    CompleteEnvironment: env,
+                    CompleteEnvironmentVars: env,
                 }
             ),
             cancellation_latch=cancellation_latch,
@@ -107,7 +108,7 @@ class LocalPantsRunner:
     @classmethod
     def create(
         cls,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         options_bootstrapper: OptionsBootstrapper,
         options_initializer: OptionsInitializer | None = None,
         scheduler: GraphScheduler | None = None,
@@ -123,13 +124,14 @@ class LocalPantsRunner:
         :param scheduler: If being called from the daemon, a warmed scheduler to use.
         """
         options_initializer = options_initializer or OptionsInitializer(options_bootstrapper)
-        build_config, options = options_initializer.build_config_and_options(
-            options_bootstrapper, env, raise_=True
+        build_config = options_initializer.build_config(options_bootstrapper, env)
+        union_membership = UnionMembership.from_rules(build_config.union_rules)
+        options = options_initializer.options(
+            options_bootstrapper, env, build_config, union_membership, raise_=True
         )
         stdio_destination_use_color(options.for_global_scope().colors)
 
         run_tracker = RunTracker(options_bootstrapper.args, options)
-        union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
@@ -166,6 +168,7 @@ class LocalPantsRunner:
         return cls(
             options=options,
             options_bootstrapper=options_bootstrapper,
+            session_end_tasks_timeout=global_bootstrap_options.session_end_tasks_timeout,
             build_config=build_config,
             run_tracker=run_tracker,
             specs=specs,
@@ -274,6 +277,9 @@ class LocalPantsRunner:
             try:
                 engine_result = self._run_inner()
             finally:
+                self.graph_session.scheduler_session.wait_for_tail_tasks(
+                    self.session_end_tasks_timeout
+                )
                 metrics = self.graph_session.scheduler_session.metrics()
                 self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                 self.run_tracker.end_run(engine_result)

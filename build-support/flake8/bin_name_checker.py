@@ -63,7 +63,7 @@ def check_for_hardcoded_pants_bin_name(
         yield (
             lineno,
             colno,
-            "PANTSBIN Don't hardcode `./pants`, use `from pants.util.docutil.bin_name` instead",
+            "PNT10 Don't hardcode `./pants`, use `from pants.util.docutil.bin_name` instead",
             None,
         )
 

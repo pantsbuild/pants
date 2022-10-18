@@ -98,6 +98,7 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
 
 class DependeesGoal(Goal):
     subsystem_cls = DependeesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

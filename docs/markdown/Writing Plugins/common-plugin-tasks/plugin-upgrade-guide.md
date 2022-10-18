@@ -9,6 +9,106 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `EnvironmentName` is now required to run processes, get environment variables, etc
+
+Pants 2.15 introduces the concept of ["Target Environments"](doc:environments), which allow Pants to execute processes in remote or local containerized environments (using Docker), and to specify configuration values for those environments. 
+
+In order to support the new environments feature, an `EnvironmentName` parameter is now required in order to:
+* Run a `Process`
+* Get environment variables
+* Inspect the current `Platform`
+
+This parameter is often provided automatically from a transitive value provided earlier in the call graph. The choice of whether to use a local or alternative environment must be made at a `@goal_rule` level.
+
+In many cases, the local execution environment is sufficient. If so, your rules will not require significant work to migrate, and execution will behave similarly to pre-2.15 versions of Pants.
+
+In cases where the environment needs to be factored into to rule execution, you'll need to do some work. 
+
+2.15 adds a deprecation warning for all goals that have not considered whether they need to use the execution environment.
+
+#### `Goal.environment_behavior`
+
+2.15 adds the `environment_behavior` property to the `Goal` class, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. 
+
+When `environment_behavior=Goal.EnvironmentBehavior.UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
+
+If your Goal only ever needs to use the local target environment, use `environment_behavior=Goal.EnvironmentBehavior.LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
+
+##### For goals that need to respect `EnvironmentField`s
+
+If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=Goal.EnvironmentBehavior.USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
+
+ In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+```python
+Get(
+    EnvironmentName,
+    EnvironmentNameRequest,
+    EnvironmentNameRequest.from_field_set(field_set),
+)
+```
+
+Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
+```python
+Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
+```
+The multi-parameter `Get` syntax provides the value transitively, and so will need to be used in many `Get` callsites in `@goal_rule`s which transitively run processes, consume the platform, etc. One exception is that (most of) the APIs provided by `pants.engine.target` are pinned to running in the `__local__` environment, and so do not require an `EnvironmentName` to use.
+
+
+#### `RuleRunner.inherent_environment`
+
+To reduce the number of changes necessary in tests, the `RuleRunner.inherent_environment` argument defaults to injecting an `EnvironmentName` when running `@rule`s in tests.
+
+### `platform` kwarg for `Process` deprecated
+
+Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
+platforms (OS x CPU architecture). You had to opt into platform awareness by setting the kwarg
+`platform` on the `Process`; otherwise, remote caching could incorrectly use results from a
+different platform.
+
+This was not a safe default, and this behavior also breaks the new Docker support. So, now all
+processes automatically are marked as platform-specific.
+
+https://github.com/pantsbuild/pants/issues/16873 proposes how you will eventually be able to mark
+a `Process` as platform-agnostic.
+
+To fix this deprecation, simply delete the `platform` kwarg.
+
+### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` renamed and moved
+
+The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have
+`Vars` in their names:
+
+Before: `pants.engine.environment.{Environment,EnvironmentRequest,CompleteEnvironment}`
+After: `pants.engine.env_vars.{EnvironmentVars,EnvironmentVarsRequest,CompleteEnvironmentVars}`
+
+The old names still exist until Pants 2.16 as deprecated aliases.
+
+This rename was to avoid ambiguity with the new "environments" mechanism, which lets users specify different options for environments like Linux vs. macOS and running in Docker images.
+
+### `MockGet` expects `input_types` kwarg, not `input_type`
+
+It's now possible in Pants 2.15 to use zero arguments or multiple arguments in a `Get`. To support this change, `MockGet` from `run_run_with_mocks()` now expects the kwarg `input_types: tuple[type, ...]` rather than `input_type: type`.
+
+Before:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_type=LintTargetsRequest,
+    mock=lambda _: LintResult(...),
+)
+```
+
+After:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_types=(LintTargetsRequest,),
+    mock=lambda _: LintResult(...),
+)
+```
+
 ### Deprecated `Platform.current`
 
 The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To

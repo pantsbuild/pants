@@ -99,12 +99,10 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(task_side_effected, m)?)?;
 
-  m.add_function(wrap_pyfunction!(tasks_add_query_inputs_filter, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
-  m.add_function(wrap_pyfunction!(tasks_add_select, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
 
   m.add_function(wrap_pyfunction!(write_digest, m)?)?;
@@ -137,6 +135,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
   m.add_function(wrap_pyfunction!(session_record_test_observation, m)?)?;
   m.add_function(wrap_pyfunction!(session_isolated_shallow_clone, m)?)?;
+  m.add_function(wrap_pyfunction!(session_wait_for_tail_tasks, m)?)?;
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
@@ -195,6 +194,8 @@ impl PyTypes {
     interactive_process: &PyType,
     interactive_process_result: &PyType,
     engine_aware_parameter: &PyType,
+    docker_resolve_image_request: &PyType,
+    docker_resolve_image_result: &PyType,
     py: Python,
   ) -> Self {
     Self(RefCell::new(Some(Types {
@@ -228,6 +229,8 @@ impl PyTypes {
       interactive_process: TypeId::new(interactive_process),
       interactive_process_result: TypeId::new(interactive_process_result),
       engine_aware_parameter: TypeId::new(engine_aware_parameter),
+      docker_resolve_image_request: TypeId::new(docker_resolve_image_request),
+      docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
     })))
   }
 }
@@ -303,7 +306,6 @@ impl PyRemotingOptions {
     cache_content_behavior: String,
     cache_rpc_concurrency: usize,
     cache_read_timeout_millis: u64,
-    execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
@@ -326,7 +328,6 @@ impl PyRemotingOptions {
       cache_content_behavior: CacheContentBehavior::from_str(&cache_content_behavior).unwrap(),
       cache_rpc_concurrency,
       cache_read_timeout: Duration::from_millis(cache_read_timeout_millis),
-      execution_extra_platform_properties,
       execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
@@ -476,7 +477,7 @@ struct PyResult {
   #[pyo3(get)]
   python_traceback: Option<String>,
   #[pyo3(get)]
-  engine_traceback: Vec<String>,
+  engine_traceback: Vec<(String, Option<String>)>,
 }
 
 fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
@@ -508,7 +509,10 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
         is_throw: true,
         result: val.into(),
         python_traceback: Some(python_traceback),
-        engine_traceback,
+        engine_traceback: engine_traceback
+          .into_iter()
+          .map(|ff| (ff.name, ff.desc))
+          .collect(),
       }
     }
   }
@@ -812,7 +816,7 @@ async fn workunit_to_py_value(
           .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest_handle) => {
-        let digest = (&**digest_handle)
+        let digest = (**digest_handle)
           .as_any()
           .downcast_ref::<DirectoryDigest>()
           .ok_or_else(|| {
@@ -844,7 +848,7 @@ async fn workunit_to_py_value(
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+      UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
         .as_any()
         .downcast_ref::<Value>()
         .ok_or_else(|| {
@@ -1108,17 +1112,12 @@ fn execution_add_root_select(
 }
 
 #[pyfunction]
-fn tasks_add_query_inputs_filter(py_tasks: &PyTasks, filtered_type: &PyType) {
-  let filtered_type = TypeId::new(filtered_type);
-  let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_query_inputs_filter(filtered_type);
-}
-
-#[pyfunction]
 fn tasks_task_begin(
   py_tasks: &PyTasks,
   func: PyObject,
   output_type: &PyType,
+  arg_types: Vec<&PyType>,
+  masked_types: Vec<&PyType>,
   side_effecting: bool,
   engine_aware_return_type: bool,
   cacheable: bool,
@@ -1131,12 +1130,16 @@ fn tasks_task_begin(
     .map_err(|e| PyException::new_err(format!("{}", e)))?;
   let func = Function(Key::from_value(func.into())?);
   let output_type = TypeId::new(output_type);
+  let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+  let masked_types = masked_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
   tasks.task_begin(
     func,
     output_type,
     side_effecting,
     engine_aware_return_type,
+    arg_types,
+    masked_types,
     cacheable,
     name,
     if desc.is_empty() { None } else { Some(desc) },
@@ -1171,13 +1174,6 @@ fn tasks_add_get_union(
   let in_scope_types = in_scope_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
   tasks.add_get_union(product, input_types, in_scope_types);
-}
-
-#[pyfunction]
-fn tasks_add_select(py_tasks: &PyTasks, selector: &PyType) {
-  let selector = TypeId::new(selector);
-  let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_select(selector);
 }
 
 #[pyfunction]
@@ -1312,6 +1308,25 @@ fn session_isolated_shallow_clone(
     .isolated_shallow_clone(build_id)
     .map_err(PyException::new_err)?;
   Ok(PySession(session_clone))
+}
+
+#[pyfunction]
+fn session_wait_for_tail_tasks(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_session: &PySession,
+  timeout: f64,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  let timeout = Duration::from_secs_f64(timeout);
+  core.executor.enter(|| {
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(py_session.0.tail_tasks().wait(timeout));
+    })
+  });
+  Ok(())
 }
 
 #[pyfunction]
