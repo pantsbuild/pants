@@ -122,11 +122,7 @@ def single_target_run(
                     input_types=(TargetRootsToFieldSetsRequest,),
                     mock=lambda _: TargetRootsToFieldSets(targets_to_field_sets),
                 ),
-                MockGet(
-                    output_type=EnvironmentTarget,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda enr: rule_runner.request(EnvironmentTarget, [enr]),
-                ),
+                rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
                 MockGet(
                     output_type=RunRequest,
                     input_types=(RunFieldSet,),

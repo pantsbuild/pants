@@ -111,26 +111,10 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                         )
                     ),
                 ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(MergeDigests,),
-                    mock=lambda md: rule_runner.request(Digest, [md]),
-                ),
-                MockGet(
-                    output_type=EnvironmentTarget,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda enr: rule_runner.request(EnvironmentTarget, [enr]),
-                ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(AddPrefix,),
-                    mock=lambda ap: rule_runner.request(Digest, [ap]),
-                ),
-                MockGet(
-                    output_type=EnvironmentVars,
-                    input_types=(EnvironmentVarsRequest,),
-                    mock=lambda env: rule_runner.request(EnvironmentVars, [env]),
-                ),
+                rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
+                rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
+                rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
+                rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
@@ -143,6 +127,28 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
 
 
 def test_run_export_rule() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            UnionRule(ExportRequest, MockExportRequest),
+            QueryRule(Digest, [CreateDigest]),
+            QueryRule(EnvironmentVars, [EnvironmentVarsRequest]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+        ],
+        target_types=[MockTarget],
+    )
+    exit_code, stdout = run_export_rule(rule_runner, [make_target("foo/bar", "baz")])
+    assert exit_code == 0
+    assert "Wrote mock export for foo/bar:baz to dist/export/mock" in stdout
+    for filename in ["bar", "bar1", "bar2"]:
+        expected_dist_path = os.path.join(
+            rule_runner.build_root, "dist", "export", "mock", "foo", filename
+        )
+        assert os.path.isfile(expected_dist_path)
+        with open(expected_dist_path, "rb") as fp:
+            assert fp.read() == b"BAR"
+
+
+def test_bloop() -> None:
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
