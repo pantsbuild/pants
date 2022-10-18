@@ -753,6 +753,25 @@ async fn upload_missing_files() {
 }
 
 #[tokio::test]
+async fn upload_succeeds_for_digests_which_only_exist_remotely() {
+  let dir = TempDir::new().unwrap();
+  let cas = new_empty_cas();
+
+  let testdata = TestData::roland();
+
+  cas
+    .blobs
+    .lock()
+    .insert(testdata.fingerprint(), testdata.bytes());
+
+  // The data does not exist locally, but already exists remotely: succeed.
+  new_store(dir.path(), &cas.address())
+    .ensure_remote_has_recursive(vec![testdata.digest()])
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn upload_missing_file_in_directory() {
   let dir = TempDir::new().unwrap();
   let cas = new_empty_cas();
