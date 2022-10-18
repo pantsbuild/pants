@@ -92,6 +92,7 @@ class CoverageReportType(Enum):
     HTML = ("html", None)
     RAW = ("raw", None)
     JSON = ("json", None)
+    LCOV = ("lcov", None)
 
     _report_name: str
 
@@ -537,7 +538,8 @@ async def generate_coverage_reports(
         report_types.append(report_type)
         output_file = (
             f"coverage.{report_type.value}"
-            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            if report_type
+            in {CoverageReportType.XML, CoverageReportType.JSON, CoverageReportType.LCOV}
             else None
         )
         args = [report_type.report_name, f"--rcfile={coverage_config.path}"]
@@ -594,15 +596,15 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
-    report_file: PurePath | None
-    if report_type == CoverageReportType.HTML:
-        report_file = output_dir / "htmlcov" / "index.html"
-    elif report_type == CoverageReportType.XML:
-        report_file = output_dir / "coverage.xml"
-    elif report_type == CoverageReportType.JSON:
-        report_file = output_dir / "coverage.json"
-    else:
-        raise ValueError(f"Invalid coverage report type: {report_type}")
+    try:
+        report_file = {
+            CoverageReportType.HTML: output_dir / "htmlcov" / "index.html",
+            CoverageReportType.XML: output_dir / "coverage.xml",
+            CoverageReportType.JSON: output_dir / "coverage.json",
+            CoverageReportType.LCOV: output_dir / "coverage.lcov",
+        }[report_type]
+    except KeyError:
+        raise ValueError(f"Invalid coverage report type: {report_type}") from None
 
     return FilesystemCoverageReport(
         coverage_insufficient=coverage_insufficient,

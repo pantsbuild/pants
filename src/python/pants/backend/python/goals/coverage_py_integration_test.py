@@ -245,9 +245,9 @@ def test_coverage_raw() -> None:
     }
 
 
-def test_coverage_html_xml_json() -> None:
+def test_coverage_html_xml_json_lcov() -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
-        result = run_coverage(tmpdir, "--coverage-py-report=['xml', 'html', 'json']")
+        result = run_coverage(tmpdir, "--coverage-py-report=['xml', 'html', 'json', 'lcov']")
     coverage_path = Path(get_buildroot(), "dist", "coverage", "python")
     assert coverage_path.exists() is True
 
@@ -262,6 +262,10 @@ def test_coverage_html_xml_json() -> None:
 
     assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr
     json_coverage = coverage_path / "coverage.json"
+    assert json_coverage.exists() is True
+
+    assert "Wrote lcov coverage report to `dist/coverage/python`" in result.stderr
+    json_coverage = coverage_path / "coverage.lcov"
     assert json_coverage.exists() is True
 
 
