@@ -20,6 +20,7 @@ from pants.core.goals.run import (
     run,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.internals.specs_rules import (
@@ -120,6 +121,11 @@ def single_target_run(
                     output_type=TargetRootsToFieldSets,
                     input_types=(TargetRootsToFieldSetsRequest,),
                     mock=lambda _: TargetRootsToFieldSets(targets_to_field_sets),
+                ),
+                MockGet(
+                    output_type=EnvironmentTarget,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda enr: rule_runner.request(EnvironmentTarget, [enr]),
                 ),
                 MockGet(
                     output_type=RunRequest,

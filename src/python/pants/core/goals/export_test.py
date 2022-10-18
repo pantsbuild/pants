@@ -18,6 +18,7 @@ from pants.core.goals.export import (
     export,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
@@ -114,6 +115,11 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                     output_type=Digest,
                     input_types=(MergeDigests,),
                     mock=lambda md: rule_runner.request(Digest, [md]),
+                ),
+                MockGet(
+                    output_type=EnvironmentTarget,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda enr: rule_runner.request(EnvironmentTarget, [enr]),
                 ),
                 MockGet(
                     output_type=Digest,

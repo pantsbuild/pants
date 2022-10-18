@@ -614,8 +614,8 @@ def run_rule_with_mocks(
         if len(mock_gets) != len(task_rule.input_gets):
             raise ValueError(
                 f"Rule expected to receive Get providers for:\n"
-                f"{pformat(task_rule.input_gets)}\ngot:\n"
-                f"{pformat(mock_gets)}"
+                f"{pformat(mock_gets)}\ngot:\n"
+                f"{pformat(task_rule.input_gets)}"
             )
 
     res = rule(*(rule_args or ()))
