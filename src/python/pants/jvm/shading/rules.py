@@ -82,6 +82,11 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     toolcp_prefix = "__toolcp"
     immutable_input_digests = {toolcp_prefix: tool_classpath.digest}
 
+    system_properties: dict[str, str] = {
+        "verbose": str(jarjar.verbose),
+        "skipManifest": str(jarjar.skip_manifest),
+    }
+
     result = await Get(
         ProcessResult,
         JvmProcess(
@@ -96,7 +101,10 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
             classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
             input_digest=input_digest,
             extra_immutable_input_digests=immutable_input_digests,
-            extra_jvm_options=jarjar.jvm_options,
+            extra_jvm_options=[
+                *jarjar.jvm_options,
+                *[f"-D{prop}={value}" for prop, value in system_properties.items()],
+            ],
             description=f"Shading JAR {request.filename}",
             output_directories=(output_prefix,),
             level=LogLevel.DEBUG,
