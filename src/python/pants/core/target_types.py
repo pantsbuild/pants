@@ -722,7 +722,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 
 
 # -----------------------------------------------------------------------------------------------
-# `lockfile` and `lockfiles` targets
+# `_lockfile` and `_lockfiles` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -736,7 +736,7 @@ class LockfileDependenciesField(Dependencies):
 
 
 class LockfileTarget(Target):
-    alias = "lockfile"
+    alias = "_lockfile"
     core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
     help = softwrap(
         """
@@ -753,7 +753,7 @@ class LockfilesGeneratorSourcesField(MultipleSourcesField):
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):
-    alias = "lockfiles"
+    alias = "_lockfiles"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         LockfilesGeneratorSourcesField,
@@ -761,7 +761,7 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = LockfileTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (LockfileDependenciesField,)
-    help = "Generate a `lockfile` target for each file in the `sources` field."
+    help = "Generate a `_lockfile` target for each file in the `sources` field."
 
 
 def rules():

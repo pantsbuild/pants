@@ -272,6 +272,13 @@ async def setup_user_lockfile_requests(
 
 @dataclass(frozen=True)
 class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
+    """Register the type used to create synthetic targets for Python lockfiles.
+
+    As the paths for all lockfiles are known up-front, we set the `path` field to
+    `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS` so that we get a single request for all
+    our synthetic targets rather than one request per directory.
+    """
+
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
 
@@ -280,10 +287,7 @@ async def python_lockfile_synthetic_targets(
     request: PythonSyntheticLockfileTargetsRequest,
     python_setup: PythonSetup,
 ) -> SyntheticAddressMaps:
-    if (
-        not python_setup.enable_resolves
-        or request.path != SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
-    ):
+    if not python_setup.enable_resolves:
         return SyntheticAddressMaps()
 
     resolves = [
@@ -296,7 +300,7 @@ async def python_lockfile_synthetic_targets(
             (
                 os.path.join(spec_path, "BUILD.python-lockfiles"),
                 tuple(
-                    TargetAdaptor("lockfiles", name=name, sources=[lockfile])
+                    TargetAdaptor("_lockfiles", name=name, sources=[lockfile])
                     for _, lockfile, name in lockfiles
                 ),
             )
