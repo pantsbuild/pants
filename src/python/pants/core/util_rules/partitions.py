@@ -38,6 +38,26 @@ class PartitionerType(Enum):
     DEFAULT_SINGLE_PARTITION = "default_single_partition"
     """Registers a partitioner which returns the inputs as a single partition."""
 
+    DEFAULT_ONE_PARTITION_PER_INPUT = "default_one_partition_per_input"
+    """Registers a partitioner which returns a single-element partition per input."""
+
+    def default_rules(self, cls, *, by_file: bool) -> Iterable:
+        if self == PartitionerType.CUSTOM:
+            # No default rules.
+            return
+        elif self == PartitionerType.DEFAULT_SINGLE_PARTITION:
+            if by_file:
+                yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
+            else:
+                yield from _single_partition_field_sets_partitioner_rules(cls)
+        elif self == PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT:
+            if by_file:
+                yield from _partition_per_input_field_sets_by_file_partitioner_rules(cls)
+            else:
+                yield from _partition_per_input_field_sets_partitioner_rules(cls)
+        else:
+            raise NotImplementedError(f"Partitioner type {self} is missing default rules!")
+
 
 class PartitionKey(Protocol):
     @property
@@ -176,6 +196,81 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
             if subsystem.skip
             else Partitions.single_partition(
                 itertools.chain.from_iterable(
+                    sources_paths.files for sources_paths in all_sources_paths
+                )
+            )
+        )
+
+    return collect_rules(locals())
+
+
+@memoized
+def _partition_per_input_field_sets_partitioner_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    a single-element partition per input."""
+
+    @rule(
+        _param_type_overrides={
+            "request": cls.PartitionRequest,
+            "subsystem": cls.tool_subsystem,
+        }
+    )
+    async def partitioner(
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
+    ) -> Partitions:
+        return (
+            Partitions()
+            if subsystem.skip
+            else Partitions((field_set.address, (field_set,)) for field_set in request.field_sets)
+        )
+
+    return collect_rules(locals())
+
+
+@memoized
+def _partition_per_input_field_sets_by_file_partitioner_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    a single-element partition per input."""
+
+    # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
+    # a better user experience.
+    sources_field_name = None
+    for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
+        if issubclass(fieldtype, SourcesField):
+            if sources_field_name is None:
+                sources_field_name = fieldname
+                break
+            raise TypeError(
+                f"Type {cls.field_set_type} has multiple `SourcesField` fields."
+                + " Pants can't provide a default partitioner."
+            )
+    else:
+        raise TypeError(
+            f"Type {cls.field_set_type} has does not have a `SourcesField` field."
+            + " Pants can't provide a default partitioner."
+        )
+
+    @rule(
+        _param_type_overrides={
+            "request": cls.PartitionRequest,
+            "subsystem": cls.tool_subsystem,
+        }
+    )
+    async def partitioner(
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
+    ) -> Partitions:
+        assert sources_field_name is not None
+        all_sources_paths = await MultiGet(
+            Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
+            for field_set in request.field_sets
+        )
+
+        return (
+            Partitions()
+            if subsystem.skip
+            else Partitions(
+                (path, (path,))
+                for path in itertools.chain.from_iterable(
                     sources_paths.files for sources_paths in all_sources_paths
                 )
             )
