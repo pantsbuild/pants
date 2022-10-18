@@ -349,7 +349,7 @@ class JarShadingRenameRule(JarShadingRule):
 
 @dataclass(frozen=True)
 class JarShadingRemoveRule(JarShadingRule):
-    alias = "shading_remove"
+    alias = "shading_zap"
     help = "Removes from the final artifact the occurences of the `pattern`."
 
     pattern: str
