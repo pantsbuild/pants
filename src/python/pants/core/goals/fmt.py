@@ -199,6 +199,7 @@ class FmtSubsystem(GoalSubsystem):
 
 class Fmt(Goal):
     subsystem_cls = FmtSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @rule_helper
