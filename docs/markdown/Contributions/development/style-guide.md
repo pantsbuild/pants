@@ -9,7 +9,7 @@ updatedAt: "2022-04-26T23:57:26.701Z"
 Reminder: running the autoformatters and linters
 ------------------------------------------------
 
-Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. Run these commands frequently when developing:
+Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. You may find it helpful to run these commands before pushing a PR:
 
 ```bash
 $ ./pants --changed-since=HEAD fmt
