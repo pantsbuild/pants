@@ -42,6 +42,10 @@ Options for `registries` in `pants.toml`:
 
  * `skip_push` - Do not push images to this registry during `./pants publish`.
 
+ * `local_name` - A shorter name to use for the image, useful if the address is unwieldy long. This
+   shorter name will also be used for the Pants `run` goal to reduce the number of image tags in
+   your Docker images for locally run images.
+
 Example:
 
 ```toml pants.toml
@@ -57,6 +61,7 @@ skip_push = true
 [docker.registries.company-registry3]
 address = "reg3.company.internal"
 repository = "{parent_directory}/{name}"
+local_name = "company"
 ```
 ```python src/example/BUILD
 docker_image(name="demo")

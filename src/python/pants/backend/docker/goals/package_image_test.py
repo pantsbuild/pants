@@ -1129,6 +1129,18 @@ ImageRefTest = namedtuple(
                 ),
             ),
         ),
+        ImageRefTest(
+            # Test registry `local_name` (#16354)
+            docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
+            registries=dict(
+                private={"address": "our.registry", "repository": "the/pkg", "local_name": "test"}
+            ),
+            expect_refs=(
+                "test/the/pkg:latest",
+                "our.registry/the/pkg:latest",
+                "docker.io/our-the/pkg:latest",
+            ),
+        ),
     ],
 )
 def test_image_ref_formatting(test: ImageRefTest) -> None:

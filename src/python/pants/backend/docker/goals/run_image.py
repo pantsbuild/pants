@@ -3,20 +3,32 @@
 
 from __future__ import annotations
 
-from typing import cast
+from dataclasses import dataclass
+from typing import Iterator, cast
 
 from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionRule
+
+
+@dataclass(frozen=True)
+class DockerRunFieldSet(DockerFieldSet, RunFieldSet):
+    def _image_refs_generator(self, *args, **kwargs) -> Iterator[str]:
+        # We only care for one image tag when executing an image, and the first one will be a
+        # `local_name` if there is one.
+        for image_ref in super()._image_refs_generator(*args, **kwargs):
+            yield image_ref
+            return
 
 
 @rule
 async def docker_image_run_request(
-    field_set: DockerFieldSet,
+    field_set: DockerRunFieldSet,
     docker: DockerBinary,
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
@@ -38,7 +50,7 @@ async def docker_image_run_request(
 
 @rule
 async def docker_image_run_debug_adapter_request(
-    field_set: DockerFieldSet,
+    field_set: DockerRunFieldSet,
 ) -> RunDebugAdapterRequest:
     raise NotImplementedError(
         "Debugging a Docker image using a debug adapter has not yet been implemented."
@@ -46,4 +58,7 @@ async def docker_image_run_debug_adapter_request(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        UnionRule(RunFieldSet, DockerRunFieldSet),
+    ]
