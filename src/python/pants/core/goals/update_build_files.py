@@ -15,10 +15,10 @@ from typing import DefaultDict, cast
 
 from colors import green, red
 
-from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
-from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
+from pants.backend.project_info.fix.deprecations import renamed_fields_rules, renamed_targets_rules
+from pants.backend.project_info.fix.deprecations.base import FixedBUILDFile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.rules import _run_yapf

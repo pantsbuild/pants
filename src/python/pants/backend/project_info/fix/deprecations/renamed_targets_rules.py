@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import tokenize
 
-from pants.backend.build_files.fix.base import FixBuildFilesRequest
-from pants.backend.build_files.fix.deprecations.base import FixBUILDRequest, FixedBUILDFile
-from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
+from pants.backend.project_info.fix.base import FixBuildFilesRequest
+from pants.backend.project_info.fix.deprecations.base import FixBUILDRequest, FixedBUILDFile
+from pants.backend.project_info.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot

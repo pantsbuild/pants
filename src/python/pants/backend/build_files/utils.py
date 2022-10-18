@@ -8,7 +8,6 @@ from typing import Iterable
 
 from pants.core.goals.fix import FixFilesRequest, Partitions
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.rules import collect_rules, rule
@@ -26,7 +25,7 @@ def _get_build_file_partitioner_rules(cls) -> Iterable:
         }
     )
     async def partition_build_files(
-        request: FixBuildFilesRequest.PartitionRequest,
+        request: FixFilesRequest.PartitionRequest,
         subsystem: SkippableSubsystem,
         build_file_options: BuildFileOptions,
     ) -> Partitions:
@@ -41,13 +40,3 @@ def _get_build_file_partitioner_rules(cls) -> Iterable:
         return Partitions.single_partition(specified_build_files)
 
     return collect_rules(locals())
-
-
-class FixBuildFilesRequest(FixFilesRequest):
-    partitioner_type = PartitionerType.CUSTOM
-
-    @classmethod
-    def _get_rules(cls) -> Iterable:
-        assert cls.partitioner_type is PartitionerType.CUSTOM
-        yield from _get_build_file_partitioner_rules(cls)
-        yield from super()._get_rules()
