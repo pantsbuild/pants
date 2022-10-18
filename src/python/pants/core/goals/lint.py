@@ -66,6 +66,7 @@ class LintResult(EngineAwareReturnType):
         request: LintRequest.SubPartition,
         process_result: FallibleProcessResult,
         *,
+        description: str | None = None,
         strip_chroot_path: bool = False,
         report: Digest = EMPTY_DIGEST,
     ) -> LintResult:
@@ -77,7 +78,7 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.key.description if request.key else None,
+            partition_description=description,
             report=report,
         )
 

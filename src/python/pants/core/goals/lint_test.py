@@ -508,7 +508,7 @@ def test_default_single_partition_partitioner() -> None:
         MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
+    assert partitions == Partitions([(None, field_sets)])
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])

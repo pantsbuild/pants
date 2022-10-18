@@ -95,7 +95,9 @@ async def bandit_lint(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.create(request, result, report=report)
+    return LintResult.create(
+        request, result, report=report, description=interpreter_constraints.description
+    )
 
 
 def rules():

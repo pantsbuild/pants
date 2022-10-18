@@ -202,7 +202,7 @@ async def run_pylint(
         ),
     )
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
-    return LintResult.create(request, result, report=report)
+    return LintResult.create(request, result, report=report, description=request.key.description)
 
 
 def rules():

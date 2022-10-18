@@ -68,7 +68,7 @@ async def run_helm_lint(
             description=f"Linting chart: {chart.info.name}",
         ),
     )
-    return LintResult.create(request, process_result)
+    return LintResult.create(request, process_result, description=chart.description)
 
 
 def rules():
