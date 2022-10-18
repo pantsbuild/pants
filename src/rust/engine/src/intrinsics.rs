@@ -437,23 +437,23 @@ fn create_digest_to_digest(
   let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
   let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
 
-  for item in items {
+  for item in &items {
     match item {
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
         let digest = Digest::of_bytes(&bytes);
-        bytes_to_store.push((Some(digest), bytes));
+        bytes_to_store.push((Some(digest), bytes.clone()));
         typed_paths.push(TypedPath::File {
           path: &path,
-          is_executable,
+          is_executable: *is_executable,
         });
         file_digests.insert(path.to_path_buf(), digest);
       }
       CreateDigestItem::FileEntry(path, digest, is_executable) => {
         typed_paths.push(TypedPath::File {
           path: &path,
-          is_executable,
+          is_executable: *is_executable,
         });
-        file_digests.insert(path.to_path_buf(), digest);
+        file_digests.insert(path.to_path_buf(), *digest);
       }
       CreateDigestItem::SymlinkEntry(path, target) => {
         typed_paths.push(TypedPath::Link(&target));
