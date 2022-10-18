@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, ClassVar, Iterable, Optional, Tuple, Tuple
+from typing import ClassVar, Iterable, Optional, Tuple
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -34,7 +34,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -327,34 +327,54 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 
 
 class JarShadingRule(ABC):
+    alias: ClassVar[str]
+    help: ClassVar[str]
+
     @abstractmethod
-    def to_jarjar_rule(self) -> str:
+    def encode(self) -> str:
         pass
 
 
 @dataclass(frozen=True)
 class JarShadingRenameRule(JarShadingRule):
+    alias = "shading_rename"
+    help = "Renames all occurrences of the given `pattern` by the `replacement`."
+
     pattern: str
     replacement: str
 
-    def to_jarjar_rule(self) -> str:
+    def encode(self) -> str:
         return f"rule {self.pattern} {self.replacement}"
 
 
 @dataclass(frozen=True)
 class JarShadingRemoveRule(JarShadingRule):
+    alias = "shading_remove"
+    help = "Removes from the final artifact the occurences of the `pattern`."
+
     pattern: str
 
-    def to_jarjar_rule(self) -> str:
+    def encode(self) -> str:
         return f"zap {self.pattern}"
 
 
 @dataclass(frozen=True)
 class JarShadingKeepRule(JarShadingRule):
+    alias = "shading_keep"
+    help = softwrap(
+        """
+        Keeps in the final artifact the occurences of the `pattern`
+        (and removes anything else).
+        """
+    )
+
     pattern: str
 
-    def to_jarjar_rule(self) -> str:
+    def encode(self) -> str:
         return f"keep {self.pattern}"
+
+
+JVM_JAR_SHADING_RULE_TYPES = [JarShadingRenameRule, JarShadingRemoveRule, JarShadingKeepRule]
 
 
 class JvmJarShadingRules(SequenceField[JarShadingRule]):
@@ -362,7 +382,18 @@ class JvmJarShadingRules(SequenceField[JarShadingRule]):
     required = False
     expected_element_type = JarShadingRule
     expected_type_description = "an iterable of ShadingRule"
-    help = "Shading rules to be applied to the final JAR artifact."
+    help = softwrap(
+        f"""
+        Shading rules to be applied to the final JAR artifact.
+
+        There are {pluralize(len(JVM_JAR_SHADING_RULE_TYPES), "possible shading rule")} available,
+        which are as follows:
+        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_JAR_SHADING_RULE_TYPES])}
+
+        When defining shading rules, just add them this field using the rule alias and passing along
+        the required parameters.
+        """
+    )
 
     @classmethod
     def compute_value(
@@ -566,8 +597,6 @@ def build_file_aliases():
     return BuildFileAliases(
         objects={
             JarDuplicateRule.alias: JarDuplicateRule,
-            "shading_rename": JarShadingRenameRule,
-            "shading_remove": JarShadingRemoveRule,
-            "shading_keep": JarShadingKeepRule,
+            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES}
         }
     )

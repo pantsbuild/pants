@@ -34,6 +34,7 @@ from pants.jvm.target_types import (
     JarShadingRenameRule,
     JvmArtifactTarget,
 )
+from pants.jvm.target_types import JVM_JAR_SHADING_RULE_TYPES, DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -67,11 +68,9 @@ def rule_runner() -> RuleRunner:
             JvmArtifactTarget,
             DeployJarTarget,
         ],
-        objects={JarDuplicateRule.alias: JarDuplicateRule},
         objects={
-            "shading_rename": JarShadingRenameRule,
-            "shading_remove": JarShadingRemoveRule,
-            "shading_keep": JarShadingKeepRule,
+            JarDuplicateRule.alias: JarDuplicateRule,
+            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES}
         },
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
