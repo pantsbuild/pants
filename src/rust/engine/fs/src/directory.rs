@@ -570,10 +570,9 @@ impl DigestTrie {
     digests
   }
 
-  /// Returns the files in the trie, not including symlinks pointing to files.
-  pub fn files(&self) -> Vec<PathBuf> {
+  pub fn files(&self, symlink_behavior: SymlinkBehavior) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+    self.walk(symlink_behavior, &mut |path, entry| {
       if let Entry::File(_) = entry {
         files.push(path.to_owned())
       }
@@ -581,10 +580,9 @@ impl DigestTrie {
     files
   }
 
-  /// Returns the directories in the trie, not including symlinks pointing to files.
-  pub fn directories(&self) -> Vec<PathBuf> {
+  pub fn directories(&self, symlink_behavior: SymlinkBehavior) -> Vec<PathBuf> {
     let mut directories = Vec::new();
-    self.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+    self.walk(symlink_behavior, &mut |path, entry| {
       match entry {
         Entry::Directory(d) if d.name.is_empty() => {
           // Is the root directory, which is not emitted here.

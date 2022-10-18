@@ -14,7 +14,7 @@ use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
   DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
-  EMPTY_DIRECTORY_DIGEST,
+  SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
@@ -180,7 +180,7 @@ impl PySnapshot {
       self
         .0
         .tree
-        .directories()
+        .directories(SymlinkBehavior::Oblivious)
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
@@ -188,7 +188,7 @@ impl PySnapshot {
       self
         .0
         .tree
-        .files()
+        .files(SymlinkBehavior::Oblivious)
         .into_iter()
         .map(|d| d.display().to_string())
         .collect::<Vec<_>>()
@@ -211,7 +211,7 @@ impl PySnapshot {
 
   #[getter]
   fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let files = self.0.tree.files();
+    let files = self.0.tree.files(SymlinkBehavior::Oblivious);
     PyTuple::new(
       py,
       files
@@ -223,7 +223,7 @@ impl PySnapshot {
 
   #[getter]
   fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let dirs = self.0.tree.directories();
+    let dirs = self.0.tree.directories(SymlinkBehavior::Oblivious);
     PyTuple::new(
       py,
       dirs
