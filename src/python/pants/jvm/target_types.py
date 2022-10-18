@@ -348,7 +348,7 @@ class JarShadingRenameRule(JarShadingRule):
 
 
 @dataclass(frozen=True)
-class JarShadingRemoveRule(JarShadingRule):
+class JarShadingZapRule(JarShadingRule):
     alias = "shading_zap"
     help = "Removes from the final artifact the occurences of the `pattern`."
 
@@ -374,7 +374,7 @@ class JarShadingKeepRule(JarShadingRule):
         return f"keep {self.pattern}"
 
 
-JVM_JAR_SHADING_RULE_TYPES = [JarShadingRenameRule, JarShadingRemoveRule, JarShadingKeepRule]
+JVM_JAR_SHADING_RULE_TYPES = [JarShadingRenameRule, JarShadingZapRule, JarShadingKeepRule]
 
 
 class JvmJarShadingRules(SequenceField[JarShadingRule]):
