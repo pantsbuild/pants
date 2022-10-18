@@ -390,11 +390,12 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
         fs = DockerFieldSet.create(tgt)
-        tags = fs.image_refs(
+        image_refs = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
             interpolation_context,
         )
+        tags = tuple(t.full_name for r in image_refs for t in r.tags)
         assert expect_tags == tags
 
     rule_runner.write_files(
@@ -1138,10 +1139,10 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
     registries = DockerRegistries.from_dict(test.registries)
     interpolation_context = InterpolationContext.from_dict({})
     with test.expect_error or no_exception():
-        assert (
-            field_set.image_refs(test.default_repository, registries, interpolation_context)
-            == test.expect_refs
+        image_refs = field_set.image_refs(
+            test.default_repository, registries, interpolation_context
         )
+        assert tuple(t.full_name for r in image_refs for t in r.tags) == test.expect_refs
 
 
 def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:

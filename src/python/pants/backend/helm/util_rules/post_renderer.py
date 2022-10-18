@@ -119,12 +119,14 @@ async def prepare_post_renderer_for_helm_deployment(
         # Choose first non-latest image reference found, or fallback to 'latest'.
         found_ref: str | None = None
         fallback_ref: str | None = None
-        for ref in image_refs:
-            if ref.endswith(":latest"):
-                fallback_ref = ref
-            else:
-                found_ref = ref
-                break
+        for registry in image_refs:
+            for tag in registry.tags:
+                ref = tag.full_name
+                if ref.endswith(":latest"):
+                    fallback_ref = ref
+                else:
+                    found_ref = ref
+                    break
 
         resolved_ref = found_ref or fallback_ref
         if resolved_ref:
