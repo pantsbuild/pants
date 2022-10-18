@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple
+from typing import Iterable, ClassVar, Iterable, Optional, Tuple, Tuple
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -258,6 +258,7 @@ class JvmArtifactResolveField(JvmResolveField):
     )
 
 
+@dataclass(frozen=True)
 class JvmArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
@@ -323,6 +324,51 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 # JAR support fields
 # -----------------------------------------------------------------------------------------------
+
+
+class JarShadingRule(ABC):
+    @abstractmethod
+    def to_jarjar_rule(self) -> str:
+        pass
+
+
+@dataclass(frozen=True)
+class JarShadingRenameRule(JarShadingRule):
+    pattern: str
+    replacement: str
+
+    def to_jarjar_rule(self) -> str:
+        return f"rule {self.pattern} {self.replacement}"
+
+
+@dataclass(frozen=True)
+class JarShadingRemoveRule(JarShadingRule):
+    pattern: str
+
+    def to_jarjar_rule(self) -> str:
+        return f"zap {self.pattern}"
+
+
+@dataclass(frozen=True)
+class JarShadingKeepRule(JarShadingRule):
+    pattern: str
+
+    def to_jarjar_rule(self) -> str:
+        return f"keep {self.pattern}"
+
+
+class JvmJarShadingRules(SequenceField[JarShadingRule]):
+    alias = "shading_rules"
+    required = False
+    expected_element_type = JarShadingRule
+    expected_type_description = "an iterable of ShadingRule"
+    help = "Shading rules to be applied to the final JAR artifact."
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JarShadingRule]], address: Address
+    ) -> Optional[Tuple[JarShadingRule, ...]]:
+        return super().compute_value(raw_value, address)
 
 
 @dataclass(frozen=True)
@@ -437,6 +483,7 @@ class DeployJarTarget(Target):
         JvmResolveField,
         DeployJarDuplicatePolicyField,
         RestartableField,
+        JvmJarShadingRules,
     )
     help = softwrap(
         """
@@ -516,4 +563,11 @@ def rules():
 
 
 def build_file_aliases():
-    return BuildFileAliases(objects={JarDuplicateRule.alias: JarDuplicateRule})
+    return BuildFileAliases(
+        objects={
+            JarDuplicateRule.alias: JarDuplicateRule,
+            "shading_rename": JarShadingRenameRule,
+            "shading_remove": JarShadingRemoveRule,
+            "shading_keep": JarShadingKeepRule,
+        }
+    )

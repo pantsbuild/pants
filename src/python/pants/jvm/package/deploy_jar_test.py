@@ -24,8 +24,16 @@ from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
+from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JarDuplicateRule, JvmArtifactTarget
+from pants.jvm.target_types import (
+    DeployJarTarget,
+    JarShadingKeepRule,
+    JarShadingRemoveRule,
+    JarShadingRenameRule,
+    JvmArtifactTarget,
+)
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -46,6 +54,7 @@ def rule_runner() -> RuleRunner:
             *java_dep_inf_rules(),
             *target_types_rules(),
             *util_rules(),
+            *shading_rules(),
             QueryRule(BashBinary, ()),
             QueryRule(UnzipBinary, ()),
             QueryRule(InternalJdk, ()),
@@ -59,6 +68,11 @@ def rule_runner() -> RuleRunner:
             DeployJarTarget,
         ],
         objects={JarDuplicateRule.alias: JarDuplicateRule},
+        objects={
+            "shading_rename": JarShadingRenameRule,
+            "shading_remove": JarShadingRemoveRule,
+            "shading_keep": JarShadingKeepRule,
+        },
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -335,6 +349,51 @@ def test_deploy_jar_coursier_deps_duplicate_policy(rule_runner: RuleRunner) -> N
                         ],
                         duplicate_policy=[
                             duplicate_rule(pattern="^org/pantsbuild/example/lib", action="replace")
+                        ]
+                    )
+
+                    java_sources(
+                        name="example",
+                        sources=["**/*.java", ],
+                        dependencies=[
+                            ":com.fasterxml.jackson.core_jackson-databind",
+                        ],
+                    )
+
+                    jvm_artifact(
+                        name = "com.fasterxml.jackson.core_jackson-databind",
+                        group = "com.fasterxml.jackson.core",
+                        artifact = "jackson-databind",
+                        version = "2.12.5",
+                    )
+                """
+            ),
+            "3rdparty/jvm/default.lock": COURSIER_LOCKFILE_SOURCE,
+            "Example.java": JAVA_MAIN_SOURCE,
+            "lib/ExampleLib.java": JAVA_JSON_MANGLING_LIB_SOURCE,
+        }
+    )
+
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+
+@maybe_skip_jdk_test    
+def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        output_path="dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
+                        shading_rules=[
+                            shading_rename(
+                                pattern="com.fasterxml.jackson.core.**",
+                                replacement="jackson.@1",
+                            )
                         ]
                     )
 

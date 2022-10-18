@@ -33,6 +33,13 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
     JvmDependenciesField,
+)
+from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
+from pants.jvm.strip_jar.strip_jar import StripJarRequest
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import (
+    JvmDependenciesField,
+    JvmJarShadingRules,
     JvmJdkField,
     JvmMainClassNameField,
 )
@@ -53,6 +60,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
+    shading_rules: JvmJarShadingRules
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
