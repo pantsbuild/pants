@@ -143,7 +143,7 @@ def run_scalafmt(
                 ScalafmtRequest.Batch(
                     "",
                     partition,
-                    key=key,
+                    partition_key=key,
                     snapshot=rule_runner.request(Snapshot, [PathGlobs(partition)]),
                 )
             ],

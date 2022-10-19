@@ -147,7 +147,7 @@ def run_tffmt(
             TffmtRequest.Batch(
                 "",
                 files,
-                key=key,
+                partition_key=key,
                 snapshot=input_sources.snapshot,
             ),
         ],
