@@ -440,27 +440,27 @@ fn create_digest_to_digest(
   for item in &items {
     match item {
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
-        let digest = Digest::of_bytes(&bytes);
+        let digest = Digest::of_bytes(bytes);
         bytes_to_store.push((Some(digest), bytes.clone()));
         typed_paths.push(TypedPath::File {
-          path: &path,
+          path,
           is_executable: *is_executable,
         });
         file_digests.insert(path.to_path_buf(), digest);
       }
       CreateDigestItem::FileEntry(path, digest, is_executable) => {
         typed_paths.push(TypedPath::File {
-          path: &path,
+          path,
           is_executable: *is_executable,
         });
         file_digests.insert(path.to_path_buf(), *digest);
       }
       CreateDigestItem::SymlinkEntry(path, target) => {
-        typed_paths.push(TypedPath::Link(&target));
+        typed_paths.push(TypedPath::Link { path, target });
         file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
       }
       CreateDigestItem::Dir(path) => {
-        typed_paths.push(TypedPath::Dir(&path));
+        typed_paths.push(TypedPath::Dir(path));
         file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
       }
     }

@@ -400,7 +400,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -442,13 +442,15 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
 
 
 def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
-    digest = rule_runner.request(Digest, [CreateDigest([SymlinkEntry("a.ln", "b.txt")])])
+    digest = rule_runner.request(
+        Digest, [CreateDigest([SymlinkEntry("a.ln", "a.txt"), FileContent("a.txt", b"four\n")])]
+    )
     entries = rule_runner.request(DigestEntries, [digest])
     assert entries == DigestEntries(
         [
-            SymlinkEntry("a.ln", "b.txt"),
+            SymlinkEntry("a.ln", "a.txt"),
             FileEntry(
-                "b.txt",
+                "a.txt",
                 FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
             ),
         ]

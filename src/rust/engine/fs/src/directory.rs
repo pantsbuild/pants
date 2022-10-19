@@ -362,8 +362,14 @@ impl From<&Symlink> for remexec::SymlinkNode {
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
 // whether these types can be merged.
 pub enum TypedPath<'a> {
-  File { path: &'a Path, is_executable: bool },
-  Link(&'a Path),
+  File {
+    path: &'a Path,
+    is_executable: bool,
+  },
+  Link {
+    path: &'a Path,
+    target: &'a RelativePath,
+  },
   Dir(&'a Path),
 }
 
@@ -373,7 +379,7 @@ impl<'a> Deref for TypedPath<'a> {
   fn deref(&self) -> &Path {
     match self {
       TypedPath::File { path, .. } => path,
-      TypedPath::Link(l) => l,
+      TypedPath::Link { path, .. } => path,
       TypedPath::Dir(d) => d,
     }
   }
@@ -466,7 +472,7 @@ impl DigestTrie {
               is_executable,
             }));
           }
-          TypedPath::Link(target) => {
+          TypedPath::Link { target, .. } => {
             entries.push(Entry::Symlink(Symlink {
               name,
               target: RelativePath::new(prefix.join(target).as_path()).unwrap(),
