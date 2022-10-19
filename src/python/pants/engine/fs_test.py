@@ -443,7 +443,16 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
 
 def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
     digest = rule_runner.request(
-        Digest, [CreateDigest([SymlinkEntry("a.ln", "a.txt"), FileContent("a.txt", b"four\n")])]
+        Digest,
+        [
+            CreateDigest(
+                [
+                    SymlinkEntry("a.ln", "a.txt"),
+                    SymlinkEntry("b.ln", "b.txt"),
+                    FileContent("a.txt", b"four\n"),
+                ]
+            )
+        ],
     )
     entries = rule_runner.request(DigestEntries, [digest])
     assert entries == DigestEntries(
@@ -453,6 +462,7 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
                 "a.txt",
                 FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
             ),
+            SymlinkEntry("b.ln", "b.txt"),
         ]
     )
 
