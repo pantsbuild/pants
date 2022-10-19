@@ -191,3 +191,26 @@ def test_source_override(rule_runner: RuleRunner) -> None:
             TargetGeneratorSourcesHelperTarget({"source": "subdir/requirements.txt"}, file_addr),
         },
     )
+
+
+def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-enable-resolves"])
+    reqs_addr = Address("", target_name="reqs", relative_file_path="requirements.txt")
+    lock_addr = Address(
+        "3rdparty/python", target_name="python-default", relative_file_path="default.lock"
+    )
+    assert_python_requirements(
+        rule_runner,
+        "python_requirements(name='reqs')",
+        "ansicolors>=1.18.0",
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "requirements": ["ansicolors>=1.18.0"],
+                    "dependencies": [reqs_addr.spec, lock_addr.spec],
+                },
+                Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": reqs_addr.filename}, reqs_addr),
+        },
+    )

@@ -29,6 +29,8 @@ from pants.core.target_types import (
     FileTarget,
     GenericTarget,
     HTTPSource,
+    LockfilesGeneratorTarget,
+    LockfileTarget,
     RelocatedFiles,
     ResourcesGeneratorTarget,
     ResourceTarget,
@@ -91,15 +93,17 @@ def rules():
 def target_types():
     return [
         ArchiveTarget,
-        FileTarget,
-        FilesGeneratorTarget,
-        GenericTarget,
-        ResourceTarget,
-        ResourcesGeneratorTarget,
-        RelocatedFiles,
-        LocalEnvironmentTarget,
         DockerEnvironmentTarget,
+        FilesGeneratorTarget,
+        FileTarget,
+        GenericTarget,
+        LocalEnvironmentTarget,
+        LockfilesGeneratorTarget,
+        LockfileTarget,
+        RelocatedFiles,
         RemoteEnvironmentTarget,
+        ResourcesGeneratorTarget,
+        ResourceTarget,
     ]
 
 
