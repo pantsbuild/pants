@@ -278,7 +278,7 @@ async def partition_inputs(
 
 @rule(desc="Lint with regex patterns", level=LogLevel.DEBUG)
 async def lint_with_regex_patterns(
-    request: RegexLintRequest.SubPartition[Any, str], regex_lint_subsystem: RegexLintSubsystem
+    request: RegexLintRequest.Batch[Any, str], regex_lint_subsystem: RegexLintSubsystem
 ) -> LintResult:
     multi_matcher = regex_lint_subsystem.get_multi_matcher()
     assert multi_matcher is not None

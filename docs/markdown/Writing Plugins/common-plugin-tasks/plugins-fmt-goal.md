@@ -101,11 +101,11 @@ class ShfmtRequest(FmtTargetsRequest):
 
 # 3. Create `fmt` rules
 
-You will need a rule for `fmt` which takes the `FmtTargetsRequest.SubPartition` from step 3  (e.g. `ShfmtRequest`) as a parameter and returns a `FmtResult`.
+You will need a rule for `fmt` which takes the `FmtTargetsRequest.Batch` from step 3  (e.g. `ShfmtRequest`) as a parameter and returns a `FmtResult`.
 
 ```python
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: Platform) -> FmtResult:
+async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platform) -> FmtResult:
     download_shfmt_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
@@ -152,7 +152,7 @@ async def shfmt_fmt(request: ShfmtRequest.SubPartition, shfmt: Shfmt, platform: 
     return await FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest.SubPartition` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
+The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 

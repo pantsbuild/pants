@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             package.find_all_packageable_targets,
             *source_files.rules(),
             QueryRule(Partitions, [HadolintRequest.PartitionRequest]),
-            QueryRule(LintResult, [HadolintRequest.SubPartition]),
+            QueryRule(LintResult, [HadolintRequest.Batch]),
         ],
         target_types=[DockerImageTarget],
     )
@@ -53,10 +53,10 @@ def run_hadolint(
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [HadolintRequest.SubPartition("", subpartition, key)],
+            [HadolintRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

@@ -53,7 +53,7 @@ async def partition_buf(
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(
-    request: BufLintRequest.SubPartition[Any, BufFieldSet], buf: BufSubsystem, platform: Platform
+    request: BufLintRequest.Batch[Any, BufFieldSet], buf: BufSubsystem, platform: Platform
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,

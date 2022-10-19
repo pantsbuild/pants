@@ -63,8 +63,8 @@ async def partition_tffmt(
 
 
 @rule(desc="Format with `terraform fmt`")
-async def tffmt_fmt(request: TffmtRequest.SubPartition, tffmt: TfFmtSubsystem) -> FmtResult:
-    directory = cast(PartitionKey, request.key).directory
+async def tffmt_fmt(request: TffmtRequest.Batch, tffmt: TfFmtSubsystem) -> FmtResult:
+    directory = cast(PartitionKey, request.partition_key).directory
     result = await Get(
         ProcessResult,
         TerraformProcess(

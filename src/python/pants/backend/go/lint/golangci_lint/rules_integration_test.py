@@ -53,7 +53,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
             QueryRule(Partitions, [GolangciLintRequest.PartitionRequest]),
-            QueryRule(LintResult, [GolangciLintRequest.SubPartition]),
+            QueryRule(LintResult, [GolangciLintRequest.Batch]),
             SubsystemRule(GolangciLint),
         ],
     )
@@ -108,10 +108,8 @@ def run_golangci_lint(
         ],
     )
     results = []
-    for key, subpartition in partition.items():
-        result = rule_runner.request(
-            LintResult, [GolangciLintRequest.SubPartition("", subpartition, key)]
-        )
+    for key, batch in partition.items():
+        result = rule_runner.request(LintResult, [GolangciLintRequest.Batch("", batch, key)])
         results.append(result)
     return tuple(results)
 
