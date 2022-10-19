@@ -26,7 +26,7 @@ class BlackRequest(FmtTargetsRequest):
 
 @rule_helper
 async def _run_black(
-    request: FmtRequest.SubPartition,
+    request: FmtRequest.Batch,
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
@@ -110,8 +110,8 @@ async def partition_black(
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(request: BlackRequest.SubPartition, black: Black) -> FmtResult:
-    return await _run_black(request, black, cast(InterpreterConstraints, request.key))
+async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
+    return await _run_black(request, black, cast(InterpreterConstraints, request.partition_key))
 
 
 def rules():

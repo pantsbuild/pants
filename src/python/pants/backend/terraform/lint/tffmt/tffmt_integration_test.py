@@ -56,7 +56,7 @@ def rule_runner() -> RuleRunner:
             *tool.rules(),
             *source_files.rules(),
             QueryRule(Partitions, (TffmtRequest.PartitionRequest,)),
-            QueryRule(FmtResult, (TffmtRequest.SubPartition,)),
+            QueryRule(FmtResult, (TffmtRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
@@ -144,10 +144,10 @@ def run_tffmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            TffmtRequest.SubPartition(
+            TffmtRequest.Batch(
                 "",
                 files,
-                key=key,
+                partition_key=key,
                 snapshot=input_sources.snapshot,
             ),
         ],

@@ -21,6 +21,7 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -457,6 +458,7 @@ async def generate_from_python_requirement(
     request: GenerateFromPoetryRequirementsRequest,
     build_root: BuildRoot,
     union_membership: UnionMembership,
+    python_setup: PythonSetup,
 ) -> GeneratedTargets:
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
@@ -475,6 +477,15 @@ async def generate_from_python_requirement(
         ),
         union_membership,
     )
+
+    req_deps = [file_tgt.address.spec]
+
+    resolve = request.template.get(
+        PythonRequirementResolveField.alias, python_setup.default_resolve
+    )
+    lockfile = python_setup.resolves.get(resolve) if python_setup.enable_resolves else None
+    if lockfile:
+        req_deps.append(f"{lockfile}:{resolve}")
 
     digest_contents = await Get(
         DigestContents,
@@ -500,9 +511,7 @@ async def generate_from_python_requirement(
         normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
         tgt_overrides = overrides.pop(normalized_proj_name, {})
         if Dependencies.alias in tgt_overrides:
-            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
-                file_tgt.address.spec
-            ]
+            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + req_deps
 
         return PythonRequirementTarget(
             {
@@ -514,7 +523,7 @@ async def generate_from_python_requirement(
                 ),
                 # This may get overridden by `tgt_overrides`, which will have already added in
                 # the file tgt.
-                Dependencies.alias: [file_tgt.address.spec],
+                Dependencies.alias: req_deps,
                 **tgt_overrides,
             },
             request.template_address.create_generated(parsed_req.project_name),

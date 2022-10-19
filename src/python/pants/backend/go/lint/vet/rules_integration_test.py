@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *assembly.rules(),
             QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
-            QueryRule(LintResult, [GoVetRequest.SubPartition]),
+            QueryRule(LintResult, [GoVetRequest.Batch]),
             SubsystemRule(GoVetSubsystem),
         ],
     )
@@ -100,10 +100,10 @@ def run_go_vet(
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.SubPartition("", subpartition, key)],
+            [GoVetRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

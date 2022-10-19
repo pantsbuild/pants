@@ -41,7 +41,7 @@ class YapfRequest(FmtTargetsRequest):
 
 @rule_helper
 async def _run_yapf(
-    request: FmtRequest.SubPartition,
+    request: FmtRequest.Batch,
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:
@@ -77,7 +77,7 @@ async def _run_yapf(
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
-async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
+async def yapf_fmt(request: YapfRequest.Batch, yapf: Yapf) -> FmtResult:
     return await _run_yapf(request, yapf)
 
 

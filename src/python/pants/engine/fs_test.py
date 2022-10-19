@@ -1016,6 +1016,7 @@ def test_workspace_in_goal_rule() -> None:
 
     class WorkspaceGoal(Goal):
         subsystem_cls = WorkspaceGoalSubsystem
+        environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
     @dataclass(frozen=True)
     class DigestRequest:

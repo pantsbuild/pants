@@ -49,7 +49,7 @@ class FmtResult(EngineAwareReturnType):
     @staticmethod
     @rule_helper(_public=True)
     async def create(
-        request: FmtRequest.SubPartition,
+        request: FmtRequest.Batch,
         process_result: ProcessResult | FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -123,7 +123,7 @@ class FmtRequest(LintRequest):
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @frozen_after_init
     @dataclass(unsafe_hash=True)
-    class SubPartition(LintRequest.SubPartition):
+    class Batch(LintRequest.Batch):
         snapshot: Snapshot
 
         @property
@@ -134,7 +134,7 @@ class FmtRequest(LintRequest):
     def _get_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_rules()
         yield UnionRule(FmtRequest, cls)
-        yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
+        yield UnionRule(FmtRequest.Batch, cls.Batch)
 
 
 class FmtTargetsRequest(FmtRequest, LintTargetsRequest):
@@ -165,15 +165,15 @@ class FmtFilesRequest(FmtRequest, LintFilesRequest):
         yield UnionRule(FmtFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class _FmtSubpartitionBatchElement(NamedTuple):
-    request_type: type[FmtRequest.SubPartition]
+class _FmtBatchElement(NamedTuple):
+    request_type: type[FmtRequest.Batch]
     tool_name: str
     files: tuple[str, ...]
     key: Any
 
 
-class _FmtSubpartitionBatchRequest(Collection[_FmtSubpartitionBatchElement]):
-    """Request to serially format all the subpartitions in the given batch."""
+class _FmtBatchRequest(Collection[_FmtBatchElement]):
+    """Request to serially format all the elements in the given batch."""
 
 
 @dataclass(frozen=True)
@@ -199,6 +199,7 @@ class FmtSubsystem(GoalSubsystem):
 
 class Fmt(Goal):
     subsystem_cls = FmtSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @rule_helper
@@ -265,7 +266,7 @@ async def fmt(
     if not partitions_by_request_type:
         return Fmt(exit_code=0)
 
-    def batch(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
+    def batch_by_size(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
@@ -275,7 +276,7 @@ async def fmt(
         for batch in batches:
             yield tuple(batch)
 
-    def _make_disjoint_subpartition_batch_requests() -> Iterable[_FmtSubpartitionBatchRequest]:
+    def _make_disjoint_batch_requests() -> Iterable[_FmtBatchRequest]:
         partition_infos: Sequence[Tuple[Type[FmtRequest], Any]]
         files: Sequence[str]
 
@@ -291,20 +292,20 @@ async def fmt(
             files_by_partition_info[tuple(partition_infos)].append(file)
 
         for partition_infos, files in files_by_partition_info.items():
-            for subpartition in batch(files):
-                yield _FmtSubpartitionBatchRequest(
-                    _FmtSubpartitionBatchElement(
-                        request_type.SubPartition,
+            for batch in batch_by_size(files):
+                yield _FmtBatchRequest(
+                    _FmtBatchElement(
+                        request_type.Batch,
                         request_type.tool_name,
-                        subpartition,
+                        batch,
                         partition_key,
                     )
                     for request_type, partition_key in partition_infos
                 )
 
     all_results = await MultiGet(
-        Get(_FmtBatchResult, _FmtSubpartitionBatchRequest, request)
-        for request in _make_disjoint_subpartition_batch_requests()
+        Get(_FmtBatchResult, _FmtBatchRequest, request)
+        for request in _make_disjoint_batch_requests()
     )
 
     individual_results = list(
@@ -321,19 +322,19 @@ async def fmt(
 
 @rule
 async def fmt_batch(
-    request: _FmtSubpartitionBatchRequest,
+    request: _FmtBatchRequest,
 ) -> _FmtBatchResult:
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
     for request_type, tool_name, files, key in request:
-        subpartition = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(FmtResult, FmtRequest.SubPartition, subpartition)
+        batch = request_type(tool_name, files, key, current_snapshot)
+        result = await Get(FmtResult, FmtRequest.Batch, batch)
         results.append(result)
 
         assert set(result.output.files) == set(
-            subpartition.files
-        ), f"Expected {result.output.files} to match {subpartition.files}"
+            batch.files
+        ), f"Expected {result.output.files} to match {batch.files}"
         current_snapshot = result.output
     return _FmtBatchResult(tuple(results))
 

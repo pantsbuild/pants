@@ -153,6 +153,7 @@ class CheckDefaultToolsSubsystem(GoalSubsystem):
 
 class CheckDefaultTools(Goal):
     subsystem_cls = CheckDefaultToolsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

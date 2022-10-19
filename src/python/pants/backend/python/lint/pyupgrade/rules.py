@@ -36,7 +36,7 @@ class PyUpgradeRequest(FixTargetsRequest):
 
 
 @rule(desc="Fix with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_fix(request: PyUpgradeRequest.SubPartition, pyupgrade: PyUpgrade) -> FixResult:
+async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -> FixResult:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
     result = await Get(

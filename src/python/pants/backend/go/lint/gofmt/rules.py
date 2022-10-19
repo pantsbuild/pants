@@ -39,7 +39,7 @@ class GofmtRequest(FmtTargetsRequest):
 
 
 @rule(desc="Format with gofmt")
-async def gofmt_fmt(request: GofmtRequest.SubPartition, goroot: GoRoot) -> FmtResult:
+async def gofmt_fmt(request: GofmtRequest.Batch, goroot: GoRoot) -> FmtResult:
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
