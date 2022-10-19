@@ -9,6 +9,68 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `lint` and `fmt` schema changes
+
+In order to accomplish several goals (namely targetless formatters and unifying the implementation of `lint`)
+`lint` and `fmt` have undergone a drastic change of their plugin API.
+
+#### 1. `Lint<Targets|Files>Request` and `FmtTargetsRequest` now require a `tool_subsystem` class attribute.
+
+Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTargetsRequest` require
+subclasses to provide a `tool_subsystem` class attribute with a value of your tool's `Subsystem` subclass.
+
+#### 2. Your tool subsystem should have a `skip` option.
+
+Although not explictly not required by the engine to function correctly, `mypy` will complain if the
+subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
+
+Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declaration.
+
+#### 3. The core goals now use a 2-rule approach
+
+Fmt:
+
+In order to support targetless formatters, `fmt` needs to know which _files_ you'll be operating on.
+Therefore the plugin API for `fmt` has forked into 2 rules:
+
+1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
+2. A rule taking `<RequestType>.SubPartition` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
+
+This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
+that don't overlap.
+
+(Why are targetless formatters something we want to support? This allows us to have `BUILD` file formatters,
+formatters like `Prettier` running on your codebase *without* boilerplate targets, as well as Pants
+doing interesting deprecation fixers on its own files)
+
+The partitioner rule gives you all the matching files (or `FieldSet`s depending on which class you
+subclassed) and you'll return a mapping from `<key>` to files (called a Partition).
+The `<key>` can be anything passable at the rule boundary and is given back to you in your runner rule.
+The partitioner rule gives you an opportunity to perform expensive `Get`s once for the entire run,
+to partition the inputs based on metadata to simplify your runner, and to have a place for easily
+skipping your tool if requested.
+
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.SubPartition`),
+which now has a `.files` property.
+
+If you don't require any `Get`s or metadata for your tool in your partitioner rule,
+Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass,
+set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only
+provide a runner rule.
+
+-----
+
+Lint:
+
+Lint plugins are almost identical to format plugins, except in 2 ways:
+
+1. Your partitioner rule still returns a `Partitions` object, but the element type can be anything.
+2. `<RequestType>.SubPartition` has a `.elements` field instead of `.files`.
+
+-----
+
+As always, taking a look at Pants' own plugins can also be very enlightening.
+
 ### `EnvironmentName` is now required to run processes, get environment variables, etc
 
 Pants 2.15 introduces the concept of ["Target Environments"](doc:environments), which allow Pants to execute processes in remote or local containerized environments (using Docker), and to specify configuration values for those environments. 
@@ -175,7 +237,7 @@ on `FieldSet`'s mechanisms for matching targets and getting field values.
 Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
 `GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
 distinguish what language a tool belongs to, which is used for options like
-`[python].resolves_to_constraints_file` to validate which resolve names are recognized. 
+`[python].resolves_to_constraints_file` to validate which resolve names are recognized.
 
 Things will still work if you do not make this change, other than the new options not recognizing
 your tool.

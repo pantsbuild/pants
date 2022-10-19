@@ -359,6 +359,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
 class GenerateLockfilesGoal(Goal):
     subsystem_cls = GenerateLockfilesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

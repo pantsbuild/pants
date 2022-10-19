@@ -270,6 +270,7 @@ class LintSubsystem(GoalSubsystem):
 
 class Lint(Goal):
     subsystem_cls = LintSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 def _print_results(

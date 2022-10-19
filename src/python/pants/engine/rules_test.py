@@ -264,6 +264,7 @@ class ExampleSubsystem(GoalSubsystem):
 
 class Example(Goal):
     subsystem_cls = ExampleSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
