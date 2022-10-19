@@ -19,8 +19,8 @@ from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.goals.generate_lockfiles import rules as generate_lockfiles_rules
 from pants.engine.fs import DigestContents
-from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_prefix
@@ -32,6 +32,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *lockfile_rules(),
             *pex.rules(),
+            *generate_lockfiles_rules(),
             QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
         ]
     )
@@ -197,7 +198,8 @@ def test_multiple_resolves() -> None:
     rule_runner = RuleRunner(
         rules=[
             setup_user_lockfile_requests,
-            SubsystemRule(PythonSetup),
+            *PythonSetup.rules(),  # type: ignore[call-arg]
+            *generate_lockfiles_rules(),
             QueryRule(UserGenerateLockfiles, [RequestedPythonUserResolveNames]),
         ],
         target_types=[PythonRequirementTarget],

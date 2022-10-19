@@ -13,6 +13,8 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
+    TargetsWithSpecifiedFields,
+    TargetsWithSpecifiedFieldsRequest,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
@@ -20,7 +22,6 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
@@ -132,13 +133,16 @@ async def validate_jvm_artifacts_for_resolve(
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedJVMUserResolveNames,
-    all_targets: AllTargets,
     jvm_subsystem: JvmSubsystem,
 ) -> UserGenerateLockfiles:
     resolve_to_artifacts: Mapping[str, OrderedSet[ArtifactRequirement]] = defaultdict(OrderedSet)
-    for tgt in sorted(all_targets, key=lambda t: t.address):
-        if not tgt.has_field(JvmArtifactResolveField):
-            continue
+
+    filtered_targets = await Get(
+        TargetsWithSpecifiedFields,
+        TargetsWithSpecifiedFieldsRequest((JvmArtifactResolveField,)),
+    )
+
+    for tgt in sorted(filtered_targets, key=lambda t: t.address):
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
         resolve = tgt[JvmResolveField].normalized_value(jvm_subsystem)
         resolve_to_artifacts[resolve].add(artifact)

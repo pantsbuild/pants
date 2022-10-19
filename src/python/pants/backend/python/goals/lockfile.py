@@ -32,6 +32,8 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
+    TargetsWithSpecifiedFields,
+    TargetsWithSpecifiedFieldsRequest,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
@@ -41,7 +43,6 @@ from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, Synth
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
-from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -241,15 +242,19 @@ def determine_python_user_resolves(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
+    requested: RequestedPythonUserResolveNames, python_setup: PythonSetup
 ) -> UserGenerateLockfiles:
     if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
-    for tgt in all_targets:
-        if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
-            continue
+
+    filtered_targets = await Get(
+        TargetsWithSpecifiedFields,
+        TargetsWithSpecifiedFieldsRequest((PythonRequirementResolveField, PythonRequirementsField)),
+    )
+
+    for tgt in filtered_targets:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
 
