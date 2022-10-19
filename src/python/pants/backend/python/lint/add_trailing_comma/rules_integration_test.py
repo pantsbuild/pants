@@ -68,7 +68,10 @@ def run_add_trailing_comma(
         FmtResult,
         [
             AddTrailingCommaRequest.Batch(
-                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+                "",
+                input_sources.snapshot.files,
+                partition_key=None,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )
