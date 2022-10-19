@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 
 import pytest
 
@@ -15,7 +16,7 @@ from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive, MaybeExtractArchiveRequest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestContents, Snapshot
 from pants.engine.target import AllTargets, CoarsenedTargets, CoarsenedTargetsRequest
 from pants.jvm import classpath
 from pants.jvm import compile as jvm_compile
@@ -141,7 +142,7 @@ def test_shade_commons_lang(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
         ShadedJar,
         [
             ShadeJarRequest(
-                filename=commons_lang_classpath.filenames[0],
+                path=commons_lang_classpath.filenames[0],
                 digest=commons_lang_classpath.digest,
                 rules=[
                     JarShadingRenameRule(
@@ -152,8 +153,11 @@ def test_shade_commons_lang(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
         ],
     )
 
+    assert shaded_jar.path
+    assert shaded_jar.digest != EMPTY_DIGEST
+
     jar_contents = _get_jar_contents_snapshot(
-        rule_runner, filename=shaded_jar.filename, digest=shaded_jar.digest
+        rule_runner, filename=shaded_jar.path, digest=shaded_jar.digest
     )
     non_meta_dir_names = [
         dirname
@@ -165,3 +169,42 @@ def test_shade_commons_lang(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
     )
 
     assert count_renamed_dirs == len(non_meta_dir_names)
+
+
+@maybe_skip_jdk_test
+def test_restore_input_path(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfileFixture) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": jarjar_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": jarjar_lockfile.requirements_as_jvm_artifact_targets(),
+        }
+    )
+
+    test_classpath_prefix = "__test"
+    commons_lang_classpath = _resolve_jar(
+        rule_runner, Coordinate.from_coord_str(_TEST_COMMONS_LANG_COORD)
+    )
+
+    input_digest = rule_runner.request(
+        Digest, [AddPrefix(commons_lang_classpath.digest, test_classpath_prefix)]
+    )
+    input_path = os.path.join(test_classpath_prefix, commons_lang_classpath.filenames[0])
+    shaded_jar = rule_runner.request(
+        ShadedJar,
+        [
+            ShadeJarRequest(
+                path=input_path,
+                digest=input_digest,
+                rules=[
+                    JarShadingRenameRule(
+                        pattern="org.apache.commons.lang.**", replacement="legacy.commons_lang.@1"
+                    )
+                ],
+            )
+        ],
+    )
+
+    assert shaded_jar.path == input_path
+
+    result_snapshot = rule_runner.request(Snapshot, [shaded_jar.digest])
+    assert input_path in result_snapshot.files

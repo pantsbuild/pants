@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple
+from typing import ClassVar, Iterable, Optional, Tuple, Type
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -384,10 +384,14 @@ class JarShadingKeepRule(JarShadingRule):
         return f"keep {self.pattern}"
 
 
-JVM_JAR_SHADING_RULE_TYPES = [JarShadingRenameRule, JarShadingZapRule, JarShadingKeepRule]
+JVM_JAR_SHADING_RULE_TYPES: list[Type[JarShadingRule]] = [
+    JarShadingRenameRule,
+    JarShadingZapRule,
+    JarShadingKeepRule,
+]
 
 
-class JvmJarShadingRules(SequenceField[JarShadingRule]):
+class JvmShadingRulesField(SequenceField[JarShadingRule]):
     alias = "shading_rules"
     required = False
     expected_element_type = JarShadingRule
@@ -524,7 +528,7 @@ class DeployJarTarget(Target):
         JvmResolveField,
         DeployJarDuplicatePolicyField,
         RestartableField,
-        JvmJarShadingRules,
+        JvmShadingRulesField,
     )
     help = softwrap(
         """
@@ -569,6 +573,7 @@ class JvmWarTarget(Target):
         JvmWarContentField,
         JvmWarDependenciesField,
         JvmWarDescriptorAddressField,
+        JvmShadingRulesField,
         OutputPathField,
     )
     help = softwrap(

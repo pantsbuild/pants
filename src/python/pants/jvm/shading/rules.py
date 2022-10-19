@@ -6,16 +6,25 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from os import path
+from pathlib import PurePath
 from typing import Iterable
 
-from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests, RemovePrefix
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+)
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
-from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel
+from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
 from pants.jvm.target_types import JarShadingRule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -26,34 +35,50 @@ logger = logging.getLogger(__name__)
 @dataclass(unsafe_hash=True)
 @frozen_after_init
 class ShadeJarRequest:
-    filename: str
+    path: PurePath
     digest: Digest
     rules: tuple[JarShadingRule, ...]
 
+    # JarJar configuration options
+    skip_manifest: bool
+    misplaced_class_strategy: MisplacedClassStrategy | None
+    verbose: bool
+
     def __init__(
-        self, *, filename: str, digest: Digest, rules: Iterable[JarShadingRule] | None = None
+        self,
+        *,
+        path: str | PurePath,
+        digest: Digest,
+        rules: Iterable[JarShadingRule] | None = None,
+        skip_manifest: bool = False,
+        misplaced_class_strategy: MisplacedClassStrategy | None = None,
+        verbose: bool = False
     ) -> None:
-        self.filename = filename
+        self.path = path if isinstance(path, PurePath) else PurePath(path)
         self.digest = digest
         self.rules = tuple(rules or ())
+        self.skip_manifest = skip_manifest
+        self.misplaced_class_strategy = misplaced_class_strategy
+        self.verbose = verbose
 
 
 @dataclass(frozen=True)
 class ShadedJar:
-    filename: str
+    path: str
     digest: Digest
 
 
+_JARJAR_MAIN_CLASS = "com.eed3si9n.jarjar.Main"
 _JARJAR_RULE_CONFIG_FILENAME = "__jarjar.rules"
 
 
 @rule(desc="Applies shading rules to a JAR file")
 async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) -> ShadedJar:
     if not request.rules:
-        return ShadedJar(filename=request.filename, digest=request.digest)
+        return ShadedJar(path=str(request.path), digest=request.digest)
 
     output_prefix = "__out"
-    output_filename = path.join(output_prefix, path.basename(request.filename))
+    output_filename = path.join(output_prefix, request.path.name)
 
     rule_config_content = "\n".join([rule.encode() for rule in request.rules])
     logger.debug(f"Using JarJar rule file with following rules:\n{rule_config_content}")
@@ -83,21 +108,23 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     immutable_input_digests = {toolcp_prefix: tool_classpath.digest}
 
     system_properties: dict[str, str] = {
-        "verbose": str(jarjar.verbose),
-        "skipManifest": str(jarjar.skip_manifest),
+        "verbose": str(request.verbose or jarjar.verbose),
+        "skipManifest": str(request.skip_manifest or jarjar.skip_manifest),
     }
-    if jarjar.misplaced_class_strategy:
-        system_properties["misplacedClassStrategy"] = jarjar.misplaced_class_strategy.value
+    if request.misplaced_class_strategy or jarjar.misplaced_class_strategy:
+        system_properties["misplacedClassStrategy"] = (
+            request.misplaced_class_strategy.value or jarjar.misplaced_class_strategy.value
+        )
 
     result = await Get(
         ProcessResult,
         JvmProcess(
             jdk=jdk,
             argv=[
-                JarJar._jvm_entry_point,
+                _JARJAR_MAIN_CLASS,
                 "process",
                 _JARJAR_RULE_CONFIG_FILENAME,
-                request.filename,
+                str(request.path),
                 output_filename,
             ],
             classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
@@ -107,14 +134,20 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
                 *jarjar.jvm_options,
                 *[f"-D{prop}={value}" for prop, value in system_properties.items()],
             ],
-            description=f"Shading JAR {request.filename}",
+            description=f"Shading JAR {request.path}",
             output_directories=(output_prefix,),
             level=LogLevel.DEBUG,
         ),
     )
 
     shaded_jar_digest = await Get(Digest, RemovePrefix(result.output_digest, output_prefix))
-    return ShadedJar(filename=path.basename(request.filename), digest=shaded_jar_digest)
+    if request.path.parents:
+        # Restore the folder structure of the original path in the output digest
+        shaded_jar_digest = await Get(
+            Digest, AddPrefix(shaded_jar_digest, str(request.path.parent))
+        )
+
+    return ShadedJar(path=str(request.path), digest=shaded_jar_digest)
 
 
 def rules():

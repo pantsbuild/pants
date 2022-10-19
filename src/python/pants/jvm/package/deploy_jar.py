@@ -38,10 +38,11 @@ from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JarShadingZapRule,
     JvmDependenciesField,
-    JvmJarShadingRules,
     JvmJdkField,
     JvmMainClassNameField,
+    JvmShadingRulesField,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
-    shading_rules: JvmJarShadingRules
+    shading_rules: JvmShadingRulesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -107,7 +108,8 @@ async def package_deploy_jar(
     Constructs a deploy ("fat") JAR file by
     1. Resolving/compiling a Classpath for the `root_address` target,
     2. Creating a deploy jar with a valid ZIP index and deduplicated entries
-    3. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
+    3. (optionally) Apply shading rules to the bytecode inside the jar file
+    4. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
     """
 
     if field_set.main_class.value is None:
@@ -141,7 +143,7 @@ async def package_deploy_jar(
     )
 
     #
-    # 3. Strip the JAR from  all non-reproducible metadata if requested so
+    # 4. Strip the JAR from  all non-reproducible metadata if requested so
     #
 
     if jvm.reproducible_jars:
@@ -152,6 +154,25 @@ async def package_deploy_jar(
                 filenames=(output_filename.name,),
             ),
         )
+    
+    #
+    # 3. Apply shading rules
+    #
+    if field_set.shading_rules.value:
+        shaded_jar = await Get(
+            ShadedJar,
+            ShadeJarRequest(
+                path=output_filename,
+                digest=renamed_output_digest,
+                rules=field_set.shading_rules.value,
+                skip_manifest=True,
+            ),
+        )
+        artifact = BuiltPackageArtifact(relpath=shaded_jar.path)
+        artifact_digest = shaded_jar.digest
+    else:
+        artifact = BuiltPackageArtifact(relpath=str(output_filename))
+        artifact_digest = renamed_output_digest
 
     renamed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
