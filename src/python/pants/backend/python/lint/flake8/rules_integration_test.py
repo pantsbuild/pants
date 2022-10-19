@@ -60,10 +60,10 @@ def run_flake8(
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, Batch in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.Batch("", Batch, key)],
+            [Flake8Request.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

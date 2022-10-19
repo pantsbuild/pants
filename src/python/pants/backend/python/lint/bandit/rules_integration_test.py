@@ -64,10 +64,10 @@ def run_bandit(
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, Batch in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.Batch("", Batch, key)],
+            [BanditRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

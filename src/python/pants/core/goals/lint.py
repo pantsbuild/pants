@@ -423,7 +423,7 @@ async def lint(
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
-    def batch(
+    def batch_by_size(
         iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
     ) -> Iterator[tuple[_T, ...]]:
         batches = partition_sequentially(
@@ -437,10 +437,10 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (Batch, key)
+            (batch, key)
             for partitions in partitions_list
             for key, partition in partitions.items()
-            for Batch in batch(partition)
+            for batch in batch_by_size(partition)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
     }
@@ -453,7 +453,7 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    Batchs = [
+    batches = [
         request_type.Batch(
             request_type.tool_name,
             elements,
@@ -465,23 +465,23 @@ async def lint(
     ]
 
     all_batch_results = await MultiGet(
-        Get(LintResult, LintRequest.Batch, request) for request in Batchs
+        Get(LintResult, LintRequest.Batch, request) for request in batches
     )
 
-    core_request_types_by_Batch_type = {
+    core_request_types_by_batch_type = {
         request_type.Batch: request_type for request_type in lint_request_types
     }
 
     formatter_failed = any(
         result.exit_code
-        for Batch, result in zip(Batchs, all_batch_results)
-        if core_request_types_by_Batch_type[type(Batch)].is_formatter
+        for batch, result in zip(batches, all_batch_results)
+        if core_request_types_by_batch_type[type(batch)].is_formatter
     )
 
     fixer_failed = any(
         result.exit_code
-        for Batch, result in zip(Batchs, all_batch_results)
-        if core_request_types_by_Batch_type[type(Batch)].is_fixer
+        for batch, result in zip(batches, all_batch_results)
+        if core_request_types_by_batch_type[type(batch)].is_fixer
     )
 
     results_by_tool = defaultdict(list)

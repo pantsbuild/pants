@@ -68,10 +68,10 @@ def run_spectral(
         [SpectralRequest.PartitionRequest(tuple(SpectralFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, Batch in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [SpectralRequest.Batch("", Batch, key)],
+            [SpectralRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

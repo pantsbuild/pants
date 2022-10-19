@@ -162,15 +162,15 @@ class FixFilesRequest(FixRequest, LintFilesRequest):
         yield UnionRule(FixFilesRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class _FixBatchBatchElement(NamedTuple):
+class _FixBatchElement(NamedTuple):
     request_type: type[FixRequest.Batch]
     tool_name: str
     files: tuple[str, ...]
     key: Any
 
 
-class _FixBatchBatchRequest(Collection[_FixBatchBatchElement]):
-    """Request to serially fix all the Batchs in the given batch."""
+class _FixBatchRequest(Collection[_FixBatchElement]):
+    """Request to serially fix all the elements in the given batch."""
 
 
 @dataclass(frozen=True)
@@ -262,7 +262,7 @@ async def fix(
     if not partitions_by_request_type:
         return Fix(exit_code=0)
 
-    def batch(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
+    def batch_by_size(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
@@ -272,7 +272,7 @@ async def fix(
         for batch in batches:
             yield tuple(batch)
 
-    def _make_disjoint_Batch_batch_requests() -> Iterable[_FixBatchBatchRequest]:
+    def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
         partition_infos: Sequence[Tuple[Type[FixRequest], Any]]
         files: Sequence[str]
 
@@ -288,20 +288,20 @@ async def fix(
             files_by_partition_info[tuple(partition_infos)].append(file)
 
         for partition_infos, files in files_by_partition_info.items():
-            for Batch in batch(files):
-                yield _FixBatchBatchRequest(
-                    _FixBatchBatchElement(
+            for batch in batch_by_size(files):
+                yield _FixBatchRequest(
+                    _FixBatchElement(
                         request_type.Batch,
                         request_type.tool_name,
-                        Batch,
+                        batch,
                         partition_key,
                     )
                     for request_type, partition_key in partition_infos
                 )
 
     all_results = await MultiGet(
-        Get(_FixBatchResult, _FixBatchBatchRequest, request)
-        for request in _make_disjoint_Batch_batch_requests()
+        Get(_FixBatchResult, _FixBatchRequest, request)
+        for request in _make_disjoint_batch_requests()
     )
 
     individual_results = list(
@@ -318,19 +318,19 @@ async def fix(
 
 @rule
 async def fix_batch(
-    request: _FixBatchBatchRequest,
+    request: _FixBatchRequest,
 ) -> _FixBatchResult:
     current_snapshot = await Get(Snapshot, PathGlobs(request[0].files))
 
     results = []
     for request_type, tool_name, files, key in request:
-        Batch = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(FixResult, FixRequest.Batch, Batch)
+        batch = request_type(tool_name, files, key, current_snapshot)
+        result = await Get(FixResult, FixRequest.Batch, batch)
         results.append(result)
 
         assert set(result.output.files) == set(
-            Batch.files
-        ), f"Expected {result.output.files} to match {Batch.files}"
+            batch.files
+        ), f"Expected {result.output.files} to match {batch.files}"
         current_snapshot = result.output
     return _FixBatchResult(tuple(results))
 

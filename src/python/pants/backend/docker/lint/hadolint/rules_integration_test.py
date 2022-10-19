@@ -53,10 +53,10 @@ def run_hadolint(
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, Batch in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [HadolintRequest.Batch("", Batch, key)],
+            [HadolintRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

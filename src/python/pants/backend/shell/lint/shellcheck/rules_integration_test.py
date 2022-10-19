@@ -55,10 +55,10 @@ def run_shellcheck(
         ],
     )
     results = []
-    for key, Batch in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [ShellcheckRequest.Batch("", Batch, key)],
+            [ShellcheckRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

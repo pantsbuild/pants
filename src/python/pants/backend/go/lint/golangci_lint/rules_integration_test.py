@@ -108,8 +108,8 @@ def run_golangci_lint(
         ],
     )
     results = []
-    for key, Batch in partition.items():
-        result = rule_runner.request(LintResult, [GolangciLintRequest.Batch("", Batch, key)])
+    for key, batch in partition.items():
+        result = rule_runner.request(LintResult, [GolangciLintRequest.Batch("", batch, key)])
         results.append(result)
     return tuple(results)
 
