@@ -392,6 +392,7 @@ class TailorSubsystem(GoalSubsystem):
 
 class TailorGoal(Goal):
     subsystem_cls = TailorSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:

@@ -90,6 +90,7 @@ class GoGenerateGoalSubsystem(GoalSubsystem):
 
 class GoGenerateGoal(Goal):
     subsystem_cls = GoGenerateGoalSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @dataclass(frozen=True)

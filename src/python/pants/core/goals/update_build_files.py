@@ -165,6 +165,7 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
 
 class UpdateBuildFilesGoal(Goal):
     subsystem_cls = UpdateBuildFilesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule(desc="Update all BUILD files", level=LogLevel.DEBUG)

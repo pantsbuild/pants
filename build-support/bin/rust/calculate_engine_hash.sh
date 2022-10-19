@@ -29,8 +29,6 @@ function calculate_current_hash() {
   # Assumes that PY is set to the path to the interpreter that will be used to build the
   # native engine. We only use this to extract the full Python version, so this can point
   # to a raw interpreter, not necessarily one in a venv with Pants requirements installed.
-  #
-  # NB: Ensure that this stays in sync with `githooks/prepare-commit-msg`.
   (
     cd "${REPO_ROOT}" || exit 1
     (
