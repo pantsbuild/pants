@@ -34,7 +34,7 @@ In order to support targetless formatters, `fmt` needs to know which _files_ you
 Therefore the plugin API for `fmt` has forked into 2 rules:
 
 1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
-2. A rule taking `<RequestType>.SubPartition` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
+2. A rule taking `<RequestType>.Batch` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
 
 This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
 that don't overlap.
@@ -50,7 +50,7 @@ The partitioner rule gives you an opportunity to perform expensive `Get`s once f
 to partition the inputs based on metadata to simplify your runner, and to have a place for easily
 skipping your tool if requested.
 
-The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.SubPartition`),
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`),
 which now has a `.files` property.
 
 If you don't require any `Get`s or metadata for your tool in your partitioner rule,
@@ -65,7 +65,7 @@ Lint:
 Lint plugins are almost identical to format plugins, except in 2 ways:
 
 1. Your partitioner rule still returns a `Partitions` object, but the element type can be anything.
-2. `<RequestType>.SubPartition` has a `.elements` field instead of `.files`.
+2. `<RequestType>.Batch` has a `.elements` field instead of `.files`.
 
 -----
 
