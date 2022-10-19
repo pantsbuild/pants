@@ -6,7 +6,7 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
-#     "com.googlecode.jarjar:jarjar:1.3,url=not_provided,jar=not_provided"
+#     "com.eed3si9n.jarjar:jarjar-assembly:1.8.1,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -14,13 +14,13 @@
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "com.googlecode.jarjar_jarjar_1.3.jar"
+file_name = "com.eed3si9n.jarjar_jarjar-assembly_1.8.1.jar"
 
 [entries.coord]
-group = "com.googlecode.jarjar"
-artifact = "jarjar"
-version = "1.3"
+group = "com.eed3si9n.jarjar"
+artifact = "jarjar-assembly"
+version = "1.8.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "4225c8ee1bf3079c4b07c76fe03c3e28809a22204db6249c9417efa4f804b3a7"
-serialized_bytes_length = 120251
+fingerprint = "4e478405fb2669e472eb8cc0464c98b51ca0085ce83d546f0db34ac2663c3bde"
+serialized_bytes_length = 4119444

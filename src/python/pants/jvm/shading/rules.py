@@ -86,13 +86,15 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
         "verbose": str(jarjar.verbose),
         "skipManifest": str(jarjar.skip_manifest),
     }
+    if jarjar.misplaced_class_strategy:
+        system_properties["misplacedClassStrategy"] = jarjar.misplaced_class_strategy.value
 
     result = await Get(
         ProcessResult,
         JvmProcess(
             jdk=jdk,
             argv=[
-                "com.tonicsystems.jarjar.Main",
+                JarJar._jvm_entry_point,
                 "process",
                 _JARJAR_RULE_CONFIG_FILENAME,
                 request.filename,

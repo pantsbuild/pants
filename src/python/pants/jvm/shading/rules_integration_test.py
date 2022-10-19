@@ -70,7 +70,7 @@ _TEST_COMMONS_LANG_COORD = "commons-lang:commons-lang:2.6"
 @pytest.fixture
 def jarjar_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
-        "jarjar.test.lock", ["com.googlecode.jarjar:jarjar:1.3", _TEST_COMMONS_LANG_COORD]
+        "jarjar.test.lock", ["com.eed3si9n.jarjar:jarjar-assembly:1.8.1", _TEST_COMMONS_LANG_COORD]
     )
 
 
