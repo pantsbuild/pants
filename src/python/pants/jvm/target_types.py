@@ -344,6 +344,18 @@ class JarShadingRule(ABC):
     def encode(self) -> str:
         pass
 
+    @abstractmethod
+    def validate(self) -> set[str]:
+        pass
+
+    @staticmethod
+    def _validate_field(value: str, *, name: str, invalid_chars: str) -> set[str]:
+        errors = []
+        for ch in invalid_chars:
+            if ch in value:
+                errors.append(f"`{name}` can not contain the character `{ch}`.")
+        return set(errors)
+
 
 @dataclass(frozen=True)
 class JarShadingRenameRule(JarShadingRule):
@@ -356,6 +368,49 @@ class JarShadingRenameRule(JarShadingRule):
     def encode(self) -> str:
         return f"rule {self.pattern} {self.replacement}"
 
+    def validate(self) -> set[str]:
+        errors: list[str] = []
+        errors.extend(
+            JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+        )
+        errors.extend(
+            JarShadingRule._validate_field(self.replacement, name="replacement", invalid_chars="/")
+        )
+        return set(errors)
+
+
+@dataclass(frozen=True)
+class JarShadingRelocateRule(JarShadingRule):
+    alias = "shading_relocate"
+    help = softwrap(
+        """
+        Relocates the classes under the given `package` under the new package name.
+        The default target package is `__shaded_by_pants__` if none provided in
+        the `into` parameter.
+        """
+    )
+
+    package: str
+    into: str | None
+
+    def encode(self) -> str:
+        if not self.into:
+            target_suffix = "__shaded_by_pants__"
+        else:
+            target_suffix = self.into
+        return f"rule {self.package}.** {target_suffix}.@1"
+
+    def validate(self) -> set[str]:
+        errors: list[str] = []
+        errors.extend(
+            JarShadingRule._validate_field(self.package, name="package", invalid_chars="/*")
+        )
+        if self.into:
+            errors.extend(
+                JarShadingRule._validate_field(self.into, name="into", invalid_chars="/*")
+            )
+        return set(errors)
+
 
 @dataclass(frozen=True)
 class JarShadingZapRule(JarShadingRule):
@@ -366,6 +421,9 @@ class JarShadingZapRule(JarShadingRule):
 
     def encode(self) -> str:
         return f"zap {self.pattern}"
+
+    def validate(self) -> set[str]:
+        return JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
 @dataclass(frozen=True)
@@ -383,37 +441,75 @@ class JarShadingKeepRule(JarShadingRule):
     def encode(self) -> str:
         return f"keep {self.pattern}"
 
+    def validate(self) -> set[str]:
+        return JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+
 
 JVM_JAR_SHADING_RULE_TYPES: list[Type[JarShadingRule]] = [
+    JarShadingRelocateRule,
     JarShadingRenameRule,
     JarShadingZapRule,
     JarShadingKeepRule,
 ]
 
 
-class JvmShadingRulesField(SequenceField[JarShadingRule]):
-    alias = "shading_rules"
-    required = False
-    expected_element_type = JarShadingRule
-    expected_type_description = "an iterable of ShadingRule"
-    help = softwrap(
+def _shading_rules_help(intro: str) -> str:
+    return softwrap(
         f"""
-        Shading rules to be applied to the final JAR artifact.
+        {intro}
 
         There are {pluralize(len(JVM_JAR_SHADING_RULE_TYPES), "possible shading rule")} available,
         which are as follows:
         {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_JAR_SHADING_RULE_TYPES])}
 
-        When defining shading rules, just add them this field using the rule alias and passing along
-        the required parameters.
+        When defining shading rules, just add them in this field using the previously listed rule
+        alias and passing along the required parameters.
         """
     )
+
+
+def _shading_rules_validate(shading_rules: Iterable[JarShadingRule]) -> set[str]:
+    validation_errors = []
+    for shading_rule in shading_rules:
+        found_errors = shading_rule.validate()
+        if found_errors:
+            validation_errors.append(
+                "\n".join(
+                    [
+                        f"in rule `{shading_rule.alias}`:",
+                        bullet_list(found_errors),
+                        "",
+                    ]
+                )
+            )
+    return set(validation_errors)
+
+
+class JvmShadingRulesField(SequenceField[JarShadingRule], metaclass=ABCMeta):
+    alias = "shading_rules"
+    required = False
+    expected_element_type = JarShadingRule
+    expected_type_description = "an iterable of ShadingRule"
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[JarShadingRule]], address: Address
     ) -> Optional[Tuple[JarShadingRule, ...]]:
-        return super().compute_value(raw_value, address)
+        computed_value = super().compute_value(raw_value, address)
+
+        if computed_value:
+            validation_errors = _shading_rules_validate(computed_value)
+            if validation_errors:
+                raise InvalidFieldException(
+                    "\n".join(
+                        [
+                            f"Invalid values for `{cls.alias}` provided in target {address}:\n",
+                            *validation_errors,
+                        ]
+                    )
+                )
+
+        return computed_value
 
 
 @dataclass(frozen=True)
@@ -517,6 +613,10 @@ class JvmMainClassNameField(StringField):
     )
 
 
+class DeployJarShadingRulesField(JvmShadingRulesField):
+    help = _shading_rules_help("Shading rules to be applied to the final JAR artifact.")
+
+
 class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
@@ -528,7 +628,7 @@ class DeployJarTarget(Target):
         JvmResolveField,
         DeployJarDuplicatePolicyField,
         RestartableField,
-        JvmShadingRulesField,
+        DeployJarShadingRulesField,
     )
     help = softwrap(
         """
@@ -565,6 +665,12 @@ class JvmWarContentField(SpecialCasedDependencies):
     )
 
 
+class JvmWarShadingRulesField(JvmShadingRulesField):
+    help = _shading_rules_help(
+        "Shading rules to be applied to the individual JAR artifacts embedded in the `WEB-INF/lib` folder."
+    )
+
+
 class JvmWarTarget(Target):
     alias = "jvm_war"
     core_fields = (
@@ -573,7 +679,7 @@ class JvmWarTarget(Target):
         JvmWarContentField,
         JvmWarDependenciesField,
         JvmWarDescriptorAddressField,
-        JvmShadingRulesField,
+        JvmWarShadingRulesField,
         OutputPathField,
     )
     help = softwrap(

@@ -48,10 +48,10 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.target_types import (
     JarShadingRule,
-    JvmShadingRulesField,
     JvmWarContentField,
     JvmWarDependenciesField,
     JvmWarDescriptorAddressField,
+    JvmWarShadingRulesField,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class PackageWarFileFieldSet(PackageFieldSet):
     dependencies: JvmWarDependenciesField
     descriptor: JvmWarDescriptorAddressField
     content: JvmWarContentField
-    shading_rules: JvmShadingRulesField
+    shading_rules: JvmWarShadingRulesField
 
 
 @dataclass(frozen=True)

@@ -29,7 +29,12 @@ from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
-from pants.jvm.target_types import JarShadingRenameRule, JvmArtifactFieldSet, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JarShadingRelocateRule,
+    JarShadingRenameRule,
+    JvmArtifactFieldSet,
+    JvmArtifactTarget,
+)
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -145,8 +150,8 @@ def test_shade_commons_lang(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
                 path=commons_lang_classpath.filenames[0],
                 digest=commons_lang_classpath.digest,
                 rules=[
-                    JarShadingRenameRule(
-                        pattern="org.apache.commons.lang.**", replacement="legacy.commons_lang.@1"
+                    JarShadingRelocateRule(
+                        package="org.apache.commons.lang", into="legacy.commons_lang"
                     )
                 ],
             )

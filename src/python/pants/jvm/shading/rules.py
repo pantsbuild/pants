@@ -25,7 +25,7 @@ from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
 from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
-from pants.jvm.target_types import JarShadingRule
+from pants.jvm.target_types import JarShadingRule, _shading_rules_validate
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
@@ -52,7 +52,7 @@ class ShadeJarRequest:
         rules: Iterable[JarShadingRule] | None = None,
         skip_manifest: bool = False,
         misplaced_class_strategy: MisplacedClassStrategy | None = None,
-        verbose: bool = False
+        verbose: bool = False,
     ) -> None:
         self.path = path if isinstance(path, PurePath) else PurePath(path)
         self.digest = digest
@@ -60,6 +60,10 @@ class ShadeJarRequest:
         self.skip_manifest = skip_manifest
         self.misplaced_class_strategy = misplaced_class_strategy
         self.verbose = verbose
+
+        validation_errors = _shading_rules_validate(self.rules)
+        if validation_errors:
+            raise ValueError("\n".join(["Invalid rules provided:\n", *validation_errors]))
 
 
 @dataclass(frozen=True)
@@ -111,10 +115,9 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
         "verbose": str(request.verbose or jarjar.verbose),
         "skipManifest": str(request.skip_manifest or jarjar.skip_manifest),
     }
-    if request.misplaced_class_strategy or jarjar.misplaced_class_strategy:
-        system_properties["misplacedClassStrategy"] = (
-            request.misplaced_class_strategy.value or jarjar.misplaced_class_strategy.value
-        )
+    misplaced_class_strategy = request.misplaced_class_strategy or jarjar.misplaced_class_strategy
+    if misplaced_class_strategy:
+        system_properties["misplacedClassStrategy"] = misplaced_class_strategy.value
 
     result = await Get(
         ProcessResult,

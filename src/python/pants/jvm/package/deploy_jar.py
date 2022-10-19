@@ -38,11 +38,10 @@ from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
-    JarShadingZapRule,
+    DeployJarShadingRulesField,
     JvmDependenciesField,
     JvmJdkField,
     JvmMainClassNameField,
-    JvmShadingRulesField,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
-    shading_rules: JvmShadingRulesField
+    shading_rules: DeployJarShadingRulesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
