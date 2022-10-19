@@ -480,6 +480,7 @@ impl Core {
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
+      && !remoting_opts.execution_enable
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the
@@ -487,6 +488,9 @@ impl Core {
       full_store.clone().into_local_only()
     } else {
       // Otherwise, the remote CAS should be visible everywhere.
+      //
+      // With remote execution, we do not always write remote results into the local cache, so it's
+      // important to always have access to the remote cache or else we will get missing digests.
       full_store.clone()
     };
 
