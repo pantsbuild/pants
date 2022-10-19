@@ -17,12 +17,12 @@ from pants.core.util_rules.system_binaries import (
     DiffBinaryRequest,
 )
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
@@ -40,7 +40,11 @@ class BufFieldSet(FieldSet):
 
 class BufFormatRequest(FmtTargetsRequest):
     field_set_type = BufFieldSet
-    name = "buf-format"
+    tool_subsystem = BufSubsystem  # type: ignore[assignment]
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "buf-format"
 
 
 @rule
@@ -60,7 +64,6 @@ async def partition_buf(
 async def run_buf_format(
     request: BufFormatRequest.SubPartition, buf: BufSubsystem, platform: Platform
 ) -> FmtResult:
-    snapshot = await BufFormatRequest.SubPartition.get_snapshot(request)
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
@@ -76,7 +79,7 @@ async def run_buf_format(
 
     input_digest = await Get(
         Digest,
-        MergeDigests((snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
+        MergeDigests((request.snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
     )
 
     argv = [
@@ -85,25 +88,24 @@ async def run_buf_format(
         "-w",
         *buf.format_args,
         "--path",
-        ",".join(snapshot.files),
+        ",".join(request.files),
     ]
     result = await Get(
         ProcessResult,
         Process(
             argv=argv,
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
             env={"PATH": binary_shims.bin_directory},
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(result, snapshot, output_snapshot, formatter_name=BufFormatRequest.name)
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        *BufFormatRequest.registration_rules(),
+        *BufFormatRequest.rules(),
     ]

@@ -213,7 +213,7 @@ class BuildConfiguration:
 
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
-            rules_and_queries = (*rule_index.rules, *rule_index.queries)
+            rules_and_queries: tuple[Rule, ...] = (*rule_index.rules, *rule_index.queries)
             for rule in rules_and_queries:
                 self._rule_to_providers[rule].append(plugin_or_backend)
             for union_rule in rule_index.union_rules:

@@ -7,15 +7,15 @@ createdAt: "2021-10-08T18:16:00.142Z"
 updatedAt: "2022-07-25T23:52:25.735Z"
 ---
 > 🚧 Go support is beta stage
-> 
+>
 > We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/projects/21)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like Cgo files and vendoring, which we'd love your input on how to prioritize!
-> 
+>
 > Please share feedback for what you need to use Pants with your Go project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
 
 > 👍 Why use Pants with Go?
-> 
+>
 > Go's builtin tooling is already excellent! Many projects may be fine only using Go's tooling, although Pants offers some unique benefits:
-> 
+>
 > - A consistent interface for all languages/tools in your repository, such as being able to run `./pants fmt lint check test package`.
 > - Integration with Git, such as running `./pants --changed-since=HEAD test`.
 > - Caching, such as caching test results on a per-package basis.
@@ -23,11 +23,11 @@ updatedAt: "2022-07-25T23:52:25.735Z"
 > - [Advanced project introspection](doc:project-introspection), such as finding all code that transitively depends on a certain package.
 
 > 📘 Example Go repository
-> 
+>
 > Check out [github.com/pantsbuild/example-golang](https://github.com/pantsbuild/example-golang) to try out Pants's Go support.
 
 > 🚧 Assumes you're using a single Go module
-> 
+>
 > We do not yet support multiple first-party Go modules. If you are using multiple modules, we invite you to share your use case on <https://github.com/pantsbuild/pants/issues/13114>. (For example, if you are using a `replace` directive.)
 
 Initial setup
@@ -40,7 +40,7 @@ First, activate the Go backend in `pants.toml`:
 backend_packages = ["pants.backend.experimental.go"]
 ```
 
-You may want to set the option `[golang].minimum_expected_version` to a value like `"1.17"`. Pants will use this to find a Go distribution that is the same version or newer. You still set your projects' Go version with `go.mod` with the `go` directive; this option is only used for Pants to discover a compatible Go distribution. 
+You may want to set the option `[golang].minimum_expected_version` to a value like `"1.17"`. Pants will use this to find a Go distribution that is the same version or newer. You still set your projects' Go version with `go.mod` with the `go` directive; this option is only used for Pants to discover a compatible Go distribution.
 
 You can also set `[golang].go_search_paths` to influence where Pants looks for Go, e.g. `["/usr/bin"]`. It defaults to your `PATH`.
 
@@ -83,7 +83,7 @@ pkg/runner:runner
 ```
 
 > 🚧 `go.mod` and `go.sum` need to be up-to-date
-> 
+>
 > Pants does not yet update your `go.mod` and `go.sum` for you; it only reads these files when downloading modules. Run `go mod download all` to make sure these files are correct.
 
 ### The `embed` directive and `resource` targets
@@ -100,6 +100,7 @@ go_package(dependencies=[":embeds"])
 
 resources(name="embeds", sources=["hello.txt"])
 ```
+
 ```go pkg/runner/lib.go
 package runner
 
@@ -109,6 +110,7 @@ import _ "embed"
 var s string
 print(s)
 ```
+
 ```text pkg/runner/hello.txt
 Hello world!
 ```
@@ -186,21 +188,23 @@ go_package(dependencies=[":testdata"])
 
 files(name="testdata", sources=["testdata/*"])
 ```
+
 ```go pkg/runner/foo_test.go
 package foo
 
 import (
-	"os"
-	"testing"
+ "os"
+ "testing"
 )
 
 func TestFilesAvailable(t *testing.T) {
-	_, err := os.Stat("testdata/f.txt")
-	if err != nil {
-		t.Fatalf("Could not stat pkg/runner/testdata/f.txt: %v", err)
-	}
+ _, err := os.Stat("testdata/f.txt")
+ if err != nil {
+  t.Fatalf("Could not stat pkg/runner/testdata/f.txt: %v", err)
+ }
 }
 ```
+
 ```text pkg/runner/testdata/f.txt
 "Hello world!"
 ```
@@ -260,3 +264,57 @@ To only run Gofmt, use `--fmt-only` and `--lint-only`:
 ```bash
 ❯ ./pants fmt --only=gofmt ::
 ```
+
+golangci-lint
+-------------
+
+Pants can run [golangci-lint](https://golangci-lint.run/) on your Go source
+code. To activate, add this to your `pants.toml`:
+
+```tomls pants.toml
+[GLOBAL]
+backend_packages = [
+  "pants.backend.experimental.go",
+  "pants.backend.experimental.go.lint.golangci_lint",
+]
+```
+
+Now you can run `./pants lint`:
+
+```
+$ ./pants lint main.go
+20:39:43.10 [ERROR] Completed: Lint with golangci-lint - golangci-lint failed (exit code 1).
+main.go:5:6: func `bad` is unused (unused)
+func bad() {
+      ^
+
+
+
+✕ golangci-lint failed.
+```
+
+Pants will automatically include any relevant `.golangci.yml`, `.golangci.yaml`,
+`.golangci.json`, or `.golangci.toml` files in the run. You can also pass
+command line arguments with `--golangci-lint-args='--tests --fast' or
+permanently set them in`pants.toml`.
+
+```toml
+[golangci-lint]
+args = ["--fast", "--tests"]
+```
+
+Temporarily disable golangci-lint with `--golangci-lint-skip`:
+
+```bash
+./pants --golangci-lint-skip lint ::
+```
+
+Only run golangci-lint with `--lint-only`:
+
+```bash
+./pants lint --only=golangci-lint ::
+```
+
+> 👍 Benefit of Pants: golangci-lint runs in parallel with other linters
+>
+> Pants will attempt to run all activated linters and formatters at the same time for improved performance, including [Python](doc:python-linters-and-formatters), Shell, Java, and Scala linters. You can see this through Pants's dynamic UI.

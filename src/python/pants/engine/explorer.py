@@ -50,6 +50,7 @@ class RequestState:
     all_help_info: AllHelpInfo
     build_configuration: BuildConfiguration
     scheduler_session: SchedulerSession
+    env_name: EnvironmentName
 
     def product_request(
         self,
@@ -60,7 +61,7 @@ class RequestState:
     ) -> T:
         result = self.scheduler_session.product_request(
             product,
-            [Params(*subjects)],
+            [Params(*subjects, self.env_name)],
             poll=poll,
             timeout=timeout,
         )

@@ -43,7 +43,7 @@ class ScalafmtFieldSet(FieldSet):
 
 class ScalafmtRequest(FmtTargetsRequest):
     field_set_type = ScalafmtFieldSet
-    name = ScalafmtSubsystem.options_scope
+    tool_subsystem = ScalafmtSubsystem
 
 
 class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -66,6 +66,10 @@ class PartitionInfo:
     classpath_entries: tuple[str, ...]
     config_snapshot: Snapshot
     extra_immutable_input_digests: FrozenDict[str, Digest]
+
+    @property
+    def description(self) -> str:
+        return self.config_snapshot.files[0]
 
 
 def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
@@ -119,7 +123,7 @@ async def gather_scalafmt_config_files(
 @rule
 async def partition_scalafmt(
     request: ScalafmtRequest.PartitionRequest, tool: ScalafmtSubsystem
-) -> Partitions:
+) -> Partitions[PartitionInfo]:
     if tool.skip:
         return Partitions()
 
@@ -172,11 +176,9 @@ async def scalafmt_fmt(
     request: ScalafmtRequest.SubPartition, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
     partition_info = cast(PartitionInfo, request.key)
-    original_snapshot = await ScalafmtRequest.SubPartition.get_snapshot(request)
-
     merged_digest = await Get(
         Digest,
-        MergeDigests([partition_info.config_snapshot.digest, original_snapshot.digest]),
+        MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest]),
     )
 
     result = await Get(
@@ -201,13 +203,7 @@ async def scalafmt_fmt(
         ),
     )
 
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        original_snapshot,
-        output_snapshot,
-        formatter_name=ScalafmtRequest.name,
-    )
+    return await FmtResult.create(request, result)
 
 
 @rule
@@ -221,6 +217,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        *ScalafmtRequest.registration_rules(),
+        *ScalafmtRequest.rules(),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -55,14 +56,14 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[Flake8FieldSet],
+        Partitions[Any, Flake8FieldSet],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.SubPartition(subpartition, key)],
+            [Flake8Request.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)
@@ -131,7 +132,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--flake8-lockfile=<none>"]
+    extra_args = ["--flake8-lockfile=<none>", "--flake8-version=flake8<4.0,>=3.9.2"]
 
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
@@ -204,13 +205,14 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            "--flake8-extra-requirements=flake8-bandit==3.0.0",
+            "--flake8-extra-requirements=flake8-bandit==4.1.1",
+            "--flake8-extra-requirements=setuptools==65.5.0",
             "--flake8-lockfile=<none>",
             "--flake8-extra-files=['.bandit']",
         ],
     )
     assert len(result) == 1
-    assert result[0].exit_code == 0
+    assert result[0].exit_code == 0, result[0].stderr
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:

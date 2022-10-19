@@ -11,7 +11,7 @@ from pants.backend.python.lint.autoflake.rules import rules as autoflake_rules
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.autoflake.subsystem import rules as autoflake_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fix import FixResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (AutoflakeRequest.SubPartition,)),
+            QueryRule(FixResult, (AutoflakeRequest.SubPartition,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -48,7 +48,7 @@ def run_autoflake(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> FmtResult:
+) -> FixResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.lint.autoflake", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -60,15 +60,15 @@ def run_autoflake(
             SourceFilesRequest(field_set.source for field_set in field_sets),
         ],
     )
-    fmt_result = rule_runner.request(
-        FmtResult,
+    fix_result = rule_runner.request(
+        FixResult,
         [
             AutoflakeRequest.SubPartition(
-                input_sources.snapshot.files, key=None, _snapshot=input_sources.snapshot
+                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
             ),
         ],
     )
-    return fmt_result
+    return fix_result
 
 
 def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
@@ -85,22 +85,22 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_autoflake(
+    fix_result = run_autoflake(
         rule_runner,
         [tgt],
         extra_args=[f"--autoflake-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
-    assert fmt_result.did_change is False
+    assert fix_result.stdout == ""
+    assert fix_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fix_result.did_change is False
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_autoflake(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
-    assert fmt_result.did_change is True
+    fix_result = run_autoflake(rule_runner, [tgt])
+    assert fix_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
+    assert fix_result.did_change is True
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -111,11 +111,11 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    fmt_result = run_autoflake(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
+    fix_result = run_autoflake(rule_runner, tgts)
+    assert fix_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
-    assert fmt_result.did_change is True
+    assert fix_result.did_change is True
 
 
 def test_stub_files(rule_runner: RuleRunner) -> None:
@@ -133,19 +133,19 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
     ]
-    fmt_result = run_autoflake(rule_runner, good_tgts)
-    assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(
+    fix_result = run_autoflake(rule_runner, good_tgts)
+    assert fix_result.stdout == ""
+    assert fix_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "good.pyi": GOOD_FILE}
     )
-    assert not fmt_result.did_change
+    assert not fix_result.did_change
 
     bad_tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.pyi")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    fmt_result = run_autoflake(rule_runner, bad_tgts)
-    assert fmt_result.output == get_snapshot(
+    fix_result = run_autoflake(rule_runner, bad_tgts)
+    assert fix_result.output == get_snapshot(
         rule_runner, {"bad.py": FIXED_BAD_FILE, "bad.pyi": FIXED_BAD_FILE}
     )
-    assert fmt_result.did_change
+    assert fix_result.did_change

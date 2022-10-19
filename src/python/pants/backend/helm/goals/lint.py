@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
@@ -32,13 +31,13 @@ class HelmLintFieldSet(HelmChartFieldSet):
 
 class HelmLintRequest(LintTargetsRequest):
     field_set_type = HelmLintFieldSet
-    name = HelmSubsystem.options_scope
+    tool_subsystem = HelmSubsystem  # type: ignore[assignment]
 
 
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-) -> Partitions[HelmLintFieldSet]:
+) -> Partitions[HelmChart, HelmLintFieldSet]:
     field_sets = tuple(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
@@ -48,11 +47,12 @@ async def partition_helm_lint(
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
-    request: HelmLintRequest.SubPartition[HelmLintFieldSet], helm_subsystem: HelmSubsystem
+    request: HelmLintRequest.SubPartition[HelmChart, HelmLintFieldSet],
+    helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1
     field_set = request.elements[0]
-    chart = cast(HelmChart, request.key)
+    chart = request.key
 
     argv = ["lint", chart.name]
 
@@ -68,12 +68,8 @@ async def run_helm_lint(
             description=f"Linting chart: {chart.info.name}",
         ),
     )
-    return LintResult.from_fallible_process_result(
-        process_result,
-        linter_name=HelmSubsystem.options_scope,
-        partition_description=chart.info.name,
-    )
+    return LintResult.create(request, process_result)
 
 
 def rules():
-    return [*collect_rules(), *tool.rules(), *HelmLintRequest.registration_rules()]
+    return [*collect_rules(), *tool.rules(), *HelmLintRequest.rules()]

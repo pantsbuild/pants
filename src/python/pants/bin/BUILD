@@ -38,15 +38,19 @@ target(
         "src/python/pants/backend/experimental/java",
         "src/python/pants/backend/experimental/java/debug_goals",
         "src/python/pants/backend/experimental/java/lint/google_java_format",
+        "src/python/pants/backend/experimental/javascript",
+        "src/python/pants/backend/experimental/javascript/lint/prettier",
         "src/python/pants/backend/experimental/kotlin",
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
         "src/python/pants/backend/experimental/openapi",
+        "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/python/lint/add_trailing_comma",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
+        "src/python/pants/backend/experimental/python/typecheck/pyright",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
@@ -82,11 +86,5 @@ pex_binary(
     strip_pex_env=False,
 )
 
-
-pyoxidizer_binary(
-    name="pants_oxidized_experimental",
-    dependencies=["src/python/pants:pants-packaged"],
-    entry_point="pants.bin.pants_loader",
-)
 
 python_tests(name="tests")

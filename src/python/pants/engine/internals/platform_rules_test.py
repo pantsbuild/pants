@@ -13,6 +13,7 @@ from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     DockerImageField,
     DockerPlatformField,
+    EnvironmentsSubsystem,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
@@ -33,18 +34,31 @@ from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_
 def test_current_platform() -> None:
     def assert_platform(
         *,
+        envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         remote_execution: bool,
         expected: Platform,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        env_subsystem = create_subsystem(
+            EnvironmentsSubsystem,
+            names={"name": "addr"} if envs_enabled else {},
+        )
         result = run_rule_with_mocks(
-            current_platform, rule_args=[EnvironmentTarget(env_tgt), global_options]
+            current_platform, rule_args=[EnvironmentTarget(env_tgt), global_options, env_subsystem]
         )
         assert result == expected
 
     assert_platform(env_tgt=None, remote_execution=False, expected=Platform.create_for_localhost())
-    assert_platform(env_tgt=None, remote_execution=True, expected=Platform.linux_x86_64)
+    assert_platform(
+        env_tgt=None, envs_enabled=False, remote_execution=True, expected=Platform.linux_x86_64
+    )
+    assert_platform(
+        env_tgt=None,
+        envs_enabled=True,
+        remote_execution=True,
+        expected=Platform.create_for_localhost(),
+    )
 
     for re in (False, True):
         assert_platform(
@@ -80,11 +94,16 @@ def test_current_platform() -> None:
 def test_complete_env_vars() -> None:
     def assert_env_vars(
         *,
+        envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         remote_execution: bool,
         expected_env: str,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        env_subsystem = create_subsystem(
+            EnvironmentsSubsystem,
+            names={"name": "addr"} if envs_enabled else {},
+        )
 
         def mock_env_process(process: Process) -> ProcessResult:
             return Mock(
@@ -99,6 +118,7 @@ def test_complete_env_vars() -> None:
                 ),
                 EnvironmentTarget(env_tgt),
                 global_options,
+                env_subsystem,
             ],
             mock_gets=[
                 MockGet(output_type=ProcessResult, input_types=(Process,), mock=mock_env_process)
@@ -107,7 +127,8 @@ def test_complete_env_vars() -> None:
         assert dict(result) == {expected_env: "true"}
 
     assert_env_vars(env_tgt=None, remote_execution=False, expected_env="LOCAL")
-    assert_env_vars(env_tgt=None, remote_execution=True, expected_env="REMOTE")
+    assert_env_vars(env_tgt=None, envs_enabled=False, remote_execution=True, expected_env="REMOTE")
+    assert_env_vars(env_tgt=None, envs_enabled=True, remote_execution=True, expected_env="LOCAL")
 
     for re in (False, True):
         assert_env_vars(
@@ -133,15 +154,15 @@ def test_complete_env_vars() -> None:
 
 def test_docker_complete_env_vars() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(CompleteEnvironmentVars, [])],
+        rules=[QueryRule(CompleteEnvironmentVars, [EnvironmentName])],
         target_types=[DockerEnvironmentTarget],
-        singleton_environment=EnvironmentName("docker"),
+        inherent_environment=EnvironmentName("docker"),
     )
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                _docker_environment(
+                docker_environment(
                     name='docker',
                     image='centos@sha256:a1801b843b1bfaf77c501e7a6d3f709401a1e0c83863037fa3aab063a7fdb9dc',
                     platform='linux_x86_64',

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -55,14 +56,14 @@ def run_buf(
         env_inherit={"PATH"},
     )
     partition = rule_runner.request(
-        Partitions[BufFieldSet],
+        Partitions[Any, BufFieldSet],
         [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BufLintRequest.SubPartition(subpartition, key)],
+            [BufLintRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

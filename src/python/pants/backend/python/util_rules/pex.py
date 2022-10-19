@@ -48,6 +48,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -55,7 +56,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
@@ -287,7 +287,9 @@ class OptionalPex:
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(
-    interpreter_constraints: InterpreterConstraints, pex_subsystem: PexSubsystem
+    interpreter_constraints: InterpreterConstraints,
+    pex_subsystem: PexSubsystem,
+    env_target: EnvironmentTarget,
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
@@ -326,10 +328,7 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
-            # NB: We want interpreter discovery to re-run fairly frequently
-            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
-            # per-Session). See #10769 for a solution that is less of a tradeoff.
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
@@ -502,7 +501,7 @@ async def _setup_pex_requirements(
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
-    request: PexRequest, python_setup: PythonSetup, platform: Platform, pex_subsystem: PexSubsystem
+    request: PexRequest, python_setup: PythonSetup, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
     argv = [

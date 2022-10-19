@@ -7,7 +7,6 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
@@ -80,20 +79,25 @@ class Subsystem(metaclass=_SubsystemMeta):
     class EnvironmentAware(metaclass=ABCMeta):
         """A separate container for options that may be redefined by the runtime environment.
 
-        To define environment-sensitive options, create an inner class in the `Subsystem` called
+        To define environment-aware options, create an inner class in the `Subsystem` called
         `EnvironmentAware`. Option fields share their scope with their enclosing `Subsystem`,
         and the values of fields will default to the values set through Pants' configuration.
 
-        To consume environment-sensitive options, inject the `EnvironmentAware` inner class into
+        To consume environment-aware options, inject the `EnvironmentAware` inner class into
         your rule.
+
+        Optionally, it is possible to specify environment variables that are required when
+        post-processing raw values provided by users (e.g. `<PATH>` special strings) by specifying
+        `env_vars_used_by_options`, and consuming `_options_env` in your post-processing property.
+        These environment variables will be requested at construction time.
         """
 
         subsystem: ClassVar[type[Subsystem]]
-        depends_on_env_vars: ClassVar[tuple[str, ...]] = ()
+        env_vars_used_by_options: ClassVar[tuple[str, ...]] = ()
 
         options: OptionValueContainer
         env_tgt: EnvironmentTarget
-        env_vars: EnvironmentVars = EnvironmentVars()
+        _options_env: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
             from pants.core.util_rules.environments import resolve_environment_sensitive_option
@@ -195,12 +199,13 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls,
             input_selectors=(),
-            func=partial_construct_subsystem,
             input_gets=(
                 AwaitableConstraints(
                     output_type=ScopedOptions, input_types=(Scope,), is_effect=False
                 ),
             ),
+            masked_types=(),
+            func=partial_construct_subsystem,
             canonical_name=name,
         )
 
@@ -224,7 +229,6 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls.EnvironmentAware,
             input_selectors=(cls, EnvironmentTarget),
-            func=inner,
             input_gets=(
                 AwaitableConstraints(
                     output_type=EnvironmentVars,
@@ -232,6 +236,8 @@ class Subsystem(metaclass=_SubsystemMeta):
                     is_effect=False,
                 ),
             ),
+            masked_types=(),
+            func=inner,
             canonical_name=name,
         )
 
@@ -270,10 +276,14 @@ class Subsystem(metaclass=_SubsystemMeta):
         """
         register = options.registration_function_for_subsystem(cls)
         plugin_option_containers = union_membership.get(cls.PluginOption)
-        for options_info in chain(
-            collect_options_info(cls),
-            collect_options_info(cls.EnvironmentAware),
-            *(collect_options_info(container) for container in plugin_option_containers),
+        for options_info in collect_options_info(cls):
+            register(*options_info.flag_names, **options_info.flag_options)
+        for options_info in collect_options_info(cls.EnvironmentAware):
+            register(*options_info.flag_names, environment_aware=True, **options_info.flag_options)
+        for options_info in (
+            option
+            for container in plugin_option_containers
+            for option in collect_options_info(container)
         ):
             register(*options_info.flag_names, **options_info.flag_options)
 
@@ -309,7 +319,9 @@ async def _construct_env_aware(
     t.options = subsystem_instance.options
     t.env_tgt = env_tgt
 
-    if t.depends_on_env_vars:
-        t.env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(t.depends_on_env_vars))
+    if t.env_vars_used_by_options:
+        t._options_env = await Get(
+            EnvironmentVars, EnvironmentVarsRequest(t.env_vars_used_by_options)
+        )
 
     return t

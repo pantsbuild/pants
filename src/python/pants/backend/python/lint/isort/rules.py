@@ -10,10 +10,10 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -34,7 +34,8 @@ class IsortFieldSet(FieldSet):
 
 class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    name = Isort.options_scope
+    tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -60,22 +61,12 @@ def generate_argv(
     return tuple(args)
 
 
-@rule
-async def partition_isort(request: IsortRequest.PartitionRequest, isort: Isort) -> Partitions:
-    return (
-        Partitions()
-        if isort.skip
-        else Partitions.single_partition(
-            field_set.source.file_path for field_set in request.field_sets
-        )
-    )
-
-
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResult:
-    snapshot = await IsortRequest.SubPartition.get_snapshot(request)
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, isort.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
+    )
     isort_pex, config_files = await MultiGet(isort_pex_get, config_files_get)
 
     # Isort 5+ changes how config files are handled. Determine which semantics we should use.
@@ -85,28 +76,27 @@ async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResu
         isort_info = isort_pex_info.find("isort")
         is_isort5 = isort_info is not None and isort_info.version.major >= 5
 
-    input_digest = await Get(Digest, MergeDigests((snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(snapshot.files, isort, is_isort5=is_isort5),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=snapshot.files,
+            output_files=request.files,
             description=f"Run isort on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, snapshot, output_snapshot, strip_chroot_path=True, formatter_name=IsortRequest.name
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        *IsortRequest.registration_rules(),
+        *IsortRequest.rules(),
         *pex.rules(),
     ]

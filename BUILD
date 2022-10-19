@@ -10,7 +10,14 @@ files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 python_test_utils(name="test_utils")
 
 # Used for experimenting with the new Docker support.
-_docker_environment(
+docker_environment(
     name="docker_env",
     image="python:3.9",
+)
+
+# See `build-support/reapi-sample-server/README.md` for information on how to use this environment
+# for internal testing.
+remote_environment(
+    name="buildgrid_remote",
+    python_bootstrap_search_path=["<PATH>"],
 )

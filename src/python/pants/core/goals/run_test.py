@@ -20,6 +20,7 @@ from pants.core.goals.run import (
     run,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.internals.specs_rules import (
@@ -121,6 +122,7 @@ def single_target_run(
                     input_types=(TargetRootsToFieldSetsRequest,),
                     mock=lambda _: TargetRootsToFieldSets(targets_to_field_sets),
                 ),
+                rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
                 MockGet(
                     output_type=RunRequest,
                     input_types=(RunFieldSet,),
@@ -133,7 +135,7 @@ def single_target_run(
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
-                    input_type=InteractiveProcess,
+                    input_types=(InteractiveProcess,),
                     mock=rule_runner.run_interactive_process,
                 ),
             ],

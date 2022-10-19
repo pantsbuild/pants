@@ -26,6 +26,7 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
@@ -238,12 +239,12 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
+      &DOCKER,
+      &IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
       named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
-      // TODO(#16767): Allow users to specify this via an option.
-      docker::ImagePullPolicy::OnlyIfLatestOrMissing,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
       matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
@@ -312,13 +313,6 @@ impl Core {
     local_cache_read: bool,
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    // TODO: Until we can deprecate letting the flag default, we implicitly default
-    // cache_content_behavior when remote execution is in use. See the TODO in `global_options.py`.
-    let cache_content_behavior = if remoting_opts.execution_enable {
-      CacheContentBehavior::Defer
-    } else {
-      remoting_opts.cache_content_behavior
-    };
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
@@ -332,7 +326,7 @@ impl Core {
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,
-        cache_content_behavior,
+        remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
         remoting_opts.cache_read_timeout,
       )?);
@@ -344,7 +338,7 @@ impl Core {
         local_cache.clone(),
         full_store.clone(),
         local_cache_read,
-        cache_content_behavior,
+        remoting_opts.cache_content_behavior,
         process_cache_namespace,
       ));
     }
@@ -385,11 +379,8 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
-    // enable them when remote execution is in use. See the TODO in `global_options.py`.
-    let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
-    let remote_cache_write =
-      exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
+    let remote_cache_read = exec_strategy_opts.remote_cache_read;
+    let remote_cache_write = exec_strategy_opts.remote_cache_write;
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
     let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
@@ -522,6 +513,7 @@ impl Core {
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
+      && !remoting_opts.execution_enable
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the
@@ -529,6 +521,9 @@ impl Core {
       full_store.clone().into_local_only()
     } else {
       // Otherwise, the remote CAS should be visible everywhere.
+      //
+      // With remote execution, we do not always write remote results into the local cache, so it's
+      // important to always have access to the remote cache or else we will get missing digests.
       full_store.clone()
     };
 
@@ -564,11 +559,7 @@ impl Core {
     let http_client = http_client_builder
       .build()
       .map_err(|err| format!("Error building HTTP client: {}", err))?;
-    let rule_graph = RuleGraph::with_query_inputs_filter(
-      tasks.rules().clone(),
-      tasks.queries().clone(),
-      tasks.query_inputs_filter().iter().cloned().collect(),
-    )?;
+    let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
     let gitignore_file = if use_gitignore {
       let gitignore_path = build_root.join(".gitignore");

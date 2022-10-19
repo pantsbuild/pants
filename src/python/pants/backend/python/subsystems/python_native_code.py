@@ -16,7 +16,7 @@ class PythonNativeCodeSubsystem(Subsystem):
     help = "Options for building native code using Python, e.g. when resolving distributions."
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-        depends_on_env_vars = ("CPPFLAGS", "LDFLAGS")
+        env_vars_used_by_options = ("CPPFLAGS", "LDFLAGS")
 
         # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
         _cpp_flags = StrListOption(
@@ -48,6 +48,6 @@ class PythonNativeCodeSubsystem(Subsystem):
         def _iter_values(self, env_var: str, values: Sequence[str]):
             for value in values:
                 if value == f"<{env_var}>":
-                    yield from safe_shlex_split(self.env_vars.get(env_var, ""))
+                    yield from safe_shlex_split(self._options_env.get(env_var, ""))
                 else:
                     yield value

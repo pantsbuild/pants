@@ -21,4 +21,4 @@ extend-ignore:
 
 [flake8:local-plugins]
 extension =
-    PANTSBIN = bin_name_checker:check_for_hardcoded_pants_bin_name
+    PNT10 = bin_name_checker:check_for_hardcoded_pants_bin_name

@@ -95,7 +95,7 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
-    ) -> tuple[dict[str, Any], ParseState]:
+    ) -> tuple[FrozenDict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
         # file parse with a reset of the ParseState for the calling thread.
@@ -142,7 +142,11 @@ class Parser:
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
 
-        return symbols, parse_state
+        return FrozenDict(symbols), parse_state
+
+    @property
+    def builtin_symbols(self) -> FrozenDict[str, Any]:
+        return self._symbols
 
     def parse(
         self,
@@ -153,19 +157,7 @@ class Parser:
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
-        # We update the known symbols with Build File Preludes. This is subtle code; functions have
-        # their own globals set on __globals__ which they derive from the environment where they
-        # were executed. So for each extra_symbol which comes from a separate execution
-        # environment, we need to to add all of our self._symbols to those __globals__, otherwise
-        # those extra symbols will not see our target aliases etc. This also means that if multiple
-        # prelude files are present, they probably cannot see each others' symbols. We may choose
-        # to change this at some point.
-
-        global_symbols = dict(self._symbols)
-        for k, v in extra_symbols.symbols.items():
-            if hasattr(v, "__globals__"):
-                v.__globals__.update(global_symbols)
-            global_symbols[k] = v
+        global_symbols = {**self._symbols, **extra_symbols.symbols}
 
         if self.ignore_unrecognized_symbols:
             while True:

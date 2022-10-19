@@ -8,9 +8,8 @@ from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingCo
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -31,27 +30,14 @@ class AddTrailingCommaFieldSet(FieldSet):
 
 class AddTrailingCommaRequest(FmtTargetsRequest):
     field_set_type = AddTrailingCommaFieldSet
-    name = AddTrailingComma.options_scope
-
-
-@rule
-async def partition(
-    request: AddTrailingCommaRequest.PartitionRequest, add_trailing_comma: AddTrailingComma
-) -> Partitions:
-    return (
-        Partitions()
-        if add_trailing_comma.skip
-        else Partitions.single_partition(
-            field_set.sources.file_path for field_set in request.field_sets
-        )
-    )
+    tool_subsystem = AddTrailingComma
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with add-trailing-comma", level=LogLevel.DEBUG)
 async def add_trailing_comma_fmt(
     request: AddTrailingCommaRequest.SubPartition, add_trailing_comma: AddTrailingComma
 ) -> FmtResult:
-    snapshot = await AddTrailingCommaRequest.SubPartition.get_snapshot(request)
     add_trailing_comma_pex = await Get(VenvPex, PexRequest, add_trailing_comma.to_pex_request())
 
     result = await Get(
@@ -61,27 +47,20 @@ async def add_trailing_comma_fmt(
             argv=(
                 "--exit-zero-even-if-changed",
                 *add_trailing_comma.args,
-                *snapshot.files,
+                *request.files,
             ),
-            input_digest=snapshot.digest,
-            output_files=snapshot.files,
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
             description=f"Run add-trailing-comma on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result,
-        snapshot,
-        output_snapshot,
-        strip_chroot_path=True,
-        formatter_name=AddTrailingCommaRequest.name,
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        *AddTrailingCommaRequest.registration_rules(),
+        *AddTrailingCommaRequest.rules(),
         *pex.rules(),
     ]

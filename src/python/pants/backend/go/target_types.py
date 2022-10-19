@@ -147,10 +147,12 @@ class GoModTarget(TargetGenerator):
 
 
 class GoPackageSourcesField(MultipleSourcesField):
-    default = ("*.go", "*.s")
+    default = ("*.go",)
     expected_file_extensions = (
         ".go",
         ".s",
+        ".S",
+        ".sx",
         ".c",
         ".h",
         ".hh",

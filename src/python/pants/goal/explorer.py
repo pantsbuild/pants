@@ -8,6 +8,7 @@ import logging
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -58,10 +59,12 @@ class ExplorerBuiltinGoal(BuiltinGoal):
             RegisteredTargetTypes.create(build_config.target_types),
             build_config,
         )
+        env_name = determine_bootstrap_environment(graph_session.scheduler_session)
         request_state = RequestState(
             all_help_info=all_help_info,
             build_configuration=build_config,
             scheduler_session=graph_session.scheduler_session,
+            env_name=env_name,
         )
         server_request = server_request_type(
             address=self.address,

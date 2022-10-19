@@ -12,6 +12,7 @@ from typing import Any, Iterable, Optional, Tuple, Type, TypeVar
 import pytest
 
 from pants.base.specs import Specs
+from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
     Lint,
@@ -24,13 +25,19 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Address
-from pants.engine.fs import SpecsPaths, Workspace
+from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 _LintRequestT = TypeVar("_LintRequestT", bound=LintRequest)
 
@@ -68,11 +75,13 @@ class MockLintTargetsRequest(MockLintRequest, LintTargetsRequest):
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
         addresses = [field_set.address for field_set in field_sets]
-        return LintResult(cls.exit_code(addresses), "", "", cls.name)
+        return LintResult(cls.exit_code(addresses), "", "", cls.tool_name)
 
 
 class SuccessfulRequest(MockLintTargetsRequest):
-    name = "SuccessfulLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -80,7 +89,9 @@ class SuccessfulRequest(MockLintTargetsRequest):
 
 
 class FailingRequest(MockLintTargetsRequest):
-    name = "FailingLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -88,7 +99,9 @@ class FailingRequest(MockLintTargetsRequest):
 
 
 class ConditionallySucceedsRequest(MockLintTargetsRequest):
-    name = "ConditionallySucceedsLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ConditionallySucceedsLinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -98,7 +111,9 @@ class ConditionallySucceedsRequest(MockLintTargetsRequest):
 
 
 class SkippedRequest(MockLintTargetsRequest):
-    name = "SkippedLinter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SkippedLinter"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -115,32 +130,14 @@ class InvalidFieldSet(MockLinterFieldSet):
 
 class InvalidRequest(MockLintTargetsRequest):
     field_set_type = InvalidFieldSet
-    name = "InvalidLinter"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "InvalidLinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return -1
-
-
-def mock_target_partitioner(
-    request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[MockLinterFieldSet]:
-    if type(request) is SkippedRequest.PartitionRequest:
-        return Partitions()
-
-    return Partitions.single_partition(request.field_sets)
-
-
-class MockFilesRequest(MockLintRequest, LintFilesRequest):
-    name = "FilesLinter"
-
-    @classmethod
-    def get_lint_result(cls, files: Iterable[str]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
-
-
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str]:
-    return Partitions.single_partition(request.files)
 
 
 def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
@@ -150,6 +147,35 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
         subclasses = cls.__subclasses__()
         classes.extend(subclasses)
         yield from subclasses
+
+
+def mock_target_partitioner(
+    request: MockLintTargetsRequest.PartitionRequest,
+) -> Partitions[Any, MockLinterFieldSet]:
+    if type(request) is SkippedRequest.PartitionRequest:
+        return Partitions()
+
+    operates_on_paths = {
+        getattr(cls, "PartitionRequest"): cls._requires_snapshot for cls in _all_lint_requests()
+    }[type(request)]
+    if operates_on_paths:
+        return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
+
+    return Partitions.single_partition(request.field_sets)
+
+
+class MockFilesRequest(MockLintRequest, LintFilesRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FilesLinter"
+
+    @classmethod
+    def get_lint_result(cls, files: Iterable[str]) -> LintResult:
+        return LintResult(0, "", "", cls.tool_name)
+
+
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
+    return Partitions.single_partition(request.files)
 
 
 def mock_lint_partition(request: Any) -> LintResult:
@@ -162,27 +188,67 @@ class MockFmtRequest(MockLintRequest, FmtTargetsRequest):
 
 
 class SuccessfulFormatter(MockFmtRequest):
-    name = "SuccessfulFormatter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
+        return LintResult(0, "", "", cls.tool_name)
 
 
 class FailingFormatter(MockFmtRequest):
-    name = "FailingFormatter"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingFormatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
-        return LintResult(1, "", "", cls.name)
+        return LintResult(1, "", "", cls.tool_name)
 
 
 class BuildFileFormatter(MockLintRequest, FmtFilesRequest):
-    name = "BobTheBUILDer"
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BobTheBUILDer"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
-        return LintResult(0, "", "", cls.name)
+        return LintResult(0, "", "", cls.tool_name)
+
+
+class MockFixRequest(MockLintRequest, FixTargetsRequest):
+    field_set_type = MockLinterFieldSet
+
+
+class SuccessfulFixer(MockFixRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "SuccessfulFixer"
+
+    @classmethod
+    def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
+        return LintResult(0, "", "", cls.tool_name)
+
+
+class FailingFixer(MockFixRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "FailingFixer"
+
+    @classmethod
+    def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
+        return LintResult(1, "", "", cls.tool_name)
+
+
+class BuildFileFixer(MockLintRequest, FixFilesRequest):
+    @classproperty
+    def tool_name(cls) -> str:
+        return "BUILDAnnually"
+
+    @classmethod
+    def get_lint_result(cls, files: Iterable[str]) -> LintResult:
+        return LintResult(0, "", "", cls.tool_name)
 
 
 @pytest.fixture
@@ -202,6 +268,7 @@ def run_lint_rule(
     batch_size: int = 128,
     only: list[str] | None = None,
     skip_formatters: bool = False,
+    skip_fixers: bool = False,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
@@ -222,6 +289,7 @@ def run_lint_rule(
         batch_size=batch_size,
         only=only or [],
         skip_formatters=skip_formatters,
+        skip_fixers=skip_fixers,
     )
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
@@ -260,6 +328,11 @@ def run_lint_rule(
                     input_types=(Specs,),
                     mock=lambda _: SpecsPaths(("f.txt", "BUILD"), ()),
                 ),
+                MockGet(
+                    output_type=Snapshot,
+                    input_types=(PathGlobs,),
+                    mock=lambda _: EMPTY_SNAPSHOT,
+                ),
             ],
             union_membership=union_membership,
         )
@@ -293,6 +366,9 @@ def test_summary(rule_runner: RuleRunner) -> None:
         SuccessfulFormatter,
         FailingFormatter,
         BuildFileFormatter,
+        SuccessfulFixer,
+        FailingFixer,
+        BuildFileFixer,
         MockFilesRequest,
     ]
     targets = [make_target(good_address), make_target(bad_address)]
@@ -303,6 +379,76 @@ def test_summary(rule_runner: RuleRunner) -> None:
         targets=targets,
     )
     assert exit_code == FailingRequest.exit_code([bad_address])
+    assert stderr == dedent(
+        """\
+
+        ✓ BUILDAnnually succeeded.
+        ✓ BobTheBUILDer succeeded.
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFixer failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulFixer succeeded.
+        ✓ SuccessfulFormatter succeeded.
+        ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more fixers failed. Run `./pants fix` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        only=[
+            FailingRequest.tool_name,
+            MockFilesRequest.tool_name,
+            FailingFormatter.tool_name,
+            FailingFixer.tool_name,
+            BuildFileFormatter.tool_name,
+            BuildFileFixer.tool_name,
+        ],
+    )
+    assert stderr == dedent(
+        """\
+
+        ✓ BUILDAnnually succeeded.
+        ✓ BobTheBUILDer succeeded.
+        ✕ FailingFixer failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more fixers failed. Run `./pants fix` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        skip_formatters=True,
+        skip_fixers=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulLinter succeeded.
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=request_types,
+        targets=targets,
+        skip_fixers=True,
+    )
     assert stderr == dedent(
         """\
 
@@ -322,40 +468,51 @@ def test_summary(rule_runner: RuleRunner) -> None:
         rule_runner,
         lint_request_types=request_types,
         targets=targets,
-        only=[
-            FailingRequest.name,
-            MockFilesRequest.name,
-            FailingFormatter.name,
-            BuildFileFormatter.name,
-        ],
-    )
-    assert stderr == dedent(
-        """\
-
-        ✓ BobTheBUILDer succeeded.
-        ✕ FailingFormatter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-
-        (One or more formatters failed. Run `./pants fmt` to fix.)
-        """
-    )
-
-    exit_code, stderr = run_lint_rule(
-        rule_runner,
-        lint_request_types=request_types,
-        targets=targets,
         skip_formatters=True,
     )
     assert stderr == dedent(
         """\
 
+        ✓ BUILDAnnually succeeded.
         ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFixer failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+        ✓ SuccessfulFixer succeeded.
         ✓ SuccessfulLinter succeeded.
+
+        (One or more fixers failed. Run `./pants fix` to fix.)
         """
     )
+
+
+def test_default_single_partition_partitioner() -> None:
+    class KitchenSubsystem(Subsystem):
+        options_scope = "kitchen"
+        help = "a cookbook might help"
+        name = "The Kitchen"
+        skip = SkipOption("lint")
+
+    class LintKitchenRequest(LintTargetsRequest):
+        field_set_type = MockLinterFieldSet
+        tool_subsystem = KitchenSubsystem
+        partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+
+    rules = [
+        *LintKitchenRequest._get_rules(),
+        QueryRule(Partitions, [LintKitchenRequest.PartitionRequest]),
+    ]
+    rule_runner = RuleRunner(rules=rules)
+    field_sets = (
+        MockLinterFieldSet(Address("knife"), MultipleSourcesField(["knife"], Address("knife"))),
+        MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
+    )
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
+
+    rule_runner.set_options(["--kitchen-skip"])
+    partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
+    assert partitions == Partitions([])
 
 
 @pytest.mark.parametrize("batch_size", [1, 32, 128, 1024])

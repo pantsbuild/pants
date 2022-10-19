@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -37,7 +37,7 @@ use process_execution::{
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
-use graph::{Entry, Node, NodeError, NodeVisualizer};
+use graph::{Node, NodeError};
 use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
@@ -1221,32 +1221,6 @@ impl From<Task> for NodeKey {
   }
 }
 
-#[derive(Default)]
-pub struct Visualizer {
-  viz_colors: HashMap<String, String>,
-}
-
-impl NodeVisualizer<NodeKey> for Visualizer {
-  fn color_scheme(&self) -> &str {
-    "set312"
-  }
-
-  fn color(&mut self, entry: &Entry<NodeKey>, context: &<NodeKey as Node>::Context) -> String {
-    let max_colors = 12;
-    match entry.peek(context) {
-      None => "white".to_string(),
-      Some(_) => {
-        let viz_colors_len = self.viz_colors.len();
-        self
-          .viz_colors
-          .entry(entry.node().product_str())
-          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
-          .clone()
-      }
-    }
-  }
-}
-
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
@@ -1266,22 +1240,6 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  fn product_str(&self) -> String {
-    match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
-      &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => format!("{}", s.product),
-      &NodeKey::SessionValues(_) => "SessionValues".to_string(),
-      &NodeKey::RunId(_) => "RunId".to_string(),
-      &NodeKey::Task(ref t) => format!("{}", t.task.product),
-      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::Paths(..) => "Paths".to_string(),
-      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
-      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
-      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-    }
-  }
-
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
@@ -1344,9 +1302,29 @@ impl NodeKey {
   /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
   /// user-facing name should be the same as the `desc` annotation on the rule decorator.
   ///
-  fn user_facing_name(&self) -> Option<String> {
+  fn workunit_desc(&self, context: &Context) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => {
+        let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
+
+        let displayable_param_names: Vec<_> = Python::with_gil(|py| {
+          Self::engine_aware_params(context, py, &task.params)
+            .filter_map(|k| EngineAwareParameter::debug_hint((*k.value).as_ref(py)))
+            .collect()
+        });
+
+        let desc = if displayable_param_names.is_empty() {
+          task_desc
+        } else {
+          format!(
+            "{} - {}",
+            task_desc,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        };
+
+        Some(desc)
+      }
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
       NodeKey::ExecuteProcess(epr) => {
@@ -1383,22 +1361,17 @@ impl NodeKey {
   /// Filters the given Params to those which are subtypes of EngineAwareParameter.
   ///
   fn engine_aware_params<'a>(
-    context: Context,
+    context: &Context,
     py: Python<'a>,
     params: &'a Params,
-  ) -> impl Iterator<Item = Value> + 'a {
+  ) -> impl Iterator<Item = &'a Key> + 'a {
     let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
-    params.keys().filter_map(move |key| {
-      if key
+    params.keys().filter(move |key| {
+      key
         .type_id()
         .as_py_type(py)
         .is_subclass(engine_aware_param_ty)
         .unwrap_or(false)
-      {
-        Some(key.to_value())
-      } else {
-        None
-      }
     })
   }
 }
@@ -1412,22 +1385,27 @@ impl Node for NodeKey {
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let workunit_name = self.workunit_name();
-    let params = match &self {
-      NodeKey::Task(ref task) => task.params.clone(),
-      _ => Params::default(),
+    let workunit_desc = self.workunit_desc(&context);
+    let maybe_params = match &self {
+      NodeKey::Task(ref task) => Some(&task.params),
+      _ => None,
     };
     let context2 = context.clone();
 
     in_workunit!(
       workunit_name,
       self.workunit_level(),
-      desc = self.user_facing_name(),
+      desc = workunit_desc.clone(),
       user_metadata = {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        Self::engine_aware_params(context.clone(), py, &params)
-          .flat_map(|val| EngineAwareParameter::metadata((*val).as_ref(py)))
-          .collect()
+        if let Some(params) = maybe_params {
+          Python::with_gil(|py| {
+            Self::engine_aware_params(&context, py, params)
+              .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
+              .collect()
+          })
+        } else {
+          vec![]
+        }
       },
       |workunit| async move {
         // Ensure that we have installed filesystem watches before Nodes which inspect the
@@ -1467,33 +1445,7 @@ impl Node for NodeKey {
         }
 
         // If the node failed, expand the Failure with a new frame.
-        result = result.map_err(|failure| {
-          let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            Self::engine_aware_params(context2, py, &params)
-              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
-              .collect()
-          };
-          let failure_name = if displayable_param_names.is_empty() {
-            name.to_owned()
-          } else if displayable_param_names.len() == 1 {
-            format!(
-              "{} ({})",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          } else {
-            format!(
-              "{} {}",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          };
-
-          failure.with_pushed_frame(&failure_name)
-        });
+        result = result.map_err(|failure| failure.with_pushed_frame(workunit_name, workunit_desc));
 
         result
       }

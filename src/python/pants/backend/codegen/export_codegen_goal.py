@@ -32,6 +32,7 @@ class ExportCodegenSubsystem(GoalSubsystem):
 
 class ExportCodegen(Goal):
     subsystem_cls = ExportCodegenSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

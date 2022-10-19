@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufLintField
 from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
@@ -18,6 +19,7 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
@@ -35,19 +37,23 @@ class BufFieldSet(FieldSet):
 
 class BufLintRequest(LintTargetsRequest):
     field_set_type = BufFieldSet
-    name = "buf-lint"
+    tool_subsystem = BufSubsystem  # type: ignore[assignment]
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "buf-lint"
 
 
 @rule
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
-) -> Partitions[BufFieldSet]:
+) -> Partitions[Any, BufFieldSet]:
     return Partitions() if buf.lint_skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(
-    request: BufLintRequest.SubPartition[BufFieldSet], buf: BufSubsystem, platform: Platform
+    request: BufLintRequest.SubPartition[Any, BufFieldSet], buf: BufSubsystem, platform: Platform
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
@@ -103,8 +109,11 @@ async def run_buf(
             level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(process_result, linter_name=BufLintRequest.name)
+    return LintResult.create(request, process_result)
 
 
 def rules():
-    return [*collect_rules(), *BufLintRequest.registration_rules()]
+    return [
+        *collect_rules(),
+        *BufLintRequest.rules(),
+    ]

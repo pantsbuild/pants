@@ -24,6 +24,10 @@ from pants.engine.internals.defaults import ParametrizeDefault
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticAddressMapsRequest,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import (
     Dependencies,
@@ -72,6 +76,11 @@ def test_parse_address_family_empty() -> None:
                 input_types=(AddressFamilyDir,),
                 mock=lambda _: OptionalAddressFamily("/dev"),
             ),
+            MockGet(
+                output_type=SyntheticAddressMaps,
+                input_types=(SyntheticAddressMapsRequest,),
+                mock=lambda _: SyntheticAddressMaps(),
+            ),
         ],
     )
     assert optional_af.path == "/dev/null"
@@ -84,7 +93,15 @@ def test_parse_address_family_empty() -> None:
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[BuildFileOptions((), prelude_globs=("prelude",))],
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                target_type_aliases=["target"],
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
@@ -136,6 +153,20 @@ def test_prelude_exceptions() -> None:
     assert "ValueError" not in result.symbols
     with pytest.raises(ValueError):
         result.symbols["abort"]()
+
+
+def test_prelude_references_builtin_symbols() -> None:
+    prelude_content = dedent(
+        """\
+        def make_a_target():
+            # Can't call it outside of the context of a BUILD file, less we get internal errors
+            target
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    # In the real world, this would define the target (note it doesn't need to return, as BUILD files
+    # don't). In the test we're just ensuring we don't get a `NameError`
+    result.symbols["make_a_target"]()
 
 
 class ResolveField(StringField):
@@ -379,3 +410,56 @@ def test_build_file_address() -> None:
     # Generated targets should use their target generator's BUILD file.
     assert_bfa_resolved(Address("helloworld", generated_name="f.txt"))
     assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
+
+
+def test_build_files_share_globals() -> None:
+    """Test that a macro in a prelude can reference another macro in another prelude.
+
+    At some point a change was made to separate the globals/locals dict (uninentional) which has the
+    unintended side-effect of having the `__globals__` of a macro not contain references to every
+    other symbol in every other prelude.
+    """
+
+    symbols = run_rule_with_mocks(
+        evaluate_preludes,
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                target_type_aliases=[],
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
+        mock_gets=[
+            MockGet(
+                output_type=DigestContents,
+                input_types=(PathGlobs,),
+                mock=lambda _: DigestContents(
+                    [
+                        FileContent(
+                            path="/dev/null/prelude1",
+                            content=dedent(
+                                """\
+                                def hello():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                        FileContent(
+                            path="/dev/null/prelude2",
+                            content=dedent(
+                                """\
+                                def world():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                    ]
+                ),
+            ),
+        ],
+    )
+    assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
+    assert "world" in symbols.symbols["hello"].__globals__
+    assert "hello" in symbols.symbols["world"].__globals__

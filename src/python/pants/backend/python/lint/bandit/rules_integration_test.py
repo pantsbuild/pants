@@ -15,6 +15,7 @@ from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
@@ -59,14 +60,14 @@ def run_bandit(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partition = rule_runner.request(
-        Partitions[BanditFieldSet],
+        Partitions[InterpreterConstraints, BanditFieldSet],
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for key, subpartition in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.SubPartition(subpartition, key)],
+            [BanditRequest.SubPartition("", subpartition, key)],
         )
         results.append(result)
     return tuple(results)

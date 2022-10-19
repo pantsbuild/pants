@@ -13,7 +13,6 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
@@ -22,7 +21,7 @@ from pants.util.strutil import pluralize, softwrap
 
 class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    name = Black.options_scope
+    tool_subsystem = Black
 
 
 @rule_helper
@@ -31,17 +30,20 @@ async def _run_black(
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
-    snapshot = await FmtRequest.SubPartition.get_snapshot(request)
     black_pex_get = Get(
         VenvPex,
         PexRequest,
         black.to_pex_request(interpreter_constraints=interpreter_constraints),
     )
-    config_files_get = Get(ConfigFiles, ConfigFilesRequest, black.config_request(snapshot.dirs))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+    )
 
     black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
 
-    input_digest = await Get(Digest, MergeDigests((snapshot.digest, config_files.snapshot.digest)))
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
 
     result = await Get(
         ProcessResult,
@@ -52,19 +54,16 @@ async def _run_black(
                 "-W",
                 "{pants_concurrency}",
                 *black.args,
-                *snapshot.files,
+                *request.files,
             ),
             input_digest=input_digest,
-            output_files=snapshot.files,
-            concurrency_available=len(snapshot.files),
+            output_files=request.files,
+            concurrency_available=len(request.files),
             description=f"Run Black on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(
-        result, snapshot, output_snapshot, strip_chroot_path=True, formatter_name=BlackRequest.name
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 @rule
@@ -118,6 +117,6 @@ async def black_fmt(request: BlackRequest.SubPartition, black: Black) -> FmtResu
 def rules():
     return [
         *collect_rules(),
-        *BlackRequest.registration_rules(),
+        *BlackRequest.rules(),
         *pex.rules(),
     ]
