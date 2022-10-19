@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import textwrap
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -12,11 +13,28 @@ from enum import Enum
 
 from pkg_resources import Requirement
 
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.target_types import (
+    ExternalToolEXEField,
+    ExternalToolSourceField,
+    FileSourceField,
+    HTTPSource,
+    _hydrate_asset_source,
+)
 from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, AddPrefix, Snapshot
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    Target,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
+from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
@@ -336,15 +354,11 @@ class TemplatedExternalTool(ExternalTool):
         return self.url_template.format(version=self.version, platform=platform)
 
 
-@rule(level=LogLevel.DEBUG)
-async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    # Download and extract.
-    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
-
-    # Confirm executable.
-    exe_path = request.exe.lstrip("./")
-    digest = extracted_archive.digest
+@rule_helper
+async def _with_executable_set(
+    digest: Digest,
+    exe_path: str,
+) -> Digest:
     is_not_executable = False
     digest_entries = []
     for entry in await Get(DigestEntries, Digest, digest):
@@ -356,8 +370,98 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
     if is_not_executable:
         digest = await Get(Digest, CreateDigest(digest_entries))
 
+    return digest
+
+
+@rule(level=LogLevel.DEBUG)
+async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
+    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
+    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+    digest = await _with_executable_set(extracted_archive.digest, os.path.normpath(request.exe))
     return DownloadedExternalTool(digest, request.exe)
 
 
+class GenerateFileFromExternalToolRequest(GenerateSourcesRequest):
+    input = ExternalToolSourceField
+    output = FileSourceField
+
+
+@rule_helper
+async def _download_external_tool_target(target: Target) -> DownloadedExternalTool:
+    downloaded = await _hydrate_asset_source(
+        GenerateSourcesRequest(protocol_sources=EMPTY_SNAPSHOT, protocol_target=target)
+    )
+    extracted = await Get(ExtractedArchive, Digest, downloaded.snapshot.digest)
+
+    if (
+        extracted.digest != downloaded.snapshot.digest
+        and target[ExternalToolEXEField].value is None
+    ):
+        raise ValueError(
+            f"The `exe` field of the `extracted_target` '{target.address}' is required if the downloaded file is an archive."
+        )
+
+    path_prefix = os.path.join(
+        target.residence_dir or ".",
+        # NB: We add the target name as parent dir to isolate the extracted contents
+        # in the case of `export-codegen` on an archive.
+        target.address.target_name,
+    )
+    digest = await Get(
+        Digest,
+        AddPrefix(digest=extracted.digest, prefix=path_prefix),
+    )
+    source = target[ExternalToolSourceField].value
+    assert isinstance(source, HTTPSource)
+    exe_path = os.path.normpath(
+        os.path.join(path_prefix, target[ExternalToolEXEField].value or source.filename)
+    )
+    digest = await _with_executable_set(digest, exe_path)
+    return DownloadedExternalTool(digest, exe_path)
+
+
+@rule(level=LogLevel.DEBUG)
+async def generate_external_tool(
+    request: GenerateFileFromExternalToolRequest,
+) -> GeneratedSources:
+    downloaded = await _download_external_tool_target(request.protocol_target)
+    snapshot = await Get(Snapshot, Digest, downloaded.digest)
+    return GeneratedSources(snapshot)
+
+
+@dataclass(frozen=True)
+class RunExternalToolFieldSet(RunFieldSet):
+    required_fields = (ExternalToolSourceField, ExternalToolEXEField)
+
+    source: ExternalToolSourceField
+    exe: ExternalToolEXEField
+
+
+@rule
+async def create_external_tool_run_request(
+    field_set: RunExternalToolFieldSet,
+) -> RunRequest:
+    target = await Get(
+        WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
+    )
+    downloaded = await _download_external_tool_target(target.target)
+    return RunRequest(
+        digest=downloaded.digest,
+        args=(os.path.join("{chroot}", downloaded.exe),),
+    )
+
+
+@rule
+async def create_external_tool_run_dap_request(
+    field_set: RunExternalToolFieldSet,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError("Debugging for this target has not yet been implemented.")
+
+
 def rules():
-    return (*collect_rules(), *archive.rules())
+    return (
+        *collect_rules(),
+        *archive.rules(),
+        UnionRule(GenerateSourcesRequest, GenerateFileFromExternalToolRequest),
+        UnionRule(RunFieldSet, RunExternalToolFieldSet),
+    )

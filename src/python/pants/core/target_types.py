@@ -721,6 +721,31 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
 
 
+# -----------------------------------------------------------------------------------------------
+# `external_tool` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ExternalToolSourceField(AssetSourceField):
+    alias = "source"
+    expected_num_files = 0
+
+
+class ExternalToolEXEField(StringField):
+    alias = "exe"
+    help = "The filepath to the executable tool (if the url points to an archive)."
+
+
+class ExternalToolTarget(Target):
+    alias = "external_tool"
+    help = "A downloadable and executable external tool."
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ExternalToolSourceField,
+        ExternalToolEXEField,
+    )
+
+
 def rules():
     return (
         *collect_rules(),
