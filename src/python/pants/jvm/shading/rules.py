@@ -25,7 +25,7 @@ from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
 from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
-from pants.jvm.target_types import JarShadingRule, _shading_rules_validate
+from pants.jvm.target_types import JarShadingRule, _shading_validate_rules
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
@@ -61,7 +61,7 @@ class ShadeJarRequest:
         self.misplaced_class_strategy = misplaced_class_strategy
         self.verbose = verbose
 
-        validation_errors = _shading_rules_validate(self.rules)
+        validation_errors = _shading_validate_rules(self.rules)
         if validation_errors:
             raise ValueError("\n".join(["Invalid rules provided:\n", *validation_errors]))
 

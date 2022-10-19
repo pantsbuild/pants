@@ -453,7 +453,7 @@ JVM_JAR_SHADING_RULE_TYPES: list[Type[JarShadingRule]] = [
 ]
 
 
-def _shading_rules_help(intro: str) -> str:
+def _shading_rules_field_help(intro: str) -> str:
     return softwrap(
         f"""
         {intro}
@@ -468,7 +468,7 @@ def _shading_rules_help(intro: str) -> str:
     )
 
 
-def _shading_rules_validate(shading_rules: Iterable[JarShadingRule]) -> set[str]:
+def _shading_validate_rules(shading_rules: Iterable[JarShadingRule]) -> set[str]:
     validation_errors = []
     for shading_rule in shading_rules:
         found_errors = shading_rule.validate()
@@ -498,7 +498,7 @@ class JvmShadingRulesField(SequenceField[JarShadingRule], metaclass=ABCMeta):
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
-            validation_errors = _shading_rules_validate(computed_value)
+            validation_errors = _shading_validate_rules(computed_value)
             if validation_errors:
                 raise InvalidFieldException(
                     "\n".join(
@@ -614,7 +614,7 @@ class JvmMainClassNameField(StringField):
 
 
 class DeployJarShadingRulesField(JvmShadingRulesField):
-    help = _shading_rules_help("Shading rules to be applied to the final JAR artifact.")
+    help = _shading_rules_field_help("Shading rules to be applied to the final JAR artifact.")
 
 
 class DeployJarTarget(Target):
@@ -666,7 +666,7 @@ class JvmWarContentField(SpecialCasedDependencies):
 
 
 class JvmWarShadingRulesField(JvmShadingRulesField):
-    help = _shading_rules_help(
+    help = _shading_rules_field_help(
         "Shading rules to be applied to the individual JAR artifacts embedded in the `WEB-INF/lib` folder."
     )
 
