@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [PylintRequest.PartitionRequest]),
-            QueryRule(LintResult, [PylintRequest.SubPartition]),
+            QueryRule(LintResult, [PylintRequest.Batch]),
         ],
         target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
@@ -75,10 +75,10 @@ def run_pylint(
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [PylintRequest.SubPartition("", subpartition, key)],
+            [PylintRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

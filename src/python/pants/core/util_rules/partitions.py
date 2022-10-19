@@ -68,7 +68,7 @@ class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
     The partition key can be of any type able to cross a rule-boundary, and will be provided to the
     rule which "runs" your tool. If it isn't `None` it should implement the `PartitionKey` protocol.
 
-    NOTE: The partition may be divided further into multiple sub-partitions.
+    NOTE: The partition may be divided further into multiple batches.
     """
 
     @classmethod
@@ -83,10 +83,16 @@ class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
-class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
+class _BatchBase(Generic[PartitionKeyT, PartitionElementT]):
+    """Base class for a collection of elements that should all be processed together.
+
+    For example, a collection of strings pointing to files that should be linted in one process, or
+    a collection of field-sets pointing at tests that should all execute in the same process.
+    """
+
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    key: PartitionKeyT
+    partition_key: PartitionKeyT
 
 
 @dataclass(frozen=True)

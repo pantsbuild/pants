@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(Partitions, [SpectralRequest.PartitionRequest]),
-            QueryRule(LintResult, [SpectralRequest.SubPartition]),
+            QueryRule(LintResult, [SpectralRequest.Batch]),
         ],
         target_types=[OpenApiDocumentGeneratorTarget, OpenApiSourceGeneratorTarget],
     )
@@ -68,10 +68,10 @@ def run_spectral(
         [SpectralRequest.PartitionRequest(tuple(SpectralFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [SpectralRequest.SubPartition("", subpartition, key)],
+            [SpectralRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)
