@@ -33,7 +33,7 @@ mod glob_matching_tests;
 mod posixfs_tests;
 
 pub use crate::directory::{
-  DigestTrie, DirectoryDigest, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
+  DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
   EMPTY_DIRECTORY_DIGEST,
 };
 pub use crate::glob_matching::{
