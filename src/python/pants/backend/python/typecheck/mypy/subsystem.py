@@ -165,6 +165,12 @@ class MyPy(PythonToolBase):
             Alternatively, you can use this option so that the dependencies are solely
             used when running MyPy and are not runtime dependencies.
 
+            NOTE: Dependencies specified in this way are not visible to dependency inference,
+            and cannot be referenced as explicit dependencies. If you `import` from a stubs
+            module specified here, you may see warnings/errors from Pants depending on inference
+            settings. Specifying the dependencies as "typical" requirements via `requirements.txt`
+            or `python_requirement` targets avoids this issue.
+
             Expects a list of pip-style requirement strings, like
             `['types-requests==2.25.9']`.
 
