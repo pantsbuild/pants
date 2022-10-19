@@ -476,7 +476,7 @@ def _shading_validate_rules(shading_rules: Iterable[JarShadingRule]) -> set[str]
             validation_errors.append(
                 "\n".join(
                     [
-                        f"in rule `{shading_rule.alias}`:",
+                        f"In rule `{shading_rule.alias}`:",
                         bullet_list(found_errors),
                         "",
                     ]
@@ -503,7 +503,7 @@ class JvmShadingRulesField(SequenceField[JarShadingRule], metaclass=ABCMeta):
                 raise InvalidFieldException(
                     "\n".join(
                         [
-                            f"Invalid values for `{cls.alias}` provided in target {address}:\n",
+                            f"Invalid shading rules assigned to `{cls.alias}` field in target {address}:\n",
                             *validation_errors,
                         ]
                     )
