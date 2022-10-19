@@ -52,7 +52,7 @@ async def run_helm_lint(
 ) -> LintResult:
     assert len(request.elements) == 1
     field_set = request.elements[0]
-    chart = request.key
+    chart = request.partition_key
 
     argv = ["lint", chart.name]
 

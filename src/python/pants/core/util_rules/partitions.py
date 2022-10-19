@@ -84,7 +84,7 @@ class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
 class _BatchBase(Generic[PartitionKeyT, PartitionElementT]):
-    """Base class for a collection of elements that should all be processed in a single process.
+    """Base class for a collection of elements that should all be processed together.
 
     For example, a collection of strings pointing to files that should be linted in one process, or
     a collection of field-sets pointing at tests that should all execute in the same process.
@@ -92,7 +92,7 @@ class _BatchBase(Generic[PartitionKeyT, PartitionElementT]):
 
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    key: PartitionKeyT
+    partition_key: PartitionKeyT
 
 
 @dataclass(frozen=True)

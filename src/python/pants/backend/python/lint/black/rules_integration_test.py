@@ -95,7 +95,7 @@ def run_black(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest.Batch("", partition, key=key, snapshot=input_sources.snapshot),
+            BlackRequest.Batch("", partition, partition_key=key, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

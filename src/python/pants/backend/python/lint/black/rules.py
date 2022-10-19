@@ -111,7 +111,7 @@ async def partition_black(
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
-    return await _run_black(request, black, cast(InterpreterConstraints, request.key))
+    return await _run_black(request, black, cast(InterpreterConstraints, request.partition_key))
 
 
 def rules():

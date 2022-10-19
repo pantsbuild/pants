@@ -77,7 +77,9 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.key.description if request.key else None,
+            partition_description=request.partition_key.description
+            if request.partition_key
+            else None,
             report=report,
         )
 

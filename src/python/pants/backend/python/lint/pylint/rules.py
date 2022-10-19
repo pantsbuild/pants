@@ -118,11 +118,11 @@ async def run_pylint(
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.key.coarsened_targets.closure()),
+            (target.address for target in request.partition_key.coarsened_targets.closure()),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=request.key.interpreter_constraints,
+            hardcoded_interpreter_constraints=request.partition_key.interpreter_constraints,
         ),
     )
 
@@ -130,13 +130,14 @@ async def run_pylint(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=request.key.interpreter_constraints,
+            interpreter_constraints=request.partition_key.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
     sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(request.key.coarsened_targets.closure())
+        PythonSourceFiles,
+        PythonSourceFilesRequest(request.partition_key.coarsened_targets.closure()),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -154,7 +155,7 @@ async def run_pylint(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=request.key.interpreter_constraints,
+                    interpreter_constraints=request.partition_key.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],

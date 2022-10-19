@@ -58,7 +58,7 @@ async def partition_bandit(
 async def bandit_lint(
     request: BanditRequest.Batch[InterpreterConstraints, BanditFieldSet], bandit: Bandit
 ) -> LintResult:
-    interpreter_constraints = request.key
+    interpreter_constraints = request.partition_key
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,
