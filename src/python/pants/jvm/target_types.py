@@ -363,7 +363,7 @@ class JarShadingKeepRule(JarShadingRule):
     alias = "shading_keep"
     help = softwrap(
         """
-        Keeps in the final artifact the occurences of the `pattern`
+        Keeps in the final artifact the occurrences of the `pattern`
         (and removes anything else).
         """
     )
