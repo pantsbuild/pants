@@ -7,6 +7,7 @@ import dataclasses
 import logging
 import shlex
 from dataclasses import dataclass
+from itertools import groupby
 from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import Address, AddressInput
@@ -372,6 +373,69 @@ class RemoteEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 # Rules
 # -------------------------------------------------------------------------------------------
+
+
+@rule_helper
+async def _warn_on_non_local_environments(specified_targets: Iterable[Target], source: str) -> None:
+    """Raise a warning when the user runs a local-only operation against a target that expects a
+    non-local environment.
+
+    The `source` will be used to explain which goal is causing the issue.
+    """
+
+    env_names = [
+        (target[EnvironmentField].value, target)
+        for target in specified_targets
+        if target.has_field(EnvironmentField)
+    ]
+    sorted_env_names = sorted(env_names, key=lambda en: (en[0], en[1].address.spec))
+
+    env_names_and_targets = [
+        (env_name, tuple(target for _, target in group))
+        for env_name, group in groupby(sorted_env_names, lambda x: x[0])
+    ]
+
+    env_tgts = await MultiGet(
+        Get(
+            EnvironmentTarget,
+            EnvironmentNameRequest(
+                name,
+                description_of_origin=(
+                    "the `environment` field of targets including "
+                    ", ".join(tgt.address.spec for tgt in tgts[:3])
+                ),
+            ),
+        )
+        for name, tgts in env_names_and_targets
+    )
+
+    error_cases = [
+        (env_name, tgts, env_tgt.val)
+        for ((env_name, tgts), env_tgt) in zip(env_names_and_targets, env_tgts)
+        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
+    ]
+
+    for (env_name, tgts, env_tgt) in error_cases:
+        # "Blah was called with target `//foo` which specifies…"
+        # "Blah was called with targets `//foo`, `//bar` which specify…"
+        # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
+        plural = len(tgts) > 1
+        is_long = len(tgts) > 3
+        tgt_specs = [tgt.address.spec for tgt in tgts[:3]]
+
+        tgts_str = (
+            ("s " if plural else " ")
+            + ("including " if is_long else "")
+            + ", ".join(f"`{i}`" for i in tgt_specs)
+            + (" (and others)" if is_long else "")
+        )
+        end_specif = "y" if plural else "ies"
+
+        logger.warning(
+            f"{source.capitalize()} was called with target{tgts_str}, which specif{end_specif} "
+            f"the environment `{env_name}`, which is a `{env_tgt.alias}`. {source.capitalize()} "
+            "only runs in the local environment. You may experience unexpected behavior."
+        )
 
 
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
