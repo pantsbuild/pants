@@ -68,6 +68,7 @@ def build(tgt: DockerImageTarget, options: DockerOptions):
                 BuiltDockerImage.create(
                     "sha256:made-up",
                     tuple(t.full_name for r in image_refs for t in r.tags),
+                    "made-up.json",
                 ),
             ),
         ),

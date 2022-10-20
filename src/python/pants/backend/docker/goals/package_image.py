@@ -35,9 +35,10 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
 )
 from pants.backend.docker.utils import format_rename_suggestion
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
@@ -75,6 +76,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     source: DockerImageSourceField
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
+    output_path: OutputPathField
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -425,13 +427,16 @@ async def build_docker_image(
     else:
         logger.debug(docker_build_output_msg)
 
+    metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
     # FIXME: how to write this to an appropriate file for inclusion in dist/ and use as a dependency
     metadata = DockerInfoV1.from_image_refs(image_refs, image_id=image_id)
-    logger.info(json.dumps(asdict(metadata)))
+    metadata_bytes = json.dumps(asdict(metadata)).encode()
+
+    digest = await Get(Digest, CreateDigest([FileContent(metadata_filename, metadata_bytes)]))
 
     return BuiltPackage(
-        result.output_digest,
-        (BuiltDockerImage.create(image_id, tags),),
+        digest,
+        (BuiltDockerImage.create(image_id, tags, metadata_filename),),
     )
 
 
