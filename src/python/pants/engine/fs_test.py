@@ -1,5 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import hashlib
 import os
 import pkgutil
@@ -857,6 +860,40 @@ class StubHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def stub_erroring_handler(error_count_value: int) -> type[BaseHTTPRequestHandler]:
+    """Return a handler that errors once mid-download before succeeding for the next GET.
+
+    This function returns an anonymous class so that each call can create a new instance with its
+    own error counter.
+    """
+    error_num = 1
+
+    class StubErroringHandler(BaseHTTPRequestHandler):
+        error_count = error_count_value
+        response_text = b"Hello, client!"
+
+        def do_HEAD(self):
+            self.send_headers()
+
+        def do_GET(self):
+            self.send_headers()
+            nonlocal error_num
+            if error_num <= self.error_count:
+                msg = f"Returning error {error_num}"
+                error_num += 1
+                raise Exception(msg)
+            self.wfile.write(self.response_text)
+
+        def send_headers(self):
+            code = 200 if self.path == "/file.txt" else 404
+            self.send_response(code)
+            self.send_header("Content-Type", "text/utf-8")
+            self.send_header("Content-Length", f"{len(self.response_text)}")
+            self.end_headers()
+
+    return StubErroringHandler
+
+
 DOWNLOADS_FILE_DIGEST = FileDigest(
     "8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14
 )
@@ -884,6 +921,24 @@ def test_download_missing_file(downloads_rule_runner: RuleRunner) -> None:
                 Snapshot, [DownloadFile(f"http://localhost:{port}/notfound", DOWNLOADS_FILE_DIGEST)]
             )
     assert "404" in str(exc.value)
+
+
+def test_download_body_error_retry(downloads_rule_runner: RuleRunner) -> None:
+    with http_server(stub_erroring_handler(1)) as port:
+        snapshot = downloads_rule_runner.request(
+            Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+        )
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_download_body_error_retry_eventually_fails(downloads_rule_runner: RuleRunner) -> None:
+    # Returns one more error than the retry will allow.
+    with http_server(stub_erroring_handler(5)) as port:
+        with pytest.raises(Exception):
+            _ = downloads_rule_runner.request(
+                Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+            )
 
 
 def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
@@ -1010,18 +1065,21 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+@dataclass(frozen=True)
+class DigestRequest:
+    create_digest: CreateDigest
+
+
+class WorkspaceGoalSubsystem(GoalSubsystem):
+    name = "workspace-goal"
+
+
+class WorkspaceGoal(Goal):
+    subsystem_cls = WorkspaceGoalSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
 def test_workspace_in_goal_rule() -> None:
-    class WorkspaceGoalSubsystem(GoalSubsystem):
-        name = "workspace-goal"
-
-    class WorkspaceGoal(Goal):
-        subsystem_cls = WorkspaceGoalSubsystem
-        environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
-
-    @dataclass(frozen=True)
-    class DigestRequest:
-        create_digest: CreateDigest
-
     @rule
     def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")
