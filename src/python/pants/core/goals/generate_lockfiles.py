@@ -52,9 +52,9 @@ class GenerateLockfile:
 
 
 @dataclass(frozen=True)
-class EnvironmentsMixIn:
-    """A mixin, allowing a `GenerateLockfile` subclass to specify which environments the request is
-    compatible with, if the relevant backend supports environments."""
+class GenerateLockfileWithEnvironments(GenerateLockfile):
+    """Allows a `GenerateLockfile` subclass to specify which environments the request is compatible
+    with, if the relevant backend supports environments."""
 
     environments: tuple[EnvironmentName, ...]
 
@@ -432,7 +432,7 @@ async def generate_lockfiles_goal(
 
 def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) -> EnvironmentName:
 
-    if not isinstance(request, EnvironmentsMixIn):
+    if not isinstance(request, GenerateLockfileWithEnvironments):
         return default  # This request has not been migrated to use environments.
 
     if len(request.environments) == 1:
