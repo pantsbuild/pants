@@ -52,30 +52,39 @@ PartitionElementT = TypeVar("PartitionElementT")
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
 class Partition(Generic[PartitionElementT, PartitionMetadataT]):
+    """A collection of 'compatible' inputs for a plugin tool, with optional common metadata.
+
+    Inputs are 'compatible' if it is safe/possible for them to be processed in the same invocation
+    of a tool (i.e. two files formatted in the same run of a formatter, or two test targets executed
+    in a single test runner process).
+
+    The metadata in a partition (if any) can be any type able to cross a rule boundary, and will be
+    provided to the rule which "runs" your tool. If it isn't `None` it must implement the
+    `PartitionMetadata` protocol.
+
+    NOTE: Partitions may be further divided into multiple batches before being passed to the tool-running
+    rule. When this happens, the same metadata is passed along with each batch.
+    """
+
     elements: tuple[PartitionElementT, ...]
     metadata: PartitionMetadataT | None
 
 
 @runtime_ignore_subscripts
 class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
-    """A mapping from <partition.metadata> to <partition>.
+    """A collection of (<compatible inputs>, <metadata>) pairs.
 
     When implementing a plugin, one of your rules will return this type, taking in a
     `PartitionRequest` specific to your plugin.
 
     The return likely will fit into one of:
-        - Returning an empty partition: E.g. if your tool is being skipped.
+        - Returning empty partitions: E.g. if your tool is being skipped.
         - Returning one partition. The partition may contain all of the inputs
             (as will likely be the case for target-based plugins) or a subset (which will likely be the
             case for targetless plugins).
         - Returning >1 partition. This might be the case if you can't run
             the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
             and files ABC with Py2.
-
-    The partition.metadata can be of any type able to cross a rule-boundary, and will be provided to the
-    rule which "runs" your tool. If it isn't `None` it should implement the `PartitionMetadata` protocol.
-
-    NOTE: The partition may be divided further into multiple batches.
     """
 
     @classmethod
