@@ -51,13 +51,13 @@ PartitionElementT = TypeVar("PartitionElementT")
 
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
-class Partition(Generic[PartitionKeyT, PartitionElementT]):
-    key: PartitionKeyT | None
+class Partition(Generic[PartitionElementT, PartitionKeyT]):
     elements: tuple[PartitionElementT, ...]
+    key: PartitionKeyT | None
 
 
 @runtime_ignore_subscripts
-class Partitions(Collection[Partition[PartitionKeyT, PartitionElementT]]):
+class Partitions(Collection[Partition[PartitionElementT, PartitionKeyT]]):
     """A mapping from <partition key> to <partition>.
 
     When implementing a plugin, one of your rules will return this type, taking in a
@@ -81,16 +81,16 @@ class Partitions(Collection[Partition[PartitionKeyT, PartitionElementT]]):
     @classmethod
     def single_partition(
         cls, elements: Iterable[PartitionElementT], key: PartitionKeyT | None = None
-    ) -> Partitions[PartitionKeyT, PartitionElementT]:
+    ) -> Partitions[PartitionElementT, PartitionKeyT]:
         """Helper constructor for implementations that have only one partition."""
-        return Partitions([Partition(key, tuple(elements))])
+        return Partitions([Partition(tuple(elements), key)])
 
 
 # NB: Not frozen so it can be subclassed
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
-class _BatchBase(Generic[PartitionKeyT, PartitionElementT]):
+class _BatchBase(Generic[PartitionElementT, PartitionKeyT]):
     """Base class for a collection of elements that should all be processed together.
 
     For example, a collection of strings pointing to files that should be linted in one process, or
@@ -140,7 +140,7 @@ def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[Any, FieldSet]:
+    ) -> Partitions[FieldSet, Any]:
         return Partitions() if subsystem.skip else Partitions.single_partition(request.field_sets)
 
     return collect_rules(locals())
@@ -177,7 +177,7 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[Any, str]:
+    ) -> Partitions[str, Any]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))

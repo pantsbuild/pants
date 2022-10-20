@@ -56,7 +56,7 @@ def run_flake8(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partitions = rule_runner.request(
-        Partitions[Any, Flake8FieldSet],
+        Partitions[Flake8FieldSet, Any],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []

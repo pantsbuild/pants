@@ -151,7 +151,7 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
 
 def mock_target_partitioner(
     request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[Any, MockLinterFieldSet]:
+) -> Partitions[MockLinterFieldSet, Any]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -174,7 +174,7 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, Any]:
     return Partitions.single_partition(request.files)
 
 
@@ -508,7 +508,7 @@ def test_default_single_partition_partitioner() -> None:
         MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions([Partition(None, field_sets)])
+    assert partitions == Partitions([Partition(field_sets, None)])
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])

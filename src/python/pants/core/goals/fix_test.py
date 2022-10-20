@@ -484,11 +484,11 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     assert partitions == Partitions(
         [
             Partition(
-                None,
                 (
                     "bowl.utensil",
                     "knife.utensil",
                 ),
+                None,
             )
         ]
     )

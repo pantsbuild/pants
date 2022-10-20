@@ -64,7 +64,7 @@ def run_spectral(
         env_inherit={"PATH"},
     )
     partitions = rule_runner.request(
-        Partitions[Any, SpectralFieldSet],
+        Partitions[SpectralFieldSet, Any],
         [SpectralRequest.PartitionRequest(tuple(SpectralFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

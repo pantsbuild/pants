@@ -74,7 +74,7 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> Partitions[PartitionKey, PylintFieldSet]:
+) -> Partitions[PylintFieldSet, PartitionKey]:
     if pylint.skip:
         return Partitions()
 
@@ -94,6 +94,7 @@ async def partition_pylint(
 
     return Partitions(
         Partition(
+            tuple(field_sets),
             PartitionKey(
                 CoarsenedTargets(
                     coarsened_targets_by_address[field_set.address] for field_set in field_sets
@@ -101,7 +102,6 @@ async def partition_pylint(
                 resolve if len(python_setup.resolves) > 1 else None,
                 InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
             ),
-            tuple(field_sets),
         )
         for (
             resolve,
@@ -112,7 +112,7 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def run_pylint(
-    request: PylintRequest.Batch[PartitionKey, PylintFieldSet],
+    request: PylintRequest.Batch[PylintFieldSet, PartitionKey],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:

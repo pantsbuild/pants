@@ -40,7 +40,7 @@ async def partition_bandit(
     request: BanditRequest.PartitionRequest[BanditFieldSet],
     bandit: Bandit,
     python_setup: PythonSetup,
-) -> Partitions[InterpreterConstraints, BanditFieldSet]:
+) -> Partitions[BanditFieldSet, InterpreterConstraints]:
     if bandit.skip:
         return Partitions()
 
@@ -53,14 +53,14 @@ async def partition_bandit(
     )
 
     return Partitions(
-        Partition(constraints, field_sets)
+        Partition(field_sets, constraints)
         for constraints, field_sets in constraints_to_field_sets.items()
     )
 
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
-    request: BanditRequest.Batch[InterpreterConstraints, BanditFieldSet], bandit: Bandit
+    request: BanditRequest.Batch[BanditFieldSet, InterpreterConstraints], bandit: Bandit
 ) -> LintResult:
     assert request.partition_key is not None
 

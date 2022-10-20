@@ -72,7 +72,7 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partitions = rule_runner.request(
-        Partitions[PartitionKey, PylintFieldSet],
+        Partitions[PylintFieldSet, PartitionKey],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
@@ -523,7 +523,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = list(rule_runner.request(Partitions[PartitionKey, PylintFieldSet], [request]))
+    partitions = list(rule_runner.request(Partitions[PylintFieldSet, PartitionKey], [request]))
     assert len(partitions) == 3
 
     def assert_partition(

@@ -58,7 +58,7 @@ async def partition_tffmt(
     )
 
     return Partitions(
-        Partition(PartitionKey(directory), tuple(files))
+        Partition(tuple(files), PartitionKey(directory))
         for directory, files in partition_files_by_directory(source_files.files).items()
     )
 

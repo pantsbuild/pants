@@ -49,7 +49,7 @@ def run_hadolint(
         env_inherit={"PATH"},
     )
     partitions = rule_runner.request(
-        Partitions[Any, HadolintFieldSet],
+        Partitions[HadolintFieldSet, Any],
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

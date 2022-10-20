@@ -48,7 +48,7 @@ async def partition_flake8(
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> Partitions[InterpreterConstraints, Flake8FieldSet]:
+) -> Partitions[Flake8FieldSet, InterpreterConstraints]:
     if flake8.skip:
         return Partitions()
 
@@ -61,14 +61,14 @@ async def partition_flake8(
         results[constraints].append(fs)
 
     return Partitions(
-        Partition(interpreter_constraints, tuple(field_sets))
+        Partition(tuple(field_sets), interpreter_constraints)
         for interpreter_constraints, field_sets in results.items()
     )
 
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def run_flake8(
-    request: Flake8Request.Batch[InterpreterConstraints, Flake8FieldSet],
+    request: Flake8Request.Batch[Flake8FieldSet, InterpreterConstraints],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:

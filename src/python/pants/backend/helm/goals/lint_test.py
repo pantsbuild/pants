@@ -57,7 +57,7 @@ def run_helm_lint(
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(extra_options)
     partitions = rule_runner.request(
-        Partitions[chart.HelmChart, HelmLintFieldSet],
+        Partitions[HelmLintFieldSet, chart.HelmChart],
         [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

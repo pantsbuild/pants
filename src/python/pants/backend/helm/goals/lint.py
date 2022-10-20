@@ -38,19 +38,19 @@ class HelmLintRequest(LintTargetsRequest):
 @rule
 async def partition_helm_lint(
     request: HelmLintRequest.PartitionRequest[HelmLintFieldSet],
-) -> Partitions[HelmChart, HelmLintFieldSet]:
+) -> Partitions[HelmLintFieldSet, HelmChart]:
     field_sets = tuple(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
     charts = await MultiGet(Get(HelmChart, HelmChartRequest(field_set)) for field_set in field_sets)
     return Partitions(
-        Partition(chart, (field_set,)) for chart, field_set in zip(charts, field_sets)
+        Partition((field_set,), chart) for chart, field_set in zip(charts, field_sets)
     )
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(
-    request: HelmLintRequest.Batch[HelmChart, HelmLintFieldSet],
+    request: HelmLintRequest.Batch[HelmLintFieldSet, HelmChart],
     helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1

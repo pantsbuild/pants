@@ -100,7 +100,7 @@ def run_golangci_lint(
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
     partitions = rule_runner.request(
-        Partitions[Any, GolangciLintFieldSet],
+        Partitions[GolangciLintFieldSet, Any],
         [
             GolangciLintRequest.PartitionRequest(
                 tuple(GolangciLintFieldSet.create(tgt) for tgt in targets)

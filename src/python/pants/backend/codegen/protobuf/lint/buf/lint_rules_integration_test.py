@@ -56,7 +56,7 @@ def run_buf(
         env_inherit={"PATH"},
     )
     partitions = rule_runner.request(
-        Partitions[Any, BufFieldSet],
+        Partitions[BufFieldSet, Any],
         [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []

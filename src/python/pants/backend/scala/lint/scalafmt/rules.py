@@ -159,12 +159,12 @@ async def partition_scalafmt(
 
     return Partitions(
         Partition(
+            tuple(files),
             PartitionInfo(
                 classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 config_snapshot=config_snapshot,
                 extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
             ),
-            tuple(files),
         )
         for files, config_snapshot in zip(
             source_files_by_config_file.values(), config_file_snapshots

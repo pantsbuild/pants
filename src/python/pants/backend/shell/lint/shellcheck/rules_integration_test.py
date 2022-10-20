@@ -47,7 +47,7 @@ def run_shellcheck(
         env_inherit={"PATH"},
     )
     partitions = rule_runner.request(
-        Partitions[Any, ShellcheckFieldSet],
+        Partitions[ShellcheckFieldSet, Any],
         [
             ShellcheckRequest.PartitionRequest(
                 tuple(ShellcheckFieldSet.create(tgt) for tgt in targets)

@@ -113,7 +113,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = UntypedPartitions[PartitionKeyT, str]
+Partitions = UntypedPartitions[str, PartitionKeyT]
 
 
 @union

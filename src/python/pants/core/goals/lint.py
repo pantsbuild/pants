@@ -134,7 +134,7 @@ class LintRequest:
                     request: DryCleaningRequest.PartitionRequest[DryCleaningFieldSet]
                     # or `request: DryCleaningRequest.PartitionRequest` if file linter
                     subsystem: DryCleaningSubsystem,
-                ) -> Partitions[DryCleaningFieldSet]:
+                ) -> Partitions[DryCleaningFieldSet, Any]:
                     if subsystem.skip:
                         return Partitions()
 
@@ -175,7 +175,7 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionKeyT, PartitionElementT]):
+    class Batch(_BatchBase[PartitionElementT, PartitionKeyT]):
         pass
 
     @final
