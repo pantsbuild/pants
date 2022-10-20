@@ -21,7 +21,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -50,16 +50,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -137,7 +133,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -166,16 +162,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -257,7 +249,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -326,7 +318,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -397,7 +389,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -468,7 +460,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -525,7 +517,7 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
