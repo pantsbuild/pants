@@ -183,6 +183,7 @@ class MockRunSubsystem(GoalSubsystem):
 
 class MockRun(Goal):
     subsystem_cls = MockRunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

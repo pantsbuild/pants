@@ -56,9 +56,9 @@ async def partition_bandit(
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
-    request: BanditRequest.SubPartition[InterpreterConstraints, BanditFieldSet], bandit: Bandit
+    request: BanditRequest.Batch[InterpreterConstraints, BanditFieldSet], bandit: Bandit
 ) -> LintResult:
-    interpreter_constraints = request.key
+    interpreter_constraints = request.partition_key
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,

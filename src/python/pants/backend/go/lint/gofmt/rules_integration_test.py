@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            QueryRule(FmtResult, (GofmtRequest.SubPartition,)),
+            QueryRule(FmtResult, (GofmtRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
     )
@@ -120,8 +120,11 @@ def run_gofmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GofmtRequest.SubPartition(
-                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            GofmtRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_key=None,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )

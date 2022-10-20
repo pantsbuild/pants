@@ -179,7 +179,7 @@ def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partiti
 
 
 def mock_lint_partition(request: Any) -> LintResult:
-    request_type = {cls.SubPartition: cls for cls in _all_lint_requests()}[type(request)]
+    request_type = {cls.Batch: cls for cls in _all_lint_requests()}[type(request)]
     return request_type.get_lint_result(request.elements)
 
 
@@ -273,7 +273,7 @@ def run_lint_rule(
     union_membership = UnionMembership(
         {
             LintRequest: lint_request_types,
-            LintRequest.SubPartition: [rt.SubPartition for rt in lint_request_types],
+            LintRequest.Batch: [rt.Batch for rt in lint_request_types],
             LintTargetsRequest.PartitionRequest: [
                 rt.PartitionRequest
                 for rt in lint_request_types
@@ -315,7 +315,7 @@ def run_lint_rule(
                 ),
                 MockGet(
                     output_type=LintResult,
-                    input_types=(LintRequest.SubPartition,),
+                    input_types=(LintRequest.Batch,),
                     mock=mock_lint_partition,
                 ),
                 MockGet(

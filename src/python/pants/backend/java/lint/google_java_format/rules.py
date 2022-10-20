@@ -47,7 +47,7 @@ class GoogleJavaFormatToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
 async def google_java_format_fmt(
-    request: GoogleJavaFormatRequest.SubPartition,
+    request: GoogleJavaFormatRequest.Batch,
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> FmtResult:

@@ -36,7 +36,7 @@ class DocformatterRequest(FmtTargetsRequest):
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(
-    request: DocformatterRequest.SubPartition, docformatter: Docformatter
+    request: DocformatterRequest.Batch, docformatter: Docformatter
 ) -> FmtResult:
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
     result = await Get(

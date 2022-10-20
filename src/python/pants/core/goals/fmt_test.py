@@ -79,7 +79,7 @@ async def fortran_partition(request: FortranFmtRequest.PartitionRequest) -> Part
 
 
 @rule
-async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
+async def fortran_fmt(request: FortranFmtRequest.Batch) -> FmtResult:
     input = request.snapshot
     output = await Get(
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
@@ -119,7 +119,7 @@ async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionReques
 
 
 @rule
-async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResult:
+async def smalltalk_noop(request: SmalltalkNoopRequest.Batch) -> FmtResult:
     assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult(
         input=request.snapshot,
@@ -144,7 +144,7 @@ async def smalltalk_skip_partition(request: SmalltalkSkipRequest.PartitionReques
 
 
 @rule
-async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FmtResult:
+async def smalltalk_skip(request: SmalltalkSkipRequest.Batch) -> FmtResult:
     assert False
 
 
@@ -164,7 +164,7 @@ async def bricky_partition(request: BrickyBuildFileFormatter.PartitionRequest) -
 
 
 @rule
-async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> FmtResult:
+async def fmt_with_bricky(request: BrickyBuildFileFormatter.Batch) -> FmtResult:
     def brickify(contents: bytes) -> bytes:
         content_str = contents.decode("ascii")
         new_lines = []
