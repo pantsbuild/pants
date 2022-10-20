@@ -475,14 +475,17 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
                 [
                     FileContent("file.txt", b"four\n"),
                     FileContent("a/file.txt", b"four\n"),
+                    Directory("b"),
                     SymlinkEntry("a/ignored.ln", "./locally_nonexistant.txt"),
                     SymlinkEntry("a/followed.ln", "file.txt"),
                     SymlinkEntry("a/followed-dotslash.ln", "./file.txt"),
                     SymlinkEntry("followed-dir", "a"),
                     SymlinkEntry("followed-followed-dir", "followed-dir"),
                     SymlinkEntry("followed-file.ln", "file.txt"),
+                    SymlinkEntry("followed-subfile.ln", "a/file.txt"),
                     SymlinkEntry("followed-file.ln.ln", "followed-file.ln"),
                     SymlinkEntry("ignored.ln", "nonexistant.txt"),
+                    SymlinkEntry("followed-empty-dir", "b"),
                 ]
             )
         ],
@@ -497,6 +500,14 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
         "followed-file.ln",
         "followed-file.ln.ln",
         "followed-followed-dir/file.txt",
+        "followed-subfile.ln",
+    )
+    assert snapshot.dirs == (
+        "a",
+        "b",
+        "followed-dir",
+        "followed-empty-dir",
+        "followed-followed-dir",
     )
     contents = rule_runner.request(DigestContents, [digest])
     assert [content.path for content in contents] == [
@@ -508,6 +519,7 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
         "followed-file.ln",
         "followed-file.ln.ln",
         "followed-followed-dir/file.txt",
+        "followed-subfile.ln",
     ]
 
 
