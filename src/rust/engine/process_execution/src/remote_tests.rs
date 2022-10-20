@@ -151,7 +151,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -253,7 +253,8 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store).await,
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store, None)
+      .await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -353,7 +354,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store).await,
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -428,7 +429,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -527,7 +528,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -621,7 +622,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -737,7 +738,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -765,6 +766,7 @@ async fn successful_with_only_call_to_execute() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -815,6 +817,7 @@ async fn successful_after_reconnect_with_wait_execution() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -869,6 +872,7 @@ async fn successful_after_reconnect_from_retryable_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -929,7 +933,7 @@ async fn dropped_request_cancels() {
   let mock_server = {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(&request, None, None, &store)
+        execute_request: crate::remote::make_execute_request(&request, None, None, &store, None)
           .await
           .unwrap()
           .execute_request,
@@ -988,6 +992,7 @@ async fn server_rejecting_execute_request_gives_error() {
         None,
         None,
         &store,
+        None,
       )
       .await
       .unwrap()
@@ -1021,6 +1026,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1074,6 +1080,7 @@ async fn sends_headers() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1097,6 +1104,7 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1274,6 +1282,7 @@ async fn ensure_inline_stdio_is_stored() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1297,6 +1306,7 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1358,6 +1368,7 @@ async fn bad_result_bytes() {
           None,
           None,
           &store,
+          None,
         )
         .await
         .unwrap()
@@ -1406,6 +1417,7 @@ async fn initial_response_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1460,6 +1472,7 @@ async fn initial_response_missing_response_and_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1505,6 +1518,7 @@ async fn fails_after_retry_limit_exceeded() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1568,6 +1582,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1650,6 +1665,7 @@ async fn execute_missing_file_uploads_if_known() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1671,6 +1687,7 @@ async fn execute_missing_file_uploads_if_known() {
             None,
             None,
             &store,
+            None,
           )
           .await
           .unwrap()
@@ -1700,6 +1717,7 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1761,6 +1779,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -2440,6 +2459,7 @@ fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (Com
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &execution_address,
+    None,
     None,
     None,
     None,

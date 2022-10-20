@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Write};
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -45,8 +45,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+  CacheName, Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -106,6 +106,7 @@ pub enum ExecutionError {
 pub struct CommandRunner {
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   store: Store,
   executor: Executor,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -167,6 +168,7 @@ impl CommandRunner {
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
+    append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
@@ -203,6 +205,7 @@ impl CommandRunner {
     let command_runner = CommandRunner {
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       execution_client,
       operations_client,
       store,
@@ -818,6 +821,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let build_id = context.build_id.clone();
@@ -920,6 +927,37 @@ fn maybe_add_workunit(
   }
 }
 
+fn make_wrapper_for_append_only_caches(
+  caches: &BTreeMap<CacheName, RelativePath>,
+  base_path: &str,
+) -> Result<String, String> {
+  let mut script = String::new();
+  writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+  for (cache_name, path) in caches {
+    writeln!(
+      &mut script,
+      "mkdir -p '{}/{}'",
+      base_path,
+      cache_name.name()
+    )
+    .map_err(|err| format!("write! failed: {err:?}"))?;
+    if let Some(parent) = path.parent() {
+      writeln!(&mut script, "mkdir -p '{}'", parent.to_string_lossy())
+        .map_err(|err| format!("write! failed: {err}"))?;
+    }
+    writeln!(
+      &mut script,
+      "ln -s '{}/{}' '{}'",
+      base_path,
+      cache_name.name(),
+      path.as_path().to_string_lossy()
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+  writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+  Ok(script)
+}
+
 /// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
 /// a particular `Process`.
 #[derive(Clone, Debug, PartialEq)]
@@ -934,12 +972,49 @@ pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
-  _store: &Store,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
+  const CACHES_WRAPPER: &str = "./__wrapper__";
+
+  // Implement append-only caches by running a wrapper script before the actual
+
+  let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
+    (Some(base_path), caches) if !caches.is_empty() => {
+      if req.working_directory.is_some() {
+        return Err(
+          "TODO-DEV: Append-only caches and working directory cannot be set together in remote execution.".into()
+        );
+      }
+      // TODO-WIP: Make the base path configurable.
+      let script = make_wrapper_for_append_only_caches(caches, base_path)?;
+      let digest = store
+        .store_file_bytes(Bytes::from(script), false)
+        .await
+        .map_err(|err| format!("Failed to store wrapper script: {err}"))?;
+      let path = RelativePath::new(Path::new(CACHES_WRAPPER))?;
+      let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+      let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+      Some(directory_digest)
+    }
+    _ => None,
+  };
+
+  let arguments = match &wrapper_script_digest_opt {
+    Some(_) => {
+      let mut args = Vec::with_capacity(req.argv.len() + 1);
+      args.push(CACHES_WRAPPER.to_string());
+      args.extend(req.argv.iter().cloned());
+      args
+    }
+    None => req.argv.clone(),
+  };
+
   let mut command = remexec::Command {
-    arguments: req.argv.clone(),
+    arguments,
     ..remexec::Command::default()
   };
+
   for (name, value) in &req.env {
     if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
       || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
@@ -963,15 +1038,6 @@ pub async fn make_execute_request(
     ProcessExecutionStrategy::RemoteExecution(properties) => properties,
     _ => vec![],
   };
-
-  // TODO: Disabling append-only caches in remoting until server support exists due to
-  //       interaction with how servers match platform properties.
-  // if !req.append_only_caches.is_empty() {
-  //   platform_properties.extend(NamedCaches::platform_properties(
-  //     &req.append_only_caches,
-  //     &cache_key_gen_version,
-  //   ));
-  // }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     command
@@ -1091,7 +1157,19 @@ pub async fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
-  let input_root_digest = req.input_digests.complete.clone();
+  let input_root_digest: DirectoryDigest = match &wrapper_script_digest_opt {
+    Some(wrapper_digest) => {
+      let digests = vec![
+        req.input_digests.complete.clone(),
+        wrapper_digest.to_owned(),
+      ];
+      store
+        .merge(digests)
+        .await
+        .map_err(|err| format!("store error: {err}"))?
+    }
+    None => req.input_digests.complete.clone(),
+  };
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
