@@ -352,6 +352,34 @@ def test_real_import_beats_tryexcept_import(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_issue_17283(rule_runner: RuleRunner) -> None:
+    assert_deps_parsed(
+        rule_runner,
+        dedent(
+            """\
+                import foo
+
+                from one.two import (
+
+                  three,
+
+                  four,  # pants: no-infer-dep
+
+                  five,
+                )
+
+                from bar import baz
+            """
+        ),
+        expected_imports={
+            "foo": ImpInfo(lineno=1, weak=False),
+            "one.two.three": ImpInfo(lineno=5, weak=False),
+            "one.two.five": ImpInfo(lineno=9, weak=False),
+            "bar.baz": ImpInfo(lineno=12, weak=False),
+        },
+    )
+
+
 def test_gracefully_handle_syntax_errors(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(rule_runner, "x =", expected_imports={})
 
