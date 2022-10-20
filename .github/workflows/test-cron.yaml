@@ -50,16 +50,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -166,16 +162,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
