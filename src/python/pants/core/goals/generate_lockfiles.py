@@ -8,15 +8,15 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Sequence, Type
+from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.target import AllTargets, Field, Target
+from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption, StrOption
 from pants.util.docutil import bin_name, doc_url
@@ -447,31 +447,6 @@ def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) 
     )
 
     return ret
-
-
-# -----------------------------------------------------------------------------------------------
-# Rules used by most user lockfile-determining rules
-# -----------------------------------------------------------------------------------------------
-
-
-class TargetsWithSpecifiedFields(Collection[Target]):
-    """A filtered set of all the `Target`s that have specified fields."""
-
-
-@dataclass(frozen=True)
-class TargetsWithSpecifiedFieldsRequest:
-    """A request type to fetch all of the targets with specified field types."""
-
-    field_types: tuple[Type[Field], ...]
-
-
-@rule
-async def filter_targets_by_specified_fields(
-    request: TargetsWithSpecifiedFieldsRequest, all_targets: AllTargets
-) -> TargetsWithSpecifiedFields:
-    return TargetsWithSpecifiedFields(
-        tgt for tgt in all_targets if tgt.has_fields(request.field_types)
-    )
 
 
 # -----------------------------------------------------------------------------------------------

@@ -9,7 +9,6 @@ from typing import cast
 import pytest
 
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
-from pants.core.goals.generate_lockfiles import rules as generate_lockfiles_rules
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
@@ -40,7 +39,6 @@ def rule_runner() -> RuleRunner:
             *lockfile.rules(),
             *coursier_setup_rules(),
             *external_tool_rules(),
-            *generate_lockfiles_rules(),
             *source_files.rules(),
             *util_rules(),
             QueryRule(UserGenerateLockfiles, [RequestedJVMUserResolveNames]),

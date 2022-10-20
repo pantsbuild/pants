@@ -12,7 +12,6 @@ from pants.backend.scala.dependency_inference import rules as scala_dep_inf_rule
 from pants.backend.scala.resolve.lockfile import rules as scala_lockfile_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
-from pants.core.goals.generate_lockfiles import rules as generate_lockfiles_rules
 from pants.core.util_rules import external_tool, source_files, system_binaries
 from pants.engine.internals import build_files, graph
 from pants.jvm import jdk_rules
@@ -36,7 +35,6 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *coursier_fetch_rules(),
             *coursier_jvm_tool_rules(),
-            *generate_lockfiles_rules(),
             *lockfile.rules(),
             *coursier_setup_rules(),
             *external_tool.rules(),
