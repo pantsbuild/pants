@@ -16,18 +16,9 @@ use log::warn;
 use parking_lot::Mutex;
 
 use crate::{
-  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathStat, Stat, StrictGlobMatching,
-  Vfs,
+  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, LinkDepth, PathStat, Stat,
+  StrictGlobMatching, Vfs, MAX_LINK_DEPTH,
 };
-
-/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
-///
-/// We use a slightly different limit because this is not exactly the same operation: we're
-/// walking recursively while matching globs, and so our link traversals might involve steps
-/// through non-link destinations.
-const MAX_LINK_DEPTH: u8 = 64;
-
-type LinkDepth = u8;
 
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";

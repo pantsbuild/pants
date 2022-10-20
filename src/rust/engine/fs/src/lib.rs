@@ -68,6 +68,15 @@ const TARGET_NOFILE_LIMIT: u64 = 10000;
 
 const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
 
+/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
+///
+/// We use a slightly different limit because this is not exactly the same operation: we're
+/// walking recursively while matching globs, and so our link traversals might involve steps
+/// through non-link destinations.
+const MAX_LINK_DEPTH: u8 = 64;
+
+type LinkDepth = u8;
+
 /// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
 pub fn default_cache_path() -> PathBuf {
   let cache_path = std::env::var(XDG_CACHE_HOME)

@@ -1350,7 +1350,7 @@ impl Store {
   ) -> Result<Vec<FileContent>, StoreError> {
     let mut files = Vec::new();
     self.load_digest_trie(digest).await?.walk(
-      SymlinkBehavior::Aware,
+      SymlinkBehavior::Oblivious,
       &mut |path, entry| match entry {
         directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
         directory::Entry::Symlink(_) => (),

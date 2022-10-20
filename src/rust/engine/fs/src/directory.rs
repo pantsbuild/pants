@@ -13,6 +13,7 @@ use deepsize::{known_deep_size, DeepSizeOf};
 use internment::Intern;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::warn;
 use serde::Serialize;
 
 // TODO: Extract protobuf-specific pieces to a new crate.
@@ -21,7 +22,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
-use crate::{PathStat, RelativePath};
+use crate::{LinkDepth, PathStat, RelativePath, MAX_LINK_DEPTH};
 
 lazy_static! {
   pub static ref EMPTY_DIGEST_TREE: DigestTrie = DigestTrie(vec![].into());
@@ -622,31 +623,46 @@ impl DigestTrie {
       ));
       f(&PathBuf::new(), &root);
     }
-    self.walk_helper(PathBuf::new(), symlink_behavior, f)
+    self.walk_helper(PathBuf::new(), symlink_behavior, 0, f)
   }
 
   fn walk_helper(
     &self,
     path_so_far: PathBuf,
     symlink_behavior: SymlinkBehavior,
+    link_depth: LinkDepth,
     f: &mut impl FnMut(&Path, &Entry),
   ) {
     for entry in &*self.0 {
-      let path = path_so_far.join(entry.name().as_ref());
-
-      match (&symlink_behavior, entry) {
-        (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
-          if let Ok(Some(entry)) = self.entry(&s.target) {
-            f(&path, entry);
-          };
-        }
-        _ => f(&path, entry),
-      };
-
-      if let Entry::Directory(d) = entry {
-        d.tree.walk_helper(path, symlink_behavior, f);
-      }
+      self.walk_entry(entry, &path_so_far.join(entry.name().as_ref()), symlink_behavior, link_depth, f);
     }
+  }
+
+  fn walk_entry(
+    &self,
+    entry: &Entry,
+    path: &PathBuf,
+    symlink_behavior: SymlinkBehavior,
+    link_depth: LinkDepth,
+    f: &mut impl FnMut(&Path, &Entry),
+  ) {
+    match (&symlink_behavior, entry) {
+      (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
+        if let Ok(Some(target_entry)) = self.entry(&s.target) {
+          if link_depth >= MAX_LINK_DEPTH {
+            // We don't return a Result, so log and move on
+            warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+          } else {
+            self.walk_entry(&target_entry, &path, symlink_behavior, link_depth + 1, f);
+          }
+        };
+      }
+      (_, Entry::Directory(d)) => {
+        f(&path, entry);
+        d.tree.walk_helper(path.to_path_buf(), symlink_behavior, link_depth, f);
+      }
+      _ => f(&path, entry),
+    };
   }
 
   pub fn diff(&self, other: &DigestTrie) -> DigestTrieDiff {
@@ -1123,9 +1139,10 @@ fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
           path: path.strip_prefix(name.as_ref()).unwrap(),
           is_executable,
         },
-        TypedPath::Link { .. } => {
-          todo!();
-        }
+        TypedPath::Link { path, target } => TypedPath::Link {
+          path: path.strip_prefix(name.as_ref()).unwrap(),
+          target,
+        },
         TypedPath::Dir(path) => TypedPath::Dir(path.strip_prefix(name.as_ref()).unwrap()),
       })
     })
