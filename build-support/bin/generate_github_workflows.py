@@ -258,7 +258,7 @@ def setup_primary_python(install_python: bool = True) -> Sequence[Step]:
         ret.append(
             {
                 "name": f"Set up Python {gha_expr('matrix.python-version')}",
-                "uses": "actions/setup-python@v3",
+                "uses": "actions/setup-python@v4",
                 "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
             }
         )
