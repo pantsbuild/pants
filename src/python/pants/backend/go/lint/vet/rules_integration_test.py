@@ -95,15 +95,15 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions,
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.Batch("", batch, key)],
+            [GoVetRequest.Batch("", partition.elements, partition.key)],
         )
         results.append(result)
     return tuple(results)

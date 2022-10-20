@@ -90,12 +90,14 @@ def run_black(
         ],
     )
     assert len(partitions) == 1
-    key, partition = next(iter(partitions.items()))
-    assert key == InterpreterConstraints([expected_ics])
+    partition = partitions[0]
+    assert partition.key == InterpreterConstraints([expected_ics])
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest.Batch("", partition, partition_key=key, snapshot=input_sources.snapshot),
+            BlackRequest.Batch(
+                "", partition.elements, partition_key=partition.key, snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result

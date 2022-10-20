@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -92,7 +93,7 @@ async def partition_pylint(
     coarsened_targets_by_address = coarsened_targets.by_address()
 
     return Partitions(
-        (
+        Partition(
             PartitionKey(
                 CoarsenedTargets(
                     coarsened_targets_by_address[field_set.address] for field_set in field_sets
@@ -115,6 +116,8 @@ async def run_pylint(
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
+    assert request.partition_key is not None
+
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(

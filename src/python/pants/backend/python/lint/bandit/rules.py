@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
@@ -51,13 +52,18 @@ async def partition_bandit(
         request.field_sets, python_setup
     )
 
-    return Partitions(constraints_to_field_sets.items())
+    return Partitions(
+        Partition(constraints, field_sets)
+        for constraints, field_sets in constraints_to_field_sets.items()
+    )
 
 
 @rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
     request: BanditRequest.Batch[InterpreterConstraints, BanditFieldSet], bandit: Bandit
 ) -> LintResult:
+    assert request.partition_key is not None
+
     interpreter_constraints = request.partition_key
     bandit_pex_get = Get(
         VenvPex,

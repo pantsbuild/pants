@@ -59,15 +59,15 @@ def run_bandit(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions[InterpreterConstraints, BanditFieldSet],
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.Batch("", batch, key)],
+            [BanditRequest.Batch("", partition.elements, partition.key)],
         )
         results.append(result)
     return tuple(results)

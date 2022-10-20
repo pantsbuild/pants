@@ -18,6 +18,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, RemovePrefix
 from pants.engine.process import FallibleProcessResult
@@ -60,7 +61,7 @@ async def partition_flake8(
         results[constraints].append(fs)
 
     return Partitions(
-        (interpreter_constraints, tuple(field_sets))
+        Partition(interpreter_constraints, tuple(field_sets))
         for interpreter_constraints, field_sets in results.items()
     )
 

@@ -8,11 +8,12 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, TypeVar
+from typing import Any, Generic, Iterable, TypeVar
 
 from typing_extensions import Protocol
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
+from pants.engine.collection import Collection
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -22,7 +23,6 @@ from pants.engine.target import (
     SourcesPathsRequest,
     _get_field_set_fields,
 )
-from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 
@@ -49,8 +49,15 @@ PartitionKeyT = TypeVar("PartitionKeyT", bound=PartitionKey)
 PartitionElementT = TypeVar("PartitionElementT")
 
 
+@dataclass(frozen=True)
 @runtime_ignore_subscripts
-class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
+class Partition(Generic[PartitionKeyT, PartitionElementT]):
+    key: PartitionKeyT | None
+    elements: tuple[PartitionElementT, ...]
+
+
+@runtime_ignore_subscripts
+class Partitions(Collection[Partition[PartitionKeyT, PartitionElementT]]):
     """A mapping from <partition key> to <partition>.
 
     When implementing a plugin, one of your rules will return this type, taking in a
@@ -73,10 +80,10 @@ class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
 
     @classmethod
     def single_partition(
-        cls, elements: Iterable[PartitionElementT], key: PartitionKeyT = None  # type: ignore[assignment]
+        cls, elements: Iterable[PartitionElementT], key: PartitionKeyT | None = None
     ) -> Partitions[PartitionKeyT, PartitionElementT]:
         """Helper constructor for implementations that have only one partition."""
-        return Partitions([(key, tuple(elements))])
+        return Partitions([Partition(key, tuple(elements))])
 
 
 # NB: Not frozen so it can be subclassed
@@ -92,7 +99,7 @@ class _BatchBase(Generic[PartitionKeyT, PartitionElementT]):
 
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    partition_key: PartitionKeyT
+    partition_key: PartitionKeyT | None
 
 
 @dataclass(frozen=True)
@@ -133,7 +140,7 @@ def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[Any, FieldSet]:
         return Partitions() if subsystem.skip else Partitions.single_partition(request.field_sets)
 
     return collect_rules(locals())
@@ -170,7 +177,7 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[Any, str]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))

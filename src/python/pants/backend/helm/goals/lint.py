@@ -16,6 +16,7 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.util_rules.partitions import Partition
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
@@ -42,7 +43,9 @@ async def partition_helm_lint(
         field_set for field_set in request.field_sets if not field_set.skip_lint.value
     )
     charts = await MultiGet(Get(HelmChart, HelmChartRequest(field_set)) for field_set in field_sets)
-    return Partitions((chart, (field_set,)) for chart, field_set in zip(charts, field_sets))
+    return Partitions(
+        Partition(chart, (field_set,)) for chart, field_set in zip(charts, field_sets)
+    )
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
@@ -51,6 +54,8 @@ async def run_helm_lint(
     helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1
+    assert request.partition_key is not None
+
     field_set = request.elements[0]
     chart = request.partition_key
 

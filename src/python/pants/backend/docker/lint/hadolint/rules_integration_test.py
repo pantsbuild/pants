@@ -48,15 +48,15 @@ def run_hadolint(
         extra_args or (),
         env_inherit={"PATH"},
     )
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions[Any, HadolintFieldSet],
         [HadolintRequest.PartitionRequest(tuple(HadolintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [HadolintRequest.Batch("", batch, key)],
+            [HadolintRequest.Batch("", partition.elements, partition.key)],
         )
         results.append(result)
     return tuple(results)

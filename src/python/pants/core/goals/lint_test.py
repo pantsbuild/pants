@@ -25,7 +25,7 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
@@ -508,7 +508,7 @@ def test_default_single_partition_partitioner() -> None:
         MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
+    assert partitions == Partitions([Partition(None, field_sets)])
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])

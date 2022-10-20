@@ -56,15 +56,15 @@ def run_helm_lint(
     extra_options: Iterable[str] = [],
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(extra_options)
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions[chart.HelmChart, HelmLintFieldSet],
         [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [HelmLintRequest.Batch("", batch, key)],
+            [HelmLintRequest.Batch("", partition.elements, partition.key)],
         )
         results.append(result)
     return tuple(results)

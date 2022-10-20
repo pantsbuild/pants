@@ -280,9 +280,9 @@ async def fix(
         partition_infos_by_files = defaultdict(list)
         for request_type, partitions_list in partitions_by_request_type.items():
             for partitions in partitions_list:
-                for key, files in partitions.items():
-                    for file in files:
-                        partition_infos_by_files[file].append((request_type, key))
+                for partition in partitions:
+                    for file in partition.elements:
+                        partition_infos_by_files[file].append((request_type, partition.key))
 
         files_by_partition_info = defaultdict(list)
         for file, partition_infos in partition_infos_by_files.items():

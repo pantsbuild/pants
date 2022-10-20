@@ -438,10 +438,10 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (batch, key)
+            (batch, partition.key)
             for partitions in partitions_list
-            for key, partition in partitions.items()
-            for batch in batch_by_size(partition)
+            for partition in partitions
+            for batch in batch_by_size(partition.elements)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
     }
@@ -454,7 +454,7 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    batches = [
+    batches: Iterable[LintRequest.Batch] = [
         request_type.Batch(
             request_type.tool_name,
             elements,

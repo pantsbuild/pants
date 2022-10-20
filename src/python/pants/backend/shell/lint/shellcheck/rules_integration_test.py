@@ -46,7 +46,7 @@ def run_shellcheck(
         ["--backend-packages=pants.backend.shell.lint.shellcheck", *(extra_args or ())],
         env_inherit={"PATH"},
     )
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions[Any, ShellcheckFieldSet],
         [
             ShellcheckRequest.PartitionRequest(
@@ -55,10 +55,10 @@ def run_shellcheck(
         ],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [ShellcheckRequest.Batch("", batch, key)],
+            [ShellcheckRequest.Batch("", partition.elements, partition.key)],
         )
         results.append(result)
     return tuple(results)
