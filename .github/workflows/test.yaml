@@ -11,6 +11,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
@@ -129,6 +130,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Bootstrap Pants, test Rust (macOS11-x86_64)
@@ -238,6 +240,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
       || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -298,6 +301,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
       || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -364,6 +368,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
       || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -426,6 +431,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+      PANTS_REMOTE_EXECUTION: 'false'
     if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
       || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -845,6 +851,7 @@ jobs:
   test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
+      PANTS_REMOTE_EXECUTION: 'false'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (macOS11-x86_64)

@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+__defaults__(all={"environment": "remote"})
+
 shell_sources(name="scripts", sources=["cargo", "pants"])
 
 # We use `BUILD_ROOT` to establish the build root, rather than `./pants`, per
@@ -19,5 +21,13 @@ docker_environment(
 # for internal testing.
 remote_environment(
     name="buildgrid_remote",
+    python_bootstrap_search_path=["<PATH>"],
+)
+
+remote_environment(
+    name="toolchain_remote",
+    # We fallback to local because not every Pants contributor will have remote execution available
+    # to them.
+    fallback_environment="__local__",
     python_bootstrap_search_path=["<PATH>"],
 )

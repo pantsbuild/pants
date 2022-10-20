@@ -1,6 +1,12 @@
 [GLOBAL]
 colors = true
 
+# These options will be dynamically disabled by the Toolchain plugin when auth fails, e.g. a new
+# contributor not allowlisted.
+#
+# It's important that our macOS and Build Wheels jobs run locally, so we override the remote
+# execution option in those jobs to false.
+remote_execution = true
 remote_cache_read = true
 remote_cache_write = true
 

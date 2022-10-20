@@ -80,8 +80,15 @@ DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
-# NB: This overrides `pants.ci.toml`.
-DISABLE_REMOTE_CACHE_ENV = {"PANTS_REMOTE_CACHE_READ": "false", "PANTS_REMOTE_CACHE_WRITE": "false"}
+# NB: These overrides `pants.ci.toml`. It's important that we disable remote execution for the
+# build wheels and macOS test jobs, which must run on local. We also disable the remote cache in
+# jobs that would not benefit much from it to avoid exhausting the repository's allocated tokens.
+DISABLE_REMOTE_EXECUTION_ENV = {"PANTS_REMOTE_EXECUTION": "false"}
+DISABLE_REMOTE_CACHE_AND_EXECUTION_ENV = {
+    "PANTS_REMOTE_EXECUTION": "false",
+    "PANTS_REMOTE_CACHE_READ": "false",
+    "PANTS_REMOTE_CACHE_WRITE": "false",
+}
 
 
 # ----------------------------------------------------------------------
@@ -504,7 +511,7 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
             "name": f"Bootstrap Pants, test and lint Rust ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": DISABLE_REMOTE_CACHE_ENV,
+            "env": DISABLE_REMOTE_CACHE_AND_EXECUTION_ENV,
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
@@ -547,7 +554,7 @@ def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
             "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",
             "runs-on": helper.runs_on(),
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": DISABLE_REMOTE_CACHE_ENV,
+            "env": DISABLE_REMOTE_CACHE_AND_EXECUTION_ENV,
             "timeout-minutes": 60,
             "if": IS_PANTS_OWNER,
             "steps": [
@@ -568,7 +575,7 @@ def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
             "runs-on": helper.runs_on(),
             "needs": "bootstrap_pants_macos11_x86_64",
             "strategy": {"matrix": {"python-version": python_versions}},
-            "env": helper.platform_env(),
+            "env": {**helper.platform_env(), **DISABLE_REMOTE_EXECUTION_ENV},
             "timeout-minutes": 60,
             "if": IS_PANTS_OWNER,
             "steps": [
@@ -635,7 +642,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             "runs-on": helper.runs_on(),
             **({"container": container} if container else {}),
             "timeout-minutes": 90,
-            "env": DISABLE_REMOTE_CACHE_ENV,
+            "env": DISABLE_REMOTE_CACHE_AND_EXECUTION_ENV,
             "steps": initial_steps
             + [
                 setup_toolchain_auth(),
