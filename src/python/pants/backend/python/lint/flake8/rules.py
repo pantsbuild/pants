@@ -67,11 +67,11 @@ async def partition_flake8(
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def run_flake8(
-    request: Flake8Request.SubPartition[InterpreterConstraints, Flake8FieldSet],
+    request: Flake8Request.Batch[InterpreterConstraints, Flake8FieldSet],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = request.key
+    interpreter_constraints = request.partition_key
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,

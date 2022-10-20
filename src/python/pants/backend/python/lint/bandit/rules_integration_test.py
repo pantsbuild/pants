@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [BanditRequest.PartitionRequest]),
-            QueryRule(LintResult, [BanditRequest.SubPartition]),
+            QueryRule(LintResult, [BanditRequest.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -64,10 +64,10 @@ def run_bandit(
         [BanditRequest.PartitionRequest(tuple(BanditFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.SubPartition("", subpartition, key)],
+            [BanditRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

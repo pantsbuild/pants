@@ -43,7 +43,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             SubsystemRule(HelmSubsystem),
             QueryRule(Partitions, [HelmLintRequest.PartitionRequest]),
-            QueryRule(LintResult, [HelmLintRequest.SubPartition]),
+            QueryRule(LintResult, [HelmLintRequest.Batch]),
         ],
     )
     return rule_runner
@@ -61,10 +61,10 @@ def run_helm_lint(
         [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [HelmLintRequest.SubPartition("", subpartition, key)],
+            [HelmLintRequest.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

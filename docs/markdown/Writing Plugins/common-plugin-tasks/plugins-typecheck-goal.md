@@ -8,8 +8,9 @@ updatedAt: "2022-02-14T23:39:46.585Z"
 ---
 Adding a typechecker is almost identical to [adding a linter](doc:plugins-lint-goal), except for these differences:
 
-1. Subclass `CheckRequest` from `pants.core.goals.check`, rather than `LintTargetsRequest`. Register a `UnionRule(CheckRequest, CustomCheckRequest)`.
-2. Return `CheckResults` in your rule—which is a collection of `CheckResult` objects—rather than returning `LintResults`. Both types are defined in `pants.core.goals.check`.
+1. Subclass `CheckRequest` from `pants.core.goals.check`, rather than `LintTargetsRequest`.
+2. Register a `UnionRule(CheckRequest, CustomCheckRequest)` in your `rules()` instead of unpacking `<RequestType>.rules(...)`.
+3. Return `CheckResults` in your rule—which is a collection of `CheckResult` objects—rather than returning a `LintResult`.
 
 The rule will look like this:
 

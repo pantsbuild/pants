@@ -62,7 +62,7 @@ async def partition_buf(
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(
-    request: BufFormatRequest.SubPartition, buf: BufSubsystem, platform: Platform
+    request: BufFormatRequest.Batch, buf: BufSubsystem, platform: Platform
 ) -> FmtResult:
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))

@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, [Flake8Request.PartitionRequest]),
-            QueryRule(LintResult, [Flake8Request.SubPartition]),
+            QueryRule(LintResult, [Flake8Request.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -60,10 +60,10 @@ def run_flake8(
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for key, batch in partition.items():
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.SubPartition("", subpartition, key)],
+            [Flake8Request.Batch("", batch, key)],
         )
         results.append(result)
     return tuple(results)

@@ -102,7 +102,7 @@ class PackageSubsystem(GoalSubsystem):
 
 class Package(Goal):
     subsystem_cls = PackageSubsystem
-    enviroment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 class AllPackageableTargets(Targets):

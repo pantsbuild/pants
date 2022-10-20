@@ -187,7 +187,7 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
 
 
 # -----------------------------------------------------------------------------------------------
-# `file` and`files` targets
+# `file` and `files` targets
 # -----------------------------------------------------------------------------------------------
 class FileSourceField(AssetSourceField):
     uses_source_roots = False
@@ -744,6 +744,48 @@ class ExternalToolTarget(Target):
         ExternalToolSourceField,
         ExternalToolEXEField,
     )
+
+# -----------------------------------------------------------------------------------------------
+# `_lockfile` and `_lockfiles` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class LockfileSourceField(SingleSourceField):
+    uses_source_roots = False
+    required = True
+
+
+class LockfileDependenciesField(Dependencies):
+    pass
+
+
+class LockfileTarget(Target):
+    alias = "_lockfile"
+    core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
+    help = softwrap(
+        """
+        A target for lockfiles in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependees` works properly for targets
+        relying on a particular lockfile.
+        """
+    )
+
+
+class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+
+class LockfilesGeneratorTarget(TargetFilesGenerator):
+    alias = "_lockfiles"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        LockfilesGeneratorSourcesField,
+    )
+    generated_target_cls = LockfileTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (LockfileDependenciesField,)
+    help = "Generate a `_lockfile` target for each file in the `sources` field."
 
 
 def rules():
