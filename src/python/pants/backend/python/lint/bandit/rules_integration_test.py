@@ -67,7 +67,7 @@ def run_bandit(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [BanditRequest.Batch("", partition.elements, partition.key)],
+            [BanditRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

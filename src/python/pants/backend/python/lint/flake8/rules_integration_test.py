@@ -63,7 +63,7 @@ def run_flake8(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.Batch("", partition.elements, partition.key)],
+            [Flake8Request.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

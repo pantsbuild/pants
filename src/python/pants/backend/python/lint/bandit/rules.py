@@ -62,9 +62,9 @@ async def partition_bandit(
 async def bandit_lint(
     request: BanditRequest.Batch[BanditFieldSet, InterpreterConstraints], bandit: Bandit
 ) -> LintResult:
-    assert request.partition_key is not None
+    assert request.partition_metadata is not None
 
-    interpreter_constraints = request.partition_key
+    interpreter_constraints = request.partition_metadata
     bandit_pex_get = Get(
         VenvPex,
         PexRequest,

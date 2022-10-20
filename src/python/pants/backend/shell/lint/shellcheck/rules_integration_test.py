@@ -58,7 +58,7 @@ def run_shellcheck(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [ShellcheckRequest.Batch("", partition.elements, partition.key)],
+            [ShellcheckRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

@@ -72,7 +72,7 @@ async def run_flake8(
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = request.partition_key
+    interpreter_constraints = request.partition_metadata
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,

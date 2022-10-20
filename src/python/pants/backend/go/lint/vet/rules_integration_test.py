@@ -103,7 +103,7 @@ def run_go_vet(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.Batch("", partition.elements, partition.key)],
+            [GoVetRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

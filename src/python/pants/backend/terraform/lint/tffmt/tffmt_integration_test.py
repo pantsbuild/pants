@@ -147,7 +147,7 @@ def run_tffmt(
             TffmtRequest.Batch(
                 "",
                 partition.elements,
-                partition_key=partition.key,
+                partition_metadata=partition.metadata,
                 snapshot=input_sources.snapshot,
             ),
         ],

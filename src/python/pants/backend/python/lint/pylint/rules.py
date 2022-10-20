@@ -41,7 +41,7 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PartitionKey:
+class PartitionMetadata:
     coarsened_targets: CoarsenedTargets
     # NB: These are the same across every element in a partition
     resolve_description: str | None
@@ -74,7 +74,7 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> Partitions[PylintFieldSet, PartitionKey]:
+) -> Partitions[PylintFieldSet, PartitionMetadata]:
     if pylint.skip:
         return Partitions()
 
@@ -95,7 +95,7 @@ async def partition_pylint(
     return Partitions(
         Partition(
             tuple(field_sets),
-            PartitionKey(
+            PartitionMetadata(
                 CoarsenedTargets(
                     coarsened_targets_by_address[field_set.address] for field_set in field_sets
                 ),
@@ -112,20 +112,20 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def run_pylint(
-    request: PylintRequest.Batch[PylintFieldSet, PartitionKey],
+    request: PylintRequest.Batch[PylintFieldSet, PartitionMetadata],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
-    assert request.partition_key is not None
+    assert request.partition_metadata is not None
 
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.partition_key.coarsened_targets.closure()),
+            (target.address for target in request.partition_metadata.coarsened_targets.closure()),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=request.partition_key.interpreter_constraints,
+            hardcoded_interpreter_constraints=request.partition_metadata.interpreter_constraints,
         ),
     )
 
@@ -133,14 +133,14 @@ async def run_pylint(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=request.partition_key.interpreter_constraints,
+            interpreter_constraints=request.partition_metadata.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
     sources_get = Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(request.partition_key.coarsened_targets.closure()),
+        PythonSourceFilesRequest(request.partition_metadata.coarsened_targets.closure()),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -158,7 +158,7 @@ async def run_pylint(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=request.partition_key.interpreter_constraints,
+                    interpreter_constraints=request.partition_metadata.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],

@@ -63,7 +63,7 @@ def run_buf(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [BufLintRequest.Batch("", partition.elements, partition.key)],
+            [BufLintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

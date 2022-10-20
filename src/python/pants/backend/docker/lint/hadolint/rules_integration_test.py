@@ -56,7 +56,7 @@ def run_hadolint(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [HadolintRequest.Batch("", partition.elements, partition.key)],
+            [HadolintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

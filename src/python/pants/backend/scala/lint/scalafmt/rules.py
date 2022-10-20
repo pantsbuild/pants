@@ -176,7 +176,7 @@ async def partition_scalafmt(
 async def scalafmt_fmt(
     request: ScalafmtRequest.Batch, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
-    partition_info = cast(PartitionInfo, request.partition_key)
+    partition_info = cast(PartitionInfo, request.partition_metadata)
     merged_digest = await Get(
         Digest,
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest]),

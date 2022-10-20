@@ -54,10 +54,10 @@ async def run_helm_lint(
     helm_subsystem: HelmSubsystem,
 ) -> LintResult:
     assert len(request.elements) == 1
-    assert request.partition_key is not None
+    assert request.partition_metadata is not None
 
     field_set = request.elements[0]
-    chart = request.partition_key
+    chart = request.partition_metadata
 
     argv = ["lint", chart.name]
 

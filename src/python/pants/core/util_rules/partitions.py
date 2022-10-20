@@ -39,26 +39,26 @@ class PartitionerType(Enum):
     """Registers a partitioner which returns the inputs as a single partition."""
 
 
-class PartitionKey(Protocol):
+class PartitionMetadata(Protocol):
     @property
     def description(self) -> str:
         ...
 
 
-PartitionKeyT = TypeVar("PartitionKeyT", bound=PartitionKey)
+PartitionMetadataT = TypeVar("PartitionMetadataT", bound=PartitionMetadata)
 PartitionElementT = TypeVar("PartitionElementT")
 
 
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
-class Partition(Generic[PartitionElementT, PartitionKeyT]):
+class Partition(Generic[PartitionElementT, PartitionMetadataT]):
     elements: tuple[PartitionElementT, ...]
-    key: PartitionKeyT | None
+    metadata: PartitionMetadataT | None
 
 
 @runtime_ignore_subscripts
-class Partitions(Collection[Partition[PartitionElementT, PartitionKeyT]]):
-    """A mapping from <partition key> to <partition>.
+class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
+    """A mapping from <partition.metadata> to <partition>.
 
     When implementing a plugin, one of your rules will return this type, taking in a
     `PartitionRequest` specific to your plugin.
@@ -72,25 +72,25 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionKeyT]]):
             the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
             and files ABC with Py2.
 
-    The partition key can be of any type able to cross a rule-boundary, and will be provided to the
-    rule which "runs" your tool. If it isn't `None` it should implement the `PartitionKey` protocol.
+    The partition.metadata can be of any type able to cross a rule-boundary, and will be provided to the
+    rule which "runs" your tool. If it isn't `None` it should implement the `PartitionMetadata` protocol.
 
     NOTE: The partition may be divided further into multiple batches.
     """
 
     @classmethod
     def single_partition(
-        cls, elements: Iterable[PartitionElementT], key: PartitionKeyT | None = None
-    ) -> Partitions[PartitionElementT, PartitionKeyT]:
+        cls, elements: Iterable[PartitionElementT], metadata: PartitionMetadataT | None = None
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
         """Helper constructor for implementations that have only one partition."""
-        return Partitions([Partition(tuple(elements), key)])
+        return Partitions([Partition(tuple(elements), metadata)])
 
 
 # NB: Not frozen so it can be subclassed
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
-class _BatchBase(Generic[PartitionElementT, PartitionKeyT]):
+class _BatchBase(Generic[PartitionElementT, PartitionMetadataT]):
     """Base class for a collection of elements that should all be processed together.
 
     For example, a collection of strings pointing to files that should be linted in one process, or
@@ -99,7 +99,7 @@ class _BatchBase(Generic[PartitionElementT, PartitionKeyT]):
 
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    partition_key: PartitionKeyT | None
+    partition_metadata: PartitionMetadataT | None
 
 
 @dataclass(frozen=True)

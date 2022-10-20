@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import PartitionKey, PylintRequest
+from pants.backend.python.lint.pylint.rules import PartitionMetadata, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -72,14 +72,14 @@ def run_pylint(
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     partitions = rule_runner.request(
-        Partitions[PylintFieldSet, PartitionKey],
+        Partitions[PylintFieldSet, PartitionMetadata],
         [PylintRequest.PartitionRequest(tuple(PylintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [PylintRequest.Batch("", partition.elements, partition.key)],
+            [PylintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)
@@ -523,7 +523,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         )
     )
 
-    partitions = list(rule_runner.request(Partitions[PylintFieldSet, PartitionKey], [request]))
+    partitions = list(rule_runner.request(Partitions[PylintFieldSet, PartitionMetadata], [request]))
     assert len(partitions) == 3
 
     def assert_partition(
@@ -533,8 +533,8 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         interpreter: str,
         resolve: str,
     ) -> None:
-        assert partition.key is not None
-        key = partition.key
+        assert partition.metadata is not None
+        key = partition.metadata
 
         root_addresses = {t.address for t in roots}
         assert {t.address for t in key.coarsened_targets.closure()} == {

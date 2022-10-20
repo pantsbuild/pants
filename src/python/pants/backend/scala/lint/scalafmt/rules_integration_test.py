@@ -133,9 +133,9 @@ def run_scalafmt(
     if expected_partitions:
         assert len(partitions) == len(expected_partitions)
         for partition in partitions:
-            assert partition.key is not None
+            assert partition.metadata is not None
 
-            config_file = partition.key.config_snapshot.files[0]
+            config_file = partition.metadata.config_snapshot.files[0]
             assert config_file in expected_partitions
             assert partition.elements == expected_partitions[config_file]
     else:
@@ -147,7 +147,7 @@ def run_scalafmt(
                 ScalafmtRequest.Batch(
                     "",
                     partition.elements,
-                    partition_key=partition.key,
+                    partition_metadata=partition.metadata,
                     snapshot=rule_runner.request(Snapshot, [PathGlobs(partition.elements)]),
                 )
             ],

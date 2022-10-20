@@ -64,7 +64,7 @@ def run_helm_lint(
     for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [HelmLintRequest.Batch("", partition.elements, partition.key)],
+            [HelmLintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

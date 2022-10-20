@@ -19,7 +19,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
     _BatchBase,
@@ -77,8 +77,8 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.partition_key.description
-            if request.partition_key
+            partition_description=request.partition_metadata.description
+            if request.partition_metadata
             else None,
             report=report,
         )
@@ -175,7 +175,7 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionElementT, PartitionKeyT]):
+    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
         pass
 
     @final
@@ -438,7 +438,7 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (batch, partition.key)
+            (batch, partition.metadata)
             for partitions in partitions_list
             for partition in partitions
             for batch in batch_by_size(partition.elements)

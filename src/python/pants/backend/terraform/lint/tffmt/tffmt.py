@@ -38,7 +38,7 @@ class TffmtRequest(FmtTargetsRequest):
 
 
 @dataclass(frozen=True)
-class PartitionKey:
+class PartitionMetadata:
     directory: str
 
     @property
@@ -58,14 +58,14 @@ async def partition_tffmt(
     )
 
     return Partitions(
-        Partition(tuple(files), PartitionKey(directory))
+        Partition(tuple(files), PartitionMetadata(directory))
         for directory, files in partition_files_by_directory(source_files.files).items()
     )
 
 
 @rule(desc="Format with `terraform fmt`")
 async def tffmt_fmt(request: TffmtRequest.Batch, tffmt: TfFmtSubsystem) -> FmtResult:
-    directory = cast(PartitionKey, request.partition_key).directory
+    directory = cast(PartitionMetadata, request.partition_metadata).directory
     result = await Get(
         ProcessResult,
         TerraformProcess(
