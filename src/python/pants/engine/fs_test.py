@@ -1065,18 +1065,21 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+@dataclass(frozen=True)
+class DigestRequest:
+    create_digest: CreateDigest
+
+
+class WorkspaceGoalSubsystem(GoalSubsystem):
+    name = "workspace-goal"
+
+
+class WorkspaceGoal(Goal):
+    subsystem_cls = WorkspaceGoalSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
 def test_workspace_in_goal_rule() -> None:
-    class WorkspaceGoalSubsystem(GoalSubsystem):
-        name = "workspace-goal"
-
-    class WorkspaceGoal(Goal):
-        subsystem_cls = WorkspaceGoalSubsystem
-        environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
-
-    @dataclass(frozen=True)
-    class DigestRequest:
-        create_digest: CreateDigest
-
     @rule
     def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")
