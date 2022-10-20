@@ -52,6 +52,14 @@ class GenerateLockfile:
 
 
 @dataclass(frozen=True)
+class EnvironmentsMixIn:
+    """A mixin, allowing a `GenerateLockfile` subclass to specify which environments the request is
+    compatible with, if the relevant backend supports environments."""
+
+    environments: tuple[EnvironmentName, ...]
+
+
+@dataclass(frozen=True)
 class WrappedGenerateLockfile:
     request: GenerateLockfile
 
@@ -379,6 +387,8 @@ async def generate_lockfiles_goal(
         set(generate_lockfiles_subsystem.resolve),
     )
 
+    # This is the "planning" phase of lockfile generation. Currently this is all done in the local
+    # environment, since there's not currently a clear mechanism to proscribe an environment.
     all_specified_user_requests = await MultiGet(
         Get(
             UserGenerateLockfiles,
@@ -398,19 +408,45 @@ async def generate_lockfiles_goal(
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
+    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # environment to execute the request in. Currently we warn if multiple environments are
+    # specified.
     all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+    preferred_envs = (_preferred_environment(req, local_environment.val) for req in all_requests)
 
+    # Execute the actual lockfile generation in each request's environment.
     results = await MultiGet(
-        Get(GenerateLockfileResult, {req: GenerateLockfile, local_environment.val: EnvironmentName})
-        for req in all_requests
+        Get(GenerateLockfileResult, {req: GenerateLockfile, env_name: EnvironmentName})
+        for req, env_name in zip(all_requests, preferred_envs)
     )
 
+    # Lockfiles are actually written here. This would be an acceptable place to handle conflict
+    # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) -> EnvironmentName:
+
+    if not isinstance(request, EnvironmentsMixIn):
+        return default  # This request has not been migrated to use environments.
+
+    if len(request.environments) == 1:
+        return request.environments[0]
+
+    ret = default if default in request.environments else request.environments[0]
+
+    logger.warning(
+        f"The `{request.__class__.__name__}` for resolve `{request.resolve_name}` specifies more "
+        "than one environment. Pants will generate the lockfile using only the environment "
+        f"`{ret.val}`, which may have unintended effects when executing in the other environments."
+    )
+
+    return ret
 
 
 # -----------------------------------------------------------------------------------------------
