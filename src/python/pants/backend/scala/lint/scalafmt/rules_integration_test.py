@@ -131,24 +131,28 @@ def run_scalafmt(
         ],
     )
     if expected_partitions:
-        assert {
-            key.config_snapshot.files[0]: files for key, files in partitions.items()
-        } == expected_partitions
+        assert len(partitions) == len(expected_partitions)
+        for partition in partitions:
+            assert partition.key is not None
+
+            config_file = partition.key.config_snapshot.files[0]
+            assert config_file in expected_partitions
+            assert partition.elements == expected_partitions[config_file]
     else:
-        assert len(partitions.items()) == 1
+        assert len(partitions) == 1
     fmt_results = [
         rule_runner.request(
             FmtResult,
             [
                 ScalafmtRequest.Batch(
                     "",
-                    partition,
-                    partition_key=key,
-                    snapshot=rule_runner.request(Snapshot, [PathGlobs(partition)]),
+                    partition.elements,
+                    partition_key=partition.key,
+                    snapshot=rule_runner.request(Snapshot, [PathGlobs(partition.elements)]),
                 )
             ],
         )
-        for key, partition in partitions.items()
+        for partition in partitions
     ]
     return fmt_results if expected_partitions else fmt_results[0]
 

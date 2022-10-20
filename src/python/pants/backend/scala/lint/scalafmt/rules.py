@@ -13,6 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
@@ -157,7 +158,7 @@ async def partition_scalafmt(
     )
 
     return Partitions(
-        (
+        Partition(
             PartitionInfo(
                 classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 config_snapshot=config_snapshot,
