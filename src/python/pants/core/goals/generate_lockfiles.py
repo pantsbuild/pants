@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable, ClassVar, Iterable, Sequence, Type
 
 from pants.engine.collection import Collection
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -359,7 +359,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
 class GenerateLockfilesGoal(Goal):
     subsystem_cls = GenerateLockfilesSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
@@ -367,6 +367,7 @@ async def generate_lockfiles_goal(
     workspace: Workspace,
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    local_environment: ChosenLocalEnvironmentName,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -379,11 +380,17 @@ async def generate_lockfiles_goal(
     )
 
     all_specified_user_requests = await MultiGet(
-        Get(UserGenerateLockfiles, RequestedUserResolveNames, resolve_names)
+        Get(
+            UserGenerateLockfiles,
+            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+        )
         for resolve_names in requested_user_resolve_names
     )
     specified_tool_requests = await MultiGet(
-        Get(WrappedGenerateLockfile, GenerateToolLockfileSentinel, sentinel())
+        Get(
+            WrappedGenerateLockfile,
+            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
+        )
         for sentinel in requested_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
@@ -391,12 +398,11 @@ async def generate_lockfiles_goal(
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
+    all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+
     results = await MultiGet(
-        Get(GenerateLockfileResult, GenerateLockfile, req)
-        for req in (
-            *(req for reqs in all_specified_user_requests for req in reqs),
-            *applicable_tool_requests,
-        )
+        Get(GenerateLockfileResult, {req: GenerateLockfile, local_environment.val: EnvironmentName})
+        for req in all_requests
     )
 
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
