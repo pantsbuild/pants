@@ -32,7 +32,7 @@ class DockerRegistryOptions:
     skip_push: bool = False
     extra_image_tags: tuple[str, ...] = ()
     repository: str | None = None
-    local_name: str | None = None
+    run_as_alias: bool = False
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -45,7 +45,7 @@ class DockerRegistryOptions:
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
             repository=Parser.to_value_type(d.get("repository"), str, None),
-            local_name=Parser.to_value_type(d.get("local_name"), str, None),
+            run_as_alias=Parser.ensure_bool(d.get("run_as_alias", False)),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:

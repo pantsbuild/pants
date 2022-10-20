@@ -3,27 +3,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterator, cast
+from dataclasses import dataclass, replace
+from typing import cast
 
 from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
+from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSourceField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
-class DockerRunFieldSet(DockerFieldSet, RunFieldSet):
-    def _image_refs_generator(self, *args, **kwargs) -> Iterator[str]:
-        # We only care for one image tag when executing an image, and the first one will be a
-        # `local_name` if there is one.
-        for image_ref in super()._image_refs_generator(*args, **kwargs):
-            yield image_ref
-            return
+class DockerRunFieldSet(RunFieldSet):
+    required_fields = (DockerImageSourceField,)
 
 
 @rule
@@ -33,9 +30,24 @@ async def docker_image_run_request(
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
 ) -> RunRequest:
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+    )
+    build_request = DockerFieldSet.create(wrapped_target.target)
+    registries = options.registries()
+    for registry in registries.get(*(build_request.registries.value or [])):
+        if registry.run_as_alias:
+            # We only need to tag a single image name for run requests if there is a registry with
+            # `run_as_alias` as true.
+            build_request = replace(
+                build_request,
+                registries=DockerImageRegistriesField((registry.alias,), field_set.address),
+            )
+            break
     env, image = await MultiGet(
         Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars)),
-        Get(BuiltPackage, PackageFieldSet, field_set),
+        Get(BuiltPackage, PackageFieldSet, build_request),
     )
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
     run = docker.run_image(tag, docker_run_args=options.run_args, env=env)

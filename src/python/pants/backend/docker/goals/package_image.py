@@ -165,11 +165,7 @@ class DockerFieldSet(PackageFieldSet):
         additional_tags: tuple[str, ...] = (),
     ) -> Iterator[str]:
         image_tags = (self.tags.value or ()) + additional_tags
-        # Sort registries options so any with a defined `local_name` comes first. This is for the
-        # `run` goal to get a local image name first, if available.
-        registries_options = sorted(
-            registries.get(*(self.registries.value or [])), key=lambda r: r.local_name is None
-        )
+        registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
             repository = self.format_repository(default_repository, interpolation_context)
@@ -183,8 +179,8 @@ class DockerFieldSet(PackageFieldSet):
                 interpolation_context,
             )
             for image_name in image_names:
-                if registry.local_name is not None:
-                    yield "/".join([registry.local_name or registry.alias, image_name])
+                if registry.run_as_alias and registry.alias:
+                    yield "/".join([registry.alias, image_name])
                 yield "/".join([registry.address, image_name])
 
     def get_context_root(self, default_context_root: str) -> str:
