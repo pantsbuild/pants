@@ -80,7 +80,7 @@ class Snapshot:
 
     The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
     you can use the `digest` property to request the `DigestEntries`:
-    `await Get(DigestEntries, Digest, snapshot.digest`.
+    `await Get(DigestEntries, Digest, snapshot.digest)`.
     """
 
     @classmethod
