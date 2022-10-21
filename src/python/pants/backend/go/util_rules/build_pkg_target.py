@@ -284,14 +284,16 @@ async def setup_build_go_package_target_request(
         )
     }
 
-    pkg_dependency_addresses = []
-    for dep_import_path, address in first_party_dep_import_paths.items():
-        if dep_import_path in imports:
-            pkg_dependency_addresses.append(address)
-    for dep_tgt in third_party_dep_import_path_targets:
-        dep_import_path = dep_tgt[GoImportPathField].value
-        if dep_import_path in imports:
-            pkg_dependency_addresses.append(dep_tgt.address)
+    pkg_dependency_addresses_set = {
+        address
+        for dep_import_path, address in first_party_dep_import_paths.items()
+        if dep_import_path in imports
+    }
+    pkg_dependency_addresses_set.update(
+        dep_tgt.address
+        for dep_tgt in third_party_dep_import_path_targets
+        if dep_tgt[GoImportPathField].value in imports
+    )
     if codegen_dep_import_path_targets:
         go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.address))
         import_paths_mapping = await Get(
@@ -305,8 +307,9 @@ async def setup_build_go_package_target_request(
                 # TODO: Emit warning?
                 continue
             if codegen_dep_import_path in imports:
-                pkg_dependency_addresses.append(dep_tgt.address)
+                pkg_dependency_addresses_set.add(dep_tgt.address)
 
+    pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
     maybe_pkg_direct_dependencies = await MultiGet(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(address))
         for address in pkg_dependency_addresses
