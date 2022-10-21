@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
-from os import path
 from pathlib import PurePath
 from typing import Iterable
 
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(unsafe_hash=True)
 @frozen_after_init
-class ShadeJarRequest:
+class ShadeJarRequest(EngineAwareParameter):
     path: PurePath
     digest: Digest
     rules: tuple[JarShadingRule, ...]
@@ -65,6 +66,9 @@ class ShadeJarRequest:
         if validation_errors:
             raise ValueError("\n".join(["Invalid rules provided:\n", *validation_errors]))
 
+    def debug_hint(self) -> str | None:
+        return str(self.path)
+
 
 @dataclass(frozen=True)
 class ShadedJar:
@@ -73,7 +77,7 @@ class ShadedJar:
 
 
 _JARJAR_MAIN_CLASS = "com.eed3si9n.jarjar.Main"
-_JARJAR_RULE_CONFIG_FILENAME = "__jarjar.rules"
+_JARJAR_RULE_CONFIG_FILENAME = "rules"
 
 
 @rule(desc="Applies shading rules to a JAR file")
@@ -82,12 +86,12 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
         return ShadedJar(path=str(request.path), digest=request.digest)
 
     output_prefix = "__out"
-    output_filename = path.join(output_prefix, request.path.name)
+    output_filename = os.path.join(output_prefix, request.path.name)
 
     rule_config_content = "\n".join([rule.encode() for rule in request.rules])
-    logger.debug(f"Using JarJar rule file with following rules:\n{rule_config_content}")
+    logger.debug(f"Using JarJar rule file with following contents:\n{rule_config_content}")
 
-    lockfile_request, tool_input_digest = await MultiGet(
+    lockfile_request, conf_digest, output_digest = await MultiGet(
         Get(GenerateJvmLockfileFromTool, JarJarGeneratorLockfileSentinel()),
         Get(
             Digest,
@@ -97,19 +101,23 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
                         path=_JARJAR_RULE_CONFIG_FILENAME,
                         content=rule_config_content.encode("utf-8"),
                     ),
-                    Directory(output_prefix),
                 ]
             ),
         ),
+        Get(Digest, CreateDigest([Directory(output_prefix)])),
     )
 
     tool_classpath, input_digest = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(Digest, MergeDigests([request.digest, tool_input_digest])),
+        Get(Digest, MergeDigests([request.digest, output_digest])),
     )
 
     toolcp_prefix = "__toolcp"
-    immutable_input_digests = {toolcp_prefix: tool_classpath.digest}
+    conf_prefix = "__conf"
+    immutable_input_digests = {
+        toolcp_prefix: tool_classpath.digest,
+        conf_prefix: conf_digest,
+    }
 
     system_properties: dict[str, str] = {
         "verbose": str(request.verbose or jarjar.verbose),
@@ -126,7 +134,7 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
             argv=[
                 _JARJAR_MAIN_CLASS,
                 "process",
-                _JARJAR_RULE_CONFIG_FILENAME,
+                os.path.join(conf_prefix, _JARJAR_RULE_CONFIG_FILENAME),
                 str(request.path),
                 output_filename,
             ],
