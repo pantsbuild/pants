@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
+import re
 import sys
 from textwrap import dedent
 
@@ -88,26 +89,30 @@ def test_export_venv_pipified(
             assert len(result.post_processing_cmds) == 2
 
             ppc0 = result.post_processing_cmds[0]
-            assert ppc0.argv[1:] == (
-                # The first arg is the full path to the python interpreter, which we
-                # don't easily know here, so we ignore it in this comparison.
-                os.path.join("{digest_root}", f".{resolve}.tmp", ".", "pex"),
-                os.path.join("{digest_root}", "requirements.pex"),
+            # The first arg is the full path to the python interpreter, which we
+            # don't easily know here, so we ignore it in this comparison.
+
+            # The second arg is expected to be tmpdir/./pex.
+            tmpdir, pex_pex_name = os.path.split(os.path.normpath(ppc0.argv[1]))
+            assert pex_pex_name == "pex"
+            assert re.match(r"\{digest_root\}/\.[0-9a-f]{32}\.tmp", tmpdir)
+
+            # The third arg is expected to be tmpdir/requirements.pex.
+            req_pex_dir, req_pex_name = os.path.split(ppc0.argv[2])
+            assert req_pex_dir == tmpdir
+            assert req_pex_name == "requirements.pex"
+
+            assert ppc0.argv[3:] == (
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                "--remove=pex",
                 f"{{digest_root}}/{current_interpreter}",
             )
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 
             ppc1 = result.post_processing_cmds[1]
-            assert ppc1.argv == (
-                "rm",
-                "-rf",
-                os.path.join("{digest_root}", f".{resolve}.tmp"),
-            )
+            assert ppc1.argv == ("rm", "-rf", tmpdir)
             assert ppc1.extra_env == FrozenDict()
 
     reldirs = [result.reldir for result in all_results]
