@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -175,7 +177,7 @@ class CheckSubsystem(GoalSubsystem):
 
 class Check(Goal):
     subsystem_cls = CheckSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
@@ -201,8 +203,33 @@ async def check(
         )
         for request_type in request_types
     )
+
+    environment_names = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
+        for request in requests
+        for field_set in request.field_sets
+    )
+    request_for_each_environment_name = (
+        # this is actually correct:
+        request
+        for request in requests
+        for _ in request.field_sets
+    )
+    grouped = itertools.groupby(
+        zip(request_for_each_environment_name, environment_names), lambda x: x[0]
+    )
+    exploded_requests = [
+        (request, {env_name for (_, env_name) in env_names}) for request, env_names in grouped
+    ]
+
     all_results = await MultiGet(
-        Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
+        Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
+        for (request, env_names) in exploded_requests
+        for env_name in env_names
     )
 
     results_by_tool: dict[str, list[CheckResult]] = defaultdict(list)
