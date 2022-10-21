@@ -4,12 +4,19 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from textwrap import dedent
 
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget
+from pants.backend.go.dependency_inference import (
+    GoImportPathsMappingAddressSet,
+    GoModuleImportPathsMapping,
+    GoModuleImportPathsMappings,
+    GoModuleImportPathsMappingsHook,
+)
+from pants.backend.go.target_types import GoModTarget, GoOwningGoModAddressField, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -31,13 +38,17 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
-from pants.core.target_types import FilesGeneratorTarget, FileSourceField
+from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, QueryRule, rule
-from pants.engine.target import Dependencies, DependenciesRequest
+from pants.engine.target import AllTargets, Dependencies, DependenciesRequest
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import path_safe
 
 
@@ -46,6 +57,54 @@ from pants.util.strutil import path_safe
 # is common for codegen plugins to need to do.
 class GoCodegenBuildFilesRequest(GoCodegenBuildRequest):
     generate_from = FileSourceField
+
+
+class GenerateFromFileImportPathsMappingHook(GoModuleImportPathsMappingsHook):
+    pass
+
+
+@rule(desc="Map import paths for all 'generate from file' targets.", level=LogLevel.DEBUG)
+async def map_import_paths(
+    _request: GenerateFromFileImportPathsMappingHook,
+    all_targets: AllTargets,
+) -> GoModuleImportPathsMappings:
+    file_targets = [tgt for tgt in all_targets if tgt.has_field(FileSourceField)]
+
+    owning_go_mod_targets = await MultiGet(
+        Get(OwningGoMod, OwningGoModRequest(tgt.address)) for tgt in file_targets
+    )
+
+    import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+
+    for owning_go_mod, tgt in zip(owning_go_mod_targets, file_targets):
+        import_paths_by_module[owning_go_mod.address]["codegen.com/gen"].add(tgt.address)
+
+    return GoModuleImportPathsMappings(
+        FrozenDict(
+            {
+                go_mod_addr: GoModuleImportPathsMapping(
+                    mapping=FrozenDict(
+                        {
+                            import_path: GoImportPathsMappingAddressSet(
+                                addresses=tuple(sorted(addresses)), infer_all=True
+                            )
+                            for import_path, addresses in import_path_mapping.items()
+                        }
+                    ),
+                    address_to_import_path=FrozenDict(
+                        {
+                            address: import_path
+                            for import_path, addresses in import_path_mapping.items()
+                            for address in addresses
+                        }
+                    ),
+                )
+                for go_mod_addr, import_path_mapping in import_paths_by_module.items()
+            }
+        )
+    )
 
 
 @rule
@@ -101,11 +160,15 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
             generate_from_file,
+            map_import_paths,
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
+            UnionRule(GoModuleImportPathsMappingsHook, GenerateFromFileImportPathsMappingHook),
+            FileTarget.register_plugin_field(GoOwningGoModAddressField),
+            FilesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ],
         target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
     )
@@ -141,9 +204,9 @@ def assert_pkg_target_built(
     assert build_request.dir_path == expected_dir_path
     assert build_request.go_files == tuple(expected_go_file_names)
     assert not build_request.s_files
-    assert [
-        dep.import_path for dep in build_request.direct_dependencies
-    ] == expected_direct_dependency_import_paths
+    assert sorted([dep.import_path for dep in build_request.direct_dependencies]) == sorted(
+        expected_direct_dependency_import_paths
+    )
     assert_built(
         rule_runner,
         build_request,
