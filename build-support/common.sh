@@ -49,8 +49,7 @@ function git_merge_base() {
 
 function determine_python() {
   if [[ -n "${PY:-}" ]]; then
-    echo "${PY}"
-    return 0
+    which "${PY}" && return 0
   fi
 
   local candidate_versions
