@@ -252,14 +252,12 @@ async def run_go_tests(
                 field_set.address, for_xtests=True, coverage_config=coverage_config
             ),
         )
-        print(f"maybe_xtest_pkg_build_request={maybe_xtest_pkg_build_request}")
         if maybe_xtest_pkg_build_request.request is None:
             assert maybe_xtest_pkg_build_request.stderr is not None
             return compilation_failure(
                 maybe_xtest_pkg_build_request.exit_code, None, maybe_xtest_pkg_build_request.stderr
             )
         xtest_pkg_build_request = maybe_xtest_pkg_build_request.request
-        print(f"xtest_pkg_build_request={xtest_pkg_build_request}")
         main_direct_deps.append(xtest_pkg_build_request)
 
     # Generate coverage setup code for the test main if coverage is enabled.
