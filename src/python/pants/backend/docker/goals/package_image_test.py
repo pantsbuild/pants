@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os.path
 from collections import namedtuple
@@ -15,12 +16,15 @@ from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
     DockerFieldSet,
     DockerImageTagValueError,
+    DockerInfoV1,
     DockerRepositoryNameError,
+    ImageRefRegistry,
+    ImageRefTag,
     build_docker_image,
     parse_image_id_from_docker_build_output,
     rules,
 )
-from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import (
@@ -44,7 +48,15 @@ from pants.backend.docker.util_rules.docker_build_env import (
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_FILE_DIGEST,
+    EMPTY_SNAPSHOT,
+    CreateDigest,
+    Digest,
+    FileContent,
+    Snapshot,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResult,
@@ -93,8 +105,11 @@ def assert_build(
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
     plugin_tags: tuple[str, ...] = (),
+    expected_registries_metadata: None | dict = None,
 ) -> None:
     tgt = rule_runner.get_target(address)
+    metadata_file_path: list[str] = []
+    metadata_file_contents: list[bytes] = []
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
@@ -127,6 +142,13 @@ def assert_build(
             platform=Platform.create_for_localhost(),
             metadata=ProcessResultMetadata(0, "ran_locally", 0),
         )
+
+    def mock_get_info_file(request: CreateDigest) -> Digest:
+        assert len(request) == 1
+        assert isinstance(request[0], FileContent)
+        metadata_file_path.append(request[0].path)
+        metadata_file_contents.append(request[0].content)
+        return EMPTY_DIGEST
 
     if options:
         opts = options or {}
@@ -180,12 +202,27 @@ def assert_build(
                 input_types=(Process,),
                 mock=run_process_mock,
             ),
+            MockGet(
+                output_type=Digest,
+                input_types=(CreateDigest,),
+                mock=mock_get_info_file,
+            ),
         ],
     )
 
     assert result.digest == EMPTY_DIGEST
     assert len(result.artifacts) == 1
-    assert result.artifacts[0].relpath is None
+    assert len(metadata_file_path) == len(metadata_file_contents) == 1
+    assert result.artifacts[0].relpath == metadata_file_path[0]
+
+    metadata = json.loads(metadata_file_contents[0])
+    # basic checks that we can always do
+    assert metadata["version"] == 1
+    assert metadata["image_id"] == "<unknown>"
+    assert isinstance(metadata["registries"], dict)
+    # detailed checks, if the test opts in
+    if expected_registries_metadata is not None:
+        assert metadata["registries"] == expected_registries_metadata
 
     for log_line in extra_log_lines:
         assert log_line in result.artifacts[0].extra_log_lines
@@ -234,11 +271,27 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="test1"),
         "Built docker image: test/test1:1.2.3",
+        expected_registries_metadata={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="test/test1",
+                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="test/test1:1.2.3")},
+            )
+        },
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="test2"),
         "Built docker image: test2:1.2.3",
+        expected_registries_metadata={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="test2",
+                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="test2:1.2.3")},
+            )
+        },
     )
     assert_build(
         rule_runner,
@@ -260,6 +313,20 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             "  * test/test5:alpha-1"
         ),
         options=dict(default_repository="{directory}/{name}"),
+        expected_registries_metadata={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="test/test5",
+                tags={
+                    "latest": dict(template="latest", tag="latest", name="test/test5:latest"),
+                    "alpha-1.0": dict(
+                        template="alpha-1.0", tag="alpha-1.0", name="test/test5:alpha-1.0"
+                    ),
+                    "alpha-1": dict(template="alpha-1", tag="alpha-1", name="test/test5:alpha-1"),
+                },
+            )
+        },
     )
 
     err1 = (
@@ -310,6 +377,18 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="addr1"),
         "Built docker image: myregistry1domain:port/addr1:1.2.3",
         options=options,
+        expected_registries_metadata={
+            "@reg1": dict(
+                alias="reg1",
+                address="myregistry1domain:port",
+                repository="addr1",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/addr1:1.2.3"
+                    )
+                },
+            )
+        },
     )
     assert_build(
         rule_runner,
@@ -322,12 +401,36 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="addr3"),
         "Built docker image: myregistry3domain:port/addr3:1.2.3",
         options=options,
+        expected_registries_metadata={
+            "myregistry3domain:port": dict(
+                alias=None,
+                address="myregistry3domain:port",
+                repository="addr3",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry3domain:port/addr3:1.2.3"
+                    )
+                },
+            )
+        },
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="alias1"),
         "Built docker image: myregistry1domain:port/alias1:1.2.3",
         options=options,
+        expected_registries_metadata={
+            "@reg1": dict(
+                alias="reg1",
+                address="myregistry1domain:port",
+                repository="alias1",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/alias1:1.2.3"
+                    )
+                },
+            )
+        },
     )
     assert_build(
         rule_runner,
@@ -346,12 +449,32 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="unreg"),
         "Built docker image: unreg:1.2.3",
         options=options,
+        expected_registries_metadata={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="unreg",
+                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="unreg:1.2.3")},
+            )
+        },
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="def"),
         "Built docker image: myregistry2domain:port/def:1.2.3",
         options=options,
+        expected_registries_metadata={
+            "@reg2": dict(
+                alias="reg2",
+                address="myregistry2domain:port",
+                repository="def",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry2domain:port/def:1.2.3"
+                    )
+                },
+            )
+        },
     )
     assert_build(
         rule_runner,
@@ -362,6 +485,28 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "  * myregistry1domain:port/multi:1.2.3"
         ),
         options=options,
+        expected_registries_metadata={
+            "@reg1": dict(
+                alias="reg1",
+                address="myregistry1domain:port",
+                repository="multi",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/multi:1.2.3"
+                    )
+                },
+            ),
+            "@reg2": dict(
+                alias="reg2",
+                address="myregistry2domain:port",
+                repository="multi",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", name="myregistry2domain:port/multi:1.2.3"
+                    )
+                },
+            ),
+        },
     )
     assert_build(
         rule_runner,
@@ -373,6 +518,29 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "  * extra/extra_tags:latest"
         ),
         options=options,
+        expected_registries_metadata={
+            "@reg1": dict(
+                alias="reg1",
+                address="myregistry1domain:port",
+                repository="extra_tags",
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3",
+                        tag="1.2.3",
+                        name="myregistry1domain:port/extra_tags:1.2.3",
+                    )
+                },
+            ),
+            "@extra": dict(
+                alias="extra",
+                address="extra",
+                repository="extra_tags",
+                tags={
+                    "1.2.3": dict(template="1.2.3", tag="1.2.3", name="extra/extra_tags:1.2.3"),
+                    "latest": dict(template="latest", tag="latest", name="extra/extra_tags:latest"),
+                },
+            ),
+        },
     )
 
 
@@ -602,6 +770,18 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="ver1"),
         "Built docker image: ver1:1.2.3",
+        expected_registries_metadata={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="ver1",
+                tags={
+                    "{build_args.VERSION}": dict(
+                        template="{build_args.VERSION}", tag="1.2.3", name="ver1:1.2.3"
+                    )
+                },
+            )
+        },
     )
 
 
@@ -949,6 +1129,14 @@ def test_build_target_stage(
         options=options,
         process_assertions=check_docker_proc,
         version_tags=("build latest", "dev latest", "prod latest"),
+        expected_registries_metadata={
+            "": dict(
+                address=None,
+                alias=None,
+                repository="image",
+                tags={"latest": dict(template="latest", tag="latest", name="image:latest")},
+            )
+        },
     )
 
 
@@ -1094,17 +1282,114 @@ ImageRefTest = namedtuple(
 @pytest.mark.parametrize(
     "test",
     [
-        ImageRefTest(docker_image=dict(name="lowercase"), expect_refs=("lowercase:latest",)),
-        ImageRefTest(docker_image=dict(name="CamelCase"), expect_refs=("camelcase:latest",)),
-        ImageRefTest(docker_image=dict(image_tags=["CamelCase"]), expect_refs=("image:CamelCase",)),
+        ImageRefTest(
+            docker_image=dict(name="lowercase"),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=None,
+                    repository="lowercase",
+                    tags=(
+                        ImageRefTag(
+                            template="latest", formatted="latest", full_name="lowercase:latest"
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        ImageRefTest(
+            docker_image=dict(name="CamelCase"),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=None,
+                    repository="camelcase",
+                    tags=(
+                        ImageRefTag(
+                            template="latest", formatted="latest", full_name="camelcase:latest"
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        ImageRefTest(
+            docker_image=dict(image_tags=["CamelCase"]),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=None,
+                    repository="image",
+                    tags=(
+                        ImageRefTag(
+                            template="CamelCase", formatted="CamelCase", full_name="image:CamelCase"
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        ImageRefTest(
+            docker_image=dict(image_tags=["{val1}", "prefix-{val2}"]),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=None,
+                    repository="image",
+                    tags=(
+                        ImageRefTag(
+                            template="{val1}",
+                            formatted="first-value",
+                            full_name="image:first-value",
+                        ),
+                        ImageRefTag(
+                            template="prefix-{val2}",
+                            formatted="prefix-second-value",
+                            full_name="image:prefix-second-value",
+                        ),
+                    ),
+                ),
+            ),
+        ),
         ImageRefTest(
             docker_image=dict(registries=["REG1.example.net"]),
-            expect_refs=("REG1.example.net/image:latest",),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="REG1.example.net"),
+                    repository="image",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="REG1.example.net/image:latest",
+                        ),
+                    ),
+                ),
+            ),
         ),
         ImageRefTest(
             docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
             registries=dict(private={"address": "our.registry", "repository": "the/pkg"}),
-            expect_refs=("docker.io/our-the/pkg:latest", "our.registry/the/pkg:latest"),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="docker.io"),
+                    repository="our-the/pkg",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="docker.io/our-the/pkg:latest",
+                        ),
+                    ),
+                ),
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        alias="private", address="our.registry", repository="the/pkg"
+                    ),
+                    repository="the/pkg",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="our.registry/the/pkg:latest",
+                        ),
+                    ),
+                ),
+            ),
         ),
         ImageRefTest(
             docker_image=dict(
@@ -1114,7 +1399,62 @@ ImageRefTest = namedtuple(
             registries=dict(
                 private={"address": "our.registry", "repository": "{target_repository}/the/pkg"}
             ),
-            expect_refs=("docker.io/test/image:latest", "our.registry/test/image/the/pkg:latest"),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="docker.io"),
+                    repository="test/image",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="docker.io/test/image:latest",
+                        ),
+                    ),
+                ),
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        alias="private",
+                        address="our.registry",
+                        repository="{target_repository}/the/pkg",
+                    ),
+                    repository="test/image/the/pkg",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="our.registry/test/image/the/pkg:latest",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        ImageRefTest(
+            docker_image=dict(registries=["@private"], image_tags=["prefix-{val1}"]),
+            registries=dict(
+                private={"address": "our.registry", "extra_image_tags": ["{val2}-suffix"]}
+            ),
+            expect_refs=(
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        alias="private",
+                        address="our.registry",
+                        extra_image_tags=("{val2}-suffix",),
+                    ),
+                    repository="image",
+                    tags=(
+                        ImageRefTag(
+                            template="prefix-{val1}",
+                            formatted="prefix-first-value",
+                            full_name="our.registry/image:prefix-first-value",
+                        ),
+                        ImageRefTag(
+                            template="{val2}-suffix",
+                            formatted="second-value-suffix",
+                            full_name="our.registry/image:second-value-suffix",
+                        ),
+                    ),
+                ),
+            ),
         ),
         ImageRefTest(
             docker_image=dict(repository="{default_repository}/a"),
@@ -1137,12 +1477,14 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
     tgt = DockerImageTarget(test.docker_image, address)
     field_set = DockerFieldSet.create(tgt)
     registries = DockerRegistries.from_dict(test.registries)
-    interpolation_context = InterpolationContext.from_dict({})
+    interpolation_context = InterpolationContext.from_dict(
+        {"val1": "first-value", "val2": "second-value"}
+    )
     with test.expect_error or no_exception():
         image_refs = field_set.image_refs(
             test.default_repository, registries, interpolation_context
         )
-        assert tuple(t.full_name for r in image_refs for t in r.tags) == test.expect_refs
+        assert tuple(image_refs) == test.expect_refs
 
 
 def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
@@ -1168,3 +1510,102 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         process_assertions=check_docker_proc,
         plugin_tags=("1.2.3",),
     )
+
+
+def test_docker_info_serialize() -> None:
+    image_id = "abc123"
+    # image refs with unique strings (i.e. not actual templates/names etc.), to make sure they're
+    # ending up in the right place in the JSON
+    image_refs = (
+        ImageRefRegistry(
+            registry=None,
+            repository="repo",
+            tags=(
+                ImageRefTag(
+                    template="repo tag1 template",
+                    formatted="repo tag1 formatted",
+                    full_name="repo tag1 full name",
+                ),
+                ImageRefTag(
+                    template="repo tag2 template",
+                    formatted="repo tag2 formatted",
+                    full_name="repo tag2 full name",
+                ),
+            ),
+        ),
+        ImageRefRegistry(
+            registry=DockerRegistryOptions(address="address"),
+            repository="address repo",
+            tags=(
+                ImageRefTag(
+                    template="address tag template",
+                    formatted="address tag formatted",
+                    full_name="address tag full name",
+                ),
+            ),
+        ),
+        ImageRefRegistry(
+            registry=DockerRegistryOptions(
+                address="alias address", alias="alias", repository="alias registry repo"
+            ),
+            repository="alias repo",
+            tags=(
+                ImageRefTag(
+                    template="alias tag template",
+                    formatted="alias tag formatted",
+                    full_name="alias tag full name",
+                ),
+            ),
+        ),
+    )
+
+    expected = dict(
+        version=1,
+        image_id=image_id,
+        registries={
+            "": dict(
+                alias=None,
+                address=None,
+                repository="repo",
+                tags={
+                    "repo tag1 template": dict(
+                        template="repo tag1 template",
+                        tag="repo tag1 formatted",
+                        name="repo tag1 full name",
+                    ),
+                    "repo tag2 template": dict(
+                        template="repo tag2 template",
+                        tag="repo tag2 formatted",
+                        name="repo tag2 full name",
+                    ),
+                },
+            ),
+            "address": dict(
+                alias=None,
+                address="address",
+                repository="address repo",
+                tags={
+                    "address tag template": dict(
+                        template="address tag template",
+                        tag="address tag formatted",
+                        name="address tag full name",
+                    )
+                },
+            ),
+            "@alias": dict(
+                alias="alias",
+                address="alias address",
+                repository="alias repo",
+                tags={
+                    "alias tag template": dict(
+                        template="alias tag template",
+                        tag="alias tag formatted",
+                        name="alias tag full name",
+                    )
+                },
+            ),
+        },
+    )
+
+    result = DockerInfoV1.serialize(image_refs, image_id)
+    assert json.loads(result) == expected

@@ -138,15 +138,15 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         interpolation_context: InterpolationContext,
         additional_tags: tuple[str, ...] = (),
     ) -> Iterator[ImageRefRegistry]:
-        # FIXME: update this doc string
-        """The image refs are the full image name, including any registry and version tag.
+        """The per-registry image refs: the full image name including any registry and version tag.
 
         In the Docker world, the term `tag` is used both for what we here prefer to call the image
         `ref`, as well as for the image version, or tag, that is at the end of the image name
         separated with a colon. By introducing the image `ref` we can retain the use of `tag` for
         the version part of the image name.
 
-        Returns all image refs to apply to the Docker image, on the form:
+        Returns all image refs to apply to the Docker image, accessible within the `full_name`
+        attribute of each element of the `tags` field:
 
             [<registry>/]<repository-name>[:<tag>]
 
@@ -154,7 +154,8 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         the `default_repository` from configuration or the `repository` field on the target
         `docker_image`.
 
-        This method will always return a non-empty tuple.
+        This method will always return at least one `ImageRefRegistry`, and there will be at least
+        one tag.
         """
         image_tags = (self.tags.value or ()) + additional_tags
         registries_options = tuple(registries.get(*(self.registries.value or [])))
@@ -227,7 +228,7 @@ class DockerInfoV1:
 
     version: Literal[1]
     image_id: str
-    # FIXME: it'd be good to include the digest here (i.e. to allow 'docker run
+    # It'd be good to include the digest here (e.g. to allow 'docker run
     # registry/repository@digest'), but that is only known after pushing to a V2 registry
 
     # registry alias or address -> registry (using a dict rather than just a list[registry] for more
@@ -235,7 +236,7 @@ class DockerInfoV1:
     registries: dict[str, DockerInfoV1Registry]
 
     @staticmethod
-    def from_image_refs(image_refs: tuple[ImageRefRegistry, ...], image_id: str) -> DockerInfoV1:
+    def serialize(image_refs: tuple[ImageRefRegistry, ...], image_id: str) -> bytes:
         def registry_key(reg: DockerRegistryOptions | None) -> str:
             if reg is None:
                 return ""
@@ -243,7 +244,7 @@ class DockerInfoV1:
                 return f"@{reg.alias}"
             return reg.address
 
-        return DockerInfoV1(
+        info = DockerInfoV1(
             version=1,
             image_id=image_id,
             registries={
@@ -261,6 +262,8 @@ class DockerInfoV1:
                 for r in image_refs
             },
         )
+
+        return json.dumps(asdict(info)).encode()
 
 
 @dataclass(frozen=True)
@@ -428,11 +431,8 @@ async def build_docker_image(
         logger.debug(docker_build_output_msg)
 
     metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
-    # FIXME: how to write this to an appropriate file for inclusion in dist/ and use as a dependency
-    metadata = DockerInfoV1.from_image_refs(image_refs, image_id=image_id)
-    metadata_bytes = json.dumps(asdict(metadata)).encode()
-
-    digest = await Get(Digest, CreateDigest([FileContent(metadata_filename, metadata_bytes)]))
+    metadata = DockerInfoV1.serialize(image_refs, image_id=image_id)
+    digest = await Get(Digest, CreateDigest([FileContent(metadata_filename, metadata)]))
 
     return BuiltPackage(
         digest,
