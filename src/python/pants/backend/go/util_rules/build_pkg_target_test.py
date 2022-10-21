@@ -540,7 +540,6 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
     )
 
 
-@pytest.mark.xfail(reason="dependency cycle")
 def test_xtest_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
