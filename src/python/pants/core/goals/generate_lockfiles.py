@@ -408,16 +408,20 @@ async def generate_lockfiles_goal(
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
+    # Execute the actual lockfile generation in each request's environment.
     # Currently, since resolves specify a single filename for output, we pick a resonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
-    preferred_envs = (_preferred_environment(req, local_environment.val) for req in all_requests)
-
-    # Execute the actual lockfile generation in each request's environment.
     results = await MultiGet(
-        Get(GenerateLockfileResult, {req: GenerateLockfile, env_name: EnvironmentName})
-        for req, env_name in zip(all_requests, preferred_envs)
+        Get(
+            GenerateLockfileResult,
+            {
+                req: GenerateLockfile,
+                _preferred_environment(req, local_environment.val): EnvironmentName,
+            },
+        )
+        for req in all_requests
     )
 
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
