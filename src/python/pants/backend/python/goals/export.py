@@ -192,7 +192,7 @@ async def export_tool(
                     os.path.join("{digest_root}", pex.name),
                     "venv",
                     "--collisions-ok",
-                    "--remove=all",
+                    "--remove=pex",
                     f"{{digest_root}}/{request.resolve_name}",
                 ],
                 {
