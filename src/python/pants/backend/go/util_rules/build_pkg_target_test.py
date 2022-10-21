@@ -475,3 +475,59 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
         expected_direct_dependency_import_paths=["codegen.com/gen"],
         expected_transitive_dependency_import_paths=["github.com/google/uuid"],
     )
+
+
+@pytest.mark.xfail(reason="dependency cycle")
+def test_xtest_deps(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": "module example.pantsbuild.org",
+            "BUILD": "go_mod(name='mod')\n",
+            "pkg/BUILD": "go_package()\n",
+            "pkg/example.go": dedent(
+                """\
+            package pkg
+
+            const ExampleValue = 2137
+            """
+            ),
+            "pkg/example_test.go": dedent(
+                """\
+            package pkg_test
+
+            import (
+                "example.pantsbuild.org/pkg"
+                "example.pantsbuild.org/pkg/testutils"
+                "testing"
+            )
+
+            func TestValue(t *testing.T) {
+                t.Run("Test", func(t *testing.T) {
+                    if pkg.ExampleValue != testutils.ExampleValueFromTestutils {
+                        t.Error("Not equal")
+                    }
+                })
+            }
+            """
+            ),
+            "pkg/testutils/BUILD": "go_package()\n",
+            "pkg/testutils/testutils.go": dedent(
+                """\
+            package testutils
+
+            import "example.pantsbuild.org/pkg"
+
+            const ExampleValueFromTestutils = pkg.ExampleValue
+            """
+            ),
+        }
+    )
+    assert_pkg_target_built(
+        rule_runner,
+        Address("pkg"),
+        expected_dir_path="pkg",
+        expected_import_path="example.pantsbuild.org/pkg",
+        expected_go_file_names=["example.go"],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
+    )
