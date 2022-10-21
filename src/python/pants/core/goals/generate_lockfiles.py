@@ -388,7 +388,7 @@ async def generate_lockfiles_goal(
     )
 
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
-    # environment, since there's not currently a clear mechanism to proscribe an environment.
+    # environment, since there's not currently a clear mechanism to prescribe an environment.
     all_specified_user_requests = await MultiGet(
         Get(
             UserGenerateLockfiles,
