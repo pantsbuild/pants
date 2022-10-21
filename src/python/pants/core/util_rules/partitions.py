@@ -36,10 +36,14 @@ class PartitionerType(Enum):
     """The plugin author has a rule to go from `RequestType.PartitionRequest` -> `Partitions`."""
 
     DEFAULT_SINGLE_PARTITION = "default_single_partition"
-    """Registers a partitioner which returns the inputs as a single partition."""
+    """Registers a partitioner which returns the inputs as a single partition
+
+    The returned partition will have no metadata."""
 
     DEFAULT_ONE_PARTITION_PER_INPUT = "default_one_partition_per_input"
-    """Registers a partitioner which returns a single-element partition per input."""
+    """Registers a partitioner which returns a single-element partition per input.
+
+    Each of the returned partitions will have no metadata."""
 
     def default_rules(self, cls, *, by_file: bool) -> Iterable:
         if self == PartitionerType.CUSTOM:
@@ -239,11 +243,11 @@ def _partition_per_input_field_sets_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[FieldSet, Any]:
         return (
             Partitions()
             if subsystem.skip
-            else Partitions((field_set.address, (field_set,)) for field_set in request.field_sets)
+            else Partitions(Partition((field_set,), None) for field_set in request.field_sets)
         )
 
     return collect_rules(locals())
@@ -280,7 +284,7 @@ def _partition_per_input_field_sets_by_file_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[str, Any]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
@@ -291,7 +295,7 @@ def _partition_per_input_field_sets_by_file_partitioner_rules(cls) -> Iterable:
             Partitions()
             if subsystem.skip
             else Partitions(
-                (path, (path,))
+                Partition((path,), None)
                 for path in itertools.chain.from_iterable(
                     sources_paths.files for sources_paths in all_sources_paths
                 )
