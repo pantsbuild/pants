@@ -141,7 +141,7 @@ async def export_virtualenv(
                     "venv",
                     "--pip",
                     "--collisions-ok",
-                    "--remove=all",
+                    "--remove=pex",
                     f"{{digest_root}}/{py_version}",
                 ],
                 {
