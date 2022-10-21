@@ -84,7 +84,7 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                "--remove=all",
+                "--remove=pex",
                 f"{{digest_root}}/{current_interpreter}",
             )
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
