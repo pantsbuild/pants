@@ -18,6 +18,7 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
@@ -67,6 +68,7 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     address: Address
     is_main: bool = False
     for_tests: bool = False
+    for_xtests: bool = False
     coverage_config: GoCoverageConfig | None = None
 
     def debug_hint(self) -> str:
@@ -125,6 +127,10 @@ def maybe_get_codegen_request_type(
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest, union_membership: UnionMembership
 ) -> FallibleBuildGoPackageRequest:
+    assert not (
+        request.for_tests and request.for_xtests
+    ), "for_tests and for_xtests cannot be set together"
+
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(request.address, description_of_origin="<build_pkg_target.py>"),
@@ -164,6 +170,7 @@ async def setup_build_go_package_target_request(
         digest = _first_party_pkg_digest.digest
         pkg_name = _first_party_pkg_analysis.name
         import_path = _first_party_pkg_analysis.import_path
+        base_import_path = import_path
         imports = set(_first_party_pkg_analysis.imports)
         if request.for_tests:
             imports.update(_first_party_pkg_analysis.test_imports)
@@ -191,8 +198,31 @@ async def setup_build_go_package_target_request(
         objc_files = _first_party_pkg_analysis.m_files
         fortran_files = _first_party_pkg_analysis.f_files
 
+        # If the xtest package was requested, then replace analysis with the xtest values.
+        if request.for_xtests:
+            import_path = f"{import_path}_test"
+            pkg_name = f"{pkg_name}_test"
+            imports = set(_first_party_pkg_analysis.xtest_imports)
+            go_file_names = _first_party_pkg_analysis.xtest_go_files
+            s_files = ()
+            cgo_files = ()
+            cgo_flags = CGoCompilerFlags(
+                cflags=(),
+                cppflags=(),
+                cxxflags=(),
+                fflags=(),
+                ldflags=(),
+                pkg_config=(),
+            )
+            c_files = ()
+            cxx_files = ()
+            objc_files = ()
+            fortran_files = ()
+            embed_config = _first_party_pkg_digest.xtest_embed_config
+
     elif target.has_field(GoThirdPartyPackageDependenciesField):
         import_path = target[GoImportPathField].value
+        base_import_path = import_path
 
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
@@ -287,6 +317,21 @@ async def setup_build_go_package_target_request(
                 dependency_failed=True,
             )
         pkg_direct_dependencies.append(maybe_pkg_dep.request)
+
+    # Allow xtest packages to depend on the base package (with tests).
+    if request.for_xtests and any(
+        dep_import_path == base_import_path for dep_import_path in imports
+    ):
+        maybe_base_pkg_dep = await Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(request.address, for_tests=True),
+        )
+        if maybe_base_pkg_dep.request is None:
+            return dataclasses.replace(
+                maybe_base_pkg_dep,
+                dependency_failed=True,
+            )
+        pkg_direct_dependencies.append(maybe_base_pkg_dep.request)
 
     result = BuildGoPackageRequest(
         digest=digest,
