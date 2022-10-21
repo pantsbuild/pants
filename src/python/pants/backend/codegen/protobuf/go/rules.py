@@ -186,6 +186,13 @@ async def map_import_paths_of_all_go_protobuf_targets(
                             for import_path, addresses in import_path_mapping.items()
                         }
                     ),
+                    address_to_import_path=FrozenDict(
+                        {
+                            address: import_path
+                            for import_path, addresses in import_path_mapping.items()
+                            for address in addresses
+                        }
+                    ),
                 )
                 for go_mod_addr, import_path_mapping in import_paths_by_module.items()
             }
