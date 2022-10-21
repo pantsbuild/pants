@@ -74,6 +74,13 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     def debug_hint(self) -> str:
         return str(self.address)
 
+    def __post_init__(self):
+        if self.for_tests and self.for_xtests:
+            raise ValueError(
+                "`BuildGoPackageTargetRequest.for_tests` and `BuildGoPackageTargetRequest.for_xtests` "
+                "cannot be set together."
+            )
+
 
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
@@ -127,10 +134,6 @@ def maybe_get_codegen_request_type(
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest, union_membership: UnionMembership
 ) -> FallibleBuildGoPackageRequest:
-    assert not (
-        request.for_tests and request.for_xtests
-    ), "for_tests and for_xtests cannot be set together"
-
     wrapped_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(request.address, description_of_origin="<build_pkg_target.py>"),
