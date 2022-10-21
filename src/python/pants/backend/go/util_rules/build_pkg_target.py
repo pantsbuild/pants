@@ -7,6 +7,8 @@ import dataclasses
 from dataclasses import dataclass
 from typing import ClassVar, Type, cast
 
+from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
+from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
     GoImportPathField,
     GoPackageSourcesField,
@@ -16,6 +18,7 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
@@ -23,8 +26,15 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgDigest,
     FirstPartyPkgAnalysisRequest,
     FirstPartyPkgDigestRequest,
+    FirstPartyPkgImportPath,
+    FirstPartyPkgImportPathRequest,
 )
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfo,
+    GoModInfoRequest,
+    OwningGoMod,
+    OwningGoModRequest,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
@@ -57,10 +67,18 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     address: Address
     is_main: bool = False
     for_tests: bool = False
+    for_xtests: bool = False
     coverage_config: GoCoverageConfig | None = None
 
     def debug_hint(self) -> str:
         return str(self.address)
+
+    def __post_init__(self):
+        if self.for_tests and self.for_xtests:
+            raise ValueError(
+                "`BuildGoPackageTargetRequest.for_tests` and `BuildGoPackageTargetRequest.for_xtests` "
+                "cannot be set together."
+            )
 
 
 @union
@@ -153,6 +171,10 @@ async def setup_build_go_package_target_request(
 
         digest = _first_party_pkg_digest.digest
         import_path = _first_party_pkg_analysis.import_path
+        base_import_path = import_path
+        imports = set(_first_party_pkg_analysis.imports)
+        if request.for_tests:
+            imports.update(_first_party_pkg_analysis.test_imports)
         dir_path = _first_party_pkg_analysis.dir_path
         minimum_go_version = _first_party_pkg_analysis.minimum_go_version
 
@@ -171,8 +193,31 @@ async def setup_build_go_package_target_request(
                     embed_config = _first_party_pkg_digest.test_embed_config
         s_file_names = _first_party_pkg_analysis.s_files
 
+        # If the xtest package was requested, then replace analysis with the xtest values.
+        if request.for_xtests:
+            import_path = f"{import_path}_test"
+            pkg_name = f"{pkg_name}_test"
+            imports = set(_first_party_pkg_analysis.xtest_imports)
+            go_file_names = _first_party_pkg_analysis.xtest_go_files
+            s_files = ()
+            cgo_files = ()
+            cgo_flags = CGoCompilerFlags(
+                cflags=(),
+                cppflags=(),
+                cxxflags=(),
+                fflags=(),
+                ldflags=(),
+                pkg_config=(),
+            )
+            c_files = ()
+            cxx_files = ()
+            objc_files = ()
+            fortran_files = ()
+            embed_config = _first_party_pkg_digest.xtest_embed_config
+
     elif target.has_field(GoThirdPartyPackageDependenciesField):
         import_path = target[GoImportPathField].value
+        base_import_path = import_path
 
         _go_mod_address = target.address.maybe_convert_to_target_generator()
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
@@ -186,6 +231,7 @@ async def setup_build_go_package_target_request(
         if _third_party_pkg_info.error:
             raise _third_party_pkg_info.error
 
+        imports = set(_third_party_pkg_info.imports)
         dir_path = _third_party_pkg_info.dir_path
         digest = _third_party_pkg_info.digest
         minimum_go_version = _third_party_pkg_info.minimum_go_version
@@ -200,25 +246,84 @@ async def setup_build_go_package_target_request(
             "message!"
         )
 
-    all_deps = await Get(Targets, DependenciesRequest(target[Dependencies]))
-    maybe_direct_dependencies = await MultiGet(
-        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
-        for tgt in all_deps
-        if (
-            tgt.has_field(GoPackageSourcesField)
-            or tgt.has_field(GoThirdPartyPackageDependenciesField)
-            or bool(maybe_get_codegen_request_type(tgt, union_membership))
-        )
+    all_direct_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
+
+    first_party_dep_import_path_targets = []
+    third_party_dep_import_path_targets = []
+    codegen_dep_import_path_targets = []
+    for dep in all_direct_dependencies:
+        if dep.has_field(GoPackageSourcesField):
+            first_party_dep_import_path_targets.append(dep)
+        elif dep.has_field(GoThirdPartyPackageDependenciesField):
+            third_party_dep_import_path_targets.append(dep)
+        elif bool(maybe_get_codegen_request_type(dep, union_membership)):
+            codegen_dep_import_path_targets.append(dep)
+
+    first_party_dep_import_path_results = await MultiGet(
+        Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(tgt.address))
+        for tgt in first_party_dep_import_path_targets
     )
-    direct_dependencies = []
-    for maybe_dep in maybe_direct_dependencies:
-        if maybe_dep.request is None:
+    first_party_dep_import_paths = {
+        result.import_path: tgt.address
+        for tgt, result in zip(
+            first_party_dep_import_path_targets, first_party_dep_import_path_results
+        )
+    }
+
+    pkg_dependency_addresses_set = {
+        address
+        for dep_import_path, address in first_party_dep_import_paths.items()
+        if dep_import_path in imports
+    }
+    pkg_dependency_addresses_set.update(
+        dep_tgt.address
+        for dep_tgt in third_party_dep_import_path_targets
+        if dep_tgt[GoImportPathField].value in imports
+    )
+    if codegen_dep_import_path_targets:
+        go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.address))
+        import_paths_mapping = await Get(
+            GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
+        )
+        for dep_tgt in codegen_dep_import_path_targets:
+            codegen_dep_import_path = import_paths_mapping.address_to_import_path.get(
+                dep_tgt.address
+            )
+            if codegen_dep_import_path is None:
+                # TODO: Emit warning?
+                continue
+            if codegen_dep_import_path in imports:
+                pkg_dependency_addresses_set.add(dep_tgt.address)
+
+    pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
+    maybe_pkg_direct_dependencies = await MultiGet(
+        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(address))
+        for address in pkg_dependency_addresses
+    )
+
+    pkg_direct_dependencies = []
+    for maybe_pkg_dep in maybe_pkg_direct_dependencies:
+        if maybe_pkg_dep.request is None:
             return dataclasses.replace(
-                maybe_dep,
-                import_path="main" if request.is_main else import_path,
+                maybe_pkg_dep,
                 dependency_failed=True,
             )
-        direct_dependencies.append(maybe_dep.request)
+        pkg_direct_dependencies.append(maybe_pkg_dep.request)
+
+    # Allow xtest packages to depend on the base package (with tests).
+    if request.for_xtests and any(
+        dep_import_path == base_import_path for dep_import_path in imports
+    ):
+        maybe_base_pkg_dep = await Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(request.address, for_tests=True),
+        )
+        if maybe_base_pkg_dep.request is None:
+            return dataclasses.replace(
+                maybe_base_pkg_dep,
+                dependency_failed=True,
+            )
+        pkg_direct_dependencies.append(maybe_base_pkg_dep.request)
 
     result = BuildGoPackageRequest(
         digest=digest,
@@ -227,7 +332,7 @@ async def setup_build_go_package_target_request(
         go_file_names=go_file_names,
         s_file_names=s_file_names,
         minimum_go_version=minimum_go_version,
-        direct_dependencies=tuple(direct_dependencies),
+        direct_dependencies=tuple(pkg_direct_dependencies),
         for_tests=request.for_tests,
         embed_config=embed_config,
         coverage_config=request.coverage_config,

@@ -31,6 +31,7 @@ class GoModuleImportPathsMapping:
     path(s) for a single Go module."""
 
     mapping: FrozenDict[str, GoImportPathsMappingAddressSet]
+    address_to_import_path: FrozenDict[Address, str]
 
 
 @dataclass(frozen=True)
