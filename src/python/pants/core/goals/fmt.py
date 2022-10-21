@@ -18,7 +18,7 @@ from pants.core.goals.lint import (
     _get_partitions_by_request_type,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
-from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as UntypedPartitions
 from pants.core.util_rules.partitions import _single_partition_field_sets_by_file_partitioner_rules
 from pants.engine.collection import Collection
@@ -113,7 +113,7 @@ class FmtResult(EngineAwareReturnType):
         return False
 
 
-Partitions = UntypedPartitions[PartitionKeyT, str]
+Partitions = UntypedPartitions[str, PartitionMetadataT]
 
 
 @union
@@ -283,9 +283,9 @@ async def fmt(
         partition_infos_by_files = defaultdict(list)
         for request_type, partitions_list in partitions_by_request_type.items():
             for partitions in partitions_list:
-                for key, files in partitions.items():
-                    for file in files:
-                        partition_infos_by_files[file].append((request_type, key))
+                for partition in partitions:
+                    for file in partition.elements:
+                        partition_infos_by_files[file].append((request_type, partition.metadata))
 
         files_by_partition_info = defaultdict(list)
         for file, partition_infos in partition_infos_by_files.items():
@@ -298,9 +298,9 @@ async def fmt(
                         request_type.Batch,
                         request_type.tool_name,
                         batch,
-                        partition_key,
+                        partition_metadata,
                     )
-                    for request_type, partition_key in partition_infos
+                    for request_type, partition_metadata in partition_infos
                 )
 
     all_results = await MultiGet(

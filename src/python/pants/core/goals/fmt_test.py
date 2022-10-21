@@ -25,7 +25,7 @@ from pants.core.goals.fmt import (
 )
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -483,12 +483,12 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
     assert partitions == Partitions(
         [
-            (
-                None,
+            Partition(
                 (
                     "bowl.utensil",
                     "knife.utensil",
                 ),
+                None,
             )
         ]
     )

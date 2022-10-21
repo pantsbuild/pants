@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -40,7 +41,7 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PartitionKey:
+class PartitionMetadata:
     coarsened_targets: CoarsenedTargets
     # NB: These are the same across every element in a partition
     resolve_description: str | None
@@ -73,7 +74,7 @@ async def partition_pylint(
     pylint: Pylint,
     python_setup: PythonSetup,
     first_party_plugins: PylintFirstPartyPlugins,
-) -> Partitions[PartitionKey, PylintFieldSet]:
+) -> Partitions[PylintFieldSet, PartitionMetadata]:
     if pylint.skip:
         return Partitions()
 
@@ -92,15 +93,15 @@ async def partition_pylint(
     coarsened_targets_by_address = coarsened_targets.by_address()
 
     return Partitions(
-        (
-            PartitionKey(
+        Partition(
+            tuple(field_sets),
+            PartitionMetadata(
                 CoarsenedTargets(
                     coarsened_targets_by_address[field_set.address] for field_set in field_sets
                 ),
                 resolve if len(python_setup.resolves) > 1 else None,
                 InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
             ),
-            tuple(field_sets),
         )
         for (
             resolve,
@@ -111,18 +112,20 @@ async def partition_pylint(
 
 @rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def run_pylint(
-    request: PylintRequest.Batch[PartitionKey, PylintFieldSet],
+    request: PylintRequest.Batch[PylintFieldSet, PartitionMetadata],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
 ) -> LintResult:
+    assert request.partition_metadata is not None
+
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.partition_key.coarsened_targets.closure()),
+            (target.address for target in request.partition_metadata.coarsened_targets.closure()),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
-            hardcoded_interpreter_constraints=request.partition_key.interpreter_constraints,
+            hardcoded_interpreter_constraints=request.partition_metadata.interpreter_constraints,
         ),
     )
 
@@ -130,14 +133,14 @@ async def run_pylint(
         Pex,
         PexRequest,
         pylint.to_pex_request(
-            interpreter_constraints=request.partition_key.interpreter_constraints,
+            interpreter_constraints=request.partition_metadata.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
     )
 
     sources_get = Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(request.partition_key.coarsened_targets.closure()),
+        PythonSourceFilesRequest(request.partition_metadata.coarsened_targets.closure()),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -155,7 +158,7 @@ async def run_pylint(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    interpreter_constraints=request.partition_key.interpreter_constraints,
+                    interpreter_constraints=request.partition_metadata.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],

@@ -99,8 +99,8 @@ def run_golangci_lint(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    partition = rule_runner.request(
-        Partitions[Any, GolangciLintFieldSet],
+    partitions = rule_runner.request(
+        Partitions[GolangciLintFieldSet, Any],
         [
             GolangciLintRequest.PartitionRequest(
                 tuple(GolangciLintFieldSet.create(tgt) for tgt in targets)
@@ -108,8 +108,10 @@ def run_golangci_lint(
         ],
     )
     results = []
-    for key, batch in partition.items():
-        result = rule_runner.request(LintResult, [GolangciLintRequest.Batch("", batch, key)])
+    for partition in partitions:
+        result = rule_runner.request(
+            LintResult, [GolangciLintRequest.Batch("", partition.elements, partition.metadata)]
+        )
         results.append(result)
     return tuple(results)
 

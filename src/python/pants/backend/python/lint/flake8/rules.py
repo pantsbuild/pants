@@ -18,6 +18,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, PathGlobs, RemovePrefix
 from pants.engine.process import FallibleProcessResult
@@ -47,7 +48,7 @@ async def partition_flake8(
     flake8: Flake8,
     python_setup: PythonSetup,
     first_party_plugins: Flake8FirstPartyPlugins,
-) -> Partitions[InterpreterConstraints, Flake8FieldSet]:
+) -> Partitions[Flake8FieldSet, InterpreterConstraints]:
     if flake8.skip:
         return Partitions()
 
@@ -60,18 +61,18 @@ async def partition_flake8(
         results[constraints].append(fs)
 
     return Partitions(
-        (interpreter_constraints, tuple(field_sets))
+        Partition(tuple(field_sets), interpreter_constraints)
         for interpreter_constraints, field_sets in results.items()
     )
 
 
 @rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def run_flake8(
-    request: Flake8Request.Batch[InterpreterConstraints, Flake8FieldSet],
+    request: Flake8Request.Batch[Flake8FieldSet, InterpreterConstraints],
     flake8: Flake8,
     first_party_plugins: Flake8FirstPartyPlugins,
 ) -> LintResult:
-    interpreter_constraints = request.partition_key
+    interpreter_constraints = request.partition_metadata
     flake8_pex_get = Get(
         VenvPex,
         PexRequest,
