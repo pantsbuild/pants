@@ -42,7 +42,7 @@ def run_yapf(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            YapfRequest.Batch("", snapshot.files, partition_key=None, snapshot=snapshot),
+            YapfRequest.Batch("", snapshot.files, partition_metadata=None, snapshot=snapshot),
         ],
     )
     return fmt_result

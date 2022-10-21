@@ -56,7 +56,7 @@ class GolangciLintRequest(LintTargetsRequest):
 
 @rule(desc="Lint with golangci-lint", level=LogLevel.DEBUG)
 async def run_golangci_lint(
-    request: GolangciLintRequest.Batch[Any, GolangciLintFieldSet],
+    request: GolangciLintRequest.Batch[GolangciLintFieldSet, Any],
     golangci_lint: GolangciLint,
     goroot: GoRoot,
     bash: BashBinary,

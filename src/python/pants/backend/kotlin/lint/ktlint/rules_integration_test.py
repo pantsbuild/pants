@@ -96,7 +96,7 @@ def run_ktlint(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
             KtlintRequest.Batch(
                 "",
                 input_sources.snapshot.files,
-                partition_key=None,
+                partition_metadata=None,
                 snapshot=input_sources.snapshot,
             ),
         ],

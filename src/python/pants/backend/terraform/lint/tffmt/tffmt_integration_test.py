@@ -139,15 +139,15 @@ def run_tffmt(
         return None
 
     assert len(partitions) == 1
-    key, files = next(iter(partitions.items()))
-    assert set(files) == set(input_sources.snapshot.files)
+    partition = partitions[0]
+    assert set(partition.elements) == set(input_sources.snapshot.files)
     fmt_result = rule_runner.request(
         FmtResult,
         [
             TffmtRequest.Batch(
                 "",
-                files,
-                partition_key=key,
+                partition.elements,
+                partition_metadata=partition.metadata,
                 snapshot=input_sources.snapshot,
             ),
         ],

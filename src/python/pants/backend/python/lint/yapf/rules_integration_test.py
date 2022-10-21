@@ -72,7 +72,7 @@ def run_yapf(
             YapfRequest.Batch(
                 "",
                 input_sources.snapshot.files,
-                partition_key=None,
+                partition_metadata=None,
                 snapshot=input_sources.snapshot,
             ),
         ],

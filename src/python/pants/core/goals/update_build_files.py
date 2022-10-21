@@ -314,7 +314,10 @@ async def format_build_file_with_yapf(
     yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
     result = await _run_yapf(
         YapfRequest.Batch(
-            Yapf.options_scope, input_snapshot.files, partition_key=None, snapshot=input_snapshot
+            Yapf.options_scope,
+            input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
         ),
         yapf,
         yapf_ics,
@@ -345,7 +348,10 @@ async def format_build_file_with_black(
     black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
     result = await _run_black(
         BlackRequest.Batch(
-            Black.options_scope, input_snapshot.files, partition_key=None, snapshot=input_snapshot
+            Black.options_scope,
+            input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
         ),
         black,
         black_ics,
