@@ -55,7 +55,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 
 # Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
 # The bool value represents whether the option is expected to take a value or not.
@@ -246,33 +246,18 @@ async def run_go_tests(
     if testmain.has_xtests:
         # Build a synthetic package for xtests where the import path is the same as the package under test
         # but with "_test" appended.
-        #
-        # Subset the direct dependencies to only the dependencies used by the xtest code. (Dependency
-        # inference will have included all of the regular, test, and xtest dependencies of the package in
-        # the build graph.) Moreover, ensure that any import of the package under test is on the _test_
-        # version of the package that was just built.
-        dep_by_import_path = {
-            dep.import_path: dep for dep in test_pkg_build_request.direct_dependencies
-        }
-        direct_dependencies: OrderedSet[BuildGoPackageRequest] = OrderedSet()
-        for xtest_import in pkg_analysis.xtest_imports:
-            if xtest_import == pkg_analysis.import_path:
-                direct_dependencies.add(test_pkg_build_request)
-            elif xtest_import in dep_by_import_path:
-                direct_dependencies.add(dep_by_import_path[xtest_import])
-
-        xtest_pkg_build_request = BuildGoPackageRequest(
-            import_path=f"{import_path}_test",
-            pkg_name=f"{pkg_analysis.name}_test",
-            digest=pkg_digest.digest,
-            dir_path=pkg_analysis.dir_path,
-            go_files=pkg_analysis.xtest_go_files,
-            s_files=(),  # TODO: Are there .s files for xtest?
-            direct_dependencies=tuple(direct_dependencies),
-            minimum_go_version=pkg_analysis.minimum_go_version,
-            embed_config=pkg_digest.xtest_embed_config,
-            coverage_config=coverage_config,
+        maybe_xtest_pkg_build_request = await Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(
+                field_set.address, for_xtests=True, coverage_config=coverage_config
+            ),
         )
+        if maybe_xtest_pkg_build_request.request is None:
+            assert maybe_xtest_pkg_build_request.stderr is not None
+            return compilation_failure(
+                maybe_xtest_pkg_build_request.exit_code, None, maybe_xtest_pkg_build_request.stderr
+            )
+        xtest_pkg_build_request = maybe_xtest_pkg_build_request.request
         main_direct_deps.append(xtest_pkg_build_request)
 
     # Generate coverage setup code for the test main if coverage is enabled.

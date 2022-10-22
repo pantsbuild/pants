@@ -39,7 +39,7 @@ You can join the `pants-devel@googlegroups.com` mailing list [here](https://grou
 GitHub
 ------
 
-Pants is an open-source software project, developed at [\<https://github.com/pantsbuild/pants>](https://github.com/pantsbuild/pants).
+Pants is an open-source software project, developed at [https://github.com/pantsbuild/pants](https://github.com/pantsbuild/pants).
 
 If you discover a bug with Pants or have a feature request, feel free to [file an issue](https://github.com/pantsbuild/pants/issues). Please check first if a similar issue has already been filed; if it has, please comment so that we know to bump the issue in priority.
 

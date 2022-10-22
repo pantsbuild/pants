@@ -215,6 +215,7 @@ class InternalGenerateTestLockfileFixturesSubsystem(GoalSubsystem):
 
 class InternalGenerateTestLockfileFixturesGoal(Goal):
     subsystem_cls = InternalGenerateTestLockfileFixturesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

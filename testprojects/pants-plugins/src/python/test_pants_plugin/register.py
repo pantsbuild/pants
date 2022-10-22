@@ -22,6 +22,7 @@ class LifecycleStubsSubsystem(GoalSubsystem):
 
 class LifecycleStubsGoal(Goal):
     subsystem_cls = LifecycleStubsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

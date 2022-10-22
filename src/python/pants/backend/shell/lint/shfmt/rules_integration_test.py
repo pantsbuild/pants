@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(FmtResult, [ShfmtRequest.SubPartition]),
+            QueryRule(FmtResult, [ShfmtRequest.Batch]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[ShellSourcesGeneratorTarget],
@@ -87,8 +87,11 @@ def run_shfmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ShfmtRequest.SubPartition(
-                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            ShfmtRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )

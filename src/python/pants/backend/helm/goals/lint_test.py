@@ -43,7 +43,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             SubsystemRule(HelmSubsystem),
             QueryRule(Partitions, [HelmLintRequest.PartitionRequest]),
-            QueryRule(LintResult, [HelmLintRequest.SubPartition]),
+            QueryRule(LintResult, [HelmLintRequest.Batch]),
         ],
     )
     return rule_runner
@@ -56,15 +56,15 @@ def run_helm_lint(
     extra_options: Iterable[str] = [],
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(extra_options)
-    partition = rule_runner.request(
-        Partitions[chart.HelmChart, HelmLintFieldSet],
+    partitions = rule_runner.request(
+        Partitions[HelmLintFieldSet, chart.HelmChart],
         [HelmLintRequest.PartitionRequest(tuple(HelmLintFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [HelmLintRequest.SubPartition("", subpartition, key)],
+            [HelmLintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

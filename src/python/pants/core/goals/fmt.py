@@ -32,7 +32,7 @@ class FmtRequest(FixRequest):
     def _get_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_rules()
         yield UnionRule(FmtRequest, cls)
-        yield UnionRule(FmtRequest.SubPartition, cls.SubPartition)
+        yield UnionRule(FmtRequest.Batch, cls.Batch)
 
 
 class FmtTargetsRequest(FmtRequest, FixTargetsRequest):
@@ -63,6 +63,7 @@ class FmtSubsystem(GoalSubsystem):
 
 class Fmt(Goal):
     subsystem_cls = FmtSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

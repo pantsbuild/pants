@@ -78,7 +78,11 @@ class AstVisitor(ast.NodeVisitor):
         # However, `ast` doesn't expose the exact lines each specific import is on,
         # so we are forced to tokenize the import statement to tease out which imported
         # name is on which line so we can check for the ignore pragma.
-        node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
+        # Note that we ensure we don't pass an empty string to generate_tokens,
+        # see https://github.com/pantsbuild/pants/issues/17283.
+        node_lines_iter = (
+            line or " " for line in itertools.islice(self._contents_lines, node.lineno - 1, None)
+        )
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
         def find_token(string):

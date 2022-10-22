@@ -26,7 +26,7 @@ from pants.core.goals.fix import (
 from pants.core.goals.fix import rules as fix_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -93,7 +93,7 @@ async def fortran_fmt_partition(request: FortranFmtRequest.PartitionRequest) -> 
 
 
 @rule
-async def fortran_fix(request: FortranFixRequest.SubPartition) -> FixResult:
+async def fortran_fix(request: FortranFixRequest.Batch) -> FixResult:
     input = request.snapshot
     output = await Get(
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
@@ -147,7 +147,7 @@ async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionReques
 
 
 @rule
-async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FixResult:
+async def smalltalk_noop(request: SmalltalkNoopRequest.Batch) -> FixResult:
     assert request.snapshot != EMPTY_SNAPSHOT
     return FixResult(
         input=request.snapshot,
@@ -172,7 +172,7 @@ async def smalltalk_skip_partition(request: SmalltalkSkipRequest.PartitionReques
 
 
 @rule
-async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FixResult:
+async def smalltalk_skip(request: SmalltalkSkipRequest.Batch) -> FixResult:
     assert False
 
 
@@ -192,7 +192,7 @@ async def bricky_partition(request: BrickyBuildFileFixer.PartitionRequest) -> Pa
 
 
 @rule
-async def fix_with_bricky(request: BrickyBuildFileFixer.SubPartition) -> FixResult:
+async def fix_with_bricky(request: BrickyBuildFileFixer.Batch) -> FixResult:
     def brickify(contents: bytes) -> bytes:
         content_str = contents.decode("ascii")
         new_lines = []
@@ -502,12 +502,12 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     partitions = rule_runner.request(Partitions, [FixKitchenRequest.PartitionRequest(field_sets)])
     assert partitions == Partitions(
         [
-            (
-                None,
+            Partition(
                 (
                     "bowl.utensil",
                     "knife.utensil",
                 ),
+                None,
             )
         ]
     )

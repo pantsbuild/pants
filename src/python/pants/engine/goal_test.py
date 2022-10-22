@@ -15,6 +15,7 @@ def test_line_oriented_goal() -> None:
 
     class OutputtingGoal(Goal):
         subsystem_cls = OutputtingGoalOptions
+        environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
     @goal_rule
     def output_rule(console: Console, options: OutputtingGoalOptions) -> OutputtingGoal:

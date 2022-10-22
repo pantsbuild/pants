@@ -20,7 +20,7 @@ class BuildifierRequest(FmtBuildFilesRequest):
 
 @rule(desc="Format with Buildifier", level=LogLevel.DEBUG)
 async def buildfier_fmt(
-    request: BuildifierRequest.SubPartition, buildifier: Buildifier, platform: Platform
+    request: BuildifierRequest.Batch, buildifier: Buildifier, platform: Platform
 ) -> FmtResult:
     buildifier_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, buildifier.get_request(platform)
