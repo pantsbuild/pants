@@ -22,3 +22,6 @@ class JUnit(JvmToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
+
+    # TODO: Replace with a proper `SkipOption`.
+    skip = False
