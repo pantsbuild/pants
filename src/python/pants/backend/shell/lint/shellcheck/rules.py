@@ -41,7 +41,7 @@ class ShellcheckRequest(LintTargetsRequest):
 
 @rule(desc="Lint with Shellcheck", level=LogLevel.DEBUG)
 async def run_shellcheck(
-    request: ShellcheckRequest.SubPartition[Any, ShellcheckFieldSet],
+    request: ShellcheckRequest.Batch[ShellcheckFieldSet, Any],
     shellcheck: Shellcheck,
     platform: Platform,
 ) -> LintResult:

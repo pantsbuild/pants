@@ -62,7 +62,7 @@ def generate_argv(
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest.SubPartition, isort: Isort) -> FmtResult:
+async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)

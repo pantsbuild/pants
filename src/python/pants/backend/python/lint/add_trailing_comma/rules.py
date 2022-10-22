@@ -36,7 +36,7 @@ class AddTrailingCommaRequest(FmtTargetsRequest):
 
 @rule(desc="Format with add-trailing-comma", level=LogLevel.DEBUG)
 async def add_trailing_comma_fmt(
-    request: AddTrailingCommaRequest.SubPartition, add_trailing_comma: AddTrailingComma
+    request: AddTrailingCommaRequest.Batch, add_trailing_comma: AddTrailingComma
 ) -> FmtResult:
     add_trailing_comma_pex = await Get(VenvPex, PexRequest, add_trailing_comma.to_pex_request())
 

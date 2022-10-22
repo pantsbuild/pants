@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *docformatter_subsystem_rules(),
             *source_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (DocformatterRequest.SubPartition,)),
+            QueryRule(FmtResult, (DocformatterRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -59,8 +59,11 @@ def run_docformatter(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            DocformatterRequest.SubPartition(
-                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            DocformatterRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )

@@ -48,6 +48,7 @@ class ShowGoPackageAnalysisSubsystem(GoalSubsystem):
 
 class ShowGoPackageAnalysis(Goal):
     subsystem_cls = ShowGoPackageAnalysisSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule
@@ -134,6 +135,7 @@ class GoExportCgoCodegenSubsystem(GoalSubsystem):
 
 class GoExportCgoCodegen(Goal):
     subsystem_cls = GoExportCgoCodegenSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @dataclass(frozen=True)

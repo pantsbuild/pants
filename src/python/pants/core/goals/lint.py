@@ -19,13 +19,13 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
+    _BatchBase,
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
     _single_partition_field_sets_partitioner_rules,
-    _SubPartitionBase,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -63,7 +63,7 @@ class LintResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: LintRequest.SubPartition,
+        request: LintRequest.Batch,
         process_result: FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -77,7 +77,9 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.key.description if request.key else None,
+            partition_description=request.partition_metadata.description
+            if request.partition_metadata
+            else None,
             report=report,
         )
 
@@ -132,19 +134,19 @@ class LintRequest:
                     request: DryCleaningRequest.PartitionRequest[DryCleaningFieldSet]
                     # or `request: DryCleaningRequest.PartitionRequest` if file linter
                     subsystem: DryCleaningSubsystem,
-                ) -> Partitions[DryCleaningFieldSet]:
+                ) -> Partitions[DryCleaningFieldSet, Any]:
                     if subsystem.skip:
                         return Partitions()
 
                     # One possible implementation
                     return Partitions.single_partition(request.field_sets)
 
-        2. A rule which takes an instance of your request type's `SubPartition` class property, and
+        2. A rule which takes an instance of your request type's `Batch` class property, and
             returns a `LintResult instance.
             E.g.
                 @rule
                 async def dry_clean(
-                    request: DryCleaningRequest.SubPartition,
+                    request: DryCleaningRequest.Batch,
                 ) -> LintResult:
                     ...
 
@@ -173,7 +175,7 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class SubPartition(_SubPartitionBase[PartitionKeyT, PartitionElementT]):
+    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
         pass
 
     @final
@@ -184,7 +186,7 @@ class LintRequest:
     @classmethod
     def _get_rules(cls) -> Iterable:
         yield UnionRule(LintRequest, cls)
-        yield UnionRule(LintRequest.SubPartition, cls.SubPartition)
+        yield UnionRule(LintRequest.Batch, cls.Batch)
 
 
 class LintTargetsRequest(LintRequest):
@@ -268,6 +270,7 @@ class LintSubsystem(GoalSubsystem):
 
 class Lint(Goal):
     subsystem_cls = LintSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 def _print_results(
@@ -421,7 +424,7 @@ async def lint(
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
-    def batch(
+    def batch_by_size(
         iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
     ) -> Iterator[tuple[_T, ...]]:
         batches = partition_sequentially(
@@ -435,10 +438,10 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (subpartition, key)
+            (batch, partition.metadata)
             for partitions in partitions_list
-            for key, partition in partitions.items()
-            for subpartition in batch(partition)
+            for partition in partitions
+            for batch in batch_by_size(partition.elements)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
     }
@@ -451,8 +454,8 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    subpartitions = [
-        request_type.SubPartition(
+    batches: Iterable[LintRequest.Batch] = [
+        request_type.Batch(
             request_type.tool_name,
             elements,
             key,
@@ -463,23 +466,23 @@ async def lint(
     ]
 
     all_batch_results = await MultiGet(
-        Get(LintResult, LintRequest.SubPartition, request) for request in subpartitions
+        Get(LintResult, LintRequest.Batch, request) for request in batches
     )
 
-    core_request_types_by_subpartition_type = {
-        request_type.SubPartition: request_type for request_type in lint_request_types
+    core_request_types_by_batch_type = {
+        request_type.Batch: request_type for request_type in lint_request_types
     }
 
     formatter_failed = any(
         result.exit_code
-        for subpartition, result in zip(subpartitions, all_batch_results)
-        if core_request_types_by_subpartition_type[type(subpartition)].is_formatter
+        for batch, result in zip(batches, all_batch_results)
+        if core_request_types_by_batch_type[type(batch)].is_formatter
     )
 
     fixer_failed = any(
         result.exit_code
-        for subpartition, result in zip(subpartitions, all_batch_results)
-        if core_request_types_by_subpartition_type[type(subpartition)].is_fixer
+        for batch, result in zip(batches, all_batch_results)
+        if core_request_types_by_batch_type[type(batch)].is_fixer
     )
 
     results_by_tool = defaultdict(list)

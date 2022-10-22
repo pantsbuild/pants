@@ -433,7 +433,7 @@ class TestSubsystem(GoalSubsystem):
 
 class Test(Goal):
     subsystem_cls = TestSubsystem
-    enviroment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     __test__ = False
 

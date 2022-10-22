@@ -180,6 +180,7 @@ class PublishSubsystem(GoalSubsystem):
 
 class Publish(Goal):
     subsystem_cls = PublishSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule
