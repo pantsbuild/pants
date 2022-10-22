@@ -488,20 +488,11 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
 
 @rule_helper
 async def _run_debug_tests(
+    targets_to_valid_field_sets: TargetRootsToFieldSets,
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            TestFieldSet,
-            goal_description=(
-                "`test --debug-adapter`" if test_subsystem.debug_adapter else "`test --debug`"
-            ),
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-        ),
-    )
     # TODO: Because these are interactive, they are always pinned to the local environment.
     # See https://github.com/pantsbuild/pants/issues/17182
     debug_requests = await MultiGet(
@@ -553,20 +544,36 @@ async def run_tests(
     run_id: RunId,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
-    if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(test_subsystem, debug_adapter, local_environment_name)
+    if test_subsystem.debug_adapter:
+        goal_description = f"`{test_subsystem.name} --debug-adapter`"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.error
+    elif test_subsystem.debug:
+        goal_description = f"`{test_subsystem.name} --debug`"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.error
+    else:
+        goal_description = f"The `{test_subsystem.name}` goal"
+        no_applicable_targets_behavior = NoApplicableTargetsBehavior.warn
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
-            goal_description=f"the `{test_subsystem.name}` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            goal_description=goal_description,
+            no_applicable_targets_behavior=no_applicable_targets_behavior,
             shard=shard,
             num_shards=num_shards,
         ),
     )
+
+    if test_subsystem.debug or test_subsystem.debug_adapter:
+        return await _run_debug_tests(
+            targets_to_valid_field_sets,
+            test_subsystem,
+            debug_adapter,
+            local_environment_name,
+        )
+
     environment_names_per_field_set = await MultiGet(
         Get(
             EnvironmentName,
