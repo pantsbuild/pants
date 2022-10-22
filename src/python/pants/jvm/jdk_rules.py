@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
@@ -201,6 +202,7 @@ async def prepare_jdk_environment(
     nailgun_: Nailgun,
     bash: BashBinary,
     request: JdkRequest,
+    env_target: EnvironmentTarget,
 ) -> JdkEnvironment:
     nailgun = nailgun_.classpath_entry
 
@@ -246,7 +248,7 @@ async def prepare_jdk_environment(
             immutable_input_digests=coursier.immutable_input_digests,
             env=env,
             description=f"Ensure download of JDK {coursier_jdk_option}.",
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
             level=LogLevel.DEBUG,
         ),
     )

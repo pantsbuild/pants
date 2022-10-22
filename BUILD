@@ -14,3 +14,10 @@ docker_environment(
     name="docker_env",
     image="python:3.9",
 )
+
+# See `build-support/reapi-sample-server/README.md` for information on how to use this environment
+# for internal testing.
+remote_environment(
+    name="buildgrid_remote",
+    python_bootstrap_search_path=["<PATH>"],
+)

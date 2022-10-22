@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.helm import HelmSubsystem
@@ -39,7 +39,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.process import InteractiveProcess, Process, ProcessResult
+from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -172,6 +172,11 @@ class RenderedHelmFiles(EngineAwareReturnType):
     def metadata(self) -> dict[str, Any] | None:
         return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
 
+    def cacheable(self) -> bool:
+        # When using post-renderers it may not be safe to cache the generated files as the final result
+        # may contain secrets or other kind of sensitive information.
+        return not self.post_processed
+
 
 @rule_helper
 async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
@@ -281,18 +286,18 @@ async def setup_render_helm_deployment_process(
     input_digests = [output_digest]
 
     # Additional process values in case a post_renderer has been requested.
-    env: Mapping[str, str] = {}
+    env: dict[str, str] = {}
     immutable_input_digests: dict[str, Digest] = {
         **chart.immutable_input_digests,
         value_files_prefix: value_files.snapshot.digest,
     }
-    append_only_caches: Mapping[str, str] = {}
+    append_only_caches: dict[str, str] = {}
     if request.post_renderer:
         logger.debug(f"Using post-renderer stage in deployment {request.field_set.address}")
         input_digests.append(request.post_renderer.digest)
-        env = request.post_renderer.env
+        env.update(request.post_renderer.env)
         immutable_input_digests.update(request.post_renderer.immutable_input_digests)
-        append_only_caches = request.post_renderer.append_only_caches
+        append_only_caches.update(request.post_renderer.append_only_caches)
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
@@ -311,6 +316,14 @@ async def setup_render_helm_deployment_process(
             return f'"{value}"'
         return value
 
+    # If using a post-renderer we are only going to keep the process result cached in
+    # memory to prevent storing in disk, either locally or remotely, secrets or other
+    # sensitive values that may been added in by the post-renderer.
+    process_cache = (
+        ProcessCacheScope.PER_RESTART_SUCCESSFUL
+        if request.post_renderer
+        else ProcessCacheScope.SUCCESSFUL
+    )
     process = HelmProcess(
         argv=[
             request.cmd.value,
@@ -352,6 +365,7 @@ async def setup_render_helm_deployment_process(
         description=request.description,
         input_digest=merged_digests,
         output_directories=output_directories,
+        cache_scope=process_cache,
     )
 
     return _HelmDeploymentProcessWrapper(

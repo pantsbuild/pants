@@ -193,6 +193,7 @@ def update_internal_lockfiles(specified: list[str] | None) -> None:
     args = [
         "./pants",
         "--concurrent",
+        f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
         # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
         # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
         # restore it here so that the lockfile gets generated properly.

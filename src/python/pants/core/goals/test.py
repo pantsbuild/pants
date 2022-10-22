@@ -433,7 +433,7 @@ class TestSubsystem(GoalSubsystem):
 
 class Test(Goal):
     subsystem_cls = TestSubsystem
-    environment_migrated = True
+    enviroment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     __test__ = False
 

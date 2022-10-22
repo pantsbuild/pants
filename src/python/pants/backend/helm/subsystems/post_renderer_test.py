@@ -11,6 +11,7 @@ import pytest
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
 from pants.backend.helm.utils.yaml import MutableYamlIndex, YamlPath
+from pants.core.goals.run import rules as run_rules
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -22,6 +23,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *post_renderer.rules(),
+            *run_rules(),
             QueryRule(HelmPostRenderer, (SetupHelmPostRenderer,)),
             QueryRule(ProcessResult, (Process,)),
         ]
@@ -71,6 +73,6 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
         elif file.path == "post_renderer_wrapper.sh":
             script_lines = file.content.decode().splitlines()
             assert (
-                "./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml ./__stdin.yaml"
+                "./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml ./__helm_stdout.yaml"
                 in script_lines
             )
