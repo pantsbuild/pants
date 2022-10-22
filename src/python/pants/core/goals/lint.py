@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
-from typing_extensions import final
+from typing_extensions import Protocol, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (
@@ -311,12 +311,17 @@ _TargetPartitioner = TypeVar("_TargetPartitioner", bound=LintTargetsRequest.Part
 _FilePartitioner = TypeVar("_FilePartitioner", bound=LintFilesRequest.PartitionRequest)
 
 
+class _MultiToolGoalSubsystem(Protocol):
+    name: str
+    only: OnlyOption
+
+
 @rule_helper
 async def _get_partitions_by_request_type(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
     file_partitioners: Iterable[type[_FilePartitioner]],
-    subsystem: GoalSubsystem,
+    subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
     # NB: Because the rule parser code will collect `Get`s from caller's scope, these allows the
     # caller to customize the specific `Get`.
@@ -325,7 +330,7 @@ async def _get_partitions_by_request_type(
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_names = determine_specified_tool_names(
         subsystem.name,
-        subsystem.only,  # type: ignore[attr-defined]
+        subsystem.only,
         core_request_types,
     )
 

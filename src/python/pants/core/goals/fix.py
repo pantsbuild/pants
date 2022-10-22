@@ -9,6 +9,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
 
+from typing_extensions import Protocol
+
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
     LintFilesRequest,
@@ -16,6 +18,7 @@ from pants.core.goals.lint import (
     LintResult,
     LintTargetsRequest,
     _get_partitions_by_request_type,
+    _MultiToolGoalSubsystem,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.core.util_rules.partitions import PartitionerType, PartitionKeyT
@@ -257,13 +260,17 @@ _FilePartitioner = TypeVar("_FilePartitioner", bound=FixFilesRequest.PartitionRe
 _GoalT = TypeVar("_GoalT", bound=Goal)
 
 
+class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
+    batch_size: BatchSizeOption
+
+
 @rule_helper
 async def _do_fix(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
     file_partitioners: Iterable[type[_FilePartitioner]],
     goal_cls: type[_GoalT],
-    subsystem: GoalSubsystem,
+    subsystem: _BatchableMultiToolGoalSubsystem,
     specs: Specs,
     workspace: Workspace,
     console: Console,
@@ -287,8 +294,8 @@ async def _do_fix(
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
-            size_target=subsystem.batch_size,  # type: ignore[attr-defined]
-            size_max=4 * subsystem.batch_size,  # type: ignore[attr-defined]
+            size_target=subsystem.batch_size,
+            size_max=4 * subsystem.batch_size,
         )
         for batch in batches:
             yield tuple(batch)
