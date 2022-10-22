@@ -42,6 +42,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -102,6 +103,12 @@ class GoTestFieldSet(TestFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipGoTestsField).value
+
+
+class GoTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = GoTestSubsystem  # type: ignore[assignment]
+    field_set_type = GoTestFieldSet
 
 
 def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
@@ -433,4 +440,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TestFieldSet, GoTestFieldSet),
+        *GoTestRequest.rules(),
     ]

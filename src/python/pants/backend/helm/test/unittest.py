@@ -27,6 +27,7 @@ from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -67,6 +68,12 @@ class HelmUnitTestFieldSet(TestFieldSet):
     dependencies: HelmUnitTestDependenciesField
     strict: HelmUnitTestStrictField
     timeout: HelmUnitTestTimeoutField
+
+
+class HelmUnitTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = HelmUnitTestSubsystem  # type: ignore[assignment]
+    field_set_type = HelmUnitTestFieldSet
 
 
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
@@ -176,4 +183,5 @@ def rules():
         *dependency_rules(),
         *tool.rules(),
         UnionRule(TestFieldSet, HelmUnitTestFieldSet),
+        *HelmUnitTestRequest.rules(),
     ]

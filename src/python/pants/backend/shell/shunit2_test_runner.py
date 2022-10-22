@@ -23,6 +23,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -65,6 +66,12 @@ class Shunit2FieldSet(TestFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipShunit2TestsField).value
+
+
+class Shunit2TestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = Shunit2  # type: ignore[assignment]
+    field_set_type = Shunit2FieldSet
 
 
 @dataclass(frozen=True)
@@ -262,4 +269,8 @@ async def setup_shunit2_debug_adapter_test(field_set: Shunit2FieldSet) -> TestDe
 
 
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, Shunit2FieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, Shunit2FieldSet),
+        *Shunit2TestRequest.rules(),
+    ]

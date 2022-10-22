@@ -33,6 +33,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -374,6 +375,12 @@ async def setup_pytest_for_target(
     return TestSetup(process, results_file_name=results_file_name)
 
 
+class PyTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = PyTest  # type: ignore[assignment]
+    field_set_type = PythonTestFieldSet
+
+
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
     field_set: PythonTestFieldSet,
@@ -480,4 +487,5 @@ def rules():
         *pytest.rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+        *PyTestRequest.rules(),
     ]

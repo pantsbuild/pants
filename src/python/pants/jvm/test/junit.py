@@ -14,6 +14,7 @@ from pants.core.goals.test import (
     TestExtraEnv,
     TestExtraEnvVarsField,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -60,6 +61,12 @@ class JunitTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: TestExtraEnvVarsField
+
+
+class JunitTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = JUnit  # type: ignore[assignment]
+    field_set_type = JunitTestFieldSet
 
 
 class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -214,4 +221,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, JunitTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
+        *JunitTestRequest.rules(),
     ]

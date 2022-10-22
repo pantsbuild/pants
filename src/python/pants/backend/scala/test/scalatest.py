@@ -17,6 +17,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -58,6 +59,12 @@ class ScalatestTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: ScalatestTestExtraEnvVarsField
+
+
+class ScalatestTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = Scalatest  # type: ignore[assignment]
+    field_set_type = ScalatestTestFieldSet
 
 
 class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -213,4 +220,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        *ScalatestTestRequest.rules(),
     ]
