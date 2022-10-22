@@ -223,9 +223,7 @@ def _get_inferred_asset_deps(
     assets: ParsedPythonAssetPaths,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> dict[str, ImportResolveResult]:
-    resolve_results: dict[str, ImportResolveResult] = {}
-
-    for filepath in assets:
+    def _resolve_single_asset(filepath) -> ImportResolveResult:
         # NB: Resources in Python's ecosystem are loaded relative to a package, so we only try and
         # query for a resource relative to requesting module's path
         # (I.e. we assume the user is doing something like `pkgutil.get_data(__file__, "foo/bar")`)
@@ -248,10 +246,7 @@ def _get_inferred_asset_deps(
         if inferred_tgts:
             possible_addresses = tuple(tgt.address for tgt in inferred_tgts)
             if len(possible_addresses) == 1:
-                resolve_results[filepath] = ImportResolveResult(
-                    ImportOwnerStatus.unambiguous, possible_addresses
-                )
-                continue
+                return ImportResolveResult(ImportOwnerStatus.unambiguous, possible_addresses)
 
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 possible_addresses,
@@ -261,15 +256,13 @@ def _get_inferred_asset_deps(
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(possible_addresses)
             if maybe_disambiguated:
-                resolve_results[filepath] = ImportResolveResult(
-                    ImportOwnerStatus.disambiguated, (maybe_disambiguated,)
-                )
+                return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
             else:
-                resolve_results[filepath] = ImportResolveResult(ImportOwnerStatus.ambiguous)
+                return ImportResolveResult(ImportOwnerStatus.ambiguous)
         else:
-            resolve_results[filepath] = ImportResolveResult(ImportOwnerStatus.unowned)
+            return ImportResolveResult(ImportOwnerStatus.unowned)
 
-    return resolve_results
+    return {filepath: _resolve_single_asset(filepath) for filepath in assets}
 
 
 class ImportOwnerStatus(Enum):
@@ -293,34 +286,30 @@ def _get_imports_info(
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> dict[str, ImportResolveResult]:
-    resolve_result: dict[str, ImportResolveResult] = {}
-
-    for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
+    def _resolve_single_import(owners, import_name) -> ImportResolveResult:
         if owners.unambiguous:
-            resolve_result[imp] = ImportResolveResult(
-                ImportOwnerStatus.unambiguous, owners.unambiguous
-            )
-            continue
+            return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
             import_reference="module",
-            context=f"The target {address} imports `{imp}`",
+            context=f"The target {address} imports `{import_name}`",
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
-            resolve_result[imp] = ImportResolveResult(
-                ImportOwnerStatus.disambiguated, (maybe_disambiguated,)
-            )
-        elif imp.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
-            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unownable)
-        elif parsed_imports[imp].weak:
-            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.weak_ignore)
+            return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
+        elif import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
+            return ImportResolveResult(ImportOwnerStatus.unownable)
+        elif parsed_imports[import_name].weak:
+            return ImportResolveResult(ImportOwnerStatus.weak_ignore)
         else:
-            resolve_result[imp] = ImportResolveResult(ImportOwnerStatus.unowned)
+            return ImportResolveResult(ImportOwnerStatus.unowned)
 
-    return resolve_result
+    return {
+        imp: _resolve_single_import(owners, imp)
+        for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items())
+    }
 
 
 def _collect_imports_info(
