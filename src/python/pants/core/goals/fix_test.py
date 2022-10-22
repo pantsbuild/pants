@@ -104,7 +104,7 @@ async def fortran_fix(request: FortranFixRequest.Batch) -> FixResult:
 
 
 @rule
-async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
+async def fortran_fmt(request: FortranFmtRequest.Batch) -> FmtResult:
     output = await Get(
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
     )
