@@ -38,14 +38,25 @@ class PartitionerType(Enum):
     DEFAULT_SINGLE_PARTITION = "default_single_partition"
     """Registers a partitioner which returns the inputs as a single partition
 
-    The returned partition will have no metadata."""
+    The returned partition will have no metadata.
+    """
 
     DEFAULT_ONE_PARTITION_PER_INPUT = "default_one_partition_per_input"
     """Registers a partitioner which returns a single-element partition per input.
 
-    Each of the returned partitions will have no metadata."""
+    Each of the returned partitions will have no metadata.
+    """
 
     def default_rules(self, cls, *, by_file: bool) -> Iterable:
+        """Return an iterable of rules defining the default partitioning logic for this
+        `PartitionerType`.
+
+        NOTE: Not all `PartitionerType`s have default logic, so this method can return an empty iterable.
+
+        :param by_file: If `True`, rules returned from this method (if any) will compute partitions with
+          `str`-type elements, where each `str` value is the path to a file. If `False`, rule will compute
+          partitions with `FieldSet`-type elements.
+        """
         if self == PartitionerType.CUSTOM:
             # No default rules.
             return
