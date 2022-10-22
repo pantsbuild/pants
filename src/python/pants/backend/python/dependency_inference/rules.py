@@ -457,7 +457,7 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@rule
+@rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_infer_subsystem: PythonInferSubsystem,
@@ -556,10 +556,8 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await Get(
-        ParsedPythonDependencies,
-        PythonImportDependenciesInferenceFieldSet,
-        request.field_set,
+    parsed_dependencies = await _exec_parse_deps(
+        request.field_set, python_infer_subsystem, python_setup
     )
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
@@ -683,7 +681,6 @@ async def infer_python_conftest_dependencies(
 # This is a separate function to facilitate tests registering import inference.
 def import_rules():
     return [
-        _exec_parse_deps,
         resolve_parsed_dependencies,
         find_other_owners_for_unowned_import,
         infer_python_dependencies_via_source,
