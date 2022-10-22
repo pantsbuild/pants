@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -344,31 +343,60 @@ class UnownedImportsPossibleOwnersRequest:
 
 
 @dataclass(frozen=True)
+class UnownedImportPossibleOwnerRequest:
+    unowned_import: str
+    original_resolve: str
+
+
+@dataclass(frozen=True)
 class UnownedImportsPossibleOwners:
     value: Dict[str, list[tuple[Address, ResolveName]]]
+
+
+@dataclass(frozen=True)
+class UnownedImportPossibleOwners:
+    value: list[tuple[Address, ResolveName]]
 
 
 @rule
 async def find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
-    python_setup: PythonSetup,
 ) -> UnownedImportsPossibleOwners:
-    other_owners_from_other_resolves = await MultiGet(
-        Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
-        for imported_module in req.unowned_imports
-    )
-    other_owners_as_targets = await MultiGet(
-        Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
-        for owners in other_owners_from_other_resolves
+    individual_possible_owners = await MultiGet(
+        Get(UnownedImportPossibleOwners, UnownedImportPossibleOwnerRequest(r, req.original_resolve))
+        for r in req.unowned_imports
     )
 
-    imports_to_other_owners: DefaultDict[str, list[tuple[Address, ResolveName]]] = defaultdict(list)
-    for imported_module, targets in zip(req.unowned_imports, other_owners_as_targets):
-        for t in targets:
-            other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
-            if other_owner_resolve != req.original_resolve:
-                imports_to_other_owners[imported_module].append((t.address, other_owner_resolve))
-    return UnownedImportsPossibleOwners(dict(imports_to_other_owners))
+    return UnownedImportsPossibleOwners(
+        {
+            imported_module: possible_owners.value
+            for imported_module, possible_owners in zip(
+                req.unowned_imports, individual_possible_owners
+            )
+            if possible_owners.value
+        }
+    )
+
+
+@rule
+async def find_other_owners_for_unowned_import(
+    req: UnownedImportPossibleOwnerRequest,
+    python_setup: PythonSetup,
+) -> UnownedImportPossibleOwners:
+    other_owner_from_other_resolves = await Get(
+        PythonModuleOwners, PythonModuleOwnersRequest(req.unowned_import, resolve=None)
+    )
+
+    owners = other_owner_from_other_resolves
+    other_owners_as_targets = await Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
+
+    other_owners = []
+
+    for t in other_owners_as_targets:
+        other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
+        if other_owner_resolve != req.original_resolve:
+            other_owners.append((t.address, other_owner_resolve))
+    return UnownedImportPossibleOwners(other_owners)
 
 
 @rule_helper
@@ -658,6 +686,7 @@ def import_rules():
     return [
         _exec_parse_deps,
         resolve_parsed_dependencies,
+        find_other_owners_for_unowned_import,
         find_other_owners_for_unowned_imports,
         infer_python_dependencies_via_source,
         *pex.rules(),
