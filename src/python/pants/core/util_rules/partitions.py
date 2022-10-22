@@ -61,15 +61,15 @@ class PartitionerType(Enum):
             # No default rules.
             return
         elif self == PartitionerType.DEFAULT_SINGLE_PARTITION:
-            if by_file:
-                yield from _single_partition_field_sets_by_file_partitioner_rules(cls)
-            else:
-                yield from _single_partition_field_sets_partitioner_rules(cls)
+            rules_generator = (
+                _single_partition_file_rules if by_file else _single_partition_field_set_rules
+            )
+            yield from rules_generator(cls)
         elif self == PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT:
-            if by_file:
-                yield from _partition_per_input_field_sets_by_file_partitioner_rules(cls)
-            else:
-                yield from _partition_per_input_field_sets_partitioner_rules(cls)
+            rules_generator = (
+                _partition_per_input_file_rules if by_file else _partition_per_input_field_set_rules
+            )
+            yield from rules_generator(cls)
         else:
             raise NotImplementedError(f"Partitioner type {self} is missing default rules!")
 
@@ -172,7 +172,7 @@ class _PartitionFilesRequestBase:
 
 
 @memoized
-def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
+def _single_partition_field_set_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     one partition."""
 
@@ -191,7 +191,7 @@ def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
 
 
 @memoized
-def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
+def _single_partition_file_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     one partition."""
 
@@ -242,7 +242,7 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
 
 
 @memoized
-def _partition_per_input_field_sets_partitioner_rules(cls) -> Iterable:
+def _partition_per_input_field_set_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     a single-element partition per input."""
 
@@ -265,7 +265,7 @@ def _partition_per_input_field_sets_partitioner_rules(cls) -> Iterable:
 
 
 @memoized
-def _partition_per_input_field_sets_by_file_partitioner_rules(cls) -> Iterable:
+def _partition_per_input_file_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     a single-element partition per input."""
 
