@@ -358,8 +358,8 @@ class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
 
-@rule
-async def find_other_owners_for_unowned_imports(
+@rule_helper
+async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
     individual_possible_owners = await MultiGet(
@@ -414,8 +414,7 @@ async def _handle_unowned_imports(
     other_resolves_snippet = ""
     if len(python_setup.resolves) > 1:
         imports_to_other_owners = (
-            await Get(
-                UnownedImportsPossibleOwners,
+            await _find_other_owners_for_unowned_imports(
                 UnownedImportsPossibleOwnersRequest(unowned_imports, resolve),
             )
         ).value
@@ -687,7 +686,6 @@ def import_rules():
         _exec_parse_deps,
         resolve_parsed_dependencies,
         find_other_owners_for_unowned_import,
-        find_other_owners_for_unowned_imports,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),

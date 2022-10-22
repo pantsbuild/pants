@@ -22,6 +22,7 @@ from pants.backend.python.dependency_inference.rules import (
     UnownedImportsPossibleOwners,
     UnownedImportsPossibleOwnersRequest,
     _collect_imports_info,
+    _find_other_owners_for_unowned_imports,
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -87,8 +88,7 @@ async def dump_python_source_analysis_single(
 
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
-    imports_to_other_owners = await Get(
-        UnownedImportsPossibleOwners,
+    imports_to_other_owners = await _find_other_owners_for_unowned_imports(
         UnownedImportsPossibleOwnersRequest(unowned_imports, resolve),
     )
 

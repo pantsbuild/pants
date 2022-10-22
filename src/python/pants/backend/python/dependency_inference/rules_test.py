@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -28,6 +29,7 @@ from pants.backend.python.dependency_inference.rules import (
     UnownedDependencyUsage,
     UnownedImportsPossibleOwners,
     UnownedImportsPossibleOwnersRequest,
+    _find_other_owners_for_unowned_imports,
     _get_imports_info,
     import_rules,
     infer_python_conftest_dependencies,
@@ -47,7 +49,7 @@ from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarg
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.rules import SubsystemRule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import ExplicitlyProvidedDependencies, InferredDependencies
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
@@ -472,14 +474,18 @@ def test_infer_python_conftests() -> None:
 
 @pytest.fixture
 def imports_rule_runner() -> RuleRunner:
+    return mk_imports_rule_runner([])
+
+
+def mk_imports_rule_runner(more_rules: Iterable) -> RuleRunner:
     return RuleRunner(
         rules=[
+            *more_rules,
             *import_rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
             *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
-            QueryRule(UnownedImportsPossibleOwners, [UnownedImportsPossibleOwnersRequest]),
         ],
         target_types=[
             PythonSourceTarget,
@@ -780,7 +786,23 @@ class TestFindOtherOwners:
     other_resolve = "other-resolve"
     other_other_resolve = "other-other-resolve"
 
-    def do_test(self, imports_rule_runner):
+    @staticmethod
+    @rule
+    async def run_rule(
+        req: UnownedImportsPossibleOwnersRequest,
+    ) -> UnownedImportsPossibleOwners:
+        return await _find_other_owners_for_unowned_imports(req)
+
+    @pytest.fixture
+    def _imports_rule_runner(self):
+        return mk_imports_rule_runner(
+            [
+                self.run_rule,
+                QueryRule(UnownedImportsPossibleOwners, [UnownedImportsPossibleOwnersRequest]),
+            ]
+        )
+
+    def do_test(self, imports_rule_runner: RuleRunner):
         resolves = {"python-default": "", self.other_resolve: "", self.other_other_resolve: ""}
         imports_rule_runner.set_options(
             [
@@ -809,13 +831,13 @@ class TestFindOtherOwners:
             ],
         )
 
-    def test_no_other_owners_found(self, imports_rule_runner: RuleRunner):
-        r = self.do_test(imports_rule_runner)
+    def test_no_other_owners_found(self, _imports_rule_runner):
+        r = self.do_test(_imports_rule_runner)
         assert not r.value
 
-    def test_other_owners_found_in_single_resolve(self, imports_rule_runner: RuleRunner):
+    def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: RuleRunner):
 
-        imports_rule_runner.write_files(
+        _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(
                     f"""\
@@ -830,7 +852,7 @@ class TestFindOtherOwners:
             }
         )
 
-        r = self.do_test(imports_rule_runner)
+        r = self.do_test(_imports_rule_runner)
 
         as_module = f"other.{self.missing_import_name}"
         assert as_module in r.value
@@ -841,9 +863,9 @@ class TestFindOtherOwners:
             )
         ]
 
-    def test_other_owners_found_in_multiple_resolves(self, imports_rule_runner: RuleRunner):
+    def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: RuleRunner):
 
-        imports_rule_runner.write_files(
+        _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(
                     f"""\
@@ -858,7 +880,7 @@ class TestFindOtherOwners:
             }
         )
 
-        r = self.do_test(imports_rule_runner)
+        r = self.do_test(_imports_rule_runner)
 
         as_module = f"other.{self.missing_import_name}"
         assert as_module in r.value
