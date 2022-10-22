@@ -197,21 +197,7 @@ def _single_partition_file_rules(cls) -> Iterable:
 
     # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
     # a better user experience.
-    sources_field_name = None
-    for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
-        if issubclass(fieldtype, SourcesField):
-            if sources_field_name is None:
-                sources_field_name = fieldname
-                break
-            raise TypeError(
-                f"Type {cls.field_set_type} has multiple `SourcesField` fields."
-                + " Pants can't provide a default partitioner."
-            )
-    else:
-        raise TypeError(
-            f"Type {cls.field_set_type} has does not have a `SourcesField` field."
-            + " Pants can't provide a default partitioner."
-        )
+    sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
         _param_type_overrides={
@@ -271,21 +257,7 @@ def _partition_per_input_file_rules(cls) -> Iterable:
 
     # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
     # a better user experience.
-    sources_field_name = None
-    for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
-        if issubclass(fieldtype, SourcesField):
-            if sources_field_name is None:
-                sources_field_name = fieldname
-                break
-            raise TypeError(
-                f"Type {cls.field_set_type} has multiple `SourcesField` fields."
-                + " Pants can't provide a default partitioner."
-            )
-    else:
-        raise TypeError(
-            f"Type {cls.field_set_type} has does not have a `SourcesField` field."
-            + " Pants can't provide a default partitioner."
-        )
+    sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
         _param_type_overrides={
@@ -314,3 +286,28 @@ def _partition_per_input_file_rules(cls) -> Iterable:
         )
 
     return collect_rules(locals())
+
+
+def _get_sources_field_name(field_set_type: type[FieldSet]) -> str:
+    """Get the name of the one `SourcesField` belonging to the given target type.
+
+    NOTE: The input target type's fields must contain exactly one `SourcesField`.
+    Otherwise this method will raise a `TypeError`.
+    """
+
+    sources_field_name = None
+    for fieldname, fieldtype in _get_field_set_fields(field_set_type).items():
+        if issubclass(fieldtype, SourcesField):
+            if sources_field_name is None:
+                sources_field_name = fieldname
+                break
+            raise TypeError(
+                f"Type {field_set_type} has multiple `SourcesField` fields."
+                + " Pants can't provide a default partitioner."
+            )
+    else:
+        raise TypeError(
+            f"Type {field_set_type} has does not have a `SourcesField` field."
+            + " Pants can't provide a default partitioner."
+        )
+    return sources_field_name
