@@ -76,7 +76,7 @@ def fix_single(
 
 @rule(desc="Fix deprecated target type names", level=LogLevel.DEBUG)
 async def fix(
-    request: Request.SubPartition,
+    request: Request.Batch,
 ) -> FixResult:
     digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
     fixed_contents = await MultiGet(
