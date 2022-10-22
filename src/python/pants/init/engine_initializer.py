@@ -21,7 +21,14 @@ from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing, platform_rules, specs_rules
+from pants.engine.internals import (
+    build_files,
+    graph,
+    options_parsing,
+    platform_rules,
+    specs_rules,
+    synthetic_targets,
+)
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -273,6 +280,7 @@ class EngineInitializer:
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
+                *synthetic_targets.rules(),
                 *rules,
             )
         )
@@ -286,7 +294,8 @@ class EngineInitializer:
             )
         )
 
-        environment_migrated_goal_param_types = [
+        # param types for goals with the `USES_ENVIRONMENT` behaviour (see `goal.py`)
+        environment_selecting_goal_param_types = [
             t for t in GraphSession.goal_param_types if t != EnvironmentName
         ]
         rules = FrozenOrderedSet(
@@ -296,8 +305,8 @@ class EngineInitializer:
                 *(
                     QueryRule(
                         goal_type,
-                        environment_migrated_goal_param_types
-                        if goal_type._get_environment_migrated()
+                        environment_selecting_goal_param_types
+                        if goal_type._selects_environments()
                         else GraphSession.goal_param_types,
                     )
                     for goal_type in goal_map.values()

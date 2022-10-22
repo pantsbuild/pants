@@ -132,7 +132,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--flake8-lockfile=<none>"]
+    extra_args = ["--flake8-lockfile=<none>", "--flake8-version=flake8<4.0,>=3.9.2"]
 
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
@@ -205,10 +205,8 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            "--flake8-extra-requirements=flake8-bandit==3.0.0",
-            # N.B.: Needed to workaround break cause by the 5.0.0 release as documented here:
-            # https://github.com/python/importlib_metadata/issues/406
-            "--flake8-extra-requirements=importlib-metadata==4.13.0",
+            "--flake8-extra-requirements=flake8-bandit==4.1.1",
+            "--flake8-extra-requirements=setuptools==65.5.0",
             "--flake8-lockfile=<none>",
             "--flake8-extra-files=['.bandit']",
         ],

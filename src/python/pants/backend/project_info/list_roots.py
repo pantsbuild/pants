@@ -14,7 +14,7 @@ class RootsSubsystem(LineOriented, GoalSubsystem):
 
 class Roots(Goal):
     subsystem_cls = RootsSubsystem
-    environment_migrated = True
+    enviroment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
