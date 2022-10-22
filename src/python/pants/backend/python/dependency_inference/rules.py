@@ -281,7 +281,7 @@ class ImportOwnerStatus(Enum):
     unownable = "unownable"
 
 
-@dataclass()
+@dataclass(frozen=True)
 class ImportResolveResult:
     status: ImportOwnerStatus
     address: tuple[Address, ...] = ()
