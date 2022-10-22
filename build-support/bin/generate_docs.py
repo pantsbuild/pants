@@ -232,6 +232,7 @@ def create_parser() -> argparse.ArgumentParser:
 def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
+        "pants.backend.build_files.fix.deprecations",
         "pants.backend.build_files.fmt.black",
         "pants.backend.build_files.fmt.buildifier",
         "pants.backend.build_files.fmt.yapf",
@@ -262,7 +263,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.terraform",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
-        "pants.backend.project_info.fix.deprecations",
         "pants.backend.python",
         "pants.backend.python.lint.bandit",
         "pants.backend.python.lint.black",

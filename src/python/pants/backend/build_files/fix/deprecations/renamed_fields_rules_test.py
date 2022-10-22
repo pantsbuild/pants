@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.project_info.fix.deprecations.renamed_fields_rules import (
+from pants.backend.build_files.fix.deprecations.renamed_fields_rules import (
     RenamedFieldTypes,
     RenameRequest,
     determine_renamed_field_types,
