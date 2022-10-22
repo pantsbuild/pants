@@ -9,8 +9,9 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Optional, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
 
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
@@ -18,6 +19,13 @@ from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
     EnvironmentNameRequest,
+)
+from pants.core.util_rules.partitions import (
+    PartitionElementT,
+    PartitionerType,
+    PartitionMetadataT,
+    _BatchBase,
+    _PartitionFieldSetsRequestBase,
 )
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -50,10 +58,11 @@ from pants.engine.target import (
     ValidNumbers,
     parse_shard_spec,
 )
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -206,6 +215,54 @@ class TestFieldSet(FieldSet, metaclass=ABCMeta):
     sources: SourcesField
 
     __test__ = False
+
+
+_TestFieldSetT = TypeVar("_TestFieldSetT", bound=TestFieldSet)
+
+
+@union
+class TestRequest:
+    """Base class for plugin types wanting to be run as part of `test`.
+
+    Plugins should define a new type which subclasses this type, and set the
+    appropriate class variables.
+    E.g.
+        class DryCleaningRequest(TestRequest):
+            tool_subsystem = DryCleaningSubsystem
+            field_set_type = DryCleaningFieldSet
+
+    Then register the rules which tell Pants about your plugin.
+    E.g.
+        def rules():
+            return [
+                *collect_rules(),
+                *DryCleaningRequest.rules(),
+            ]
+    """
+
+    tool_subsystem: ClassVar[type[SkippableSubsystem]]
+    field_set_type: ClassVar[type[TestFieldSet]]
+    partitioner_type: ClassVar[PartitionerType] = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
+
+    __test__ = False
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return cls.tool_subsystem.options_scope
+
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    class PartitionRequest(_PartitionFieldSetsRequestBase[_TestFieldSetT]):
+        pass
+
+    @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
+    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
+        pass
+
+    @classmethod
+    def rules(cls) -> Iterable:
+        yield UnionRule(TestRequest, cls)
+        yield UnionRule(TestRequest.PartitionRequest, cls.PartitionRequest)
+        yield UnionRule(TestRequest.Batch, cls.Batch)
 
 
 class CoverageData(ABC):
