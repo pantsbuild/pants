@@ -21,11 +21,10 @@ def test_goal_validation(use_pantsd: bool) -> None:
 
 
 def test_unimplemented_goals_noop() -> None:
-    # Running on a `file` target should usually fail, but it should no-op if no `run`
+    # Packaging a `file` target should usually fail, but it should no-op if no `package`
     # implementations are activated.
     with setup_tmpdir({"bad.txt": "", "BUILD": "file(source='f.txt')"}) as tmpdir:
-        run_pants(["run", tmpdir]).assert_success()
-        run_pants(["--backend-packages=['pants.backend.python']", "run", tmpdir]).assert_failure()
+        run_pants(["package", tmpdir]).assert_success()
 
 
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
