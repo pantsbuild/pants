@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, TypeVar
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
@@ -20,6 +20,9 @@ from pants.util.memo import memoized_property
 
 class DuplicateNameError(MappingError):
     """Indicates more than one top-level object was found with the same name."""
+
+
+AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,12 @@ class AddressMap:
             target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
+        return cls.create(filepath, target_adaptors)
+
+    @classmethod
+    def create(
+        cls: type[AddressMapT], filepath: str, target_adaptors: Iterable[TargetAdaptor]
+    ) -> AddressMapT:
         name_to_target_adaptors: dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
             name = target_adaptor.name or os.path.basename(os.path.dirname(filepath))
@@ -113,7 +122,7 @@ class AddressFamily:
                 if name in name_to_target_adaptors:
                     previous_path, _ = name_to_target_adaptors[name]
                     raise DuplicateNameError(
-                        f"A target with name {name!r} is already defined in {previous_path!r}, but"
+                        f"A target with name {name!r} is already defined in {previous_path!r}, but "
                         f"is also defined in {address_map.path!r}. Because both targets share the "
                         f"same namespace of {spec_path!r}, this is not allowed."
                     )

@@ -59,6 +59,7 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
 
 class Filedeps(Goal):
     subsystem_cls = FiledepsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

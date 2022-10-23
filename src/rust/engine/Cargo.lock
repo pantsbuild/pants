@@ -982,6 +982,7 @@ dependencies = [
  "futures",
  "grpc_util",
  "hashing",
+ "log",
  "parking_lot 0.12.1",
  "prost",
  "protos",

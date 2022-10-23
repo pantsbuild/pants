@@ -9,21 +9,98 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 2.15
 ----
 
+### `lint` and `fmt` schema changes
+
+In order to accomplish several goals (namely targetless formatters and unifying the implementation of `lint`)
+`lint` and `fmt` have undergone a drastic change of their plugin API.
+
+#### 1. `Lint<Targets|Files>Request` and `FmtTargetsRequest` now require a `tool_subsystem` class attribute.
+
+Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTargetsRequest` require
+subclasses to provide a `tool_subsystem` class attribute with a value of your tool's `Subsystem` subclass.
+
+#### 2. Your tool subsystem should have a `skip` option.
+
+Although not explictly not required by the engine to function correctly, `mypy` will complain if the
+subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
+
+Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declaration.
+
+#### 3. The core goals now use a 2-rule approach
+
+Fmt:
+
+In order to support targetless formatters, `fmt` needs to know which _files_ you'll be operating on.
+Therefore the plugin API for `fmt` has forked into 2 rules:
+
+1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
+2. A rule taking `<RequestType>.Batch` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
+
+This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
+that don't overlap.
+
+(Why are targetless formatters something we want to support? This allows us to have `BUILD` file formatters,
+formatters like `Prettier` running on your codebase *without* boilerplate targets, as well as Pants
+doing interesting deprecation fixers on its own files)
+
+The partitioner rule gives you all the matching files (or `FieldSet`s depending on which class you
+subclassed) and you'll return a mapping from `<key>` to files (called a Partition).
+The `<key>` can be anything passable at the rule boundary and is given back to you in your runner rule.
+The partitioner rule gives you an opportunity to perform expensive `Get`s once for the entire run,
+to partition the inputs based on metadata to simplify your runner, and to have a place for easily
+skipping your tool if requested.
+
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`),
+which now has a `.files` property.
+
+If you don't require any `Get`s or metadata for your tool in your partitioner rule,
+Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass,
+set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only
+provide a runner rule.
+
+-----
+
+Lint:
+
+Lint plugins are almost identical to format plugins, except in 2 ways:
+
+1. Your partitioner rule still returns a `Partitions` object, but the element type can be anything.
+2. `<RequestType>.Batch` has a `.elements` field instead of `.files`.
+
+-----
+
+As always, taking a look at Pants' own plugins can also be very enlightening.
+
 ### `EnvironmentName` is now required to run processes, get environment variables, etc
 
-In order to support the new [environments](doc:environments) feature, an `EnvironmentName` parameter
-is now required in order to:
+Pants 2.15 introduces the concept of ["Target Environments"](doc:environments), which allow Pants to execute processes in remote or local containerized environments (using Docker), and to specify configuration values for those environments. 
+
+In order to support the new environments feature, an `EnvironmentName` parameter is now required in order to:
 * Run a `Process`
 * Get environment variables
 * Inspect the current `Platform`
 
-Some deprecations are in place to reduce the burden on `@rule` authors:
+This parameter is often provided automatically from a transitive value provided earlier in the call graph. The choice of whether to use a local or alternative environment must be made at a `@goal_rule` level.
 
-#### `Goal.environment_migrated`
+In many cases, the local execution environment is sufficient. If so, your rules will not require significant work to migrate, and execution will behave similarly to pre-2.15 versions of Pants.
 
-The `Goal` class has an `environment_migrated` property, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. When `environment_migrated=False` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName`.
+In cases where the environment needs to be factored into to rule execution, you'll need to do some work. 
 
-To migrate a `Goal`, set `environment_migrated=True`, select an `EnvironmentName` to use for (different portions of) your `Goal`, and then provide the `EnvironmentName` to the relevant callsites. In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+2.15 adds a deprecation warning for all goals that have not considered whether they need to use the execution environment.
+
+#### `Goal.environment_behavior`
+
+2.15 adds the `environment_behavior` property to the `Goal` class, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. 
+
+When `environment_behavior=Goal.EnvironmentBehavior.UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
+
+If your Goal only ever needs to use the local target environment, use `environment_behavior=Goal.EnvironmentBehavior.LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
+
+##### For goals that need to respect `EnvironmentField`s
+
+If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=Goal.EnvironmentBehavior.USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
+
+ In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
 ```python
 Get(
     EnvironmentName,
@@ -31,13 +108,13 @@ Get(
     EnvironmentNameRequest.from_field_set(field_set),
 )
 ```
-If rather than using the environment configured by a target your `Goal` should always be pinned to run in the local environment, you can instead request the `ChosenLocalEnvironmentName` and use its content as the `EnvironmentName`.
 
 Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
 ```python
 Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
 ```
 The multi-parameter `Get` syntax provides the value transitively, and so will need to be used in many `Get` callsites in `@goal_rule`s which transitively run processes, consume the platform, etc. One exception is that (most of) the APIs provided by `pants.engine.target` are pinned to running in the `__local__` environment, and so do not require an `EnvironmentName` to use.
+
 
 #### `RuleRunner.inherent_environment`
 
@@ -160,7 +237,7 @@ on `FieldSet`'s mechanisms for matching targets and getting field values.
 Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
 `GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
 distinguish what language a tool belongs to, which is used for options like
-`[python].resolves_to_constraints_file` to validate which resolve names are recognized. 
+`[python].resolves_to_constraints_file` to validate which resolve names are recognized.
 
 Things will still work if you do not make this change, other than the new options not recognizing
 your tool.

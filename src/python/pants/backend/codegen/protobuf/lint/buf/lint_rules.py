@@ -47,13 +47,13 @@ class BufLintRequest(LintTargetsRequest):
 @rule
 async def partition_buf(
     request: BufLintRequest.PartitionRequest[BufFieldSet], buf: BufSubsystem
-) -> Partitions[Any, BufFieldSet]:
+) -> Partitions[BufFieldSet, Any]:
     return Partitions() if buf.lint_skip else Partitions.single_partition(request.field_sets)
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(
-    request: BufLintRequest.SubPartition[Any, BufFieldSet], buf: BufSubsystem, platform: Platform
+    request: BufLintRequest.Batch[BufFieldSet, Any], buf: BufSubsystem, platform: Platform
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,

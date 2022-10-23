@@ -25,7 +25,7 @@ from pants.core.goals.fmt import (
 )
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import Partition, PartitionerType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -79,7 +79,7 @@ async def fortran_partition(request: FortranFmtRequest.PartitionRequest) -> Part
 
 
 @rule
-async def fortran_fmt(request: FortranFmtRequest.SubPartition) -> FmtResult:
+async def fortran_fmt(request: FortranFmtRequest.Batch) -> FmtResult:
     input = request.snapshot
     output = await Get(
         Snapshot, CreateDigest([FileContent(file, FORTRAN_FILE.content) for file in request.files])
@@ -119,7 +119,7 @@ async def smalltalk_noop_partition(request: SmalltalkNoopRequest.PartitionReques
 
 
 @rule
-async def smalltalk_noop(request: SmalltalkNoopRequest.SubPartition) -> FmtResult:
+async def smalltalk_noop(request: SmalltalkNoopRequest.Batch) -> FmtResult:
     assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult(
         input=request.snapshot,
@@ -144,7 +144,7 @@ async def smalltalk_skip_partition(request: SmalltalkSkipRequest.PartitionReques
 
 
 @rule
-async def smalltalk_skip(request: SmalltalkSkipRequest.SubPartition) -> FmtResult:
+async def smalltalk_skip(request: SmalltalkSkipRequest.Batch) -> FmtResult:
     assert False
 
 
@@ -164,7 +164,7 @@ async def bricky_partition(request: BrickyBuildFileFormatter.PartitionRequest) -
 
 
 @rule
-async def fmt_with_bricky(request: BrickyBuildFileFormatter.SubPartition) -> FmtResult:
+async def fmt_with_bricky(request: BrickyBuildFileFormatter.Batch) -> FmtResult:
     def brickify(contents: bytes) -> bytes:
         content_str = contents.decode("ascii")
         new_lines = []
@@ -483,12 +483,12 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     partitions = rule_runner.request(Partitions, [FmtKitchenRequest.PartitionRequest(field_sets)])
     assert partitions == Partitions(
         [
-            (
-                None,
+            Partition(
                 (
                     "bowl.utensil",
                     "knife.utensil",
                 ),
+                None,
             )
         ]
     )

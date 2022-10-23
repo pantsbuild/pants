@@ -47,7 +47,7 @@ class GoVetRequest(LintTargetsRequest):
 
 
 @rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest.SubPartition[Any, GoVetFieldSet]) -> LintResult:
+async def run_go_vet(request: GoVetRequest.Batch[GoVetFieldSet, Any]) -> LintResult:
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(field_set.sources for field_set in request.elements),

@@ -16,6 +16,7 @@ class JvmSymbolMapSubsystem(GoalSubsystem):
 
 class JvmSymbolMap(Goal):
     subsystem_cls = JvmSymbolMapSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule

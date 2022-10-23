@@ -8,11 +8,12 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, TypeVar
+from typing import Any, Generic, Iterable, TypeVar
 
 from typing_extensions import Protocol
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
+from pants.engine.collection import Collection
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -22,7 +23,6 @@ from pants.engine.target import (
     SourcesPathsRequest,
     _get_field_set_fields,
 )
-from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
 
@@ -39,54 +39,76 @@ class PartitionerType(Enum):
     """Registers a partitioner which returns the inputs as a single partition."""
 
 
-class PartitionKey(Protocol):
+class PartitionMetadata(Protocol):
     @property
     def description(self) -> str:
         ...
 
 
-PartitionKeyT = TypeVar("PartitionKeyT", bound=PartitionKey)
+PartitionMetadataT = TypeVar("PartitionMetadataT", bound=PartitionMetadata)
 PartitionElementT = TypeVar("PartitionElementT")
 
 
+@dataclass(frozen=True)
 @runtime_ignore_subscripts
-class Partitions(FrozenDict["PartitionKeyT", "tuple[PartitionElementT, ...]"]):
-    """A mapping from <partition key> to <partition>.
+class Partition(Generic[PartitionElementT, PartitionMetadataT]):
+    """A collection of 'compatible' inputs for a plugin tool, with optional common metadata.
+
+    Inputs are 'compatible' if it is safe/possible for them to be processed in the same invocation
+    of a tool (i.e. two files formatted in the same run of a formatter, or two test targets executed
+    in a single test runner process).
+
+    The metadata in a partition (if any) can be any type able to cross a rule boundary, and will be
+    provided to the rule which "runs" your tool. If it isn't `None` it must implement the
+    `PartitionMetadata` protocol.
+
+    NOTE: Partitions may be further divided into multiple batches before being passed to the tool-running
+    rule. When this happens, the same metadata is passed along with each batch.
+    """
+
+    elements: tuple[PartitionElementT, ...]
+    metadata: PartitionMetadataT | None
+
+
+@runtime_ignore_subscripts
+class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
+    """A collection of (<compatible inputs>, <metadata>) pairs.
 
     When implementing a plugin, one of your rules will return this type, taking in a
     `PartitionRequest` specific to your plugin.
 
     The return likely will fit into one of:
-        - Returning an empty partition: E.g. if your tool is being skipped.
+        - Returning empty partitions: E.g. if your tool is being skipped.
         - Returning one partition. The partition may contain all of the inputs
             (as will likely be the case for target-based plugins) or a subset (which will likely be the
             case for targetless plugins).
         - Returning >1 partition. This might be the case if you can't run
             the tool on all the inputs at once. E.g. having to run a Python tool on XYZ with Py3,
             and files ABC with Py2.
-
-    The partition key can be of any type able to cross a rule-boundary, and will be provided to the
-    rule which "runs" your tool. If it isn't `None` it should implement the `PartitionKey` protocol.
-
-    NOTE: The partition may be divided further into multiple sub-partitions.
     """
 
     @classmethod
     def single_partition(
-        cls, elements: Iterable[PartitionElementT], key: PartitionKeyT = None  # type: ignore[assignment]
-    ) -> Partitions[PartitionKeyT, PartitionElementT]:
+        cls, elements: Iterable[PartitionElementT], metadata: PartitionMetadataT | None = None
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
         """Helper constructor for implementations that have only one partition."""
-        return Partitions([(key, tuple(elements))])
+        return Partitions([Partition(tuple(elements), metadata)])
 
 
 # NB: Not frozen so it can be subclassed
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 @runtime_ignore_subscripts
-class _SubPartitionBase(Generic[PartitionKeyT, PartitionElementT]):
+class _BatchBase(Generic[PartitionElementT, PartitionMetadataT]):
+    """Base class for a collection of elements that should all be processed together.
+
+    For example, a collection of strings pointing to files that should be linted in one process, or
+    a collection of field-sets pointing at tests that should all execute in the same process.
+    """
+
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    key: PartitionKeyT
+    partition_metadata: PartitionMetadataT | None
 
 
 @dataclass(frozen=True)
@@ -127,7 +149,7 @@ def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[FieldSet, Any]:
         return Partitions() if subsystem.skip else Partitions.single_partition(request.field_sets)
 
     return collect_rules(locals())
@@ -164,7 +186,7 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions:
+    ) -> Partitions[str, Any]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))

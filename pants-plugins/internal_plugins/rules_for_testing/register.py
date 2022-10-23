@@ -16,7 +16,7 @@ class ListAndDieForTestingSubsystem(GoalSubsystem):
 
 class ListAndDieForTesting(Goal):
     subsystem_cls = ListAndDieForTestingSubsystem
-    environment_migrated = True
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

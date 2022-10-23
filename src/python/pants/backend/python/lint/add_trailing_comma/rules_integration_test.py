@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (AddTrailingCommaRequest.SubPartition,)),
+            QueryRule(FmtResult, (AddTrailingCommaRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -67,8 +67,11 @@ def run_add_trailing_comma(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            AddTrailingCommaRequest.SubPartition(
-                "", input_sources.snapshot.files, key=None, snapshot=input_sources.snapshot
+            AddTrailingCommaRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
             ),
         ],
     )

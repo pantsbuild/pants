@@ -4,6 +4,7 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
@@ -81,6 +82,28 @@ class Goal:
     value to indicate whether the rule exited cleanly.
     """
 
+    class EnvironmentBehavior(Enum):
+        """Indicates that a goal's behavior with respect to environments has not been considered.
+
+        If set, will trigger a deprecation warning. If the desired behavior is to stay pinned to
+        defaults, changing to `LOCAL_ONLY` will silence the warning for this goal.
+        """
+
+        UNMIGRATED = 1
+
+        """ Indicates that the goal will always operate on the local environment target.
+
+        This is largely the same behavior as Pants has had pre-2.15. Set to this value to silence
+        the deprecation warning that arises from using `UNMIGRATED`."""
+        LOCAL_ONLY = 2
+
+        f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
+
+        This requires migration work to be done by the goal author. See
+        {doc_url('plugin-upgrade-guide')}.
+        """
+        USES_ENVIRONMENTS = 3
+
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
 
@@ -91,17 +114,18 @@ class Goal:
 
     See {doc_url('plugin-upgrade-guide')}.
     """
-    environment_migrated: ClassVar[bool] = False
+    environment_behavior: ClassVar[EnvironmentBehavior] = EnvironmentBehavior.UNMIGRATED
 
     @classmethod
-    def _get_environment_migrated(cls) -> bool:
+    def _selects_environments(cls) -> bool:
         deprecated_conditional(
-            lambda: not cls.environment_migrated,
+            lambda: cls.environment_behavior == Goal.EnvironmentBehavior.UNMIGRATED,
             "2.17.0.dev0",
-            f"Not setting `Goal.environment_migrated=True` for `Goal` `{cls.name}`",
+            f"Setting `Goal.environment_behavior=EnvironmentBehavior.UNMIGRATED` for `Goal` "
+            f"`{cls.name}`",
             hint=f"See {doc_url('plugin-upgrade-guide')}\n",
         )
-        return cls.environment_migrated
+        return cls.environment_behavior == Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     @final
     @classproperty

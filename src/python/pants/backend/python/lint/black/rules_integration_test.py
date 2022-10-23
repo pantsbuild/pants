@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(Partitions, (BlackRequest.PartitionRequest,)),
-            QueryRule(FmtResult, (BlackRequest.SubPartition,)),
+            QueryRule(FmtResult, (BlackRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -90,12 +90,17 @@ def run_black(
         ],
     )
     assert len(partitions) == 1
-    key, partition = next(iter(partitions.items()))
-    assert key == InterpreterConstraints([expected_ics])
+    partition = partitions[0]
+    assert partition.metadata == InterpreterConstraints([expected_ics])
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest.SubPartition("", partition, key=key, snapshot=input_sources.snapshot),
+            BlackRequest.Batch(
+                "",
+                partition.elements,
+                partition_metadata=partition.metadata,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result

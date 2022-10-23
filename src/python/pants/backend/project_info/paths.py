@@ -40,7 +40,7 @@ class PathsSubsystem(Outputting, GoalSubsystem):
 
 class PathsGoal(Goal):
     subsystem_cls = PathsSubsystem
-    environment_migrated = True
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 def find_paths_breadth_first(
