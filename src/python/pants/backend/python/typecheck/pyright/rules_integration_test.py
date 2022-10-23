@@ -39,6 +39,7 @@ def rule_runner() -> RuleRunner:
             *pyright_rules(),
             *target_types_rules.rules(),
             QueryRule(CheckResults, (PyrightRequest,)),
+            QueryRule(PyrightPartitions, (PyrightRequest,)),
         ],
         target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonSourceTarget],
     )
