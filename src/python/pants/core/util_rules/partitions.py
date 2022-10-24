@@ -54,7 +54,7 @@ class PartitionerType(Enum):
         NOTE: Not all `PartitionerType`s have default logic, so this method can return an empty iterable.
 
         :param by_file: If `True`, rules returned from this method (if any) will compute partitions with
-          `str`-type elements, where each `str` value is the path to a file. If `False`, rule will compute
+          `str`-type elements, where each `str` value is the path to the resolved source field. If `False`, rule will compute
           partitions with `FieldSet`-type elements.
         """
         if self == PartitionerType.CUSTOM:
