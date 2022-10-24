@@ -24,6 +24,7 @@ from pants.core.util_rules.partitions import (
     PartitionElementT,
     PartitionerType,
     PartitionMetadataT,
+    Partitions,
     _BatchBase,
     _PartitionFieldSetsRequestBase,
 )
@@ -60,6 +61,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption, StrOption
+from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classproperty
@@ -642,8 +644,51 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
 
 
 @rule_helper
+async def _get_test_batches(
+    core_request_types: Iterable[type[TestRequest]],
+    targets_to_field_sets: TargetRootsToFieldSets,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> list[TestRequest.Batch]:
+    def partitions_get(request_type: type[TestRequest]) -> Get[Partitions]:
+        partition_type = cast(TestRequest, request_type)
+        field_set_type = partition_type.field_set_type
+        applicable_field_sets: list[TestFieldSet] = []
+        for target, field_sets in targets_to_field_sets.mapping.items():
+            if field_set_type.is_applicable(target):
+                applicable_field_sets.extend(field_sets)
+
+        partition_request = partition_type.PartitionRequest(tuple(applicable_field_sets))
+        return Get(
+            Partitions,
+            {
+                partition_request: TestRequest.PartitionRequest,
+                local_environment_name.val: EnvironmentName,
+            },
+        )
+
+    all_partitions = await MultiGet(
+        partitions_get(request_type) for request_type in core_request_types
+    )
+
+    return [
+        request_type.Batch(
+            cast(TestRequest, request_type).tool_name, tuple(batch), partition.metadata
+        )
+        for request_type, partitions in zip(core_request_types, all_partitions)
+        for partition in partitions
+        for batch in partition_sequentially(
+            # TODO: Expose max batch size as a subsystem parameter.
+            partition.elements,
+            key=lambda x: str(x),
+            size_target=128,
+            size_max=128,
+        )
+    ]
+
+
+@rule_helper
 async def _run_debug_tests(
-    targets_to_valid_field_sets: TargetRootsToFieldSets,
+    batches: Iterable[TestRequest.Batch],
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     local_environment_name: ChosenLocalEnvironmentName,
@@ -654,15 +699,15 @@ async def _run_debug_tests(
         (
             Get(
                 TestDebugRequest,
-                {field_set: TestFieldSet, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
             )
             if not test_subsystem.debug_adapter
             else Get(
                 TestDebugAdapterRequest,
-                {field_set: TestFieldSet, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
             )
         )
-        for field_set in targets_to_valid_field_sets.field_sets
+        for batch in batches
     )
     exit_code = 0
     for debug_request in debug_requests:
@@ -686,6 +731,29 @@ async def _run_debug_tests(
         if debug_result.exit_code != 0:
             exit_code = debug_result.exit_code
     return Test(exit_code)
+
+
+@rule(desc="Determine environment for partition", level=LogLevel.DEBUG)
+async def get_batch_environment(batch: TestRequest.Batch) -> EnvironmentName:
+    environment_names_per_element = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
+        for field_set in batch.elements
+    )
+    unique_environments = len({name.val for name in environment_names_per_element})
+    if unique_environments != 1:
+        batch_description = "Test batch"
+        if batch.partition_metadata:
+            batch_description = f"{batch_description} '{batch.partition_metadata.description}'"
+
+        raise AssertionError(
+            # TODO: Print conflicting field sets in env.
+            f"{batch_description} contains elements from {unique_environments} environments; exactly 1 environment is expected"
+        )
+    return environment_names_per_element[0]
 
 
 @goal_rule
@@ -721,27 +789,28 @@ async def run_tests(
         ),
     )
 
+    request_types = union_membership.get(TestRequest)
+    test_batches = await _get_test_batches(
+        request_types,
+        targets_to_valid_field_sets,
+        local_environment_name,
+    )
+
     if test_subsystem.debug or test_subsystem.debug_adapter:
         return await _run_debug_tests(
-            targets_to_valid_field_sets,
-            test_subsystem,
-            debug_adapter,
-            local_environment_name,
+            test_batches, test_subsystem, debug_adapter, local_environment_name
         )
 
-    environment_names_per_field_set = await MultiGet(
+    environment_names = await MultiGet(
         Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
+            EnvironmentName, {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName}
         )
-        for field_set in targets_to_valid_field_sets.field_sets
+        for batch in test_batches
     )
+
     results = await MultiGet(
-        Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
-        for field_set, environment_name in zip(
-            targets_to_valid_field_sets.field_sets, environment_names_per_field_set
-        )
+        Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
+        for batch, environment_name in zip(test_batches, environment_names)
     )
 
     # Print summary.
