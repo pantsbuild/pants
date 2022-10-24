@@ -216,10 +216,10 @@ async def check(
         for (_, field_set) in request_to_field_set
     )
 
-    request_to_env_name = (
+    request_to_env_name = {
         (request, env_name)
         for (request, _), env_name in zip(request_to_field_set, environment_names)
-    )
+    }
 
     # Run each check request in each valid environment (potentially multiple runs per tool)
     all_results = await MultiGet(
