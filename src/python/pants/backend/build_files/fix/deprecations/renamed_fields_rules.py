@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import DefaultDict, Mapping
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
-from pants.backend.build_files.fix.deprecations.base import FixBUILDRequest, FixedBUILDFile
+from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
 from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
@@ -22,11 +22,11 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-class Request(FixBuildFilesRequest):
+class RenameFieldsInFilesRequest(FixBuildFilesRequest):
     tool_subsystem = BUILDDeprecationsFixer
 
 
-class RenameRequest(FixBUILDRequest):
+class RenameFieldsInFileRequest(FixBUILDFileRequest):
     pass
 
 
@@ -76,7 +76,7 @@ def determine_renamed_field_types(
 
 @rule
 def fix_single(
-    request: RenameRequest,
+    request: RenameFieldsInFileRequest,
     renamed_field_types: RenamedFieldTypes,
 ) -> FixedBUILDFile:
     pants_target: str = ""
@@ -155,22 +155,24 @@ def fix_single(
 
 @rule(desc="Fix deprecated field names", level=LogLevel.DEBUG)
 async def fix(
-    request: Request.Batch,
+    request: RenameFieldsInFilesRequest.Batch,
 ) -> FixResult:
     digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
     fixed_contents = await MultiGet(
-        Get(FixedBUILDFile, RenameRequest(file_content.path, file_content.content))
+        Get(FixedBUILDFile, RenameFieldsInFileRequest(file_content.path, file_content.content))
         for file_content in digest_contents
     )
     snapshot = await Get(
         Snapshot,
         CreateDigest(FileContent(content.path, content.content) for content in fixed_contents),
     )
-    return FixResult(request.snapshot, snapshot, "", "", tool_name=Request.tool_name)
+    return FixResult(
+        request.snapshot, snapshot, "", "", tool_name=RenameFieldsInFilesRequest.tool_name
+    )
 
 
 def rules():
     return [
         *collect_rules(),
-        *Request.rules(),
+        *RenameFieldsInFilesRequest.rules(),
     ]

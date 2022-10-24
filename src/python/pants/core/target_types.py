@@ -30,6 +30,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -71,20 +72,20 @@ from pants.util.strutil import softwrap
 @frozen_after_init
 class HTTPSource:
     url: str
-    len: int
     sha256: str
+    len: int
     # Defaults to last part of the URL path (E.g. `index.html`)
     filename: str
 
-    def __init__(self, url: str, *, len: int, sha256: str, filename: str = ""):
+    def __init__(self, url: str, *, sha256: str, len: int, filename: str = ""):
         for field in dataclasses.fields(self):
             value = locals()[field.name]
             if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
         self.url = url
-        self.len = len
         self.sha256 = sha256
+        self.len = len
         self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
 
         if not self.filename:
@@ -103,10 +104,63 @@ class HTTPSource:
             )
 
 
+@dataclass(frozen=True)
+class _HTTPInfo:
+    url: str
+    sha256: str
+    len: int
+
+
+@dataclass(unsafe_hash=True)
+@frozen_after_init
+class HTTPSources:
+    linux_arm64: _HTTPInfo | None
+    linux_x86_64: _HTTPInfo | None
+    macos_arm64: _HTTPInfo | None
+    macos_x86_64: _HTTPInfo | None
+    # Defaults to last part of the resolved URL path (E.g. `index.html`)
+    filename: str | None
+
+    def __init__(
+        self,
+        *,
+        linux_arm64: str | None = None,
+        linux_x86_64: str | None = None,
+        macos_arm64: str | None = None,
+        macos_x86_64: str | None = None,
+        filename: str | None = None,
+    ):
+        # NB: We can't resolve the platform infobecause the BUILD file will be evaluated on the host,
+        # which might not match the execution environment.
+        for field in dataclasses.fields(self):
+            value = locals()[field.name]
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"`{field.name}` must be a `str`, got `{type(value)!r}`.")
+
+        def decode(value: str | None):
+            if value is None:
+                return value
+            url, sha256, len = [x.strip() for x in value.split("|")]
+            return _HTTPInfo(url, sha256, int(len))
+
+        self.linux_arm64 = decode(linux_arm64)
+        self.linux_x86_64 = decode(linux_x86_64)
+        self.macos_arm64 = decode(macos_arm64)
+        self.macos_x86_64 = decode(macos_x86_64)
+        self.filename = filename
+
+        if self.filename == "":
+            raise ValueError("The `filename` cannot be emtpy.")
+        if self.filename and ("\\" in self.filename or "/" in self.filename):
+            raise ValueError(
+                f"`filename` cannot contain a path separator, but was set to '{self.filename}'"
+            )
+
+
 class AssetSourceField(SingleSourceField):
-    value: str | HTTPSource  # type: ignore[assignment]
-    # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
-    # is implemented.
+    value: str | HTTPSource | HTTPSources  # type: ignore[assignment]
+    # @TODO: Don't document http_source(s), link to them once
+    # https://github.com/pantsbuild/pants/issues/14832 is implemented.
     help = softwrap(
         """
         The source of this target.
@@ -116,29 +170,44 @@ class AssetSourceField(SingleSourceField):
 
         If an http_source is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
-        `http_source` has the following signature:
-            http_source(url: str, *, len: int, sha256: str, filename: str = "")
+        `http_source`/`https_sources` have the following signatures:
+
+            http_source(url: str, *, sha256: str,  len: int,  filename: str = "")
+            http_sources(
+                *,
+                # Each of these accept a `|` separated string matching `<url>|<sha256>|<len>`
+                # where whitespace is stripped around the `|`.
+                # E.g. https://pantsbuild.org|feed6789feed6789feed6789|112233
+                linux_arm64: str | None = None,
+                linux_x86_64: str | None = None,
+                macos_arm64: str | None = None,
+                macos_x86_64: str | None = None,
+                filename: str | None = None,
+            )
+
         The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
+
         You can easily get the len and checksum with the following command:
+
             `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
         """
     )
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[Union[str, HTTPSource]], address: Address
-    ) -> Optional[Union[str, HTTPSource]]:
+        cls, raw_value: Optional[Union[str, HTTPSource, HTTPSources]], address: Address
+    ) -> Optional[Union[str, HTTPSource, HTTPSources]]:
         if raw_value is None or isinstance(raw_value, str):
             return super().compute_value(raw_value, address)
-        elif not isinstance(raw_value, HTTPSource):
+        elif not isinstance(raw_value, (HTTPSource, HTTPSources)):
             raise InvalidFieldTypeException(
                 address,
                 cls.alias,
                 raw_value,
-                expected_type="a string or an `http_source` object",
+                expected_type="a string or an `http_source`/`http_sources` object",
             )
         return raw_value
 
@@ -155,28 +224,48 @@ class AssetSourceField(SingleSourceField):
     @property
     def file_path(self) -> str:
         assert self.value
-        filename = self.value if isinstance(self.value, str) else self.value.filename
+        # NB: For http_source(s) we end with "/" and handle filename in the hydration rule
+        filename = self.value if isinstance(self.value, str) else ""
         return os.path.join(self.address.spec_path, filename)
 
 
 @rule_helper
-async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSources:
+async def _hydrate_asset_source(
+    request: GenerateSourcesRequest, platform: Platform
+) -> GeneratedSources:
     target = request.protocol_target
     source_field = target[AssetSourceField]
     if isinstance(source_field.value, str):
         return GeneratedSources(request.protocol_sources)
 
-    http_source = source_field.value
+    source = source_field.value
+    if isinstance(source, HTTPSources):
+        http_source = _HTTPInfo(**dataclasses.asdict(source)[platform.value])
+    else:
+        http_source = _HTTPInfo(url=source.url, sha256=source.sha256, len=source.len)
+
     file_digest = FileDigest(http_source.sha256, http_source.len)
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
     await Get(Digest, DownloadFile(http_source.url, file_digest))
+    filename = source.filename or urllib.parse.urlparse(http_source.url).path.rsplit("/", 1)[-1]
+    if not filename:
+        raise ValueError(
+            softwrap(
+                f"""
+                Couldn't deduce filename from `url`: '{http_source.url}'.
+
+                Please specify the `filename` argument.
+                """
+            )
+        )
+
     snapshot = await Get(
         Snapshot,
         CreateDigest(
             [
                 FileEntry(
-                    path=source_field.file_path,
+                    path=os.path.join(source_field.file_path, filename),
                     file_digest=file_digest,
                 )
             ]
@@ -218,8 +307,10 @@ class GenerateFileSourceRequest(GenerateSourcesRequest):
 
 
 @rule
-async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_file_source(
+    request: GenerateFileSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -437,8 +528,10 @@ class GenerateResourceSourceRequest(GenerateSourcesRequest):
 
 
 @rule
-async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_resource_source(
+    request: GenerateResourceSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):

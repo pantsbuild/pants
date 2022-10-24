@@ -11,7 +11,7 @@ from pants.engine.internals.parser import ParseError
 
 
 @dataclass(frozen=True)
-class FixBUILDRequest:
+class FixBUILDFileRequest:
     path: str
     content: bytes
 

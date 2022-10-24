@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.build_files.fix.deprecations.renamed_fields_rules import (
     RenamedFieldTypes,
-    RenameRequest,
+    RenameFieldsInFileRequest,
     determine_renamed_field_types,
     fix_single,
 )
@@ -61,7 +61,7 @@ def test_determine_renamed_fields() -> None:
 def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
     result = fix_single(
-        RenameRequest("BUILD", content=content),
+        RenameFieldsInFileRequest("BUILD", content=content),
         RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
     )
     assert result.content == content
@@ -78,7 +78,7 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
 )
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = fix_single(
-        RenameRequest("BUILD", content="\n".join(lines).encode("utf-8")),
+        RenameFieldsInFileRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )
     assert result.content == "\n".join(expected).encode("utf-8")

@@ -6,7 +6,7 @@ from __future__ import annotations
 import tokenize
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
-from pants.backend.build_files.fix.deprecations.base import FixBUILDRequest, FixedBUILDFile
+from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
 from pants.backend.build_files.fix.deprecations.subsystem import BUILDDeprecationsFixer
 from pants.core.goals.fix import FixResult
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
@@ -18,17 +18,19 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-class Request(FixBuildFilesRequest):
+class RenameTargetsInFilesRequest(FixBuildFilesRequest):
     tool_subsystem = BUILDDeprecationsFixer
 
 
-class RenamedTargetTypes(FrozenDict[str, str]):
+class RenameTargetsInFileRequest(FrozenDict[str, str]):
     """Deprecated target type names to new names."""
 
 
 @rule
-def determine_renamed_target_types(target_types: RegisteredTargetTypes) -> RenamedTargetTypes:
-    return RenamedTargetTypes(
+def determine_renamed_target_types(
+    target_types: RegisteredTargetTypes,
+) -> RenameTargetsInFileRequest:
+    return RenameTargetsInFileRequest(
         {
             tgt.deprecated_alias: tgt.alias
             for tgt in target_types.types
@@ -37,14 +39,14 @@ def determine_renamed_target_types(target_types: RegisteredTargetTypes) -> Renam
     )
 
 
-class RenameRequest(FixBUILDRequest):
+class RenameRequest(FixBUILDFileRequest):
     pass
 
 
 @rule
 def fix_single(
     request: RenameRequest,
-    renamed_target_types: RenamedTargetTypes,
+    renamed_target_types: RenameTargetsInFileRequest,
 ) -> FixedBUILDFile:
     tokens = request.tokenize()
 
@@ -76,7 +78,7 @@ def fix_single(
 
 @rule(desc="Fix deprecated target type names", level=LogLevel.DEBUG)
 async def fix(
-    request: Request.Batch,
+    request: RenameTargetsInFilesRequest.Batch,
 ) -> FixResult:
     digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
     fixed_contents = await MultiGet(
@@ -87,11 +89,13 @@ async def fix(
         Snapshot,
         CreateDigest(FileContent(content.path, content.content) for content in fixed_contents),
     )
-    return FixResult(request.snapshot, snapshot, "", "", tool_name=Request.tool_name)
+    return FixResult(
+        request.snapshot, snapshot, "", "", tool_name=RenameTargetsInFilesRequest.tool_name
+    )
 
 
 def rules():
     return [
         *collect_rules(),
-        *Request.rules(),
+        *RenameTargetsInFilesRequest.rules(),
     ]
