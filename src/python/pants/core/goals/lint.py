@@ -25,7 +25,6 @@ from pants.core.util_rules.partitions import (
     _BatchBase,
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
-    _single_partition_field_sets_partitioner_rules,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -200,9 +199,7 @@ class LintTargetsRequest(LintRequest):
 
     @classmethod
     def _get_rules(cls) -> Iterable:
-        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from _single_partition_field_sets_partitioner_rules(cls)
-
+        yield from cls.partitioner_type.default_rules(cls, by_file=False)
         yield from super()._get_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 

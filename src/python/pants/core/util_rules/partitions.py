@@ -36,7 +36,42 @@ class PartitionerType(Enum):
     """The plugin author has a rule to go from `RequestType.PartitionRequest` -> `Partitions`."""
 
     DEFAULT_SINGLE_PARTITION = "default_single_partition"
-    """Registers a partitioner which returns the inputs as a single partition."""
+    """Registers a partitioner which returns the inputs as a single partition
+
+    The returned partition will have no metadata.
+    """
+
+    DEFAULT_ONE_PARTITION_PER_INPUT = "default_one_partition_per_input"
+    """Registers a partitioner which returns a single-element partition per input.
+
+    Each of the returned partitions will have no metadata.
+    """
+
+    def default_rules(self, cls, *, by_file: bool) -> Iterable:
+        """Return an iterable of rules defining the default partitioning logic for this
+        `PartitionerType`.
+
+        NOTE: Not all `PartitionerType`s have default logic, so this method can return an empty iterable.
+
+        :param by_file: If `True`, rules returned from this method (if any) will compute partitions with
+          `str`-type elements, where each `str` value is the path to the resolved source field. If `False`, rule will compute
+          partitions with `FieldSet`-type elements.
+        """
+        if self == PartitionerType.CUSTOM:
+            # No default rules.
+            return
+        elif self == PartitionerType.DEFAULT_SINGLE_PARTITION:
+            rules_generator = (
+                _single_partition_file_rules if by_file else _single_partition_field_set_rules
+            )
+            yield from rules_generator(cls)
+        elif self == PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT:
+            rules_generator = (
+                _partition_per_input_file_rules if by_file else _partition_per_input_field_set_rules
+            )
+            yield from rules_generator(cls)
+        else:
+            raise NotImplementedError(f"Partitioner type {self} is missing default rules!")
 
 
 class PartitionMetadata(Protocol):
@@ -137,7 +172,7 @@ class _PartitionFilesRequestBase:
 
 
 @memoized
-def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
+def _single_partition_field_set_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     one partition."""
 
@@ -156,27 +191,13 @@ def _single_partition_field_sets_partitioner_rules(cls) -> Iterable:
 
 
 @memoized
-def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
+def _single_partition_file_rules(cls) -> Iterable:
     """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
     one partition."""
 
     # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
     # a better user experience.
-    sources_field_name = None
-    for fieldname, fieldtype in _get_field_set_fields(cls.field_set_type).items():
-        if issubclass(fieldtype, SourcesField):
-            if sources_field_name is None:
-                sources_field_name = fieldname
-                break
-            raise TypeError(
-                f"Type {cls.field_set_type} has multiple `SourcesField` fields."
-                + " Pants can't provide a default partitioner."
-            )
-    else:
-        raise TypeError(
-            f"Type {cls.field_set_type} has does not have a `SourcesField` field."
-            + " Pants can't provide a default partitioner."
-        )
+    sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
         _param_type_overrides={
@@ -204,3 +225,89 @@ def _single_partition_field_sets_by_file_partitioner_rules(cls) -> Iterable:
         )
 
     return collect_rules(locals())
+
+
+@memoized
+def _partition_per_input_field_set_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    a single-element partition per input."""
+
+    @rule(
+        _param_type_overrides={
+            "request": cls.PartitionRequest,
+            "subsystem": cls.tool_subsystem,
+        }
+    )
+    async def partitioner(
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
+    ) -> Partitions[FieldSet, Any]:
+        return (
+            Partitions()
+            if subsystem.skip
+            else Partitions(Partition((field_set,), None) for field_set in request.field_sets)
+        )
+
+    return collect_rules(locals())
+
+
+@memoized
+def _partition_per_input_file_rules(cls) -> Iterable:
+    """Returns a rule that implements a "partitioner" for `PartitionFieldSetsRequest`, which returns
+    a single-element partition per input."""
+
+    # NB: This only works if the FieldSet has a single `SourcesField` field. We check here for
+    # a better user experience.
+    sources_field_name = _get_sources_field_name(cls.field_set_type)
+
+    @rule(
+        _param_type_overrides={
+            "request": cls.PartitionRequest,
+            "subsystem": cls.tool_subsystem,
+        }
+    )
+    async def partitioner(
+        request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
+    ) -> Partitions[str, Any]:
+        assert sources_field_name is not None
+        all_sources_paths = await MultiGet(
+            Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
+            for field_set in request.field_sets
+        )
+
+        return (
+            Partitions()
+            if subsystem.skip
+            else Partitions(
+                Partition((path,), None)
+                for path in itertools.chain.from_iterable(
+                    sources_paths.files for sources_paths in all_sources_paths
+                )
+            )
+        )
+
+    return collect_rules(locals())
+
+
+def _get_sources_field_name(field_set_type: type[FieldSet]) -> str:
+    """Get the name of the one `SourcesField` belonging to the given target type.
+
+    NOTE: The input target type's fields must contain exactly one `SourcesField`.
+    Otherwise this method will raise a `TypeError`.
+    """
+
+    sources_field_name = None
+    for fieldname, fieldtype in _get_field_set_fields(field_set_type).items():
+        if issubclass(fieldtype, SourcesField):
+            if sources_field_name is None:
+                sources_field_name = fieldname
+                break
+            raise TypeError(
+                f"Type {field_set_type} has multiple `SourcesField` fields."
+                + " Pants can't provide a default partitioner."
+            )
+    else:
+        raise TypeError(
+            f"Type {field_set_type} has does not have a `SourcesField` field."
+            + " Pants can't provide a default partitioner."
+        )
+    return sources_field_name
