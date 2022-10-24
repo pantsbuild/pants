@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, Generic, Iterable, Set, TypeVar, cast
+from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
 
 import colors
 
@@ -221,15 +221,10 @@ async def check(
         for (request, _), env_name in zip(request_to_field_set, environment_names)
     )
 
-    exploded_requests: Dict[CheckRequest, Set[EnvironmentName]] = defaultdict(set)
-    for request, env_name in request_to_env_name:
-        exploded_requests[request].add(env_name)
-
     # Run each check request in each valid environment (potentially multiple runs per tool)
     all_results = await MultiGet(
         Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
-        for (request, env_names) in exploded_requests.items()
-        for env_name in env_names
+        for (request, env_name) in request_to_env_name
     )
 
     results_by_tool: dict[str, list[CheckResult]] = defaultdict(list)
