@@ -24,7 +24,6 @@ from pants.core.target_types import (
     FileSourceField,
     FileTarget,
     HTTPSource,
-    HTTPSources,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
     ResourceTarget,
@@ -34,7 +33,6 @@ from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
-from pants.engine.platform import Platform
 from pants.engine.target import (
     GeneratedSources,
     SourcesField,
@@ -308,8 +306,7 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-@pytest.mark.parametrize("target_name", ["http_source", "http_sources"])
-def test_url_assets(target_name) -> None:
+def test_url_assets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
@@ -318,19 +315,14 @@ def test_url_assets(target_name) -> None:
             *run_pex_binary.rules(),
             *python_target_type_rules.rules(),
             *run.rules(),
-            QueryRule(Platform, []),
         ],
         target_types=[FileTarget, ResourceTarget, PythonSourceTarget, PexBinary],
-        objects={"http_source": HTTPSource, "http_sources": HTTPSources},
+        objects={"http_source": HTTPSource},
     )
-    platform = rule_runner.request(Platform, [])
-    url = "https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py"
-    sha256 = "8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"
-    filelen = 500
     http_source_info = (
-        f'{platform.value}="{url} | {sha256} | {filelen}"'
-        if target_name.endswith("s")
-        else f'url="{url}",sha256="{sha256}",len={filelen}'
+        'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
+        + "len=500,"
+        + 'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
     )
     rule_runner.write_files(
         {
@@ -338,11 +330,13 @@ def test_url_assets(target_name) -> None:
                 f"""\
                 resource(
                     name='antigravity',
-                    source={target_name}({http_source_info}),
+                    source=http_source(
+                        {http_source_info},
+                    ),
                 )
                 resource(
                     name='antigravity_renamed',
-                    source={target_name}(
+                    source=http_source(
                         {http_source_info},
                         filename="antigravity_renamed.py",
                     ),
