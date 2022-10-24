@@ -130,7 +130,7 @@ class HTTPSources:
         macos_x86_64: str | None = None,
         filename: str | None = None,
     ):
-        # NB: We can't resolve the platform infobecause the BUILD file will be evaluated on the host,
+        # NB: We can't resolve the platform info because the BUILD file will be evaluated on the host,
         # which might not match the execution environment.
         for field in dataclasses.fields(self):
             value = locals()[field.name]
