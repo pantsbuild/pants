@@ -75,9 +75,10 @@ class TestResult(EngineAwareReturnType):
     stdout_digest: FileDigest
     stderr: str
     stderr_digest: FileDigest
-    address: Address
+    addresses: tuple[Address, ...]
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
+    partition_description: str | None = None
 
     coverage_data: CoverageData | None = None
     # TODO: Rename this to `reports`. There is no guarantee that every language will produce
@@ -89,22 +90,39 @@ class TestResult(EngineAwareReturnType):
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
-    @classmethod
-    def skip(cls, address: Address, output_setting: ShowOutput) -> TestResult:
-        return cls(
+    @staticmethod
+    def skip(address: Address, output_setting: ShowOutput) -> TestResult:
+        return TestResult(
             exit_code=None,
             stdout="",
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=address,
+            addresses=(address,),
             output_setting=output_setting,
             result_metadata=None,
         )
 
-    @classmethod
+    @staticmethod
+    def skip_batch(
+        batch: TestRequest.Batch[_TestFieldSetT, Any], output_setting: ShowOutput
+    ) -> TestResult:
+        return TestResult(
+            exit_code=None,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            addresses=tuple(field_set.address for field_set in batch.elements),
+            output_setting=output_setting,
+            result_metadata=None,
+            partition_description=batch.partition_metadata.description
+            if batch.partition_metadata
+            else None,
+        )
+
+    @staticmethod
     def from_fallible_process_result(
-        cls,
         process_result: FallibleProcessResult,
         address: Address,
         output_setting: ShowOutput,
@@ -113,13 +131,13 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
     ) -> TestResult:
-        return cls(
+        return TestResult(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
             stdout_digest=process_result.stdout_digest,
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
-            address=address,
+            addresses=(address,),
             output_setting=output_setting,
             result_metadata=process_result.metadata,
             coverage_data=coverage_data,
@@ -127,9 +145,50 @@ class TestResult(EngineAwareReturnType):
             extra_output=extra_output,
         )
 
+    @staticmethod
+    def from_batched_fallible_process_result(
+        process_result: FallibleProcessResult,
+        batch: TestRequest.Batch[_TestFieldSetT, Any],
+        output_setting: ShowOutput,
+        *,
+        coverage_data: CoverageData | None = None,
+        xml_results: Snapshot | None = None,
+        extra_output: Snapshot | None = None,
+    ) -> TestResult:
+        return TestResult(
+            exit_code=process_result.exit_code,
+            stdout=process_result.stdout.decode(),
+            stdout_digest=process_result.stdout_digest,
+            stderr=process_result.stderr.decode(),
+            stderr_digest=process_result.stderr_digest,
+            addresses=tuple(field_set.address for field_set in batch.elements),
+            output_setting=output_setting,
+            result_metadata=process_result.metadata,
+            coverage_data=coverage_data,
+            xml_results=xml_results,
+            extra_output=extra_output,
+            partition_description=batch.partition_metadata.description
+            if batch.partition_metadata
+            else None,
+        )
+
     @property
     def skipped(self) -> bool:
         return self.exit_code is None or self.result_metadata is None
+
+    @property
+    def description(self) -> str:
+        if len(self.addresses) == 1:
+            return self.addresses[0].spec
+        else:
+            return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
+
+    @property
+    def path_safe_description(self) -> str:
+        if len(self.addresses) == 1:
+            return self.addresses[0].path_safe_spec
+        else:
+            return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
@@ -137,7 +196,7 @@ class TestResult(EngineAwareReturnType):
         if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
-            return self.address.spec < other.address.spec
+            return self.description < other.description
         if self.skipped or self.exit_code is None:
             return True
         if other.skipped or other.exit_code is None:
@@ -163,6 +222,8 @@ class TestResult(EngineAwareReturnType):
             return "skipped."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         message = f"{status}."
+        if self.partition_description:
+            message += f"\nPartition: {self.partition_description}"
         if self.output_setting == ShowOutput.NONE or (
             self.output_setting == ShowOutput.FAILED and self.exit_code == 0
         ):
@@ -177,7 +238,7 @@ class TestResult(EngineAwareReturnType):
         return f"{message}{output}"
 
     def metadata(self) -> dict[str, Any]:
-        return {"address": self.address.spec}
+        return {"addresses": [address.spec for address in self.addresses]}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -661,7 +722,7 @@ async def run_tests(
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
+                path_prefix=str(distdir.relpath / "test" / result.path_safe_description),
             )
 
     if test_subsystem.report:
@@ -763,7 +824,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
     suffix = f" {elapsed_print}{source_print}"
-    return f"{sigil} {result.address} {status}{suffix}."
+    return f"{sigil} {result.description} {status}{suffix}."
 
 
 @dataclass(frozen=True)

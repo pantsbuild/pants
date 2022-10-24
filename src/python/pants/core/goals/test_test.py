@@ -114,7 +114,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr="",
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=self.address,
+            addresses=(self.address,),
             coverage_data=MockCoverageData(self.address),
             output_setting=ShowOutput.ALL,
             result_metadata=None
@@ -333,7 +333,7 @@ def _assert_test_summary(
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=Address(spec_path="", target_name="dummy_address"),
+            addresses=(Address(spec_path="", target_name="dummy_address"),),
             output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
         ),
@@ -429,12 +429,30 @@ def sort_results() -> None:
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=ShowOutput.ALL,
     )
-    skip1 = create_test_result(exit_code=None, address=Address("t1"))
-    skip2 = create_test_result(exit_code=None, address=Address("t2"))
-    success1 = create_test_result(exit_code=0, address=Address("t1"))
-    success2 = create_test_result(exit_code=0, address=Address("t2"))
-    fail1 = create_test_result(exit_code=1, address=Address("t1"))
-    fail2 = create_test_result(exit_code=1, address=Address("t2"))
+    skip1 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t1"),),
+    )
+    skip2 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t2"),),
+    )
+    success1 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t1"),),
+    )
+    success2 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t2"),),
+    )
+    fail1 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t1"),),
+    )
+    fail2 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t2"),),
+    )
     assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
         skip1,
         skip2,
@@ -462,7 +480,7 @@ def assert_streaming_output(
         stderr=stderr,
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
-        address=Address("demo_test"),
+        addresses=(Address("demo_test"),),
         result_metadata=result_metadata,
     )
     assert result.level() == expected_level

@@ -187,7 +187,7 @@ async def run_go_tests(
             stderr=stderr or "",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=field_set.address,
+            addresses=(field_set.address,),
             output_setting=test_subsystem.output,
             result_metadata=None,
         )
