@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -204,24 +203,26 @@ async def check(
         for request_type in request_types
     )
 
+    request_to_field_set = [
+        (request, field_set) for request in requests for field_set in request.field_sets
+    ]
+
     environment_names = await MultiGet(
         Get(
             EnvironmentName,
             EnvironmentNameRequest,
             EnvironmentNameRequest.from_field_set(field_set),
         )
-        for request in requests
-        for field_set in request.field_sets
+        for (_, field_set) in request_to_field_set
     )
 
-    # Need one instance of request per `EnvironmentName` to associate with the `EnvironmentNames`
-    # because we can't get the request and the `EnvironmentName` in the same `Get` above.
-    request_for_each_environment_name = itertools.chain.from_iterable(
-        itertools.repeat(request, len(request.field_sets)) for request in requests
+    request_to_env_name = (
+        (request, env_name)
+        for (request, _), env_name in zip(request_to_field_set, environment_names)
     )
 
     exploded_requests: Dict[CheckRequest, Set[EnvironmentName]] = defaultdict(set)
-    for request, env_name in zip(request_for_each_environment_name, environment_names):
+    for request, env_name in request_to_env_name:
         exploded_requests[request].add(env_name)
 
     # Run each check request in each valid environment (potentially multiple runs per tool)
