@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
+from typing import Any, ClassVar, Dict, Generic, Iterable, Set, TypeVar, cast
 
 import colors
 
@@ -213,22 +213,21 @@ async def check(
         for request in requests
         for field_set in request.field_sets
     )
-    request_for_each_environment_name = (
-        # this is actually correct:
-        request
-        for request in requests
-        for _ in request.field_sets
-    )
-    grouped = itertools.groupby(
-        zip(request_for_each_environment_name, environment_names), lambda x: x[0]
-    )
-    exploded_requests = [
-        (request, {env_name for (_, env_name) in env_names}) for request, env_names in grouped
-    ]
 
+    # Need one instance of request per `EnvironmentName` to associate with the `EnvironmentNames`
+    # because we can't get the request and the `EnvironmentName` in the same `Get` above.
+    request_for_each_environment_name = itertools.chain.from_iterable(
+        itertools.repeat(request, len(request.field_sets)) for request in requests
+    )
+
+    exploded_requests: Dict[CheckRequest, Set[EnvironmentName]] = defaultdict(set)
+    for request, env_name in zip(request_for_each_environment_name, environment_names):
+        exploded_requests[request].add(env_name)
+
+    # Run each check request in each valid environment (potentially multiple runs per tool)
     all_results = await MultiGet(
         Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
-        for (request, env_names) in exploded_requests
+        for (request, env_names) in exploded_requests.items()
         for env_name in env_names
     )
 
