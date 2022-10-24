@@ -64,19 +64,13 @@ def test_formatter(use_pantsd: bool) -> None:
         assert good_content == read_file(f)
 
 
-@ensure_daemon
-def test_formatter_and_fixer(use_pantsd: bool) -> None:
+def test_formatter_and_fixer() -> None:
     f = "testprojects/src/python/hello/greet/greet.py"
-
-    def run() -> str:
-        return run_pants(
-            [
-                "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black', 'pants.backend.python.lint.autoflake']",
-                "fix",
-                f,
-            ],
-            use_pantsd=use_pantsd,
-        ).stderr
-
-    stderr = run()
+    stderr = run_pants(
+        [
+            "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black', 'pants.backend.python.lint.autoflake']",
+            "fix",
+            f,
+        ],
+    ).stderr
     assert stderr.index("Fix with Autoflake") < stderr.index("Format with Black")
