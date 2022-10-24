@@ -360,7 +360,7 @@ async def fix(
                 for request_type in union_membership.get(FixRequest)
                 if not (request_type.is_formatter and fix_subsystem.skip_formatters)
             ),
-            # NB: We sort the core request types to fixers are first. This is to ensure that, between
+            # NB: We sort the core request types so that fixers are first. This is to ensure that, between
             # fixers and formatters, re-running isn't necessary due to tool conflicts (re-running may
             # still be necessary within formatters). This is because fixers are expected to modify
             # code irrespective of formattint, and formatters aren't expected to be modifying the code
