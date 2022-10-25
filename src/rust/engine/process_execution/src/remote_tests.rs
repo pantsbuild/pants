@@ -97,6 +97,10 @@ async fn make_execute_request() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -115,10 +119,10 @@ async fn make_execute_request() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -130,7 +134,7 @@ async fn make_execute_request() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "5aa25fbe0530761c1e0692c6f4e4bba67ebb29634a3b5b1c4998b95061ac5285",
+          "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
         )
         .unwrap(),
         141,
@@ -180,6 +184,10 @@ async fn make_execute_request_with_instance_name() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -203,10 +211,10 @@ async fn make_execute_request_with_instance_name() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "0f5513942fe627c46827ee8024406e24aa3f47d2a6582ed33c244b89e420a160",
+          "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
         )
         .unwrap(),
-        160,
+        216,
       ))
         .into(),
     ),

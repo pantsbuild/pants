@@ -454,6 +454,19 @@ pub enum ProcessExecutionStrategy {
   Docker(String),
 }
 
+impl ProcessExecutionStrategy {
+  /// What to insert into the Command proto so that we don't incorrectly cache
+  /// Docker vs remote execution vs local execution.
+  pub fn cache_value(&self) -> String {
+    match self {
+      Self::Local => "local_execution".to_string(),
+      Self::RemoteExecution(_) => "remote_execution".to_string(),
+      // TODO: This should be the container ID, not just image name.
+      Self::Docker(image) => format!("docker_execution: {image}"),
+    }
+  }
+}
+
 ///
 /// A process to be executed.
 ///
