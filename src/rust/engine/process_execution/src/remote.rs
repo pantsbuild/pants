@@ -630,6 +630,8 @@ impl CommandRunner {
                 context.build_id,
                 status
               );
+              // We completed this operation.
+              current_operation_name = None;
               status
             }
             StreamOutcome::StreamClosed(operation_name_opt) => {
@@ -660,6 +662,9 @@ impl CommandRunner {
             message: status.message().to_owned(),
             ..StatusProto::default()
           };
+          // `OperationOrStatus` always represents a completed operation, so this operation
+          // is completed.
+          current_operation_name = None;
           OperationOrStatus::Status(status_proto)
         }
       };
