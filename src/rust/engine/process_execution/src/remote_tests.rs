@@ -97,6 +97,10 @@ async fn make_execute_request() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -115,10 +119,10 @@ async fn make_execute_request() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -130,7 +134,7 @@ async fn make_execute_request() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "5aa25fbe0530761c1e0692c6f4e4bba67ebb29634a3b5b1c4998b95061ac5285",
+          "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
         )
         .unwrap(),
         141,
@@ -180,6 +184,10 @@ async fn make_execute_request_with_instance_name() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -203,10 +211,10 @@ async fn make_execute_request_with_instance_name() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "0f5513942fe627c46827ee8024406e24aa3f47d2a6582ed33c244b89e420a160",
+          "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
         )
         .unwrap(),
-        160,
+        216,
       ))
         .into(),
     ),
@@ -219,7 +227,7 @@ async fn make_execute_request_with_instance_name() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "62faff0371cc0b08c4a8b0218d37335083674761928576d2090d02b4f10aaf61",
+          "5b017857389d245cd0663105f3b8ee47bb7412940e4859098c8af46bdd21c8b6",
         )
         .unwrap(),
         141,
@@ -266,6 +274,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -291,10 +303,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "9ea985902b500695cfc80fb87aab4b110272a863cfd7196a31b6504e483006b6",
+          "04ed10b1ddac69249ad1ca463fd4284c4f9c0115a2f2aaf1fd8a9ce6571ee29c",
         )
         .unwrap(),
-        168,
+        224,
       ))
         .into(),
     ),
@@ -306,7 +318,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "504f18fbe21c7fe17f7e7e038f25780cd8bb3a280333715112d04d7325ba4b98",
+          "e55329e2c0413a6def422752f9e964204e7e40ec81e2867a6222a43727ba29d1",
         )
         .unwrap(),
         141,
@@ -334,10 +346,16 @@ async fn make_execute_request_with_jdk() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::Local.cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![remexec::platform::Property {
         name: "JDK_SYMLINK".to_owned(),
@@ -351,10 +369,10 @@ async fn make_execute_request_with_jdk() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "fdb14491ad797437907cd8a2f2b7afba9e556b73773b1045383af930e7244a16",
+          "45e72f32f1d935e02732e26a8aaec041877811a9b7fe66816ace7b570173953e",
         )
         .unwrap(),
-        87,
+        142,
       ))
         .into(),
     ),
@@ -366,10 +384,10 @@ async fn make_execute_request_with_jdk() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "44bfe183fa37bab87d919147c48f014b2d964dbd0ff95fca55a7780e00cdeb3e",
+          "2868a54befe3ad9d8fd2ac30c2a170ac890715ec0b196ab8259e8b6beabf7d1c",
         )
         .unwrap(),
-        140,
+        141,
       ))
         .into(),
     ),
@@ -400,10 +418,16 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![
         remexec::platform::Property {
@@ -435,10 +459,10 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "cb0dce5f745b343c440d9c1fbd5a368953d44423fa1ff4c51c8a6aba38851e9a",
+          "03b368b6f449438938636f57fbaf6b6e2a1eb776583b5197c1320b646ee8d64a",
         )
         .unwrap(),
-        142,
+        198,
       ))
         .into(),
     ),
@@ -450,7 +474,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "844f05249ca4a71d5e216650dfc26e20d3b52512c015108f30ab29eaa76d549c",
+          "0291bda0da047d715b6da33c1e4c2a74679ab06c95a32424ea754f70be5242ed",
         )
         .unwrap(),
         141,
@@ -497,6 +521,10 @@ async fn make_execute_request_with_timeout() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -515,10 +543,10 @@ async fn make_execute_request_with_timeout() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -531,7 +559,7 @@ async fn make_execute_request_with_timeout() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "25eed790a1cf4a0e7e30361b87cb0315eb28d155a5d02fe9c968bc9560cce5f4",
+          "6e3666265a4ef89ddf26a406516484429b2d8e744fbae6b36a66c6853407626a",
         )
         .unwrap(),
         145,
@@ -605,6 +633,10 @@ async fn make_execute_request_using_immutable_inputs() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -623,10 +655,10 @@ async fn make_execute_request_using_immutable_inputs() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -638,7 +670,7 @@ async fn make_execute_request_using_immutable_inputs() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "54dd9dd373e6492b6c22e0cf4d93c3da893ce6a702577cabf44bdd0d5f013fa9",
+          "2c1eae75a54d2464ac63ba51587deb3986f15c3966c61f77fb9b06b195f4127a",
         )
         .unwrap(),
         141,
