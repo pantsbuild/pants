@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
 
-from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
+from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
@@ -561,6 +561,7 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    batch_size = BatchSizeOption(uppercase="Test", lowercase="test")
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -626,6 +627,7 @@ async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
     local_environment_name: ChosenLocalEnvironmentName,
+    test_subsystem: TestSubsystem,
 ) -> list[TestRequest.Batch]:
     def partitions_get(request_type: type[TestRequest]) -> Get[Partitions]:
         partition_type = cast(TestRequest, request_type)
@@ -655,11 +657,10 @@ async def _get_test_batches(
         for request_type, partitions in zip(core_request_types, all_partitions)
         for partition in partitions
         for batch in partition_sequentially(
-            # TODO: Expose max batch size as a subsystem parameter.
             partition.elements,
             key=lambda x: str(x),
-            size_target=128,
-            size_max=128,
+            size_target=test_subsystem.batch_size,
+            size_max=2 * test_subsystem.batch_size,
         )
     ]
 
@@ -772,6 +773,7 @@ async def run_tests(
         request_types,
         targets_to_valid_field_sets,
         local_environment_name,
+        test_subsystem,
     )
 
     if test_subsystem.debug or test_subsystem.debug_adapter:
