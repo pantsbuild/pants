@@ -70,8 +70,7 @@ class Shunit2FieldSet(TestFieldSet):
 
 
 class Shunit2TestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = Shunit2  # type: ignore[assignment]
+    tool_subsystem = Shunit2
     field_set_type = Shunit2FieldSet
 
 
