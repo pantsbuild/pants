@@ -8,7 +8,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 path = "src/console_ui.rs"
 
 [dependencies]
-console = "0.15.1"
+console = "0.15.2"
 futures = "0.3"
 indexmap = "1.9"
 indicatif = "0.17"
