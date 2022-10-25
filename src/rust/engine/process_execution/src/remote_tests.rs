@@ -19,6 +19,7 @@ use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
+use tokio::time::{sleep, timeout};
 use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
@@ -38,10 +39,10 @@ const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct RemoteTestResult {
-  pub(crate) original: FallibleProcessResultWithPlatform,
-  pub(crate) stdout_bytes: Vec<u8>,
-  pub(crate) stderr_bytes: Vec<u8>,
+struct RemoteTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
 }
 
 impl RemoteTestResult {
@@ -56,13 +57,13 @@ impl RemoteTestResult {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StdoutType {
+enum StdoutType {
   Raw(String),
   Digest(Digest),
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StderrType {
+enum StderrType {
   Raw(String),
   Digest(Digest),
 }
@@ -785,6 +786,61 @@ async fn successful_after_reconnect_from_retryable_error() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
+}
+
+#[tokio::test]
+async fn dropped_request_cancels() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
+  let client_timeout = Duration::new(5, 0);
+  let delayed_operation_time = Duration::new(15, 0);
+
+  let request = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
+
+  let op_name = "gimme-foo".to_string();
+
+  let mock_server = {
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(&request, None, None)
+          .unwrap()
+          .2,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  let cas = mock::StubCAS::builder()
+    .file(&TestData::roland())
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let (command_runner, _store) = create_command_runner(mock_server.address(), &cas);
+
+  let context = Context {
+    workunit_store,
+    build_id: String::from("marmosets"),
+    run_id: RunId(0),
+    ..Context::default()
+  };
+
+  // Timeout the run, which should cause the remote operation to be cancelled.
+  if let Ok(res) = timeout(
+    client_timeout,
+    command_runner.run(context, &mut workunit, request),
+  )
+  .await
+  {
+    panic!("Did not expect the client to return successfully. Got: {res:?}");
+  }
+
+  // Wait for the cancellation to have been spawned and sent.
+  sleep(Duration::from_secs(2)).await;
+
+  // Confirm that the cancellation was sent.
+  assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
 
 #[tokio::test]
@@ -1958,7 +2014,7 @@ pub fn echo_foo_request() -> Process {
   req
 }
 
-pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
+fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   let op = Operation {
     name: operation_name.to_string(),
     done: false,
@@ -1967,7 +2023,13 @@ pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   MockOperation::new(op)
 }
 
-pub(crate) fn make_retryable_operation_failure() -> MockOperation {
+fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
+  let mut op = make_incomplete_operation(operation_name);
+  op.duration = Some(delay);
+  op
+}
+
+fn make_retryable_operation_failure() -> MockOperation {
   let status = protos::gen::google::rpc::Status {
     code: Code::Aborted as i32,
     message: String::from("the bot running the task appears to be lost"),
@@ -1994,7 +2056,7 @@ pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   }
 }
 
-pub(crate) fn make_action_result(
+fn make_action_result(
   stdout: StdoutType,
   stderr: StderrType,
   exit_code: i32,
@@ -2051,7 +2113,7 @@ fn make_successful_operation_with_maybe_metadata(
   }
 }
 
-pub(crate) fn make_successful_operation(
+fn make_successful_operation(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2062,7 +2124,7 @@ pub(crate) fn make_successful_operation(
   MockOperation::new(op)
 }
 
-pub(crate) fn make_successful_operation_with_metadata(
+fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2097,7 +2159,7 @@ fn timestamp_only_secs(v: i64) -> prost_types::Timestamp {
   }
 }
 
-pub(crate) fn make_precondition_failure_operation(
+fn make_precondition_failure_operation(
   violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
 ) -> MockOperation {
   let operation = Operation {
@@ -2130,7 +2192,7 @@ fn make_precondition_failure_status(
   }
 }
 
-pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
+async fn run_cmd_runner<R: crate::CommandRunner>(
   request: Process,
   command_runner: R,
   store: Store,
@@ -2201,11 +2263,7 @@ async fn run_command_remote(
   })
 }
 
-pub(crate) fn make_store(
-  store_dir: &Path,
-  cas: &mock::StubCAS,
-  executor: task_executor::Executor,
-) -> Store {
+fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
   Store::local_only(executor, store_dir)
     .unwrap()
     .into_with_remote(
@@ -2280,7 +2338,7 @@ async fn extract_output_files_from_response(
   Ok(directory_digest.as_digest())
 }
 
-pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
+fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
   let rust_type_name = type_name::<T>();
   let proto_type_name = rust_type_name
     .strip_prefix(prefix)
@@ -2293,7 +2351,7 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
   }
 }
 
-pub(crate) fn missing_preconditionfailure_violation(
+fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> protos::gen::google::rpc::precondition_failure::Violation {
   {
@@ -2306,7 +2364,7 @@ pub(crate) fn missing_preconditionfailure_violation(
 }
 
 #[track_caller]
-pub(crate) fn assert_contains(haystack: &str, needle: &str) {
+fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
@@ -2315,7 +2373,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-pub(crate) fn cat_roland_request() -> Process {
+fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.platform = Platform::Linux_x86_64;
@@ -2326,7 +2384,7 @@ pub(crate) fn cat_roland_request() -> Process {
   process
 }
 
-pub(crate) fn echo_roland_request() -> Process {
+fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
   req.platform = Platform::Linux_x86_64;
   req.timeout = one_second();
@@ -2334,7 +2392,7 @@ pub(crate) fn echo_roland_request() -> Process {
   req
 }
 
-pub(crate) fn assert_cancellation_requests(
+fn assert_cancellation_requests(
   mock_server: &mock::execution_server::TestServer,
   expected: Vec<String>,
 ) {
