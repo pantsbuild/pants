@@ -22,6 +22,7 @@ from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.build_graph.address import Address
+from pants.core.goals.test import get_filtered_environment
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine import process
@@ -76,6 +77,7 @@ def rule_runner() -> RuleRunner:
             *java_wsdl_rules(),
             *wsdl_rules(),
             *testutil.rules(),
+            get_filtered_environment,
             QueryRule(JaxWsTools, ()),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromWsdlRequest]),
