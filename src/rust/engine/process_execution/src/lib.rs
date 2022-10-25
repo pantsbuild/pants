@@ -461,7 +461,8 @@ impl ProcessExecutionStrategy {
     match self {
       Self::Local => "local_execution".to_string(),
       Self::RemoteExecution(_) => "remote_execution".to_string(),
-      // TODO: This should be the container ID, not just image name.
+      // NB: this image will include the container ID, thanks to
+      // https://github.com/pantsbuild/pants/pull/17101.
       Self::Docker(image) => format!("docker_execution: {image}"),
     }
   }
