@@ -304,6 +304,7 @@ async fn main() {
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
+        executor.clone(),
         Duration::from_secs(args.overall_deadline_secs),
         Duration::from_millis(100),
         args.execution_rpc_concurrency,
