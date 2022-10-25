@@ -47,7 +47,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -470,6 +470,7 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
     )
 
 
+@logging
 def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) -> None:
     digest = rule_runner.request(
         Digest,
@@ -478,10 +479,13 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
                 [
                     FileContent("file.txt", b"four\n"),
                     FileContent("a/file.txt", b"four\n"),
+                    FileContent("a/file2.txt", b"four\n"),
                     Directory("b"),
                     SymlinkEntry("a/ignored.ln", "./locally_nonexistant.txt"),
                     SymlinkEntry("a/followed.ln", "file.txt"),
+                    SymlinkEntry("a/followed2.ln", "file2.txt"),
                     SymlinkEntry("a/followed-dotslash.ln", "./file.txt"),
+                    SymlinkEntry("a/followed2-dotslash.ln", "./file2.txt"),
                     SymlinkEntry("followed-dir", "a"),
                     SymlinkEntry("followed-followed-dir", "followed-dir"),
                     SymlinkEntry("followed-file.ln", "file.txt"),
@@ -489,22 +493,37 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
                     SymlinkEntry("followed-file.ln.ln", "followed-file.ln"),
                     SymlinkEntry("ignored.ln", "nonexistant.txt"),
                     SymlinkEntry("followed-empty-dir", "b"),
+                    SymlinkEntry("circular", "./circular"),  # Should be ignored
                 ]
             )
         ],
     )
-    snapshot = rule_runner.request(Snapshot, [digest])
-    assert snapshot.files == (
+    expected_filelist = (
         "a/file.txt",
-        "a/followed.ln",
+        "a/file2.txt",
         "a/followed-dotslash.ln",
+        "a/followed.ln",
+        "a/followed2-dotslash.ln",
+        "a/followed2.ln",
         "file.txt",
         "followed-dir/file.txt",
+        "followed-dir/file2.txt",
+        "followed-dir/followed-dotslash.ln",
+        "followed-dir/followed.ln",
+        "followed-dir/followed2-dotslash.ln",
+        "followed-dir/followed2.ln",
         "followed-file.ln",
         "followed-file.ln.ln",
         "followed-followed-dir/file.txt",
+        "followed-followed-dir/file2.txt",
+        "followed-followed-dir/followed-dotslash.ln",
+        "followed-followed-dir/followed.ln",
+        "followed-followed-dir/followed2-dotslash.ln",
+        "followed-followed-dir/followed2.ln",
         "followed-subfile.ln",
     )
+    snapshot = rule_runner.request(Snapshot, [digest])
+    assert snapshot.files == expected_filelist
     assert snapshot.dirs == (
         "a",
         "b",
@@ -513,17 +532,7 @@ def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) ->
         "followed-followed-dir",
     )
     contents = rule_runner.request(DigestContents, [digest])
-    assert [content.path for content in contents] == [
-        "a/file.txt",
-        "a/followed.ln",
-        "a/followed-dotslash.ln",
-        "file.txt",
-        "followed-dir/file.txt",
-        "followed-file.ln",
-        "followed-file.ln.ln",
-        "followed-followed-dir/file.txt",
-        "followed-subfile.ln",
-    ]
+    assert tuple(content.path for content in contents) == expected_filelist
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:

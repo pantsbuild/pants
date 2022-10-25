@@ -1349,14 +1349,14 @@ impl Store {
     digest: DirectoryDigest,
   ) -> Result<Vec<FileContent>, StoreError> {
     let mut files = Vec::new();
-    self.load_digest_trie(digest).await?.walk(
-      SymlinkBehavior::Oblivious,
-      &mut |path, entry| match entry {
+    self
+      .load_digest_trie(digest)
+      .await?
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
         directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
         directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
-      },
-    );
+      });
 
     future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
       let store = self.clone();

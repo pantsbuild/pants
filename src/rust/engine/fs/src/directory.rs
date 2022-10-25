@@ -326,7 +326,7 @@ impl From<&File> for remexec::FileNode {
 #[derive(Clone, Debug, DeepSizeOf)]
 pub struct Symlink {
   name: Name,
-  target: RelativePath,
+  target: PathBuf,
 }
 
 impl Symlink {
@@ -334,7 +334,7 @@ impl Symlink {
     self.name
   }
 
-  pub fn target(&self) -> &RelativePath {
+  pub fn target(&self) -> &Path {
     &self.target
   }
 }
@@ -345,7 +345,7 @@ impl TryFrom<&remexec::SymlinkNode> for Symlink {
   fn try_from(symlink_node: &remexec::SymlinkNode) -> Result<Self, Self::Error> {
     Ok(Self {
       name: Name(Intern::from(&symlink_node.name)),
-      target: RelativePath::new(&symlink_node.target)?,
+      target: PathBuf::from(&symlink_node.target),
     })
   }
 }
@@ -363,14 +363,8 @@ impl From<&Symlink> for remexec::SymlinkNode {
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
 // whether these types can be merged.
 pub enum TypedPath<'a> {
-  File {
-    path: &'a Path,
-    is_executable: bool,
-  },
-  Link {
-    path: &'a Path,
-    target: &'a RelativePath,
-  },
+  File { path: &'a Path, is_executable: bool },
+  Link { path: &'a Path, target: &'a Path },
   Dir(&'a Path),
 }
 
@@ -476,7 +470,7 @@ impl DigestTrie {
           TypedPath::Link { target, .. } => {
             entries.push(Entry::Symlink(Symlink {
               name,
-              target: RelativePath::new(prefix.join(target).as_path()).unwrap(),
+              target: target.to_path_buf(),
             }));
           }
           TypedPath::Dir { .. } => {
@@ -660,16 +654,16 @@ impl DigestTrie {
             // We don't return a Result, so log and move on
             warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
           } else {
-            self.walk_entry(&target_entry, &path, symlink_behavior, link_depth + 1, f);
+            self.walk_entry(target_entry, path, symlink_behavior, link_depth + 1, f);
           }
         };
       }
       (_, Entry::Directory(d)) => {
-        f(&path, entry);
+        f(path, entry);
         d.tree
           .walk_helper(path.to_path_buf(), symlink_behavior, link_depth, f);
       }
-      _ => f(&path, entry),
+      _ => f(path, entry),
     };
   }
 
@@ -1149,7 +1143,7 @@ fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
         },
         TypedPath::Link { path, target } => TypedPath::Link {
           path: path.strip_prefix(name.as_ref()).unwrap(),
-          target: RelativePath::new(target.strip_prefix(name.as_ref()).unwrap()).unwrap(),
+          target: target.strip_prefix(name.as_ref()).unwrap_or(target),
         },
         TypedPath::Dir(path) => TypedPath::Dir(path.strip_prefix(name.as_ref()).unwrap()),
       })
