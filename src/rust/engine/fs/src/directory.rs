@@ -634,7 +634,13 @@ impl DigestTrie {
     f: &mut impl FnMut(&Path, &Entry),
   ) {
     for entry in &*self.0 {
-      self.walk_entry(entry, &path_so_far.join(entry.name().as_ref()), symlink_behavior, link_depth, f);
+      self.walk_entry(
+        entry,
+        &path_so_far.join(entry.name().as_ref()),
+        symlink_behavior,
+        link_depth,
+        f,
+      );
     }
   }
 
@@ -648,6 +654,7 @@ impl DigestTrie {
   ) {
     match (&symlink_behavior, entry) {
       (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
+        warn!("Symlink {} pointing to {}", s.name, s.target.display());
         if let Ok(Some(target_entry)) = self.entry(&s.target) {
           if link_depth >= MAX_LINK_DEPTH {
             // We don't return a Result, so log and move on
@@ -659,7 +666,8 @@ impl DigestTrie {
       }
       (_, Entry::Directory(d)) => {
         f(&path, entry);
-        d.tree.walk_helper(path.to_path_buf(), symlink_behavior, link_depth, f);
+        d.tree
+          .walk_helper(path.to_path_buf(), symlink_behavior, link_depth, f);
       }
       _ => f(&path, entry),
     };
@@ -1141,7 +1149,7 @@ fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
         },
         TypedPath::Link { path, target } => TypedPath::Link {
           path: path.strip_prefix(name.as_ref()).unwrap(),
-          target,
+          target: RelativePath::new(target.strip_prefix(name.as_ref()).unwrap()).unwrap(),
         },
         TypedPath::Dir(path) => TypedPath::Dir(path.strip_prefix(name.as_ref()).unwrap()),
       })
