@@ -23,6 +23,7 @@ from typing import (
     Iterator,
     Mapping,
     Sequence,
+    Type,
     TypeVar,
     cast,
 )
@@ -530,6 +531,14 @@ class RuleRunner:
                 remote_execution=False,
                 remote_execution_extra_platform_properties=[],
             ),
+        )
+
+    def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
+        """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
+        return MockGet(
+            output_type=output_type,
+            input_types=tuple(input_types),
+            mock=lambda *input_values: self.request(output_type, input_values),
         )
 
 

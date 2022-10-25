@@ -56,6 +56,7 @@ class CountLinesOfCodeSubsystem(GoalSubsystem):
 
 class CountLinesOfCode(Goal):
     subsystem_cls = CountLinesOfCodeSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

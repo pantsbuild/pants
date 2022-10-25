@@ -238,6 +238,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stephan Erb
 + Stu Hood
 + Suresh Joshi
++ Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
