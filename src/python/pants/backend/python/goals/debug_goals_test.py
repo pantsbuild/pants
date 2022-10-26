@@ -3,13 +3,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
-from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import (
     ImportOwnerStatus,
@@ -123,22 +121,21 @@ def test_debug_goals(imports_rule_runner: RuleRunner):
 
     tgt = imports_rule_runner.get_target(Address(filedir, target_name="t"))
 
-    v = imports_rule_runner.request(
+    result = imports_rule_runner.request(
         PythonSourceAnalysis, (PythonImportDependenciesInferenceFieldSet.create(tgt),)
     )
 
-    print(json.dumps(v, cls=_PeekJsonEncoder, indent=2))
-
-    assert v
-    assert len(v.identified.imports) == 6
+    assert result
+    assert len(result.identified.imports) == 6
     assert (
-        len([i for i in v.identified.imports.values() if i.weak]) == 1
+        len([i for i in result.identified.imports.values() if i.weak]) == 1
     ), "did not find the weak import"
-    assert len(v.identified.assets) == 1
+    assert len(result.identified.assets) == 1
     assert (
-        v.resolved.assets[str(Path(filedir, "config.json"))].status == ImportOwnerStatus.unambiguous
+        result.resolved.assets[str(Path(filedir, "config.json"))].status
+        == ImportOwnerStatus.unambiguous
     )
 
     # possible owners
-    assert v.resolved.resolve_results["watchdog"].status == ImportOwnerStatus.unowned
-    assert v.possible_owners.value["watchdog"]
+    assert result.resolved.resolve_results["watchdog"].status == ImportOwnerStatus.unowned
+    assert result.possible_owners.value["watchdog"]
