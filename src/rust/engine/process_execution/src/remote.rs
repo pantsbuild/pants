@@ -54,6 +54,10 @@ use crate::{
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
+// Environment variable which is used to differentiate between running in Docker vs. local vs.
+// remote execution.
+pub const CACHE_KEY_EXECUTION_STRATEGY: &str = "PANTS_CACHE_KEY_EXECUTION_STRATEGY";
+
 // Environment variable which is used to include a unique value for cache busting of processes that
 // have indicated that they should never be cached.
 pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
@@ -956,6 +960,13 @@ pub fn make_execute_request(
         value: cache_key_gen_version,
       });
   }
+
+  command
+    .environment_variables
+    .push(remexec::command::EnvironmentVariable {
+      name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
+      value: req.execution_strategy.cache_value(),
+    });
 
   if matches!(
     req.cache_scope,
