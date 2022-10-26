@@ -806,7 +806,11 @@ impl crate::CommandRunner for CommandRunner {
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, execute_request) = make_execute_request(
+    let EntireExecuteRequest {
+      action,
+      command,
+      execute_request,
+    } = make_execute_request(
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
