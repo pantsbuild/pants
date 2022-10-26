@@ -64,7 +64,6 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
@@ -320,45 +319,28 @@ class TestRequest:
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
-        pass
+        @property
+        def element(self) -> PartitionElementT:
+            """Return the single element of this batch.
 
-    @memoized_classproperty
-    def _one_input_per_batch_compatibility_rules(cls) -> Iterable:
-        """Rules to bridge between the old `TestFieldSet`-driven API to the new batched API."""
+            NOTE: Accessing this property will raise a `TypeError` if this `Batch` contains
+            >1 elements. It is only safe to be used by test runners utilizing the "default"
+            one-input-per-partition partitioner type.
+            """
 
-        @rule(_param_type_overrides={"batch": cls.Batch})
-        async def one_input_per_batch(batch: TestRequest.Batch) -> TestResult:
-            if len(batch.elements) != 1:
+            if len(self.elements) != 1:
+                description = ""
+                if self.partition_metadata:
+                    description = f" from partition '{self.partition_metadata.description}'"
                 raise TypeError(
-                    f"The `{cls.tool_name}` test runner was registered to expect one input per test, but received {len(batch.elements)} inputs"
+                    f"Expected a single element in batch{description}, but found {len(self.elements)}"
                 )
-            return await Get(TestResult, TestFieldSet, batch.elements[0])
 
-        @rule(_param_type_overrides={"batch": cls.Batch})
-        async def one_input_per_batch_debug(batch: TestRequest.Batch) -> TestDebugRequest:
-            if len(batch.elements) != 1:
-                raise TypeError(
-                    f"The `{cls.tool_name}` test runner was registered to expect one input per test, but received {len(batch.elements)} inputs"
-                )
-            return await Get(TestDebugRequest, TestFieldSet, batch.elements[0])
-
-        @rule(_param_type_overrides={"batch": cls.Batch})
-        async def one_input_per_batch_debug_adapter(
-            batch: TestRequest.Batch,
-        ) -> TestDebugAdapterRequest:
-            if len(batch.elements) != 1:
-                raise TypeError(
-                    f"The `{cls.tool_name}` test runner was registered to expect one input per test, but received {len(batch.elements)} inputs"
-                )
-            return await Get(TestDebugAdapterRequest, TestFieldSet, batch.elements[0])
-
-        return collect_rules(locals())
+            return self.elements[0]
 
     @classmethod
     def rules(cls) -> Iterable:
         yield from cls.partitioner_type.default_rules(cls, by_file=False)
-        if cls.partitioner_type == PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT:
-            yield from cls._one_input_per_batch_compatibility_rules
 
         yield UnionRule(TestRequest, cls)
         yield UnionRule(TestRequest.PartitionRequest, cls.PartitionRequest)

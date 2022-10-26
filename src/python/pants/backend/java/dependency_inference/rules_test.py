@@ -19,7 +19,6 @@ from pants.backend.java.target_types import (
     JunitTestsGeneratorTarget,
 )
 from pants.backend.java.target_types import rules as java_target_rules
-from pants.core.goals.test import get_filtered_environment
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.target import (
@@ -29,7 +28,6 @@ from pants.engine.target import (
     InferredDependencies,
     Targets,
 )
-from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.strip_jar import strip_jar
@@ -45,7 +43,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *classpath.rules(),
             *config_files.rules(),
             *jvm_tool.rules(),
             *dep_inference_rules(),
@@ -56,7 +53,6 @@ def rule_runner() -> RuleRunner:
             *junit_rules(),
             *source_files.rules(),
             *util_rules(),
-            get_filtered_environment,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(InferredDependencies, [InferJavaSourceDependencies]),

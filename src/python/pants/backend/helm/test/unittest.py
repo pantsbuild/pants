@@ -4,6 +4,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.helm.dependency_inference.unittest import rules as dependency_rules
 from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
@@ -78,10 +79,12 @@ class HelmUnitTestRequest(TestRequest):
 
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
 async def run_helm_unittest(
-    field_set: HelmUnitTestFieldSet,
+    batch: HelmUnitTestRequest.Batch[HelmUnitTestFieldSet, Any],
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
+    field_set = batch.element
+
     direct_dep_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
         Get(
@@ -165,13 +168,13 @@ async def run_helm_unittest(
 
 
 @rule
-async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) -> TestDebugRequest:
+async def generate_helm_unittest_debug_request(_: HelmUnitTestRequest.Batch) -> TestDebugRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
 
 @rule
 async def generate_helm_unittest_debug_adapter_request(
-    field_set: HelmUnitTestFieldSet,
+    _: HelmUnitTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 

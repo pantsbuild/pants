@@ -21,7 +21,6 @@ from pants.backend.codegen.protobuf.target_types import rules as target_types_ru
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
-from pants.core.goals.test import get_filtered_environment
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import testutil
@@ -79,7 +78,6 @@ def rule_runner() -> RuleRunner:
             *java_protobuf_rules(),
             *target_types_rules(),
             *testutil.rules(),
-            get_filtered_environment,
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),

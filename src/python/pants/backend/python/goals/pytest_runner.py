@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -383,9 +383,11 @@ class PyTestRequest(TestRequest):
 
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
-    field_set: PythonTestFieldSet,
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
+    field_set = batch.element
+
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -424,8 +426,10 @@ async def run_python_test(
 
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
-async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+async def debug_python_test(
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.element, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -435,7 +439,7 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 
 @rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
 async def debugpy_python_test(
-    field_set: PythonTestFieldSet,
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
@@ -445,7 +449,7 @@ async def debugpy_python_test(
     setup = await Get(
         TestSetup,
         TestSetupRequest(
-            field_set,
+            batch.element,
             is_debug=True,
             main=debugpy.main,
             prepend_argv=debugpy.get_args(debug_adapter, pytest.main),

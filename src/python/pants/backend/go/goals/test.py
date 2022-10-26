@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
@@ -168,12 +168,14 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
-    field_set: GoTestFieldSet,
+    batch: GoTestRequest.Batch[GoTestFieldSet, Any],
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
     test_extra_env: TestExtraEnv,
     goroot: GoRoot,
 ) -> TestResult:
+    field_set = batch.element
+
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
         Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
@@ -425,13 +427,13 @@ async def run_go_tests(
 
 
 @rule
-async def generate_go_tests_debug_request(field_set: GoTestFieldSet) -> TestDebugRequest:
+async def generate_go_tests_debug_request(_: GoTestRequest.Batch) -> TestDebugRequest:
     raise NotImplementedError("This is a stub.")
 
 
 @rule
 async def generate_go_tests_debug_adapter_request(
-    field_set: GoTestFieldSet,
+    _: GoTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("This is a stub.")
 

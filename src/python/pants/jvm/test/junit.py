@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -171,8 +172,10 @@ async def setup_junit_for_target(
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     test_subsystem: TestSubsystem,
-    field_set: JunitTestFieldSet,
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestResult:
+    field_set = batch.element
+
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -191,8 +194,10 @@ async def run_junit_test(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+async def setup_junit_debug_request(
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
         InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
@@ -201,7 +206,7 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 
 @rule
 async def setup_junit_debug_adapter_request(
-    field_set: JunitTestFieldSet,
+    _: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError(
         "Debugging JUnit tests using a debug adapter has not yet been implemented."

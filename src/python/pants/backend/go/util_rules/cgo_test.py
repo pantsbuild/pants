@@ -36,7 +36,6 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.test import get_filtered_environment
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
 from pants.engine.internals.native_engine import EMPTY_DIGEST
@@ -62,7 +61,6 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             *package_binary.rules(),
-            get_filtered_environment,
             QueryRule(BuiltPackage, [GoBinaryFieldSet]),
             QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),

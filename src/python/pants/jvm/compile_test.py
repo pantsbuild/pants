@@ -44,7 +44,6 @@ from pants.backend.scala.dependency_inference.rules import rules as scala_dep_in
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
-from pants.core.goals.test import get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -123,7 +122,6 @@ def rule_runner() -> RuleRunner:
             *protobuf_rules(),
             *stripped_source_files.rules(),
             *protobuf_target_types_rules(),
-            get_filtered_environment,
             QueryRule(Classpath, (Addresses,)),
             QueryRule(RenderedClasspath, (Addresses,)),
             QueryRule(UnexpandedTargets, (Addresses,)),

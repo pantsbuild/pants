@@ -192,68 +192,57 @@ class ExampleTestMetadata:
 6. Define the main test execution `@rule`
 -----------------------------------------
 
-If you used the default partitioner type in your `TestRequest` subclass, define a rule like:
+To actually execute your test runner, define a rule like:
 
 ```python
 from pants.core.goals.test import TestResult
 
 @rule
 async def run_example_tests(
-    field_set: ExampleTestFieldSet,
+    batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
     # Any other subsystems/inputs you need.
 ) -> TestResult:
     ...
 ```
 
-Otherwise define a rule like:
+If you didn't define a custom metadata type, you can use `Any` as the second type argument to the `Batch` type:
 
 ```python
 from pants.core.goals.test import TestResult
 
 @rule
 async def run_example_tests(
-    partition: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
+    batch: ExampleTestRequest.Batch[ExampleTestFieldSet, Any],
     # Any other subsystems/inputs you need.
 ) -> TestResult:
     ...
 ```
+
+The `batch` input will have two properties:
+
+  1. `elements` contains all the field sets that should be tested by your runner
+  2. `metadata` contains any (optional) common data about the batch returned by your partitioning rule
+
+If you didn't override the `partitioner_type` in your `TestRequest` subclass, `elements` will be a list of size 1 and `metadata` will be `None`. For convenience, you can use `batch.element` in this case to get the single field set. The `element` property will raise a `TypeError` if used on a batch with more than one element.
 
 7. Define `@rule`s for debug testing
 ------------------------------------
 
-If you used the default partitioner type in your `TestRequest` subclass, define rules like:
+`./pants test` exposes `--debug` and `--debug-adapter` options for interactive execution of tests. To hook into these execution modes, define two additional rules:
 
 ```python
 from pants.core.goals.test import TestDebugAdapterRequest, TestDebugRequest
 
 @rule
 async def setup_example_debug_test(
-    field_set: ExampleTestFieldSet,
-) -> TestDebugRequest:
-    ...
-
-@rule
-async def setup_example_debug_adapter_test(
-    field_set: ExampleTestFieldSet,
-) -> TestDebugAdapterRequest:
-    ...
-```
-
-Otherwise define rules like:
-
-```python
-from pants.core.goals.test import TestDebugAdapterRequest, TestDebugRequest
-
-@rule
-async def setup_example_debug_test(
-    partition: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
+    batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
 ) -> TestDebugRequest:
     ...
 @rule
 async def setup_example_debug_adapter_test(
-    partition: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
+    batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
 ) -> TestDebugAdapterRequest:
     ...
 ```
 
-If your test runner is not compatible with the Debug Adapter / if it doesn't benefit from running in `--debug` mode, you can simply `raise` a `NotImplementedError` saying so in one/both of these rules.
+You _must_ define these rules to avoid rule-graph errors. If your test runner is not compatible with the Debug Adapter, or if it doesn't benefit from running in `--debug` mode, you can simply `raise` a `NotImplementedError` saying so in one/both of these rules.
