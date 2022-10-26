@@ -210,7 +210,7 @@ class FixSubsystem(GoalSubsystem):
 
 class Fix(Goal):
     subsystem_cls = FixSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @rule_helper
