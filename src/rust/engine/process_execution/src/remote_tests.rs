@@ -19,6 +19,7 @@ use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
+use tokio::time::{sleep, timeout};
 use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
@@ -38,10 +39,10 @@ const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct RemoteTestResult {
-  pub(crate) original: FallibleProcessResultWithPlatform,
-  pub(crate) stdout_bytes: Vec<u8>,
-  pub(crate) stderr_bytes: Vec<u8>,
+struct RemoteTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
 }
 
 impl RemoteTestResult {
@@ -56,13 +57,13 @@ impl RemoteTestResult {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StdoutType {
+enum StdoutType {
   Raw(String),
   Digest(Digest),
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StderrType {
+enum StderrType {
   Raw(String),
   Digest(Digest),
 }
@@ -97,6 +98,10 @@ async fn make_execute_request() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -115,10 +120,10 @@ async fn make_execute_request() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -130,7 +135,7 @@ async fn make_execute_request() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "5aa25fbe0530761c1e0692c6f4e4bba67ebb29634a3b5b1c4998b95061ac5285",
+          "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
         )
         .unwrap(),
         141,
@@ -180,6 +185,10 @@ async fn make_execute_request_with_instance_name() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -203,10 +212,10 @@ async fn make_execute_request_with_instance_name() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "0f5513942fe627c46827ee8024406e24aa3f47d2a6582ed33c244b89e420a160",
+          "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
         )
         .unwrap(),
-        160,
+        216,
       ))
         .into(),
     ),
@@ -219,7 +228,7 @@ async fn make_execute_request_with_instance_name() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "62faff0371cc0b08c4a8b0218d37335083674761928576d2090d02b4f10aaf61",
+          "5b017857389d245cd0663105f3b8ee47bb7412940e4859098c8af46bdd21c8b6",
         )
         .unwrap(),
         141,
@@ -266,6 +275,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -291,10 +304,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "9ea985902b500695cfc80fb87aab4b110272a863cfd7196a31b6504e483006b6",
+          "04ed10b1ddac69249ad1ca463fd4284c4f9c0115a2f2aaf1fd8a9ce6571ee29c",
         )
         .unwrap(),
-        168,
+        224,
       ))
         .into(),
     ),
@@ -306,7 +319,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "504f18fbe21c7fe17f7e7e038f25780cd8bb3a280333715112d04d7325ba4b98",
+          "e55329e2c0413a6def422752f9e964204e7e40ec81e2867a6222a43727ba29d1",
         )
         .unwrap(),
         141,
@@ -334,10 +347,16 @@ async fn make_execute_request_with_jdk() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::Local.cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![remexec::platform::Property {
         name: "JDK_SYMLINK".to_owned(),
@@ -351,10 +370,10 @@ async fn make_execute_request_with_jdk() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "fdb14491ad797437907cd8a2f2b7afba9e556b73773b1045383af930e7244a16",
+          "45e72f32f1d935e02732e26a8aaec041877811a9b7fe66816ace7b570173953e",
         )
         .unwrap(),
-        87,
+        142,
       ))
         .into(),
     ),
@@ -366,10 +385,10 @@ async fn make_execute_request_with_jdk() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "44bfe183fa37bab87d919147c48f014b2d964dbd0ff95fca55a7780e00cdeb3e",
+          "2868a54befe3ad9d8fd2ac30c2a170ac890715ec0b196ab8259e8b6beabf7d1c",
         )
         .unwrap(),
-        140,
+        141,
       ))
         .into(),
     ),
@@ -400,10 +419,16 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![
         remexec::platform::Property {
@@ -435,10 +460,10 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "cb0dce5f745b343c440d9c1fbd5a368953d44423fa1ff4c51c8a6aba38851e9a",
+          "03b368b6f449438938636f57fbaf6b6e2a1eb776583b5197c1320b646ee8d64a",
         )
         .unwrap(),
-        142,
+        198,
       ))
         .into(),
     ),
@@ -450,7 +475,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "844f05249ca4a71d5e216650dfc26e20d3b52512c015108f30ab29eaa76d549c",
+          "0291bda0da047d715b6da33c1e4c2a74679ab06c95a32424ea754f70be5242ed",
         )
         .unwrap(),
         141,
@@ -497,6 +522,10 @@ async fn make_execute_request_with_timeout() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -515,10 +544,10 @@ async fn make_execute_request_with_timeout() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -531,7 +560,7 @@ async fn make_execute_request_with_timeout() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "25eed790a1cf4a0e7e30361b87cb0315eb28d155a5d02fe9c968bc9560cce5f4",
+          "6e3666265a4ef89ddf26a406516484429b2d8e744fbae6b36a66c6853407626a",
         )
         .unwrap(),
         145,
@@ -605,6 +634,10 @@ async fn make_execute_request_using_immutable_inputs() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -623,10 +656,10 @@ async fn make_execute_request_using_immutable_inputs() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -638,7 +671,7 @@ async fn make_execute_request_using_immutable_inputs() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "54dd9dd373e6492b6c22e0cf4d93c3da893ce6a702577cabf44bdd0d5f013fa9",
+          "2c1eae75a54d2464ac63ba51587deb3986f15c3966c61f77fb9b06b195f4127a",
         )
         .unwrap(),
         141,
@@ -788,6 +821,61 @@ async fn successful_after_reconnect_from_retryable_error() {
 }
 
 #[tokio::test]
+async fn dropped_request_cancels() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
+  let client_timeout = Duration::new(5, 0);
+  let delayed_operation_time = Duration::new(15, 0);
+
+  let request = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
+
+  let op_name = "gimme-foo".to_string();
+
+  let mock_server = {
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(&request, None, None)
+          .unwrap()
+          .2,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  let cas = mock::StubCAS::builder()
+    .file(&TestData::roland())
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let (command_runner, _store) = create_command_runner(mock_server.address(), &cas);
+
+  let context = Context {
+    workunit_store,
+    build_id: String::from("marmosets"),
+    run_id: RunId(0),
+    ..Context::default()
+  };
+
+  // Timeout the run, which should cause the remote operation to be cancelled.
+  if let Ok(res) = timeout(
+    client_timeout,
+    command_runner.run(context, &mut workunit, request),
+  )
+  .await
+  {
+    panic!("Did not expect the client to return successfully. Got: {res:?}");
+  }
+
+  // Wait for the cancellation to have been spawned and sent.
+  sleep(Duration::from_secs(2)).await;
+
+  // Confirm that the cancellation was sent.
+  assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
+}
+
+#[tokio::test]
 async fn server_rejecting_execute_request_gives_error() {
   WorkunitStore::setup_for_tests();
 
@@ -897,6 +985,7 @@ async fn sends_headers() {
       String::from("authorization") => String::from("Bearer catnip-will-get-you-anywhere"),
     },
     store,
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1087,6 +1176,7 @@ async fn ensure_inline_stdio_is_stored() {
     None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1427,6 +1517,7 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1487,6 +1578,7 @@ async fn execute_missing_file_errors_if_unknown() {
     None,
     BTreeMap::new(),
     store,
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1954,7 +2046,7 @@ pub fn echo_foo_request() -> Process {
   req
 }
 
-pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
+fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   let op = Operation {
     name: operation_name.to_string(),
     done: false,
@@ -1963,7 +2055,13 @@ pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   MockOperation::new(op)
 }
 
-pub(crate) fn make_retryable_operation_failure() -> MockOperation {
+fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
+  let mut op = make_incomplete_operation(operation_name);
+  op.duration = Some(delay);
+  op
+}
+
+fn make_retryable_operation_failure() -> MockOperation {
   let status = protos::gen::google::rpc::Status {
     code: Code::Aborted as i32,
     message: String::from("the bot running the task appears to be lost"),
@@ -1990,7 +2088,7 @@ pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   }
 }
 
-pub(crate) fn make_action_result(
+fn make_action_result(
   stdout: StdoutType,
   stderr: StderrType,
   exit_code: i32,
@@ -2047,7 +2145,7 @@ fn make_successful_operation_with_maybe_metadata(
   }
 }
 
-pub(crate) fn make_successful_operation(
+fn make_successful_operation(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2058,7 +2156,7 @@ pub(crate) fn make_successful_operation(
   MockOperation::new(op)
 }
 
-pub(crate) fn make_successful_operation_with_metadata(
+fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2093,7 +2191,7 @@ fn timestamp_only_secs(v: i64) -> prost_types::Timestamp {
   }
 }
 
-pub(crate) fn make_precondition_failure_operation(
+fn make_precondition_failure_operation(
   violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
 ) -> MockOperation {
   let operation = Operation {
@@ -2126,7 +2224,7 @@ fn make_precondition_failure_status(
   }
 }
 
-pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
+async fn run_cmd_runner<R: crate::CommandRunner>(
   request: Process,
   command_runner: R,
   store: Store,
@@ -2159,6 +2257,7 @@ fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (Com
     None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -2196,11 +2295,7 @@ async fn run_command_remote(
   })
 }
 
-pub(crate) fn make_store(
-  store_dir: &Path,
-  cas: &mock::StubCAS,
-  executor: task_executor::Executor,
-) -> Store {
+fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
   Store::local_only(executor, store_dir)
     .unwrap()
     .into_with_remote(
@@ -2275,7 +2370,7 @@ async fn extract_output_files_from_response(
   Ok(directory_digest.as_digest())
 }
 
-pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
+fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
   let rust_type_name = type_name::<T>();
   let proto_type_name = rust_type_name
     .strip_prefix(prefix)
@@ -2288,7 +2383,7 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
   }
 }
 
-pub(crate) fn missing_preconditionfailure_violation(
+fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> protos::gen::google::rpc::precondition_failure::Violation {
   {
@@ -2301,7 +2396,7 @@ pub(crate) fn missing_preconditionfailure_violation(
 }
 
 #[track_caller]
-pub(crate) fn assert_contains(haystack: &str, needle: &str) {
+fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
@@ -2310,7 +2405,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-pub(crate) fn cat_roland_request() -> Process {
+fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.platform = Platform::Linux_x86_64;
@@ -2321,7 +2416,7 @@ pub(crate) fn cat_roland_request() -> Process {
   process
 }
 
-pub(crate) fn echo_roland_request() -> Process {
+fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
   req.platform = Platform::Linux_x86_64;
   req.timeout = one_second();
@@ -2329,7 +2424,7 @@ pub(crate) fn echo_roland_request() -> Process {
   req
 }
 
-pub(crate) fn assert_cancellation_requests(
+fn assert_cancellation_requests(
   mock_server: &mock::execution_server::TestServer,
   expected: Vec<String>,
 ) {
