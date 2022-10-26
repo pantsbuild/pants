@@ -328,7 +328,6 @@ def _collect_imports_info(
             dep.status == ImportOwnerStatus.unambiguous
             or dep.status == ImportOwnerStatus.disambiguated
         )
-        and dep.address
     ), frozenset(
         imp for imp, dep in resolve_result.items() if dep.status == ImportOwnerStatus.unowned
     )
