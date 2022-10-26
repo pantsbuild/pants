@@ -16,6 +16,7 @@ from pants.core.util_rules import source_files, system_binaries
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import lockfile
+from pants.jvm.jar_tool import jar_tool
 from pants.jvm.package import deploy_jar, war
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.strip_jar import strip_jar
@@ -56,6 +57,7 @@ def rules():
         *source_files.rules(),
         *strip_jar.rules(),
         *deploy_jar.rules(),
+        *jar_tool.rules(),
         *run_deploy_jar.rules(),
         *war.rules(),
         *jvm_junit_rules(),

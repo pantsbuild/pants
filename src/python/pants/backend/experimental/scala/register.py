@@ -19,6 +19,7 @@ from pants.backend.scala.test import scalatest
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import lockfile
+from pants.jvm.jar_tool import jar_tool
 from pants.jvm.package import deploy_jar
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
@@ -53,6 +54,7 @@ def rules():
         *junit.rules(),
         *strip_jar.rules(),
         *deploy_jar.rules(),
+        *jar_tool.rules(),
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),

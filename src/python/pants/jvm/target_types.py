@@ -16,6 +16,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     Dependencies,
+    DictStringToStringField,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
@@ -322,6 +323,11 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
+class JarDuplicateRulesField(DictStringToStringField):
+    alias = "duplicate_rules"
+    help = "A dictionary of path patterns"
+
+
 class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
@@ -342,6 +348,7 @@ class DeployJarTarget(Target):
         JvmMainClassNameField,
         JvmJdkField,
         JvmResolveField,
+        JarDuplicateRulesField,
         RestartableField,
     )
     help = softwrap(
