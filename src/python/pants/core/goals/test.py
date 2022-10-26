@@ -118,9 +118,9 @@ class TestResult(EngineAwareReturnType):
             addresses=tuple(field_set.address for field_set in batch.elements),
             output_setting=output_setting,
             result_metadata=None,
-            partition_description=batch.partition_metadata.description
-            if batch.partition_metadata
-            else None,
+            partition_description=(
+                batch.partition_metadata.description if batch.partition_metadata else None
+            ),
         )
 
     @staticmethod
@@ -169,9 +169,9 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
-            partition_description=batch.partition_metadata.description
-            if batch.partition_metadata
-            else None,
+            partition_description=(
+                batch.partition_metadata.description if batch.partition_metadata else None
+            ),
         )
 
     @property
@@ -182,15 +182,15 @@ class TestResult(EngineAwareReturnType):
     def description(self) -> str:
         if len(self.addresses) == 1:
             return self.addresses[0].spec
-        else:
-            return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
+
+        return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
 
     @property
     def path_safe_description(self) -> str:
         if len(self.addresses) == 1:
             return self.addresses[0].path_safe_spec
-        else:
-            return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
+
+        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
