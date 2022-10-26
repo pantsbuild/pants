@@ -8,7 +8,7 @@ import textwrap
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals.test import GoTestFieldSet
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as test_rules
 from pants.backend.go.goals.test import transform_test_args
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
@@ -49,7 +49,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             get_filtered_environment,
-            QueryRule(TestResult, [GoTestFieldSet]),
+            QueryRule(TestResult, [GoTestRequest.Batch]),
             QueryRule(ProcessResult, [GoSdkProcess]),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
@@ -123,7 +123,9 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
 
@@ -145,7 +147,9 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
 
@@ -180,7 +184,9 @@ def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
     assert "PASS" in result.stdout
@@ -206,7 +212,9 @@ def test_internal_example_passes(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
 
@@ -235,7 +243,9 @@ def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "foo.TestMain called" in result.stdout
     assert "FAIL: TestAdd" in result.stdout
@@ -272,12 +282,16 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "bad_test.go:1:1: expected 'package', found invalid\n" in result.stderr
 
     tgt = rule_runner.get_target(Address("foo/uses_dep"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
 
@@ -312,7 +326,9 @@ def test_external_test_success(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
 
@@ -345,7 +361,9 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
 
@@ -383,7 +401,9 @@ def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "BenchmarkAdd" in result.stdout
     assert "PASS" in result.stdout
@@ -418,7 +438,9 @@ def test_external_example_passes(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: ExamplePrint" in result.stdout
 
@@ -458,7 +480,9 @@ def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo", generated_name="./"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "foo_test.TestMain called" in result.stdout
 
@@ -502,7 +526,9 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "FAIL: TestAddInternal" in result.stdout
     assert "FAIL: TestAddExternal" in result.stdout
@@ -539,7 +565,9 @@ def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: FuzzFoo" in result.stdout
 
@@ -607,7 +635,9 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         },
         env_inherit={"PATH"},
     )
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestEnvs" in result.stdout
 
@@ -649,7 +679,9 @@ def test_no_tests(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.skipped
 
 
@@ -681,7 +713,9 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 1
     assert "failed to parse" in result.stderr
 
@@ -723,5 +757,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0

@@ -66,6 +66,9 @@ class GoTestSubsystem(Subsystem):
         ),
     )
 
+    # TODO: Replace with a proper `SkipOption`.
+    skip = False
+
     def coverage_output_dir(self, distdir: DistDir, import_path: str) -> PurePath:
         import_path_escaped = import_path.replace("/", "_")
         return PurePath(

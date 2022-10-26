@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -33,6 +33,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -374,11 +375,19 @@ async def setup_pytest_for_target(
     return TestSetup(process, results_file_name=results_file_name)
 
 
+class PyTestRequest(TestRequest):
+    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
+    tool_subsystem = PyTest  # type: ignore[assignment]
+    field_set_type = PythonTestFieldSet
+
+
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
-    field_set: PythonTestFieldSet,
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
+    field_set = batch.single_element
+
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
@@ -417,8 +426,10 @@ async def run_python_test(
 
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
-async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+async def debug_python_test(
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -428,7 +439,7 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 
 @rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
 async def debugpy_python_test(
-    field_set: PythonTestFieldSet,
+    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
@@ -438,7 +449,7 @@ async def debugpy_python_test(
     setup = await Get(
         TestSetup,
         TestSetupRequest(
-            field_set,
+            batch.single_element,
             is_debug=True,
             main=debugpy.main,
             prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
@@ -480,4 +491,5 @@ def rules():
         *pytest.rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
+        *PyTestRequest.rules(),
     ]

@@ -24,3 +24,6 @@ class Scalatest(JvmToolBase):
         passthrough=True,
         extra_help="See https://www.scalatest.org/user_guide/using_the_runner for supported arguments.",
     )
+
+    # TODO: Replace with a proper `SkipOption`.
+    skip = False

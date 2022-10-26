@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.helm.target_types import HelmChartTarget, HelmUnitTestTestTarget
 from pants.backend.helm.target_types import rules as target_types_rules
-from pants.backend.helm.test.unittest import HelmUnitTestFieldSet
+from pants.backend.helm.test.unittest import HelmUnitTestFieldSet, HelmUnitTestRequest
 from pants.backend.helm.test.unittest import rules as unittest_rules
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *source_root_rules(),
             *target_types_rules(),
-            QueryRule(TestResult, (HelmUnitTestFieldSet,)),
+            QueryRule(TestResult, (HelmUnitTestRequest.Batch,)),
         ],
     )
 
@@ -72,7 +72,7 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("tests", target_name="test"))
     field_set = HelmUnitTestFieldSet.create(target)
 
-    result = rule_runner.request(TestResult, [field_set])
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
 
     assert result.exit_code == 0
     assert result.xml_results and result.xml_results.files
@@ -111,5 +111,5 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("tests", target_name="test"))
     field_set = HelmUnitTestFieldSet.create(target)
 
-    result = rule_runner.request(TestResult, [field_set])
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1

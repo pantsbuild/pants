@@ -53,6 +53,9 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         help="Output type used for the test report.",
     )
 
+    # TODO: Replace with a proper `SkipOption`.
+    skip = False
+
     def generate_exe(self, _: Platform) -> str:
         return "./untt"
 
