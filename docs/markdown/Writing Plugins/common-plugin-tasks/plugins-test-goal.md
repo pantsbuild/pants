@@ -223,7 +223,7 @@ The `batch` input will have two properties:
   1. `elements` contains all the field sets that should be tested by your runner
   2. `metadata` contains any (optional) common data about the batch returned by your partitioning rule
 
-If you didn't override the `partitioner_type` in your `TestRequest` subclass, `elements` will be a list of size 1 and `metadata` will be `None`. For convenience, you can use `batch.element` in this case to get the single field set. The `element` property will raise a `TypeError` if used on a batch with more than one element.
+If you didn't override the `partitioner_type` in your `TestRequest` subclass, `elements` will be a list of size 1 and `metadata` will be `None`. For convenience, you can use `batch.single_element` in this case to get the single field set. The `single_element` property will raise a `TypeError` if used on a batch with more than one element.
 
 7. Define `@rule`s for debug testing
 ------------------------------------

@@ -174,7 +174,7 @@ async def run_go_tests(
     test_extra_env: TestExtraEnv,
     goroot: GoRoot,
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),

@@ -175,7 +175,7 @@ async def run_scalatest_test(
     test_subsystem: TestSubsystem,
     batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any],
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
@@ -198,7 +198,7 @@ async def run_scalatest_test(
 async def setup_scalatest_debug_request(
     batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any]
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.element, is_debug=True))
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
         InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)

@@ -386,7 +386,7 @@ async def run_python_test(
     batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
@@ -429,7 +429,7 @@ async def run_python_test(
 async def debug_python_test(
     batch: PyTestRequest.Batch[PythonTestFieldSet, Any]
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.element, is_debug=True))
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -449,7 +449,7 @@ async def debugpy_python_test(
     setup = await Get(
         TestSetup,
         TestSetupRequest(
-            batch.element,
+            batch.single_element,
             is_debug=True,
             main=debugpy.main,
             prepend_argv=debugpy.get_args(debug_adapter, pytest.main),

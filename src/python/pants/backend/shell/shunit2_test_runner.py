@@ -245,7 +245,7 @@ async def setup_shunit2_for_target(
 async def run_tests_with_shunit2(
     batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any], test_subsystem: TestSubsystem
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
@@ -260,7 +260,7 @@ async def run_tests_with_shunit2(
 async def setup_shunit2_debug_test(
     batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.element))
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True

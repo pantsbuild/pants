@@ -83,7 +83,7 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     direct_dep_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),

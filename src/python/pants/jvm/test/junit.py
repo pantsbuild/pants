@@ -174,7 +174,7 @@ async def run_junit_test(
     test_subsystem: TestSubsystem,
     batch: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestResult:
-    field_set = batch.element
+    field_set = batch.single_element
 
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
@@ -197,7 +197,7 @@ async def run_junit_test(
 async def setup_junit_debug_request(
     batch: JunitTestRequest.Batch[JunitTestFieldSet, Any]
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.element, is_debug=True))
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
         InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)

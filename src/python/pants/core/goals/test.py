@@ -320,7 +320,7 @@ class TestRequest:
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
         @property
-        def element(self) -> PartitionElementT:
+        def single_element(self) -> PartitionElementT:
             """Return the single element of this batch.
 
             NOTE: Accessing this property will raise a `TypeError` if this `Batch` contains
