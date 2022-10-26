@@ -64,11 +64,13 @@ If you have a "skip" field, use it in an `opt_out` method of your subclass:
 
 ```python
 from pants.core.goals.test import TestFieldSet
+
 @dataclass(frozen=True)
 class ExampleTestFieldSet(TestFieldSet):
     required_fields = (ExamleTestSourceField,)
     sources: ExampleTestSourceField
     timeout: ExampleTestTimeoutField
+
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipExampleTestsField).value
@@ -78,6 +80,7 @@ Register your new subclass as a valid `TestFieldSet` using a `UnionRule`:
 
 ```python
 from pants.engine.unions import UnionRule
+
 def rules():
     return [
         # Add to any other existing rules here:
@@ -238,6 +241,7 @@ async def setup_example_debug_test(
     batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
 ) -> TestDebugRequest:
     ...
+
 @rule
 async def setup_example_debug_adapter_test(
     batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
