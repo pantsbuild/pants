@@ -76,7 +76,8 @@ def test_debug_goals(imports_rule_runner: RuleRunner):
                 import json  # unownable, root level
                 import os.path  # unownable, not root level
 
-                import watchdog  # dependency not included
+                import stuff  # dependency missing
+                import watchdog  # dependency included in other resolve
                 import yaml  # dependency included
 
                 try:
@@ -105,6 +106,11 @@ def test_debug_goals(imports_rule_runner: RuleRunner):
                 )
 
                 python_requirement(
+                    name="imported",
+                    requirements=["pyyaml"],
+                )
+
+                python_requirement(
                     name="other",
                     requirements=["watchdog"],
                     resolve="other",
@@ -124,7 +130,7 @@ def test_debug_goals(imports_rule_runner: RuleRunner):
     print(json.dumps(v, cls=_PeekJsonEncoder, indent=2))
 
     assert v
-    assert len(v.identified.imports) == 5
+    assert len(v.identified.imports) == 6
     assert (
         len([i for i in v.identified.imports.values() if i.weak]) == 1
     ), "did not find the weak import"
