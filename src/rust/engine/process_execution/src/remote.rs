@@ -910,11 +910,20 @@ fn maybe_add_workunit(
   }
 }
 
+/// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
+/// a particular `Process`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntireExecuteRequest {
+  pub action: Action,
+  pub command: Command,
+  pub execute_request: ExecuteRequest,
+}
+
 pub fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
-) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
+) -> Result<EntireExecuteRequest, String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
     ..remexec::Command::default()
@@ -1091,7 +1100,11 @@ pub fn make_execute_request(
     ..remexec::ExecuteRequest::default()
   };
 
-  Ok((action, command, execute_request))
+  Ok(EntireExecuteRequest {
+    action,
+    command,
+    execute_request,
+  })
 }
 
 async fn populate_fallible_execution_result_for_timeout(
