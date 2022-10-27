@@ -8,6 +8,10 @@ updatedAt: "2022-10-03T21:39:51.235Z"
 Environments
 ============
 
+> 🚧 Environments are currently in `preview`, and have not yet stabilized.
+>
+> We'd love your feedback on how Environments could be most useful to you! Please refer to [the tracking issue](https://github.com/pantsbuild/pants/issues/17355) for known stabilization blockers.
+
 By default, Pants will execute all sandboxed build work directly on localhost. But defining and using additional "environments" for particular targets allows Pants to transparently execute some or all of your build either:
 1. locally in Docker containers
 2. remotely via [remote execution](doc:remote-execution)
@@ -62,8 +66,6 @@ The `environment=` field may either:
 1. refer to an environment by name
 2. use a special `__local__` environment name, which resolves to any matching `local_environment` (see "Environment matching" below)
 
-Test targets additionally have a `runtime_environment=` field (_TODO: see workflow example below, and implement_) which defaults to the value of the target's `environment=` field, but which can be set explicitly to indicate that a test should execute in a different environment than it was built in. This can be used to enable cross-building (where a test is built on one platform, but executed on another), or to explicitly provide tools or running services at test runtime which would not otherwise be available.
-
 > 🚧 Environment compatibility
 > 
 > Currently, there is no static validation that a target's environment is compatible with its dependencies' environments -- only the implicit validation of the goals that you run successfully against those targets (`check`, `lint`, `test`, `package`, etc).
@@ -98,7 +100,7 @@ A single environment name may end up referring to different environment targets 
 * `docker_environment` targets will match [if Docker is enabled](doc:reference-global#docker_execution), and if their `platform=` field is compatible with localhost's platform.
 * `remote_environment` targets will match [if Remote execution is enabled](doc:reference-global#remote_execution).
 
-It a particular environment target _doesn't_ match, it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain.
+If a particular environment target _doesn't_ match, it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain.
 
 For example: a chain like "prefer remote execution if enabled, but fall back to local execution if the platform matches, otherwise use docker" might be configured via the targets:
 ```python BUILD
@@ -191,12 +193,6 @@ docker_image(
 > Note that the Docker image used in your `docker_environment` does not need to match the base image of the `docker_image` targets that consume them: they only need to be compatible. This is because execution of build steps in a `docker_environment` occurs in an anonymous container, and only the required inputs are provided to the `docker_image` build.
 >
 > This means that your `docker_environment` can include things like compilers or other tools relevant to your build, without needing to manually use multi-stage Docker builds.
-
-### Execute a test in Docker, while natively cross-building it
-
-_TODO: Like https://github.com/pantsbuild/pants/issues/15764, but for tests._
-
-_TODO: Give an example of using `environment=` vs `runtime_environment=` to use docker only for test execution, but not for building of thirdparty dependencies by using PEX to cross-build. This will require exposing options out of PEX to override (?) the target platform, and figuring out how that doesn't break `check` is an open question._
 
 ### Toggle use of an environment for some consumers
 
