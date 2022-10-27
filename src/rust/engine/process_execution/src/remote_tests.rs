@@ -147,7 +147,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
+    crate::remote::make_execute_request(&req, None, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -244,7 +244,7 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None,),
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None,).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -339,7 +339,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()),),
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()),).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -409,7 +409,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
+    crate::remote::make_execute_request(&req, None, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -503,7 +503,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
+    crate::remote::make_execute_request(&req, None, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -592,7 +592,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
+    crate::remote::make_execute_request(&req, None, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -707,7 +707,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
+    crate::remote::make_execute_request(&req, None, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -727,6 +727,7 @@ async fn successful_with_only_call_to_execute() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -768,6 +769,7 @@ async fn successful_after_reconnect_with_wait_execution() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -813,6 +815,7 @@ async fn successful_after_reconnect_from_retryable_error() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     let execute_request_2 = execute_request.clone();
@@ -868,6 +871,7 @@ async fn dropped_request_cancels() {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
         execute_request: crate::remote::make_execute_request(&request, None, None)
+          .await
           .unwrap()
           .execute_request,
         stream_responses: Ok(vec![
@@ -922,6 +926,7 @@ async fn server_rejecting_execute_request_gives_error() {
         None,
         None,
       )
+      .await
       .unwrap()
       .execute_request,
       stream_responses: Err(Status::invalid_argument("".to_owned())),
@@ -947,6 +952,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -976,6 +982,7 @@ async fn sends_headers() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1169,6 +1176,7 @@ async fn ensure_inline_stdio_is_stored() {
     let EntireExecuteRequest {
       execute_request, ..
     } = crate::remote::make_execute_request(&echo_roland_request().try_into().unwrap(), None, None)
+      .await
       .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1267,6 +1275,7 @@ async fn bad_result_bytes() {
           None,
           None,
         )
+        .await
         .unwrap()
         .execute_request,
         stream_responses: Ok(vec![
@@ -1306,6 +1315,7 @@ async fn initial_response_error() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1348,6 +1358,7 @@ async fn initial_response_missing_response_and_error() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1385,6 +1396,7 @@ async fn fails_after_retry_limit_exceeded() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1439,6 +1451,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
       execute_request, ..
     } =
       crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
+        .await
         .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1495,6 +1508,7 @@ async fn execute_missing_file_uploads_if_known() {
     let EntireExecuteRequest {
       execute_request, ..
     } = crate::remote::make_execute_request(&cat_roland_request().try_into().unwrap(), None, None)
+      .await
       .unwrap();
 
     mock::execution_server::TestServer::new(
@@ -1514,6 +1528,7 @@ async fn execute_missing_file_uploads_if_known() {
             None,
             None,
           )
+          .await
           .unwrap()
           .execute_request,
           stream_responses: Ok(vec![

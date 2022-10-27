@@ -957,14 +957,16 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(
+pub async fn digest(
   process: &Process,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
 ) -> Digest {
   let EntireExecuteRequest {
     execute_request, ..
-  } = remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
+  } = remote::make_execute_request(process, instance_name, process_cache_namespace)
+    .await
+    .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

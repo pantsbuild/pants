@@ -162,7 +162,7 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   ]);
   let EntireExecuteRequest {
     action, command, ..
-  } = make_execute_request(&process, None, None).unwrap();
+  } = make_execute_request(&process, None, None).await.unwrap();
   let (_command_digest, action_digest) =
     ensure_action_stored_locally(&store_setup.store, &command, &action)
       .await
