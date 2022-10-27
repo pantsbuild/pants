@@ -14,7 +14,11 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
-from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
+from pants.backend.python.goals.pytest_runner import (
+    PytestPluginSetup,
+    PytestPluginSetupRequest,
+    PyTestRequest,
+)
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -64,9 +68,9 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *setup_py.rules(),
-            QueryRule(TestResult, (PythonTestFieldSet,)),
-            QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
-            QueryRule(TestDebugAdapterRequest, (PythonTestFieldSet,)),
+            QueryRule(TestResult, (PyTestRequest.Batch,)),
+            QueryRule(TestDebugRequest, (PyTestRequest.Batch,)),
+            QueryRule(TestDebugAdapterRequest, (PyTestRequest.Batch,)),
         ],
         target_types=[
             PexBinary,
@@ -113,9 +117,11 @@ def run_pytest(
     env: dict[str, str] | None = None,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
-    test_result = rule_runner.request(TestResult, inputs)
-    debug_request = rule_runner.request(TestDebugRequest, inputs)
+    input: PyTestRequest.Batch = PyTestRequest.Batch(
+        "", (PythonTestFieldSet.create(test_target),), None
+    )
+    test_result = rule_runner.request(TestResult, [input])
+    debug_request = rule_runner.request(TestDebugRequest, [input])
     if debug_request.process is not None:
         with mock_console(rule_runner.options_bootstrapper):
             debug_result = rule_runner.run_interactive_process(debug_request.process)
@@ -131,8 +137,9 @@ def run_pytest_noninteractive(
     env: dict[str, str] | None = None,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
-    return rule_runner.request(TestResult, inputs)
+    return rule_runner.request(
+        TestResult, [PyTestRequest.Batch("", (PythonTestFieldSet.create(test_target),), None)]
+    )
 
 
 def run_pytest_interactive(
@@ -143,8 +150,9 @@ def run_pytest_interactive(
     env: dict[str, str] | None = None,
 ) -> InteractiveProcessResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
-    inputs = [PythonTestFieldSet.create(test_target)]
-    debug_request = rule_runner.request(TestDebugRequest, inputs)
+    debug_request = rule_runner.request(
+        TestDebugRequest, [PyTestRequest.Batch("", (PythonTestFieldSet.create(test_target),), None)]
+    )
     with mock_console(rule_runner.options_bootstrapper):
         return rule_runner.run_interactive_process(debug_request.process)
 
@@ -709,8 +717,9 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
     )
-    inputs = [PythonTestFieldSet.create(tgt)]
-    request = rule_runner.request(TestDebugAdapterRequest, inputs)
+    request = rule_runner.request(
+        TestDebugAdapterRequest, [PyTestRequest.Batch("", (PythonTestFieldSet.create(tgt),), None)]
+    )
     assert request.process is not None
     assert request.process.process.argv == (
         "./pytest_runner.pex_pex_shim.sh",

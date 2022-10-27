@@ -806,11 +806,18 @@ impl crate::CommandRunner for CommandRunner {
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, execute_request) = make_execute_request(
+    let EntireExecuteRequest {
+      action,
+      command,
+      execute_request,
+      input_root_digest,
+    } = make_execute_request(
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
-    )?;
+      &self.store,
+    )
+    .await?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
@@ -832,7 +839,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete.clone()),
+      Some(input_root_digest),
     )
     .await?;
 
@@ -910,11 +917,22 @@ fn maybe_add_workunit(
   }
 }
 
-pub fn make_execute_request(
+/// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
+/// a particular `Process`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntireExecuteRequest {
+  pub action: Action,
+  pub command: Command,
+  pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
+}
+
+pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
-) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
+  _store: &Store,
+) -> Result<EntireExecuteRequest, String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
     ..remexec::Command::default()
@@ -1070,9 +1088,11 @@ pub fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
+  let input_root_digest = req.input_digests.complete.clone();
+
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
     ..remexec::Action::default()
   };
 
@@ -1091,7 +1111,12 @@ pub fn make_execute_request(
     ..remexec::ExecuteRequest::default()
   };
 
-  Ok((action, command, execute_request))
+  Ok(EntireExecuteRequest {
+    action,
+    command,
+    execute_request,
+    input_root_digest,
+  })
 }
 
 async fn populate_fallible_execution_result_for_timeout(

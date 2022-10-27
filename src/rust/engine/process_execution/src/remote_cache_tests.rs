@@ -18,7 +18,7 @@ use store::Store;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
-use crate::remote::{ensure_action_stored_locally, make_execute_request};
+use crate::remote::{ensure_action_stored_locally, make_execute_request, EntireExecuteRequest};
 use crate::{
   CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
@@ -160,7 +160,11 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   let process = Process::new(vec![
     "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
-  let (action, command, _exec_request) = make_execute_request(&process, None, None).unwrap();
+  let EntireExecuteRequest {
+    action, command, ..
+  } = make_execute_request(&process, None, None, &store_setup.store)
+    .await
+    .unwrap();
   let (_command_digest, action_digest) =
     ensure_action_stored_locally(&store_setup.store, &command, &action)
       .await

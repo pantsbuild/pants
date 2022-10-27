@@ -21,7 +21,9 @@ use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
-use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
+use crate::remote::{
+  apply_headers, make_execute_request, populate_fallible_execution_result, EntireExecuteRequest,
+};
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
   Process, ProcessCacheScope, ProcessError, ProcessResultSource,
@@ -466,11 +468,15 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, _execute_request) = make_execute_request(
+    let EntireExecuteRequest {
+      action, command, ..
+    } = make_execute_request(
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
-    )?;
+      &self.store,
+    )
+    .await?;
     let failures_cached = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.

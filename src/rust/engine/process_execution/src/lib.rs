@@ -89,6 +89,8 @@ pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
+use crate::remote::EntireExecuteRequest;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProcessError {
   /// A Digest was not present in either of the local or remote Stores.
@@ -955,13 +957,17 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(
+pub async fn digest(
   process: &Process,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  store: &Store,
 ) -> Digest {
-  let (_, _, execute_request) =
-    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
+  let EntireExecuteRequest {
+    execute_request, ..
+  } = remote::make_execute_request(process, instance_name, process_cache_namespace, store)
+    .await
+    .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

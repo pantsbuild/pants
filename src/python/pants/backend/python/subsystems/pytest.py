@@ -146,6 +146,9 @@ class PyTest(PythonToolBase):
 
     export = ExportToolOption()
 
+    # TODO: Replace with a proper `SkipOption`.
+    skip = False
+
     @property
     def all_requirements(self) -> tuple[str, ...]:
         return (self.version, *self.extra_requirements)
