@@ -1436,7 +1436,10 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result.to_string(), "Internal: Something went wrong");
+  assert_eq!(
+    result.to_string(),
+    "Error from remote execution: InvalidArgument: \"Execute endpoint called. Did not expect this call.\""
+  );
 }
 
 #[tokio::test]
