@@ -474,6 +474,7 @@ impl crate::CommandRunner for CommandRunner {
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
+      &self.store,
     )
     .await?;
     let failures_cached = request.cache_scope == ProcessCacheScope::Always;

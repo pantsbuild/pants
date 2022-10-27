@@ -814,6 +814,7 @@ impl crate::CommandRunner for CommandRunner {
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
+      &self.store,
     )
     .await?;
     let build_id = context.build_id.clone();
@@ -928,6 +929,7 @@ pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
+  _store: &Store,
 ) -> Result<EntireExecuteRequest, String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),

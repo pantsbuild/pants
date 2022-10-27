@@ -77,9 +77,14 @@ impl crate::CommandRunner for CommandRunner {
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
       digest: Some(
-        crate::digest(&req, None, self.process_cache_namespace.clone())
-          .await
-          .into(),
+        crate::digest(
+          &req,
+          None,
+          self.process_cache_namespace.clone(),
+          &self.file_store,
+        )
+        .await
+        .into(),
       ),
       key_type: CacheKeyType::Process.into(),
     };

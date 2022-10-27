@@ -961,10 +961,11 @@ pub async fn digest(
   process: &Process,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  store: &Store,
 ) -> Digest {
   let EntireExecuteRequest {
     execute_request, ..
-  } = remote::make_execute_request(process, instance_name, process_cache_namespace)
+  } = remote::make_execute_request(process, instance_name, process_cache_namespace, store)
     .await
     .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()

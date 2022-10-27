@@ -92,7 +92,7 @@ impl NailgunPool {
   ) -> Result<BorrowedNailgunProcess, ProcessError> {
     let name = server_process.description.clone();
     let requested_fingerprint =
-      NailgunProcessFingerprint::new(name.clone(), &server_process).await?;
+      NailgunProcessFingerprint::new(name.clone(), &server_process, &self.store).await?;
     let semaphore_acquisition = self.sema.clone().acquire_owned();
     let permit = in_workunit!(
       "acquire_nailgun_process",
@@ -427,8 +427,8 @@ struct NailgunProcessFingerprint {
 }
 
 impl NailgunProcessFingerprint {
-  pub async fn new(name: String, nailgun_req: &Process) -> Result<Self, String> {
-    let nailgun_req_digest = crate::digest(nailgun_req, None, None).await;
+  pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
+    let nailgun_req_digest = crate::digest(nailgun_req, None, None, store).await;
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,
