@@ -155,7 +155,8 @@ async fn make_execute_request() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -256,7 +257,8 @@ async fn make_execute_request_with_instance_name() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -355,7 +357,8 @@ async fn make_execute_request_with_cache_key_gen_version() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -429,7 +432,8 @@ async fn make_execute_request_with_jdk() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -527,7 +531,8 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -620,7 +625,8 @@ async fn make_execute_request_with_timeout() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
     })
   );
 }
@@ -735,7 +741,8 @@ async fn make_execute_request_using_immutable_inputs() {
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
-      execute_request: want_execute_request
+      execute_request: want_execute_request,
+      input_root_digest: expected_digest,
     })
   );
 }

@@ -810,6 +810,7 @@ impl crate::CommandRunner for CommandRunner {
       action,
       command,
       execute_request,
+      input_root_digest,
     } = make_execute_request(
       &request,
       self.instance_name.clone(),
@@ -838,7 +839,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete.clone()),
+      Some(input_root_digest),
     )
     .await?;
 
@@ -923,6 +924,7 @@ pub struct EntireExecuteRequest {
   pub action: Action,
   pub command: Command,
   pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
 }
 
 pub async fn make_execute_request(
@@ -1086,9 +1088,11 @@ pub async fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
+  let input_root_digest = req.input_digests.complete.clone();
+
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
     ..remexec::Action::default()
   };
 
@@ -1111,6 +1115,7 @@ pub async fn make_execute_request(
     action,
     command,
     execute_request,
+    input_root_digest,
   })
 }
 
