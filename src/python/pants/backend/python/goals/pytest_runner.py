@@ -396,7 +396,7 @@ async def run_python_test(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([".coverage"]))
         )
         if coverage_snapshot.files == (".coverage",):
-            coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
+            coverage_data = PytestCoverageData((field_set.address,), coverage_snapshot.digest)
         else:
             logger.warning(f"Failed to generate coverage data for {field_set.address}.")
 
