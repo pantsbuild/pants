@@ -362,8 +362,8 @@ pub struct WorkunitMetadata {
 #[derive(Clone, Debug)]
 pub enum UserMetadataItem {
   PyValue(Arc<dyn Value>),
-  ImmediateInt(i64),
-  ImmediateString(String),
+  Int(i64),
+  String(String),
 }
 
 #[derive(Clone)]

@@ -466,15 +466,15 @@ impl ExecuteProcess {
             user_metadata: vec![
               (
                 "definition".to_string(),
-                UserMetadataItem::ImmediateString(definition),
+                UserMetadataItem::String(definition),
               ),
               (
                 "source".to_string(),
-                UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+                UserMetadataItem::String(format!("{:?}", res.metadata.source)),
               ),
               (
                 "exit_code".to_string(),
-                UserMetadataItem::ImmediateInt(res.exit_code as i64),
+                UserMetadataItem::Int(res.exit_code as i64),
               ),
             ],
             ..initial

@@ -40,8 +40,8 @@ use hashing::{Digest, Fingerprint};
 use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use task_executor::Executor;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
-  WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
@@ -853,6 +853,10 @@ impl crate::CommandRunner for CommandRunner {
       // renders at the Process's level.
       request.level,
       desc = Some(request.description.clone()),
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
