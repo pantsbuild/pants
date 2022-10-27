@@ -118,9 +118,7 @@ class TestResult(EngineAwareReturnType):
             addresses=tuple(field_set.address for field_set in batch.elements),
             output_setting=output_setting,
             result_metadata=None,
-            partition_description=(
-                batch.partition_metadata.description if batch.partition_metadata else None
-            ),
+            partition_description=batch.partition_metadata.description,
         )
 
     @staticmethod
@@ -169,9 +167,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
-            partition_description=(
-                batch.partition_metadata.description if batch.partition_metadata else None
-            ),
+            partition_description=batch.partition_metadata.description,
         )
 
     @property
@@ -330,7 +326,7 @@ class TestRequest:
 
             if len(self.elements) != 1:
                 description = ""
-                if self.partition_metadata:
+                if self.partition_metadata.description:
                     description = f" from partition '{self.partition_metadata.description}'"
                 raise TypeError(
                     f"Expected a single element in batch{description}, but found {len(self.elements)}"
@@ -728,7 +724,7 @@ async def get_batch_environment(batch: TestRequest.Batch) -> EnvironmentName:
     unique_environments = len({name.val for name in environment_names_per_element})
     if unique_environments != 1:
         batch_description = "Test batch"
-        if batch.partition_metadata:
+        if batch.partition_metadata.description:
             batch_description = f"{batch_description} '{batch.partition_metadata.description}'"
 
         raise AssertionError(

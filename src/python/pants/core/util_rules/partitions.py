@@ -8,7 +8,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Generic, Iterable, TypeVar
+from typing import Generic, Iterable, TypeVar, overload
 
 from typing_extensions import Protocol
 
@@ -76,8 +76,14 @@ class PartitionerType(Enum):
 
 class PartitionMetadata(Protocol):
     @property
-    def description(self) -> str:
+    def description(self) -> str | None:
         ...
+
+
+class _EmptyMetadata:
+    @property
+    def description(self) -> None:
+        return None
 
 
 PartitionMetadataT = TypeVar("PartitionMetadataT", bound=PartitionMetadata)
@@ -102,7 +108,7 @@ class Partition(Generic[PartitionElementT, PartitionMetadataT]):
     """
 
     elements: tuple[PartitionElementT, ...]
-    metadata: PartitionMetadataT | None
+    metadata: PartitionMetadataT
 
 
 @runtime_ignore_subscripts
@@ -122,12 +128,31 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
             and files ABC with Py2.
     """
 
+    # NOTE: We have to redefine type-vars here for use in the `classmethod`s below because in this scope
+    # `PartitionElementT` and `PartitionMetadataT` are no longer generic.
+    _MetadataT = TypeVar("_MetadataT", bound=PartitionMetadata)
+    _ElementT = TypeVar("_ElementT")
+
+    @overload
     @classmethod
     def single_partition(
-        cls, elements: Iterable[PartitionElementT], metadata: PartitionMetadataT | None = None
-    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
+        cls, elements: Iterable[_ElementT]
+    ) -> Partitions[_ElementT, _EmptyMetadata]:
+        ...
+
+    @overload
+    @classmethod
+    def single_partition(
+        cls, elements: Iterable[_ElementT], *, metadata: _MetadataT
+    ) -> Partitions[_ElementT, _MetadataT]:
+        ...
+
+    @classmethod
+    def single_partition(
+        cls, elements: Iterable[_ElementT], *, metadata: _MetadataT | None = None
+    ) -> Partitions:
         """Helper constructor for implementations that have only one partition."""
-        return Partitions([Partition(tuple(elements), metadata)])
+        return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
 
 
 # NB: Not frozen so it can be subclassed
@@ -143,7 +168,7 @@ class _BatchBase(Generic[PartitionElementT, PartitionMetadataT]):
 
     tool_name: str
     elements: tuple[PartitionElementT, ...]
-    partition_metadata: PartitionMetadataT | None
+    partition_metadata: PartitionMetadataT
 
 
 @dataclass(frozen=True)
@@ -184,7 +209,7 @@ def _single_partition_field_set_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[FieldSet, Any]:
+    ) -> Partitions[FieldSet, _EmptyMetadata]:
         return Partitions() if subsystem.skip else Partitions.single_partition(request.field_sets)
 
     return collect_rules(locals())
@@ -207,7 +232,7 @@ def _single_partition_file_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[str, Any]:
+    ) -> Partitions[str, _EmptyMetadata]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
@@ -240,11 +265,13 @@ def _partition_per_input_field_set_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[FieldSet, Any]:
+    ) -> Partitions[FieldSet, _EmptyMetadata]:
         return (
             Partitions()
             if subsystem.skip
-            else Partitions(Partition((field_set,), None) for field_set in request.field_sets)
+            else Partitions(
+                Partition((field_set,), _EmptyMetadata()) for field_set in request.field_sets
+            )
         )
 
     return collect_rules(locals())
@@ -267,7 +294,7 @@ def _partition_per_input_file_rules(cls) -> Iterable:
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
-    ) -> Partitions[str, Any]:
+    ) -> Partitions[str, _EmptyMetadata]:
         assert sources_field_name is not None
         all_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(getattr(field_set, sources_field_name)))
@@ -278,7 +305,7 @@ def _partition_per_input_file_rules(cls) -> Iterable:
             Partitions()
             if subsystem.skip
             else Partitions(
-                Partition((path,), None)
+                Partition((path,), _EmptyMetadata())
                 for path in itertools.chain.from_iterable(
                     sources_paths.files for sources_paths in all_sources_paths
                 )
