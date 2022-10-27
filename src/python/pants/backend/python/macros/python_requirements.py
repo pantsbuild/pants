@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import os
 from typing import Iterable
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -29,6 +30,7 @@ from pants.core.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -112,7 +114,18 @@ async def generate_from_python_requirement(
     )
     lockfile = python_setup.resolves.get(resolve) if python_setup.enable_resolves else None
     if lockfile:
-        req_deps.append(f"{lockfile}:{resolve}")
+        target_adaptor = await Get(
+            TargetAdaptor,
+            TargetAdaptorRequest(
+                description_of_origin=f"python_requirements lockfile dep for the {resolve} resolve",
+                address=Address(
+                    os.path.dirname(lockfile),
+                    target_name=resolve,
+                ),
+            ),
+        )
+        if target_adaptor.type_alias == "_lockfiles":
+            req_deps.append(f"{lockfile}:{resolve}")
 
     digest_contents = await Get(
         DigestContents,

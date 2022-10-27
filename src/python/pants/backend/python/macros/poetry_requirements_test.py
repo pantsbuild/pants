@@ -9,6 +9,7 @@ from textwrap import dedent
 import pytest
 from packaging.version import Version
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirementsTargetGenerator,
@@ -438,6 +439,7 @@ def test_parse_multi_reqs() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *lockfile.rules(),
             *poetry_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
