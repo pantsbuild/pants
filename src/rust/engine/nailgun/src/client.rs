@@ -143,7 +143,7 @@ pub async fn client_execute(
           (i.e. OOM-killed). If you keep seeing this error message, try the troubleshooting steps below. \
           If none of those help, please consider filing a GitHub issue or reaching out on Slack so that we can \
           investigate the possible memory overconsumption (https://www.pantsbuild.org/docs/getting-help).\n \
-          - Exit all other applications, including applications running in the background.\n \
+          - Exit other applications, including applications running in the background.\n \
           - Set the global option `--pantsd-max-memory-usage` to reduce Pantsd's memory consumption by retaining \
             less in its in-memory cache (run `./pants help-advanced global`).\n \
           - Disable pantsd with the global option `--no-pantsd` to avoid persisting memory across Pants runs, \
