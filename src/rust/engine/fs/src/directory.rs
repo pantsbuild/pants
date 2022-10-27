@@ -617,11 +617,12 @@ impl DigestTrie {
       ));
       f(&PathBuf::new(), &root);
     }
-    self.walk_helper(PathBuf::new(), symlink_behavior, 0, f)
+    self.walk_helper(self, PathBuf::new(), symlink_behavior, 0, f)
   }
 
   fn walk_helper(
     &self,
+    root: &DigestTrie,
     path_so_far: PathBuf,
     symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
@@ -629,6 +630,7 @@ impl DigestTrie {
   ) {
     for entry in &*self.0 {
       self.walk_entry(
+        root,
         entry,
         &path_so_far.join(entry.name().as_ref()),
         symlink_behavior,
@@ -640,6 +642,7 @@ impl DigestTrie {
 
   fn walk_entry(
     &self,
+    root: &DigestTrie,
     entry: &Entry,
     path: &PathBuf,
     symlink_behavior: SymlinkBehavior,
@@ -648,20 +651,33 @@ impl DigestTrie {
   ) {
     match (&symlink_behavior, entry) {
       (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
-        warn!("Symlink {} pointing to {}", s.name, s.target.display());
-        if let Ok(Some(target_entry)) = self.entry(&s.target) {
+        let mut tree = self;
+        let mut target = s.target.clone();
+        if target.starts_with("../") {
+          tree = root;
+          target = path.parent().unwrap().join(s.target.clone());
+        }
+
+        if let Ok(Some(target_entry)) = tree.entry_helper(root, &target, link_depth) {
           if link_depth >= MAX_LINK_DEPTH {
             // We don't return a Result, so log and move on
             warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
           } else {
-            self.walk_entry(target_entry, path, symlink_behavior, link_depth + 1, f);
+            self.walk_entry(
+              root,
+              target_entry,
+              path,
+              symlink_behavior,
+              link_depth + 1,
+              f,
+            );
           }
-        };
+        }
       }
       (_, Entry::Directory(d)) => {
         f(path, entry);
         d.tree
-          .walk_helper(path.to_path_buf(), symlink_behavior, link_depth, f);
+          .walk_helper(root, path.to_path_buf(), symlink_behavior, link_depth, f);
       }
       _ => f(path, entry),
     };
@@ -880,17 +896,41 @@ impl DigestTrie {
   }
 
   /// Return the Entry at the given relative path in the trie, or None if no such path was present.
+
+  /// If a directory component is a symlink, will follow the symlink. Will not follow a symlink if
+  /// it is the final component (E.g. will follow symlink `b` for `a/b/c` but not `a/b`).
+  /// Cannot follow a symlink above `self` (returns None).
   ///
-  /// An error will be returned if the given path attempts to traverse below a file entry.
+  /// An error will be returned if the given path attempts to traverse below a file entry or symlink.
   pub fn entry<'a>(&'a self, path: &Path) -> Result<Option<&'a Entry>, String> {
+    self.entry_helper(self, path, 0)
+  }
+
+  fn entry_helper<'a>(
+    &'a self,
+    root: &'a DigestTrie,
+    requested_path: &Path,
+    link_depth: LinkDepth,
+  ) -> Result<Option<&'a Entry>, String> {
     let mut tree = self;
     let mut path_so_far = PathBuf::new();
-    let mut components = path.components().peekable();
+    let mut components = requested_path.components().peekable();
     while let Some(component) = components.next() {
       path_so_far.push(component);
       let component = component.as_os_str();
 
-      let matching_entry = tree
+      if component == ".." {
+        if let Some(parent) = path_so_far.parent().unwrap().parent() {
+          return self.entry_helper(
+            root,
+            &parent.join(requested_path.strip_prefix(path_so_far.clone()).unwrap()),
+            link_depth,
+          );
+        }
+        return Ok(None); // We're out of ancestors, so we've gone above the tree
+      }
+
+      let maybe_matching_entry = tree
         .entries()
         .binary_search_by_key(&component, |entry| {
           Path::new(entry.name().as_ref()).as_os_str()
@@ -898,31 +938,75 @@ impl DigestTrie {
         .ok()
         .map(|idx| &tree.entries()[idx]);
       if components.peek().is_none() {
-        return Ok(matching_entry);
+        return Ok(maybe_matching_entry);
+      }
+      if maybe_matching_entry.is_none() {
+        return Ok(None);
       }
 
-      // We need to descend further, so the entry must be a Directory.
-      tree = match matching_entry {
-        Some(Entry::Directory(d)) => &d.tree,
-        None => return Ok(None),
-        Some(Entry::File(_)) => {
-          return Err(format!(
-            "{tree_digest:?} cannot contain a path at {path:?}, \
-             because a file was encountered at {path_so_far:?}.",
-            tree_digest = self.compute_root_digest()
-          ))
-        }
-        Some(Entry::Symlink(_)) => {
-          return Err(format!(
-            "{tree_digest:?} cannot contain a path at {path:?}, \
-             because a symlink was encountered at {path_so_far:?}.",
-            tree_digest = self.compute_root_digest()
-          ))
-        }
-      };
+      // We need to descend further
+      if let Some(subtree) = self.tree_for_entry(
+        root,
+        requested_path,
+        maybe_matching_entry.unwrap(),
+        &path_so_far,
+        link_depth,
+      )? {
+        tree = subtree;
+      } else {
+        return Ok(None);
+      }
     }
 
     Ok(None)
+  }
+
+  fn tree_for_entry<'a>(
+    &'a self,
+    root: &'a DigestTrie,
+    requested_path: &Path,
+    entry: &'a Entry,
+    entry_path: &Path,
+    link_depth: LinkDepth,
+  ) -> Result<Option<&'a DigestTrie>, String> {
+    match entry {
+      Entry::Directory(d) => Ok(Some(&d.tree)),
+      Entry::File(_) => Err(format!(
+        "{tree_digest:?} cannot contain a path at {requested_path:?}, \
+           because a file was encountered at {entry_path:?}.",
+        tree_digest = self.compute_root_digest()
+      )),
+      Entry::Symlink(s) => {
+        let mut ancestor_path = entry_path.parent().unwrap();
+        let mut full_target = ancestor_path.join(s.target.clone());
+        while let Ok(stripped_target) = full_target.strip_prefix(ancestor_path.join("../")) {
+          if let Some(ancestor) = ancestor_path.parent() {
+            ancestor_path = ancestor;
+            full_target = ancestor_path.join(stripped_target).clone();
+          } else {
+            return Ok(None); // We're out of ancestors, so we've gone above the tree
+          }
+        }
+        let mut tree = root;
+        let mut target = full_target.clone();
+        if let Ok(stripped_target) = full_target.strip_prefix(entry_path.parent().unwrap()) {
+          tree = self;
+          target = stripped_target.to_path_buf();
+        }
+
+        if let Some(target_entry) = tree.entry_helper(root, &target, link_depth + 1)? {
+          tree.tree_for_entry(
+            root,
+            requested_path,
+            target_entry,
+            &entry_path.join(target_entry.name().as_ref()),
+            link_depth + 1,
+          )
+        } else {
+          Ok(None)
+        }
+      }
+    }
   }
 
   /// Given DigestTries, merge them recursively into a single DigestTrie.

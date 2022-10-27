@@ -118,7 +118,7 @@ class DigestEntries(Collection[Union[FileEntry, SymlinkEntry, Directory]]):
     """The indirect file contents of a Digest.
 
     DigestEntries is a collection of FileEntry/SymlinkEntry/Directory instances representing,
-    respecively, actual files, actual symlinks, and empty directories present in the Digest.
+    respectively, actual files, actual symlinks, and empty directories present in the Digest.
     """
 
 

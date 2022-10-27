@@ -470,69 +470,90 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
     )
 
 
-@logging
-def test_snapshot_and_contents_are_symlink_oblivious(rule_runner: RuleRunner) -> None:
-    digest = rule_runner.request(
-        Digest,
-        [
+@pytest.mark.parametrize(
+    "create_digest, files, dirs",
+    [
+        pytest.param(
             CreateDigest(
                 [
                     FileContent("file.txt", b"four\n"),
-                    FileContent("a/file.txt", b"four\n"),
-                    FileContent("a/file2.txt", b"four\n"),
-                    Directory("b"),
-                    SymlinkEntry("a/ignored.ln", "./locally_nonexistant.txt"),
-                    SymlinkEntry("a/followed.ln", "file.txt"),
-                    SymlinkEntry("a/followed2.ln", "file2.txt"),
-                    SymlinkEntry("a/followed-dotslash.ln", "./file.txt"),
-                    SymlinkEntry("a/followed2-dotslash.ln", "./file2.txt"),
-                    SymlinkEntry("followed-dir", "a"),
-                    SymlinkEntry("followed-followed-dir", "followed-dir"),
-                    SymlinkEntry("followed-file.ln", "file.txt"),
-                    SymlinkEntry("followed-subfile.ln", "a/file.txt"),
-                    SymlinkEntry("followed-file.ln.ln", "followed-file.ln"),
-                    SymlinkEntry("ignored.ln", "nonexistant.txt"),
-                    SymlinkEntry("followed-empty-dir", "b"),
-                    SymlinkEntry("circular", "./circular"),  # Should be ignored
+                    SymlinkEntry("symlink", "file.txt"),
+                    SymlinkEntry("a/symlink", "../file.txt"),
+                    SymlinkEntry("a/b/symlink", "../../file.txt"),
                 ]
-            )
-        ],
-    )
-    expected_filelist = (
-        "a/file.txt",
-        "a/file2.txt",
-        "a/followed-dotslash.ln",
-        "a/followed.ln",
-        "a/followed2-dotslash.ln",
-        "a/followed2.ln",
-        "file.txt",
-        "followed-dir/file.txt",
-        "followed-dir/file2.txt",
-        "followed-dir/followed-dotslash.ln",
-        "followed-dir/followed.ln",
-        "followed-dir/followed2-dotslash.ln",
-        "followed-dir/followed2.ln",
-        "followed-file.ln",
-        "followed-file.ln.ln",
-        "followed-followed-dir/file.txt",
-        "followed-followed-dir/file2.txt",
-        "followed-followed-dir/followed-dotslash.ln",
-        "followed-followed-dir/followed.ln",
-        "followed-followed-dir/followed2-dotslash.ln",
-        "followed-followed-dir/followed2.ln",
-        "followed-subfile.ln",
-    )
+            ),
+            ("a/b/symlink", "a/symlink", "file.txt", "symlink"),
+            ("a", "a/b"),
+            id="simple",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("circular", "./circular"),  # After so many traversals, we give up
+                    SymlinkEntry(
+                        "a/symlink", "file.txt"
+                    ),  # looks for a/file.txt, which doesn't exist
+                    SymlinkEntry("a/too-far.ln", "../../file.txt"),  # went too far up
+                    SymlinkEntry("too-far.ln", "../file.txt"),  # went too far up
+                ]
+            ),
+            ("file.txt",),
+            ("a",),
+            id="ignored",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("a/b/parent-file.ln", "../../file.txt"),
+                    SymlinkEntry("dirlink", "a"),
+                ]
+            ),
+            ("a/b/parent-file.ln", "dirlink/b/parent-file.ln", "file.txt"),
+            ("a", "a/b", "dirlink", "dirlink/b"),
+            id="parentdir-in-symlink-target",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("dirlink", "a"),
+                    SymlinkEntry("double-dirlink", "dirlink"),
+                ]
+            ),
+            ("a/file.txt", "dirlink/file.txt", "double-dirlink/file.txt"),
+            ("a", "dirlink", "double-dirlink"),
+            id="double-dirlink",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("a/dirlink", "../b/c/d"),
+                    SymlinkEntry("b/c/d/link", "../../file.txt"),
+                ]
+            ),
+            # NOTE: No "b/c/d/link", because that'd result in "a/file.txt"
+            ("a/dirlink/link", "file.txt"),
+            ("a", "a/dirlink", "b", "b/c", "b/c/d"),
+            id="symlink-makes-updir-valid",
+        ),
+    ],
+)
+@logging
+def test_snapshot_and_contents_are_symlink_oblivious(
+    rule_runner: RuleRunner,
+    create_digest: CreateDigest,
+    files: tuple[str, ...],
+    dirs: tuple[str, ...],
+) -> None:
+    digest = rule_runner.request(Digest, [create_digest])
     snapshot = rule_runner.request(Snapshot, [digest])
-    assert snapshot.files == expected_filelist
-    assert snapshot.dirs == (
-        "a",
-        "b",
-        "followed-dir",
-        "followed-empty-dir",
-        "followed-followed-dir",
-    )
+    assert snapshot.files == files
+    assert snapshot.dirs == dirs
     contents = rule_runner.request(DigestContents, [digest])
-    assert tuple(content.path for content in contents) == expected_filelist
+    assert tuple(content.path for content in contents) == files
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
