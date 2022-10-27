@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -118,24 +120,25 @@ class AllPytestPluginSetups(Collection[PytestPluginSetup]):
 # TODO: Why is this necessary? We should be able to use `PythonTestFieldSet` as the rule param.
 @dataclass(frozen=True)
 class AllPytestPluginSetupsRequest:
-    address: Address
+    addresses: tuple[Address, ...]
 
 
 @rule
 async def run_all_setup_plugins(
     request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
 ) -> AllPytestPluginSetups:
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    wrapped_tgts = await MultiGet(
+        Get(WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>"))
+        for address in request.addresses
     )
-    applicable_setup_request_types = tuple(
-        request
-        for request in union_membership.get(PytestPluginSetupRequest)
-        if request.is_applicable(wrapped_tgt.target)
-    )
+    setup_requests = [
+        request_type(wrapped_tgt.target)  # type: ignore[abstract]
+        for request_type in union_membership.get(PytestPluginSetupRequest)
+        for wrapped_tgt in wrapped_tgts
+        if request_type.is_applicable(wrapped_tgt.target)
+    ]
     setups = await MultiGet(
-        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc, abstract]
-        for request in applicable_setup_request_types
+        Get(PytestPluginSetup, PytestPluginSetupRequest, request) for request in setup_requests
     )
     return AllPytestPluginSetups(setups)
 
@@ -189,7 +192,7 @@ async def setup_pytest_for_target(
 ) -> TestSetup:
     transitive_targets, plugin_setups = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
-        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest(request.field_set.address)),
+        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest((request.field_set.address,))),
     )
     all_targets = transitive_targets.closure
 
