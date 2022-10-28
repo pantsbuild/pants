@@ -21,6 +21,8 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
+    PythonResolveField,
+    PythonTestsBatchCompatibilityTagField,
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
@@ -52,6 +54,8 @@ class PythonTestFieldSet(TestFieldSet):
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
     xdist_concurrency: PythonTestsXdistConcurrencyField
+    batch_compatibility_tag: PythonTestsBatchCompatibilityTagField
+    resolve: PythonResolveField
     environment: EnvironmentField
 
     @classmethod

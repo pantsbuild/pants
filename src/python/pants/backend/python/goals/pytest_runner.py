@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -162,13 +163,19 @@ class TestMetadata:
     interpreter_constraints: InterpreterConstraints
     extra_env_vars: tuple[str, ...]
     xdist_concurrency: int | None
+    resolve: str
+    compatability_tag: str | None = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @property
     def description(self) -> str | None:
-        return None
+        if not self.compatability_tag:
+            return None
+
+        # TODO: Put more info here.
+        return self.compatability_tag
 
 
 @dataclass(frozen=True)
@@ -424,6 +431,8 @@ async def partition_python_tests(
     python_setup: PythonSetup,
 ) -> Partitions[PythonTestFieldSet, TestMetadata]:
     partitions = []
+    compatible_tests = defaultdict(list)
+
     for field_set in request.field_sets:
         metadata = TestMetadata(
             interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
@@ -431,8 +440,19 @@ async def partition_python_tests(
             ),
             extra_env_vars=field_set.extra_env_vars.value or (),
             xdist_concurrency=field_set.xdist_concurrency.value,
+            resolve=field_set.resolve.normalized_value(python_setup),
+            compatability_tag=field_set.batch_compatibility_tag.value,
         )
-        partitions.append(Partition((field_set,), metadata))
+
+        if not metadata.compatability_tag:
+            # Tests without a compatibility tag are assumed to be incompatible with all others.
+            partitions.append(Partition((field_set,), metadata))
+        else:
+            # Group tests by their common metadata.
+            compatible_tests[metadata].append(field_set)
+
+    for metadata, field_sets in compatible_tests.items():
+        partitions.append(Partition(tuple(field_sets), metadata))
 
     return Partitions(partitions)
 

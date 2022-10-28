@@ -878,6 +878,37 @@ class PythonTestsXdistConcurrencyField(IntField):
     )
 
 
+class PythonTestsBatchCompatibilityTagField(StringField):
+    alias = "batch_compatibility_tag"
+    help = softwrap(
+        """
+        An arbitrary value used to mark the test files belonging to this target as valid for
+        batched execution.
+
+        By default, Pants will test one `python_test` per `pytest` process. This can cause
+        high-level `pytest` fixtures to execute more often than expected. To reduce overhead
+        and share expensive test setup/teardown logic between multiple test modules, you can
+        set this field to an arbitrary non-empty string on all the `python_test` targets that
+        are safe/compatible to run in the same process.
+
+        `python_test` targets with different values for this field will _never_ execute in the
+        same `pytest` process. This is useful when your monorepo contains multiple incompatible
+        test-setup processes (for example, multiple `conftest.py`s that call `django.setup()`
+        using different settings).
+
+        Pants will make a best-effort attempt to run `python_test` targets with the same value
+        for this field in the same `pytest` process. Compatible tests may not ultimately end up
+        in the same batch if the total number of those tests is larger than the configured value
+        of `[test].batch_size`, or if they have differing values for other `python_test` fields:
+
+          * `resolve`
+          * `interpreter_constraints`
+          * `extra_env_vars`
+          * `xdist_concurrency`
+        """
+    )
+
+
 class SkipPythonTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -890,6 +921,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
     PythonTestsXdistConcurrencyField,
+    PythonTestsBatchCompatibilityTagField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,
