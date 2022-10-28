@@ -57,6 +57,7 @@ SOURCES = {
         python_tests(
             name="tests",
             dependencies=[":project"],
+            batch_compatibility_tag="default",
         )
         """
     ),
@@ -107,7 +108,7 @@ SOURCES = {
            assert True is True
         """
     ),
-    "tests/python/project_test/no_src/BUILD.py": "python_tests()",
+    "tests/python/project_test/no_src/BUILD.py": "python_tests(batch_compatibility_tag='default')",
 }
 
 
