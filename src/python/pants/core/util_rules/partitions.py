@@ -128,28 +128,23 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
             and files ABC with Py2.
     """
 
-    # NOTE: We have to redefine type-vars here for use in the `classmethod`s below because in this scope
-    # `PartitionElementT` and `PartitionMetadataT` are no longer generic.
-    _MetadataT = TypeVar("_MetadataT", bound=PartitionMetadata)
-    _ElementT = TypeVar("_ElementT")
-
     @overload
     @classmethod
     def single_partition(
-        cls, elements: Iterable[_ElementT]
-    ) -> Partitions[_ElementT, _EmptyMetadata]:
+        cls, elements: Iterable[PartitionElementT]
+    ) -> Partitions[PartitionElementT, _EmptyMetadata]:
         ...
 
     @overload
     @classmethod
     def single_partition(
-        cls, elements: Iterable[_ElementT], *, metadata: _MetadataT
-    ) -> Partitions[_ElementT, _MetadataT]:
+        cls, elements: Iterable[PartitionElementT], *, metadata: PartitionMetadataT
+    ) -> Partitions[PartitionElementT, PartitionMetadataT]:
         ...
 
     @classmethod
     def single_partition(
-        cls, elements: Iterable[_ElementT], *, metadata: _MetadataT | None = None
+        cls, elements: Iterable[PartitionElementT], *, metadata: PartitionMetadataT | None = None
     ) -> Partitions:
         """Helper constructor for implementations that have only one partition."""
         return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
