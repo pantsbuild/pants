@@ -193,6 +193,6 @@ The mode of operation is declared per union member (i.e. on the subclass of the 
     class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
-Any other default value for `path` should be considered invalid and yield underfined behaviour. (that is it may change without notice in future versions of Pants.)
+Any other default value for `path` should be considered invalid and yield undefined behaviour. (that is it may change without notice in future versions of Pants.)
 
 During rule execution, the `path` field of the `request` instance will hold the value for the path currently being parsed in case of a per directory mode of operation otherwise it will be `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS`.
