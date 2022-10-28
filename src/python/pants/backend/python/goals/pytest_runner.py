@@ -1,11 +1,14 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import re
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
@@ -39,6 +42,7 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -118,24 +122,25 @@ class AllPytestPluginSetups(Collection[PytestPluginSetup]):
 # TODO: Why is this necessary? We should be able to use `PythonTestFieldSet` as the rule param.
 @dataclass(frozen=True)
 class AllPytestPluginSetupsRequest:
-    address: Address
+    addresses: tuple[Address, ...]
 
 
 @rule
 async def run_all_setup_plugins(
     request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
 ) -> AllPytestPluginSetups:
-    wrapped_tgt = await Get(
-        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    wrapped_tgts = await MultiGet(
+        Get(WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>"))
+        for address in request.addresses
     )
-    applicable_setup_request_types = tuple(
-        request
-        for request in union_membership.get(PytestPluginSetupRequest)
-        if request.is_applicable(wrapped_tgt.target)
-    )
+    setup_requests = [
+        request_type(wrapped_tgt.target)  # type: ignore[abstract]
+        for request_type in union_membership.get(PytestPluginSetupRequest)
+        for wrapped_tgt in wrapped_tgts
+        if request_type.is_applicable(wrapped_tgt.target)
+    ]
     setups = await MultiGet(
-        Get(PytestPluginSetup, PytestPluginSetupRequest, request(wrapped_tgt.target))  # type: ignore[misc, abstract]
-        for request in applicable_setup_request_types
+        Get(PytestPluginSetup, PytestPluginSetupRequest, request) for request in setup_requests
     )
     return AllPytestPluginSetups(setups)
 
@@ -152,8 +157,32 @@ _EXTRA_OUTPUT_DIR = "extra-output"
 
 
 @dataclass(frozen=True)
+class TestMetadata:
+    """Parameters that must be constant for all test targets in a `pytest` batch."""
+
+    interpreter_constraints: InterpreterConstraints
+    extra_env_vars: tuple[str, ...]
+    xdist_concurrency: int | None
+    resolve: str
+    environment: str
+    compatability_tag: str | None = None
+
+    # Prevent this class from being detected by pytest as a test class.
+    __test__ = False
+
+    @property
+    def description(self) -> str | None:
+        if not self.compatability_tag:
+            return None
+
+        # TODO: Put more info here.
+        return self.compatability_tag
+
+
+@dataclass(frozen=True)
 class TestSetupRequest:
-    field_set: PythonTestFieldSet
+    field_sets: Tuple[PythonTestFieldSet, ...]
+    metadata: TestMetadata
     is_debug: bool
     main: Optional[MainSpecification] = None  # Defaults to pytest.main
     prepend_argv: Tuple[str, ...] = ()
@@ -181,23 +210,22 @@ async def setup_pytest_for_target(
     request: TestSetupRequest,
     pytest: PyTest,
     test_subsystem: TestSubsystem,
-    python_setup: PythonSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
 ) -> TestSetup:
+    addresses = tuple(field_set.address for field_set in request.field_sets)
+
     transitive_targets, plugin_setups = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
-        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest(request.field_set.address)),
+        Get(TransitiveTargets, TransitiveTargetsRequest(addresses)),
+        Get(AllPytestPluginSetups, AllPytestPluginSetupsRequest(addresses)),
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        [request.field_set.interpreter_constraints], python_setup
-    )
+    interpreter_constraints = request.metadata.interpreter_constraints
 
-    requirements_pex_get = Get(Pex, RequirementsPexRequest([request.field_set.address]))
+    requirements_pex_get = Get(Pex, RequirementsPexRequest(addresses))
     pytest_pex_get = Get(
         Pex,
         PexRequest(
@@ -217,10 +245,12 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.source]))
+    field_set_source_files_get = Get(
+        SourceFiles, SourceFilesRequest([field_set.source for field_set in request.field_sets])
+    )
 
     field_set_extra_env_get = Get(
-        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(request.metadata.extra_env_vars)
     )
 
     (
@@ -242,7 +272,7 @@ async def setup_pytest_for_target(
     local_dists = await Get(
         LocalDistsPex,
         LocalDistsPexRequest(
-            [request.field_set.address],
+            addresses,
             internal_only=True,
             interpreter_constraints=interpreter_constraints,
             sources=prepared_sources,
@@ -297,7 +327,12 @@ async def setup_pytest_for_target(
 
     results_file_name = None
     if not request.is_debug:
-        results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
+        results_file_prefix = request.field_sets[0].address.path_safe_spec
+        if len(request.field_sets) > 1:
+            results_file_prefix = (
+                f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
+            )
+        results_file_name = f"{results_file_prefix}.xml"
         add_opts.extend(
             (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
@@ -340,12 +375,24 @@ async def setup_pytest_for_target(
 
     xdist_concurrency = 0
     if pytest.xdist_enabled and not request.is_debug:
-        concurrency = request.field_set.xdist_concurrency.value
+        concurrency = request.metadata.xdist_concurrency
         if concurrency is None:
             contents = await Get(DigestContents, Digest, field_set_source_files.snapshot.digest)
             concurrency = _count_pytest_tests(contents)
         xdist_concurrency = concurrency
 
+    timeout_seconds: int | None = None
+    for field_set in request.field_sets:
+        timeout = field_set.timeout.calculate_from_global_options(test_subsystem, pytest)
+        if timeout:
+            if timeout_seconds:
+                timeout_seconds += timeout
+            else:
+                timeout_seconds = timeout
+
+    run_description = request.field_sets[0].address.spec
+    if len(request.field_sets) > 1:
+        run_description = f"batch of {run_description} and {len(request.field_sets)-1} other files"
     process = await Get(
         Process,
         VenvPexProcess(
@@ -362,12 +409,10 @@ async def setup_pytest_for_target(
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
-            timeout_seconds=request.field_set.timeout.calculate_from_global_options(
-                test_subsystem, pytest
-            ),
+            timeout_seconds=timeout_seconds,
             execution_slot_variable=pytest.execution_slot_var,
             concurrency_available=xdist_concurrency,
-            description=f"Run Pytest for {request.field_set.address}",
+            description=f"Run Pytest for {run_description}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,
         ),
@@ -378,17 +423,60 @@ async def setup_pytest_for_target(
 class PyTestRequest(TestRequest):
     tool_subsystem = PyTest
     field_set_type = PythonTestFieldSet
+    partitioner_type = PartitionerType.CUSTOM
+
+
+@rule(desc="Partition Pytest", level=LogLevel.DEBUG)
+async def partition_python_tests(
+    request: PyTestRequest.PartitionRequest[PythonTestFieldSet],
+    python_setup: PythonSetup,
+) -> Partitions[PythonTestFieldSet, TestMetadata]:
+    partitions = []
+    compatible_tests = defaultdict(list)
+
+    for field_set in request.field_sets:
+        metadata = TestMetadata(
+            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
+                [field_set.interpreter_constraints], python_setup
+            ),
+            extra_env_vars=tuple(sorted(field_set.extra_env_vars.value or ())),
+            xdist_concurrency=field_set.xdist_concurrency.value,
+            resolve=field_set.resolve.normalized_value(python_setup),
+            environment=field_set.environment.value,
+            compatability_tag=field_set.batch_compatibility_tag.value,
+        )
+
+        if not metadata.compatability_tag:
+            # Tests without a compatibility tag are assumed to be incompatible with all others.
+            partitions.append(Partition((field_set,), metadata))
+        else:
+            # Group tests by their common metadata.
+            compatible_tests[metadata].append(field_set)
+
+    for metadata, field_sets in compatible_tests.items():
+        partitions.append(Partition(tuple(field_sets), metadata))
+
+    return Partitions(partitions)
 
 
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
-async def run_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
+async def run_python_tests(
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    field_set = batch.single_element
 
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
+    setup = await Get(
+        TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
+    )
     result = await Get(FallibleProcessResult, Process, setup.process)
+
+    def warning_description() -> str:
+        description = batch.elements[0].address.spec
+        if len(batch.elements) > 1:
+            description = f"batch containing {description} and {len(batch.elements)-1} other files"
+        if batch.partition_metadata.description:
+            description = f"{description} ({batch.partition_metadata.description})"
+        return description
 
     coverage_data = None
     if test_subsystem.use_coverage:
@@ -396,9 +484,11 @@ async def run_python_test(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([".coverage"]))
         )
         if coverage_snapshot.files == (".coverage",):
-            coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
+            coverage_data = PytestCoverageData(
+                tuple(field_set.address for field_set in batch.elements), coverage_snapshot.digest
+            )
         else:
-            logger.warning(f"Failed to generate coverage data for {field_set.address}.")
+            logger.warning(f"Failed to generate coverage data for {warning_description()}.")
 
     xml_results_snapshot = None
     if setup.results_file_name:
@@ -406,7 +496,7 @@ async def run_python_test(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
         if xml_results_snapshot.files != (setup.results_file_name,):
-            logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
+            logger.warning(f"Failed to generate JUnit XML data for {warning_description()}.")
     extra_output_snapshot = await Get(
         Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
     )
@@ -414,9 +504,9 @@ async def run_python_test(
         Snapshot, RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR)
     )
 
-    return TestResult.from_fallible_process_result(
+    return TestResult.from_batched_fallible_process_result(
         result,
-        address=field_set.address,
+        batch=batch,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
@@ -426,9 +516,11 @@ async def run_python_test(
 
 @rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 async def debug_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, Any]
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata]
 ) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
+    setup = await Get(
+        TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=True)
+    )
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -438,7 +530,7 @@ async def debug_python_test(
 
 @rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
 async def debugpy_python_test(
-    batch: PyTestRequest.Batch[PythonTestFieldSet, Any],
+    batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
@@ -448,7 +540,8 @@ async def debugpy_python_test(
     setup = await Get(
         TestSetup,
         TestSetupRequest(
-            batch.single_element,
+            batch.elements,
+            batch.partition_metadata,
             is_debug=True,
             main=debugpy.main,
             prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
