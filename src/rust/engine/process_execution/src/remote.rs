@@ -40,8 +40,8 @@ use hashing::{Digest, Fingerprint};
 use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use task_executor::Executor;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
-  WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
@@ -491,8 +491,10 @@ impl CommandRunner {
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
-            warn!("protocol violation: REv2 prohibits setting Operation::error");
-            return Err(ExecutionError::Fatal(format_error(&rpc_status).into()));
+            // Infrastructure error. Retry it.
+            let msg = format_error(&rpc_status);
+            debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+            return Err(ExecutionError::Retryable(msg));
           }
           None => {
             return Err(ExecutionError::Fatal(
@@ -810,11 +812,14 @@ impl crate::CommandRunner for CommandRunner {
       action,
       command,
       execute_request,
+      input_root_digest,
     } = make_execute_request(
       &request,
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
-    )?;
+      &self.store,
+    )
+    .await?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
@@ -836,7 +841,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete.clone()),
+      Some(input_root_digest),
     )
     .await?;
 
@@ -848,42 +853,43 @@ impl crate::CommandRunner for CommandRunner {
       // renders at the Process's level.
       request.level,
       desc = Some(request.description.clone()),
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
-        let result = tokio::time::timeout(deadline_duration, result_fut).await;
-        if result.is_err() {
-          workunit.update_metadata(|initial| {
-            let initial = initial.map(|(m, _)| m).unwrap_or_default();
-            Some((
-              WorkunitMetadata {
-                desc: Some(format!(
-                  "remote execution timed out after {:?}",
-                  deadline_duration
-                )),
-                ..initial
-              },
-              Level::Error,
-            ))
-          })
-        }
 
         // Detect whether the operation ran or hit the deadline timeout.
-        match result {
-          Ok(result) => {
-            if result.is_ok() {
-              workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
-            } else {
-              workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
-            }
-            result
+        match tokio::time::timeout(deadline_duration, result_fut).await {
+          Ok(Ok(result)) => {
+            workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            Ok(result)
           }
-          Err(_) => {
+          Ok(Err(err)) => {
+            workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            Err(err.enrich(&format!("For action {action_digest:?}")))
+          }
+          Err(tokio::time::error::Elapsed { .. }) => {
             // The Err in this match arm originates from the timeout future.
             debug!(
               "remote execution for build_id={} timed out after {:?}",
               &build_id, deadline_duration
             );
+            workunit.update_metadata(|initial| {
+              let initial = initial.map(|(m, _)| m).unwrap_or_default();
+              Some((
+                WorkunitMetadata {
+                  desc: Some(format!(
+                    "remote execution timed out after {:?}",
+                    deadline_duration
+                  )),
+                  ..initial
+                },
+                Level::Error,
+              ))
+            });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             Err(format!("remote execution timed out after {:?}", deadline_duration).into())
           }
@@ -921,12 +927,14 @@ pub struct EntireExecuteRequest {
   pub action: Action,
   pub command: Command,
   pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
 }
 
-pub fn make_execute_request(
+pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
+  _store: &Store,
 ) -> Result<EntireExecuteRequest, String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
@@ -1083,9 +1091,11 @@ pub fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
+  let input_root_digest = req.input_digests.complete.clone();
+
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
     ..remexec::Action::default()
   };
 
@@ -1108,6 +1118,7 @@ pub fn make_execute_request(
     action,
     command,
     execute_request,
+    input_root_digest,
   })
 }
 

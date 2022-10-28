@@ -65,8 +65,7 @@ class JunitTestFieldSet(TestFieldSet):
 
 
 class JunitTestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = JUnit  # type: ignore[assignment]
+    tool_subsystem = JUnit
     field_set_type = JunitTestFieldSet
 
 
