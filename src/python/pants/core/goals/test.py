@@ -561,6 +561,36 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    batch_size = IntOption(
+        "--batch-size",
+        default=128,
+        advanced=True,
+        help=softwrap(
+            """
+            The target maximum number of files to be included in each run of batch-enabled
+            test runners.
+
+            Some test runners can execute tests from multiple files in a single run. Test
+            implementations will return all tests that _can_ run together as a single group -
+            and then this may be further divided into smaller batches, based on this option.
+            This is done:
+
+                1. to avoid OS argument length limits (in processes which don't support argument files)
+                2. to support more stable cache keys than would be possible if all files were operated \
+                    on in a single batch
+                3. to allow for parallelism in test runners which don't have internal \
+                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                    behavior when multiple processes are competing for cores and so internal parallelism \
+                    cannot be used perfectly
+
+            In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
+            and so this value is only a "target" max batch size (rather than an exact value).
+
+            NOTE: This parameter has no effect on test runners/plugins that do not implement support
+            for batched testing.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -626,6 +656,7 @@ async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
     local_environment_name: ChosenLocalEnvironmentName,
+    test_subsystem: TestSubsystem,
 ) -> list[TestRequest.Batch]:
     def partitions_get(request_type: type[TestRequest]) -> Get[Partitions]:
         partition_type = cast(TestRequest, request_type)
@@ -655,11 +686,10 @@ async def _get_test_batches(
         for request_type, partitions in zip(core_request_types, all_partitions)
         for partition in partitions
         for batch in partition_sequentially(
-            # TODO: Expose max batch size as a subsystem parameter.
             partition.elements,
             key=lambda x: str(x),
-            size_target=128,
-            size_max=128,
+            size_target=test_subsystem.batch_size,
+            size_max=2 * test_subsystem.batch_size,
         )
     ]
 
@@ -772,6 +802,7 @@ async def run_tests(
         request_types,
         targets_to_valid_field_sets,
         local_environment_name,
+        test_subsystem,
     )
 
     if test_subsystem.debug or test_subsystem.debug_adapter:
