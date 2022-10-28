@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
 
-from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, SkippableSubsystem
+from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
@@ -561,7 +561,36 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
-    batch_size = BatchSizeOption(uppercase="Test", lowercase="test")
+    batch_size = IntOption(
+        "--batch-size",
+        default=128,
+        advanced=True,
+        help=softwrap(
+            """
+            The target maximum number of files to be included in each run of batch-enabled
+            test runners.
+
+            Some test runners can execute tests from multiple files in a single run. Plugins
+            that implement this behavior will return all tests that _can_ run together as a
+            single group - the core `test` goal will then divide that group into smaller batches
+            according to this parameter. This is done:
+
+                1. to avoid OS argument length limits (in processes which don't support argument files)
+                2. to support more stable cache keys than would be possible if all files were operated \
+                    on in a single batch
+                3. to allow for parallelism in test runners which don't have internal \
+                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                    behavior when multiple processes are competing for cores and so internal parallelism \
+                    cannot be used perfectly
+
+            In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
+            and so this value is only a "target" max batch size (rather than an exact value).
+
+            NOTE: This parameter has no effect on test runners/plugins that do not implement support
+            for batched testing.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
