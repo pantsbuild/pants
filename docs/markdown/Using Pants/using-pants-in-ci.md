@@ -13,8 +13,11 @@ updatedAt: "2022-07-25T23:50:56.628Z"
 Directories to cache
 --------------------
 
-In your CI's config file, we recommend caching these directories:
+> 📘 The `init-pants` GitHub Action
+>
+> If you're using GitHub Actions to run your CI workflows, then you can use our [standard action](https://github.com/pantsbuild/actions/tree/main/init-pants) to set up and cache the Pants bootstrap state. Otherwise, read on to learn how to configure this manually.
 
+In your CI's config file, we recommend caching these directories:
 
 - `$HOME/.cache/pants/setup`<br>
   This is the Pants bootstrap directory. Cache this against the version, as specified in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
