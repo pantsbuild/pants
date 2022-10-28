@@ -468,13 +468,13 @@ async def run_python_tests(
     )
     result = await Get(FallibleProcessResult, Process, setup.process)
 
-    warning_description = batch.elements[0].address.spec
-    if len(batch.elements) > 1:
-        warning_description = (
-            f"batch containing {warning_description} and {len(batch.elements)-1} other files"
-        )
-    if batch.partition_metadata.description:
-        warning_description = f"{warning_description} ({batch.partition_metadata.description})"
+    def warning_description() -> str:
+        description = batch.elements[0].address.spec
+        if len(batch.elements) > 1:
+            description = f"batch containing {description} and {len(batch.elements)-1} other files"
+        if batch.partition_metadata.description:
+            description = f"{description} ({batch.partition_metadata.description})"
+        return description
 
     coverage_data = None
     if test_subsystem.use_coverage:
@@ -486,7 +486,7 @@ async def run_python_tests(
                 tuple(field_set.address for field_set in batch.elements), coverage_snapshot.digest
             )
         else:
-            logger.warning(f"Failed to generate coverage data for {warning_description}.")
+            logger.warning(f"Failed to generate coverage data for {warning_description()}.")
 
     xml_results_snapshot = None
     if setup.results_file_name:
@@ -494,7 +494,7 @@ async def run_python_tests(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
         if xml_results_snapshot.files != (setup.results_file_name,):
-            logger.warning(f"Failed to generate JUnit XML data for {warning_description}.")
+            logger.warning(f"Failed to generate JUnit XML data for {warning_description()}.")
     extra_output_snapshot = await Get(
         Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
     )
