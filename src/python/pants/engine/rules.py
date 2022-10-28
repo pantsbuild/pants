@@ -74,6 +74,7 @@ def _make_rule(
     masked_types: Iterable[Type],
     *,
     cacheable: bool,
+    mutable: bool,
     canonical_name: str,
     desc: Optional[str],
     level: LogLevel,
@@ -117,6 +118,7 @@ def _make_rule(
             desc=desc,
             level=level,
             cacheable=cacheable,
+            mutable=mutable,
         )
 
         return func
@@ -177,6 +179,10 @@ PRIVATE_RULE_DECORATOR_ARGUMENTS = {
     # a @rule. Although the type may be in scope for callers, it will not be consumable in the
     # `@rule` which declares the type masked.
     "_masked_types",
+    # Indicates that a rule produces a mutable output. Rules which produce mutable outputs will be
+    # placed in cycles with their dependees, such that whenever the dependee is invalidated, so is
+    # the mutable dependency. This can be used for mutable memoization.
+    "_mutable",
 }
 # We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
 # but rather set them implicitly based on the rule annotation.
@@ -206,6 +212,7 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
+    mutable: bool = kwargs.get("_mutable", False)
     masked_types: tuple[type, ...] = tuple(kwargs.get("_masked_types", ()))
     param_type_overrides: dict[str, type] = kwargs.get("_param_type_overrides", {})
 
@@ -281,6 +288,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         parameter_types,
         masked_types,
         cacheable=cacheable,
+        mutable=mutable,
         canonical_name=effective_name,
         desc=effective_desc,
         level=effective_level,
@@ -488,6 +496,7 @@ class TaskRule:
     desc: Optional[str] = None
     level: LogLevel = LogLevel.TRACE
     cacheable: bool = True
+    mutable: bool = False
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={})".format(

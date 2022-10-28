@@ -151,6 +151,7 @@ pub struct Task {
   pub masked_types: Vec<TypeId>,
   pub func: Function,
   pub cacheable: bool,
+  pub mutable: bool,
   pub display_info: DisplayInfo,
 }
 
@@ -234,6 +235,7 @@ impl Tasks {
     arg_types: Vec<TypeId>,
     masked_types: Vec<TypeId>,
     cacheable: bool,
+    mutable: bool,
     name: String,
     desc: Option<String>,
     level: Level,
@@ -246,6 +248,7 @@ impl Tasks {
 
     self.preparing = Some(Task {
       cacheable,
+      mutable,
       product: return_type,
       side_effecting,
       engine_aware_return_type,

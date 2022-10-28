@@ -1470,6 +1470,13 @@ impl Node for NodeKey {
     }
   }
 
+  fn mutable(&self) -> bool {
+    match self {
+      &NodeKey::Task(ref s) => s.task.mutable,
+      _ => false,
+    }
+  }
+
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match (self, output) {
       (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
