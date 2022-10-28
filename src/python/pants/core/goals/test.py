@@ -570,10 +570,10 @@ class TestSubsystem(GoalSubsystem):
             The target maximum number of files to be included in each run of batch-enabled
             test runners.
 
-            Some test runners can execute tests from multiple files in a single run. Plugins
-            that implement this behavior will return all tests that _can_ run together as a
-            single group - the core `test` goal will then divide that group into smaller batches
-            according to this parameter. This is done:
+            Some test runners can execute tests from multiple files in a single run. Test
+            implementations will return all tests that _can_ run together as a single group -
+            and then this may be further divided into smaller batches, based on this option.
+            This is done:
 
                 1. to avoid OS argument length limits (in processes which don't support argument files)
                 2. to support more stable cache keys than would be possible if all files were operated \
