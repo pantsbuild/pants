@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use deepsize::{known_deep_size, DeepSizeOf};
@@ -653,25 +653,20 @@ impl DigestTrie {
       (SymlinkBehavior::Oblivious, Entry::Symlink(s)) => {
         let mut tree = self;
         let mut target = s.target.clone();
-        if target.starts_with("../") {
+        if target.starts_with(Component::ParentDir) {
           tree = root;
           target = path.parent().unwrap().join(s.target.clone());
         }
 
-        if let Ok(Some(target_entry)) = tree.entry_helper(root, &target, link_depth) {
-          if link_depth >= MAX_LINK_DEPTH {
-            // We don't return a Result, so log and move on
-            warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
-          } else {
-            self.walk_entry(
-              root,
-              target_entry,
-              path,
-              symlink_behavior,
-              link_depth + 1,
-              f,
-            );
-          }
+        if let Ok(Some(target_entry)) = tree.entry_helper(root, &target, link_depth + 1) {
+          self.walk_entry(
+            root,
+            target_entry,
+            path,
+            symlink_behavior,
+            link_depth + 1,
+            f,
+          );
         }
       }
       (_, Entry::Directory(d)) => {
@@ -912,14 +907,19 @@ impl DigestTrie {
     requested_path: &Path,
     link_depth: LinkDepth,
   ) -> Result<Option<&'a Entry>, String> {
+    if link_depth >= MAX_LINK_DEPTH {
+      // We don't return a Result, so log and move on
+      warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+      return Ok(None);
+    }
+
     let mut tree = self;
     let mut path_so_far = PathBuf::new();
     let mut components = requested_path.components().peekable();
     while let Some(component) = components.next() {
       path_so_far.push(component);
-      let component = component.as_os_str();
 
-      if component == ".." {
+      if component == Component::ParentDir {
         if let Some(parent) = path_so_far.parent().unwrap().parent() {
           return self.entry_helper(
             root,
@@ -928,8 +928,11 @@ impl DigestTrie {
           );
         }
         return Ok(None); // We're out of ancestors, so we've gone above the tree
+      } else if component == Component::CurDir {
+        continue;
       }
 
+      let component = component.as_os_str();
       let maybe_matching_entry = tree
         .entries()
         .binary_search_by_key(&component, |entry| {
@@ -977,9 +980,15 @@ impl DigestTrie {
         tree_digest = self.compute_root_digest()
       )),
       Entry::Symlink(s) => {
+        if s.target.is_absolute() {
+          return Ok(None);
+        }
+
         let mut ancestor_path = entry_path.parent().unwrap();
         let mut full_target = ancestor_path.join(s.target.clone());
-        while let Ok(stripped_target) = full_target.strip_prefix(ancestor_path.join("../")) {
+        while let Ok(stripped_target) =
+          full_target.strip_prefix(ancestor_path.join(Component::ParentDir))
+        {
           if let Some(ancestor) = ancestor_path.parent() {
             ancestor_path = ancestor;
             full_target = ancestor_path.join(stripped_target).clone();

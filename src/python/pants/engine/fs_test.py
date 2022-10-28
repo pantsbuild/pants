@@ -47,7 +47,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -478,11 +478,12 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
                 [
                     FileContent("file.txt", b"four\n"),
                     SymlinkEntry("symlink", "file.txt"),
+                    SymlinkEntry("relsymlink", "./file.txt"),
                     SymlinkEntry("a/symlink", "../file.txt"),
                     SymlinkEntry("a/b/symlink", "../../file.txt"),
                 ]
             ),
-            ("a/b/symlink", "a/symlink", "file.txt", "symlink"),
+            ("a/b/symlink", "a/symlink", "file.txt", "relsymlink", "symlink"),
             ("a", "a/b"),
             id="simple",
         ),
@@ -490,12 +491,21 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
             CreateDigest(
                 [
                     FileContent("file.txt", b"four\n"),
-                    SymlinkEntry("circular", "./circular"),  # After so many traversals, we give up
+                    SymlinkEntry(
+                        "circular1", "./circular1"
+                    ),  # After so many traversals, we give up
+                    SymlinkEntry("circular2", "circular2"),  # After so many traversals, we give up
+                    SymlinkEntry("chain1", "chain2"),
+                    SymlinkEntry("chain2", "chain3"),
+                    SymlinkEntry("chain3", "chain1"),
                     SymlinkEntry(
                         "a/symlink", "file.txt"
                     ),  # looks for a/file.txt, which doesn't exist
                     SymlinkEntry("a/too-far.ln", "../../file.txt"),  # went too far up
+                    SymlinkEntry("a/parent", ".."),
                     SymlinkEntry("too-far.ln", "../file.txt"),  # went too far up
+                    SymlinkEntry("absolute1.ln", str(Path(__file__).resolve())),  # absolute path
+                    SymlinkEntry("absolute2.ln", "/file.txt"),
                 ]
             ),
             ("file.txt",),
@@ -539,8 +549,26 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
             ("a", "a/dirlink", "b", "b/c", "b/c/d"),
             id="symlink-makes-updir-valid",
         ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("dir/file.txt", b"four\n"),
+                    SymlinkEntry("dir/parent", ".."),
+                    SymlinkEntry("dir/self", "."),
+                    SymlinkEntry("dir/self_obtusely", "../dir"),
+                    SymlinkEntry(
+                        "dir/file_but_oh_so_obtusely",
+                        "self/self/self/self/self_obtusely/parent/dir/parent/dir/parent/dir/self/file.txt",
+                    ),
+                ]
+            ),
+            ("dir/file.txt", "dir/self_obtusely/file.txt", "dir/file_but_oh_so_obtusely"),
+            ("dir"),
+            id="evil",
+        ),
     ],
 )
+@logging
 def test_snapshot_and_contents_are_symlink_oblivious(
     rule_runner: RuleRunner,
     create_digest: CreateDigest,
