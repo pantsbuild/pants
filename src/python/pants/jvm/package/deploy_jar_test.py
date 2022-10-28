@@ -17,6 +17,7 @@ from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.process import Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
+from pants.jvm.jar_tool import jar_tool
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
@@ -38,6 +39,7 @@ def rule_runner() -> RuleRunner:
             *classpath_rules(),
             *jvm_tool.rules(),
             *strip_jar.rules(),
+            *jar_tool.rules(),
             *deploy_jar_rules(),
             *javac_rules(),
             *jdk_rules.rules(),

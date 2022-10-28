@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta
-from typing import Optional
+from abc import ABC, ABCMeta
+from dataclasses import dataclass
+from typing import ClassVar, Iterable, Optional, Tuple, Type
 
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -16,13 +18,13 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     Dependencies,
-    DictStringToStringField,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
+    SequenceField,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -32,7 +34,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -323,9 +325,95 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
-class JarDuplicateRulesField(DictStringToStringField):
+@dataclass(frozen=True)
+class JarDuplicateRule(ABC):
+    alias: ClassVar[str]
+    help: ClassVar[str]
+    action: ClassVar[str]
+
+    pattern: str
+
+    def __str__(self) -> str:
+        return f"{self.alias}(pattern='{self.pattern}')"
+
+
+@dataclass(frozen=True)
+class JarDuplicateSkipRule(JarDuplicateRule):
+    alias = "duplicate_skip"
+    help = "Skips all duplicate entries that match the pattern."
+    action = "SKIP"
+
+
+@dataclass(frozen=True)
+class JarDuplicateReplaceRule(JarDuplicateRule):
+    alias = "duplicate_replace"
+    help = "Replaces old duplicate entries that match the pattern with new ocurrences."
+    action = "REPLACE"
+
+
+@dataclass(frozen=True)
+class JarDuplicateConcatRule(JarDuplicateRule):
+    alias = "duplicate_concat"
+    help = "Bundles the binary content of all files that match the pattern into a single one."
+    action = "CONCAT"
+
+
+@dataclass(frozen=True)
+class JarDuplicateConcatTextRule(JarDuplicateRule):
+    alias = "duplicate_concat_text"
+    help = "Bundles the text content of all files that match the pattern into a single one."
+    action = "CONCAT_TEXT"
+
+
+@dataclass(frozen=True)
+class JarDuplicateThrowRule(JarDuplicateRule):
+    alias = "duplicate_throw"
+    help = "Throws an error if more than one file matching the pattern is found."
+    action = "THROW"
+
+
+_JAR_DUPLICATE_RULE_TYPES: list[Type[JarDuplicateRule]] = [
+    JarDuplicateSkipRule,
+    JarDuplicateReplaceRule,
+    JarDuplicateConcatRule,
+    JarDuplicateConcatTextRule,
+    JarDuplicateThrowRule,
+]
+
+
+class DeployJarDuplicateRulesField(SequenceField[JarDuplicateRule]):
     alias = "duplicate_rules"
-    help = "A dictionary of path patterns"
+    help = softwrap(
+        f"""
+        A list of the rules to apply when duplicate file entries are found in the final
+        assembled JAR file.
+
+        There are {pluralize(len(_JAR_DUPLICATE_RULE_TYPES), "possible duplicate rule")} available:
+        {bullet_list([f"`{rule.alias}`: {rule.help}" for rule in _JAR_DUPLICATE_RULE_TYPES])}
+
+        When defining duplicate rules, just add them to this field using the previous listed rule
+        alias and a given rule paramter.
+
+        Note that the order in which the rules are listed is significant.
+        """
+    )
+    required = False
+
+    expected_element_type = JarDuplicateRule
+    expected_type_description = "a list of JAR duplicate rules"
+
+    default = (JarDuplicateConcatTextRule(pattern="^META-INF/services/"),)
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JarDuplicateRule]], address: Address
+    ) -> Optional[Tuple[JarDuplicateRule, ...]]:
+        return super().compute_value(raw_value, address)
+
+    def value_or_default(self) -> tuple[JarDuplicateRule, ...]:
+        if self.value is not None:
+            return self.value
+        return self.default
 
 
 class JvmMainClassNameField(StringField):
@@ -348,7 +436,7 @@ class DeployJarTarget(Target):
         JvmMainClassNameField,
         JvmJdkField,
         JvmResolveField,
-        JarDuplicateRulesField,
+        DeployJarDuplicateRulesField,
         RestartableField,
     )
     help = softwrap(
@@ -426,3 +514,7 @@ def rules():
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
     ]
+
+
+def build_file_aliases():
+    return BuildFileAliases(objects={rule.alias: rule for rule in _JAR_DUPLICATE_RULE_TYPES})

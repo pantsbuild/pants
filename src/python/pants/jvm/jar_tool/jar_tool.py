@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from enum import Enum
-from typing import Iterable, Mapping
+from enum import Enum, unique
+from typing import Iterable
 
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
+from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -17,11 +17,11 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.util.docutil import git_url
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
 
+@unique
 class JarDuplicateAction(Enum):
     SKIP = "skip"
     REPLACE = "replace"
@@ -56,13 +56,15 @@ async def generate_jartool_lockfile_request(
 @frozen_after_init
 class JarToolRequest:
     jar_name: str
+    digest: Digest
     main_class: str | None
     classpath_entries: tuple[str, ...]
     manifest: str | None
     jars: tuple[str, ...]
-    policies: FrozenDict[str, JarDuplicateAction]
+    files: tuple[str, ...]
+    policies: tuple[tuple[str, JarDuplicateAction], ...]
     compress: bool
-    digest: Digest
+    update: bool
 
     def __init__(
         self,
@@ -73,8 +75,10 @@ class JarToolRequest:
         classpath_entries: Iterable[str] | None = None,
         manifest: str | None = None,
         jars: Iterable[str] | None = None,
-        policies: Mapping[str, str | JarDuplicateAction] | None = None,
-        compress: bool = True,
+        files: Iterable[str] | None = None,
+        policies: Iterable[tuple[str, str | JarDuplicateAction]] | None = None,
+        compress: bool = False,
+        update: bool = False,
     ) -> None:
         self.jar_name = jar_name
         self.digest = digest
@@ -82,19 +86,24 @@ class JarToolRequest:
         self.manifest = manifest
         self.classpath_entries = tuple(classpath_entries or ())
         self.jars = tuple(jars or ())
-        self.policies = FrozenDict(JarToolRequest.__parse_policies(policies or {}))
+        self.files = tuple(files or ())
+        self.policies = tuple(JarToolRequest.__parse_policies(policies or ()))
         self.compress = compress
+        self.update = update
 
     @staticmethod
     def __parse_policies(
-        policies: Mapping[str, str | JarDuplicateAction]
-    ) -> dict[str, JarDuplicateAction]:
-        return {
-            pattern: action
-            if isinstance(action, JarDuplicateAction)
-            else JarDuplicateAction(action.lower())
-            for pattern, action in policies.items()
-        }
+        policies: Iterable[tuple[str, str | JarDuplicateAction]]
+    ) -> Iterable[tuple[str, JarDuplicateAction]]:
+        return [
+            (
+                pattern,
+                action
+                if isinstance(action, JarDuplicateAction)
+                else JarDuplicateAction(action.lower()),
+            )
+            for (pattern, action) in policies
+        ]
 
 
 _JAR_TOOL_MAIN_CLASS = "org.pantsbuild.tools.jar.Main"
@@ -105,56 +114,63 @@ async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarT
     output_prefix = "__out"
     output_jarname = os.path.join(output_prefix, request.jar_name)
 
-    lockfile_request, output_digest = await MultiGet(
+    lockfile_request, empty_output_digest = await MultiGet(
         Get(GenerateJvmLockfileFromTool, JarToolGenerateLockfileSentinel()),
         Get(Digest, CreateDigest([Directory(output_prefix)])),
     )
 
-    tool_classpath, input_digest = await MultiGet(
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(Digest, MergeDigests([request.digest, output_digest])),
-    )
+    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
     toolcp_prefix = "__toolcp"
-    immutable_input_digests = {toolcp_prefix: tool_classpath.digest}
+    input_prefix = "__in"
+    immutable_input_digests = {toolcp_prefix: tool_classpath.digest, input_prefix: request.digest}
 
-    result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            argv=[
-                _JAR_TOOL_MAIN_CLASS,
-                *(("-main", request.main_class) if request.main_class else ()),
-                *(
-                    ("-classpath", ",".join(request.classpath_entries))
-                    if request.classpath_entries
-                    else ()
-                ),
-                *(("-manifest", request.manifest) if request.manifest else ()),
-                *(("-jars", ",".join(request.jars)) if request.jars else ()),
-                *(
-                    (
-                        "-policies",
-                        ",".join(
-                            f"{pattern}={action.value.upper()}"
-                            for pattern, action in request.policies.items()
-                        ),
-                    )
-                    if request.policies
-                    else ()
-                ),
-                *(("-compress",) if request.compress else ()),
-                output_jarname,
-            ],
-            classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
-            input_digest=input_digest,
-            extra_jvm_options=jar_tool.jvm_options,
-            extra_immutable_input_digests=immutable_input_digests,
-            description=f"Building jar {request.jar_name}",
-            level=LogLevel.DEBUG,
-        ),
+    policies = ",".join(
+        f"{pattern}={action.value.upper()}" for (pattern, action) in request.policies
     )
 
+    tool_process = JvmProcess(
+        jdk=jdk,
+        argv=[
+            _JAR_TOOL_MAIN_CLASS,
+            output_jarname,
+            *((f"-main={request.main_class}",) if request.main_class else ()),
+            *(
+                (f"-classpath={','.join(request.classpath_entries)}",)
+                if request.classpath_entries
+                else ()
+            ),
+            *(
+                (f"-manifest={os.path.join(input_prefix, request.manifest)}",)
+                if request.manifest
+                else ()
+            ),
+            *(
+                (f"-jars={','.join([os.path.join(input_prefix, jar) for jar in request.jars])}",)
+                if request.jars
+                else ()
+            ),
+            *(
+                (
+                    f"-files={','.join([os.path.join(input_prefix, file) for file in request.files])}",
+                )
+                if request.files
+                else ()
+            ),
+            *((f"-policies={policies}",) if policies else ()),
+            *(("-compress",) if request.compress else ()),
+            *(("-update",) if request.update else ()),
+        ],
+        classpath_entries=tool_classpath.classpath_entries(toolcp_prefix),
+        input_digest=empty_output_digest,
+        extra_jvm_options=jar_tool.jvm_options,
+        extra_immutable_input_digests=immutable_input_digests,
+        description=f"Building jar {request.jar_name}",
+        output_directories=(output_prefix,),
+        level=LogLevel.DEBUG,
+    )
+
+    result = await Get(ProcessResult, JvmProcess, tool_process)
     return await Get(Digest, RemovePrefix(result.output_digest, output_prefix))
 
 

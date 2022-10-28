@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import shlex
-import textwrap
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -16,8 +14,7 @@ from pants.core.goals.package import (
 from pants.core.goals.run import RunFieldSet
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import Process, ProcessResult
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Dependencies
 from pants.engine.unions import UnionRule
@@ -31,9 +28,15 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.jvm.jar_tool.jar_tool import JarToolRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmDependenciesField, JvmJdkField, JvmMainClassNameField
+from pants.jvm.target_types import (
+    DeployJarDuplicateRulesField,
+    JvmDependenciesField,
+    JvmJdkField,
+    JvmMainClassNameField,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     output_path: OutputPathField
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
+    duplicate_rules: DeployJarDuplicateRulesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -116,51 +120,76 @@ async def package_deploy_jar(
     #
 
     classpath = await Get(Classpath, Addresses([field_set.address]))
+    classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+
+    output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
+    jar_digest = await Get(
+        Digest,
+        JarToolRequest(
+            jar_name=output_filename.name,
+            digest=classpath_digest,
+            main_class=field_set.main_class.value,
+            jars=classpath.args(),
+            policies=[
+                (rule.pattern, rule.action) for rule in field_set.duplicate_rules.value_or_default()
+            ],
+            compress=True,
+        ),
+    )
+
+    if jvm.reproducible_jars:
+        jar_digest = await Get(
+            Digest,
+            StripJarRequest(
+                digest=jar_digest,
+                filenames=(output_filename.name,),
+            ),
+        )
 
     #
     # 2. Produce JAR manifest, and output to a ZIP file that can be included with the JARs
     #
 
-    main_class = field_set.main_class.value
+    # main_class = field_set.main_class.value
 
-    manifest_content = FileContent(
-        _JAVA_MANIFEST_FILENAME,
-        # NB: we're joining strings with newlines, because the JAR manifest format
-        # needs precise indentation, and _cannot_ start with a blank line. `dedent` seriously
-        # messes up those requirements.
-        "\n".join(
-            [
-                "Manifest-Version: 1.0",
-                f"Main-Class: {main_class}",
-                "",  # THIS BLANK LINE WILL BREAK EVERYTHING IF DELETED. DON'T DELETE IT.
-            ]
-        ).encode("utf-8"),
-    )
+    # manifest_content = FileContent(
+    #     _JAVA_MANIFEST_FILENAME,
+    #     # NB: we're joining strings with newlines, because the JAR manifest format
+    #     # needs precise indentation, and _cannot_ start with a blank line. `dedent` seriously
+    #     # messes up those requirements.
+    #     "\n".join(
+    #         [
+    #             "Manifest-Version: 1.0",
+    #             f"Main-Class: {main_class}",
+    #             "",  # THIS BLANK LINE WILL BREAK EVERYTHING IF DELETED. DON'T DELETE IT.
+    #         ]
+    #     ).encode("utf-8"),
+    # )
 
-    manifest_jar_input_digest = await Get(Digest, CreateDigest([manifest_content]))
-    manifest_jar_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                zip.path,
-                _PANTS_MANIFEST_PARTIAL_JAR_FILENAME,
-                _JAVA_MANIFEST_FILENAME,
-            ],
-            description="Build partial JAR containing manifest file",
-            input_digest=manifest_jar_input_digest,
-            output_files=[_PANTS_MANIFEST_PARTIAL_JAR_FILENAME],
-        ),
-    )
+    # manifest_jar_input_digest = await Get(Digest, CreateDigest([manifest_content]))
+    # manifest_jar_result = await Get(
+    #     ProcessResult,
+    #     Process(
+    #         argv=[
+    #             zip.path,
+    #             _PANTS_MANIFEST_PARTIAL_JAR_FILENAME,
+    #             _JAVA_MANIFEST_FILENAME,
+    #         ],
+    #         description="Build partial JAR containing manifest file",
+    #         input_digest=manifest_jar_input_digest,
+    #         output_files=[_PANTS_MANIFEST_PARTIAL_JAR_FILENAME],
+    #     ),
+    # )
 
-    manifest_jar = manifest_jar_result.output_digest
-    if jvm.reproducible_jars:
-        manifest_jar = await Get(
-            Digest,
-            StripJarRequest(
-                digest=manifest_jar,
-                filenames=(_PANTS_MANIFEST_PARTIAL_JAR_FILENAME,),
-            ),
-        )
+    # manifest_jar = manifest_jar_result.output_digest
+    # if jvm.reproducible_jars:
+    #     manifest_jar = await Get(
+    #         Digest,
+    #         StripJarRequest(
+    #             digest=manifest_jar,
+    #             filenames=(_PANTS_MANIFEST_PARTIAL_JAR_FILENAME,),
+    #         ),
+    #     )
 
     #
     # 3/4. Create broken deploy JAR, then repair it with `zip -FF`
@@ -177,40 +206,38 @@ async def package_deploy_jar(
     # If there are duplicate classnames at a given package address fat JARs, then
     # behaviour will be non-deterministic. Sorry!  --chrisjrn
 
-    output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
-    input_filenames = " ".join(shlex.quote(i) for i in classpath.args())
-    _PANTS_BROKEN_DEPLOY_JAR = "pants_broken_deploy_jar.notajar"
-    cat_and_repair_script = FileContent(
-        _PANTS_CAT_AND_REPAIR_ZIP_FILENAME,
-        # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
-        textwrap.dedent(
-            f"""
-            set -e
-            /bin/cat {input_filenames} {_PANTS_MANIFEST_PARTIAL_JAR_FILENAME} > {_PANTS_BROKEN_DEPLOY_JAR}
-            {zip.path} -FF {_PANTS_BROKEN_DEPLOY_JAR} --out {output_filename.name}
-            """
-        ).encode("utf-8"),
-    )
+    # output_filename = PurePath(field_set.output_path.value_or_default(file_ending="jar"))
+    # input_filenames = " ".join(shlex.quote(i) for i in classpath.args())
+    # _PANTS_BROKEN_DEPLOY_JAR = "pants_broken_deploy_jar.notajar"
+    # cat_and_repair_script = FileContent(
+    #     _PANTS_CAT_AND_REPAIR_ZIP_FILENAME,
+    #     # Using POSIX location/arg format for `cat`. If this gets more complicated, refactor.
+    #     textwrap.dedent(
+    #         f"""
+    #         set -e
+    #         /bin/cat {input_filenames} {_PANTS_MANIFEST_PARTIAL_JAR_FILENAME} > {_PANTS_BROKEN_DEPLOY_JAR}
+    #         {zip.path} -FF {_PANTS_BROKEN_DEPLOY_JAR} --out {output_filename.name}
+    #         """
+    #     ).encode("utf-8"),
+    # )
 
-    cat_and_repair_script_digest = await Get(Digest, CreateDigest([cat_and_repair_script]))
-    broken_deploy_jar_inputs_digest = await Get(
-        Digest,
-        MergeDigests([*classpath.digests(), cat_and_repair_script_digest, manifest_jar]),
-    )
+    # cat_and_repair_script_digest = await Get(Digest, CreateDigest([cat_and_repair_script]))
+    # broken_deploy_jar_inputs_digest = await Get(
+    #     Digest,
+    #     MergeDigests([*classpath.digests(), cat_and_repair_script_digest, manifest_jar]),
+    # )
 
-    cat_and_repair = await Get(
-        ProcessResult,
-        Process(
-            argv=[bash.path, _PANTS_CAT_AND_REPAIR_ZIP_FILENAME],
-            input_digest=broken_deploy_jar_inputs_digest,
-            output_files=[output_filename.name],
-            description="Assemble combined JAR file",
-        ),
-    )
+    # cat_and_repair = await Get(
+    #     ProcessResult,
+    #     Process(
+    #         argv=[bash.path, _PANTS_CAT_AND_REPAIR_ZIP_FILENAME],
+    #         input_digest=broken_deploy_jar_inputs_digest,
+    #         output_files=[output_filename.name],
+    #         description="Assemble combined JAR file",
+    #     ),
+    # )
 
-    renamed_output_digest = await Get(
-        Digest, AddPrefix(cat_and_repair.output_digest, str(output_filename.parent))
-    )
+    renamed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
 
