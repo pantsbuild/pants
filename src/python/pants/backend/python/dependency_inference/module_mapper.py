@@ -53,10 +53,23 @@ class ModuleProviderType(enum.Enum):
         return self.name < other.name
 
 
+@total_ordering
+class ModuleProviderHierarchy(enum.Enum):
+    MODULE = enum.auto()
+    PARENT = enum.auto()
+
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, ModuleProviderHierarchy):
+            return NotImplemented
+        return self.name < other.name
+# Not sure about the naming above, maybe change it to a `is_namespace_package` boolean or `ModuleProviderPackage` with `.NAMESPACE` and `.STANDARD`?
+
+
 @dataclass(frozen=True, order=True)
 class ModuleProvider:
     addr: Address
     typ: ModuleProviderType
+    hierarchy: ModuleProviderHierarchy
 
 
 def module_from_stripped_path(path: PurePath) -> str:
@@ -70,6 +83,9 @@ def module_from_stripped_path(path: PurePath) -> str:
 class AllPythonTargets:
     first_party: tuple[Target, ...]
     third_party: tuple[Target, ...]
+
+
+NAMESPACES = {"internal"}  # Not sure how to replace this hard-coded set with an inference in `map_first_party_python_targets_to_modules` and `map_third_party_modules_to_addresses`.
 
 
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
@@ -156,7 +172,8 @@ class FirstPartyPythonModuleMapping(
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return mapping.get(parent_module, ())
+        parent_result = mapping.get(parent_module, ())
+        return tuple(r for r in parent_result if r.hierarchy == ModuleProviderHierarchy.MODULE)
 
     def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
         """Find all providers for the module.
@@ -231,7 +248,11 @@ async def map_first_party_python_targets_to_modules(
         )
         module = module_from_stripped_path(stripped_f)
         resolves_to_modules_to_providers[resolve][module].append(
-            ModuleProvider(tgt.address, provider_type)
+            ModuleProvider(
+                tgt.address,
+                provider_type,
+                ModuleProviderHierarchy.PARENT if module in NAMESPACES else ModuleProviderHierarchy.MODULE,
+            )
         )
 
     return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
@@ -297,6 +318,7 @@ async def map_third_party_modules_to_addresses(
                     ModuleProvider(
                         tgt.address,
                         ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+                        ModuleProviderHierarchy.PARENT if module in NAMESPACES else ModuleProviderHierarchy.MODULE,
                     )
                 )
 
