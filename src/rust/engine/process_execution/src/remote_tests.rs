@@ -1436,10 +1436,10 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(
-    result.to_string(),
-    "Error from remote execution: InvalidArgument: \"Execute endpoint called. Did not expect this call.\""
-  );
+  assert!(result.to_string().ends_with(
+    "Error from remote execution: \
+     InvalidArgument: \"Execute endpoint called. Did not expect this call.\""
+  ));
 }
 
 #[tokio::test]
@@ -1483,10 +1483,9 @@ async fn initial_response_missing_response_and_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(
-    result.to_string(),
-    "Operation finished but no response supplied"
-  );
+  assert!(result
+    .to_string()
+    .ends_with("Operation finished but no response supplied"));
 }
 
 #[tokio::test]
@@ -1545,10 +1544,10 @@ async fn fails_after_retry_limit_exceeded() {
     .await
     .expect_err("Expected error");
 
-  assert_eq!(
-    result.to_string(),
-    "Too many failures from server. The last error was: the bot running the task appears to be lost"
-  );
+  assert!(result.to_string().ends_with(
+    "Too many failures from server. \
+     The last error was: the bot running the task appears to be lost"
+  ));
 }
 
 #[tokio::test]
@@ -1608,10 +1607,10 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     .await
     .expect_err("Expected error");
 
-  assert_eq!(
-    result.to_string(),
-    "Too many failures from server. The last event was the server disconnecting with no error given."
-  );
+  assert!(result.to_string().ends_with(
+    "Too many failures from server. \
+     The last event was the server disconnecting with no error given."
+  ));
 }
 
 #[tokio::test]

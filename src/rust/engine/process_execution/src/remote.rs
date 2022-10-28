@@ -40,8 +40,8 @@ use hashing::{Digest, Fingerprint};
 use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use task_executor::Executor;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
-  WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
@@ -853,42 +853,43 @@ impl crate::CommandRunner for CommandRunner {
       // renders at the Process's level.
       request.level,
       desc = Some(request.description.clone()),
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
-        let result = tokio::time::timeout(deadline_duration, result_fut).await;
-        if result.is_err() {
-          workunit.update_metadata(|initial| {
-            let initial = initial.map(|(m, _)| m).unwrap_or_default();
-            Some((
-              WorkunitMetadata {
-                desc: Some(format!(
-                  "remote execution timed out after {:?}",
-                  deadline_duration
-                )),
-                ..initial
-              },
-              Level::Error,
-            ))
-          })
-        }
 
         // Detect whether the operation ran or hit the deadline timeout.
-        match result {
-          Ok(result) => {
-            if result.is_ok() {
-              workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
-            } else {
-              workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
-            }
-            result
+        match tokio::time::timeout(deadline_duration, result_fut).await {
+          Ok(Ok(result)) => {
+            workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            Ok(result)
           }
-          Err(_) => {
+          Ok(Err(err)) => {
+            workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            Err(err.enrich(&format!("For action {action_digest:?}")))
+          }
+          Err(tokio::time::error::Elapsed { .. }) => {
             // The Err in this match arm originates from the timeout future.
             debug!(
               "remote execution for build_id={} timed out after {:?}",
               &build_id, deadline_duration
             );
+            workunit.update_metadata(|initial| {
+              let initial = initial.map(|(m, _)| m).unwrap_or_default();
+              Some((
+                WorkunitMetadata {
+                  desc: Some(format!(
+                    "remote execution timed out after {:?}",
+                    deadline_duration
+                  )),
+                  ..initial
+                },
+                Level::Error,
+              ))
+            });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             Err(format!("remote execution timed out after {:?}", deadline_duration).into())
           }

@@ -844,8 +844,8 @@ async fn workunit_to_py_value(
   let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => v.into_py(py),
-      UserMetadataItem::ImmediateInt(n) => n.into_py(py),
+      UserMetadataItem::String(v) => v.into_py(py),
+      UserMetadataItem::Int(n) => n.into_py(py),
       UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
         .as_any()
         .downcast_ref::<Value>()
