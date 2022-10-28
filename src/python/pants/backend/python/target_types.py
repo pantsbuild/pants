@@ -885,26 +885,32 @@ class PythonTestsBatchCompatibilityTagField(StringField):
         An arbitrary value used to mark the test files belonging to this target as valid for
         batched execution.
 
-        By default, Pants will test one `python_test` per `pytest` process. This can cause
-        high-level `pytest` fixtures to execute more often than expected. To reduce overhead
-        and share expensive test setup/teardown logic between multiple test modules, you can
-        set this field to an arbitrary non-empty string on all the `python_test` targets that
-        are safe/compatible to run in the same process.
+        It's _sometimes_ safe to run multiple `python_test`s within a single `pytest` process,
+        and doing so can give significant wins by allowing reuse of expensive test setup /
+        teardown logic. To opt into this behavior, set this field to an arbitrary non-empty
+        string on all the `python_test` targets that are safe/compatible to run in the same
+        process.
 
-        `python_test` targets with different values for this field will _never_ execute in the
-        same `pytest` process. This is useful when your monorepo contains multiple incompatible
-        test-setup processes (for example, multiple `conftest.py`s that call `django.setup()`
-        using different settings).
+        If this field is left unset on a target, the target is assumed to be incompatible with
+        all others and will run in a dedicated `pytest` process.
 
-        Pants will make a best-effort attempt to run `python_test` targets with the same value
-        for this field in the same `pytest` process. Compatible tests may not ultimately end up
-        in the same batch if the total number of those tests is larger than the configured value
-        of `[test].batch_size`, or if they have differing values for other `python_test` fields:
+        If this field is set on a target, and its value is different from the value on some
+        other `python_test`, then the two targets are explicitly incompatible and are guaranteed
+        to not run in the same `pytest` process.
 
-          * `resolve`
-          * `interpreter_constraints`
-          * `extra_env_vars`
-          * `xdist_concurrency`
+        If this field is set on a target, and its value is the same as the value on some other
+        `python_test`, then the two targets are explicitly compatible and _may_ run in the same
+        `pytest` process. Compatible tests may not end up in the same `pytest` batch if:
+
+            * There are "too many" compatible tests in a partition, as determined by the \
+                `[test].batch_size` config parameter, or
+            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+                `resolve`s or `extra_env_vars`).
+
+        When tests with the same `batch_compatibility_tag` have incompatibilities in some other
+        Pants metadata, they will be automatically split into separate batches. This way you can
+        set a high-level `batch_compatibility_tag` using `__defaults__` and then have tests
+        continue to work as you tweak BUILD metadata on specific targets.
         """
     )
 
