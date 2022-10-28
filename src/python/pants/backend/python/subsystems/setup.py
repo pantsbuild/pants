@@ -479,6 +479,19 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    enable_lockfile_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Create targets for all Python lockfiles defined in `[python].resolves`.
+
+            The lockfile targets will then be used as dependencies to the `python_requirement`
+            targets that use them, invalidating source targets per resolve when the lockfile
+            changes.
+            """
+        ),
+        advanced=True,
+    )
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
