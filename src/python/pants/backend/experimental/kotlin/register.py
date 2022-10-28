@@ -21,6 +21,7 @@ from pants.jvm.package import deploy_jar, war
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
 from pants.jvm.test.junit import rules as jvm_junit_rules
 
 
@@ -63,3 +64,7 @@ def rules():
         *jvm_junit_rules(),
         *kotlin_junit_rules(),
     ]
+
+
+def build_file_aliases():
+    return jvm_build_file_aliases()
