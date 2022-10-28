@@ -438,7 +438,7 @@ async def partition_python_tests(
             interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
                 [field_set.interpreter_constraints], python_setup
             ),
-            extra_env_vars=field_set.extra_env_vars.value or (),
+            extra_env_vars=tuple(sorted(field_set.extra_env_vars.value or ())),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
             compatability_tag=field_set.batch_compatibility_tag.value,

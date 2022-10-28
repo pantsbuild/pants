@@ -771,6 +771,12 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
             "python_tests(overrides={'test_2.py': {'extra_env_vars': []}})",
             [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_3.py"], [f"{PACKAGE}/test_2.py"]],
         ],
+        # Order of extra_env_vars shouldn't affect partitioning:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default', extra_env_vars=['FOO', 'BAR'])))",
+            "python_tests(overrides={'test_2.py': {'extra_env_vars': ['BAR', 'FOO']}})",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_2.py", f"{PACKAGE}/test_3.py"]],
+        ],
     ),
 )
 def test_partition(
