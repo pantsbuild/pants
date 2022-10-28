@@ -35,7 +35,7 @@ from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -146,8 +146,7 @@ class PyTest(PythonToolBase):
 
     export = ExportToolOption()
 
-    # TODO: Replace with a proper `SkipOption`.
-    skip = False
+    skip = SkipOption("test")
 
     @property
     def all_requirements(self) -> tuple[str, ...]:

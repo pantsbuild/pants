@@ -376,8 +376,7 @@ async def setup_pytest_for_target(
 
 
 class PyTestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = PyTest  # type: ignore[assignment]
+    tool_subsystem = PyTest
     field_set_type = PythonTestFieldSet
 
 

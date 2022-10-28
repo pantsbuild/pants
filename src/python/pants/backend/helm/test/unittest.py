@@ -72,8 +72,7 @@ class HelmUnitTestFieldSet(TestFieldSet):
 
 
 class HelmUnitTestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = HelmUnitTestSubsystem  # type: ignore[assignment]
+    tool_subsystem = HelmUnitTestSubsystem
     field_set_type = HelmUnitTestFieldSet
 
 
