@@ -51,6 +51,15 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   fn cacheable(&self) -> bool;
 
   ///
+  /// True if the output value of the node is mutable.
+  ///
+  /// Mutable nodes are always placed in cycles with their dependees, because any dependee of the
+  /// node is assumed to have mutated it. This causes invalidation of either node to invalidate
+  /// both of them.
+  ///
+  fn mutable(&self) -> bool;
+
+  ///
   /// A Node may want to compute cacheability differently based on properties of the Node's item.
   /// The output of this method will be and'd with `cacheable` to compute overall cacheability.
   ///
