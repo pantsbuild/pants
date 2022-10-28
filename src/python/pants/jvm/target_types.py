@@ -333,39 +333,39 @@ class JarDuplicateRule(ABC):
 
     pattern: str
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return f"{self.alias}(pattern='{self.pattern}')"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class JarDuplicateSkipRule(JarDuplicateRule):
     alias = "duplicate_skip"
     help = "Skips all duplicate entries that match the pattern."
     action = "SKIP"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class JarDuplicateReplaceRule(JarDuplicateRule):
     alias = "duplicate_replace"
     help = "Replaces old duplicate entries that match the pattern with new ocurrences."
     action = "REPLACE"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class JarDuplicateConcatRule(JarDuplicateRule):
     alias = "duplicate_concat"
     help = "Bundles the binary content of all files that match the pattern into a single one."
     action = "CONCAT"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class JarDuplicateConcatTextRule(JarDuplicateRule):
     alias = "duplicate_concat_text"
     help = "Bundles the text content of all files that match the pattern into a single one."
     action = "CONCAT_TEXT"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class JarDuplicateThrowRule(JarDuplicateRule):
     alias = "duplicate_throw"
     help = "Throws an error if more than one file matching the pattern is found."
