@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, cast
 
-from pants.backend.project_info import dependees
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info import dependents
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.base.build_environment import get_buildroot
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
@@ -72,8 +72,8 @@ async def find_changed_owners(
         addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
     )
     dependees = await Get(
-        Dependees,
-        DependeesRequest(
+        Dependents,
+        DependentsRequest(
             owners,
             transitive=request.dependees == DependeesOption.TRANSITIVE,
             include_roots=False,
@@ -155,4 +155,4 @@ class Changed(Subsystem):
 
 
 def rules():
-    return [*collect_rules(), *dependees.rules()]
+    return [*collect_rules(), *dependents.rules()]

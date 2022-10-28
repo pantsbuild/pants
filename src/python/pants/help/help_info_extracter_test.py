@@ -479,7 +479,7 @@ def test_get_all_help_info():
                 "consumed_by_rules": (
                     "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 ),
-                "dependees": ("help_info_extracter_test",),
+                "dependents": ("help_info_extracter_test",),
                 "dependencies": ("pants.option.scope",),
                 "documentation": None,
                 "is_union": False,
@@ -493,7 +493,7 @@ def test_get_all_help_info():
             },
             "pants.engine.target.Target": {
                 "consumed_by_rules": (),
-                "dependees": (),
+                "dependents": (),
                 "dependencies": (),
                 "documentation": (
                     "A Target represents an addressable set of metadata.\n\n    Set the `help` "
@@ -515,7 +515,7 @@ def test_get_all_help_info():
             },
             "pants.option.scope.Scope": {
                 "consumed_by_rules": (),
-                "dependees": (),
+                "dependents": (),
                 "dependencies": (),
                 "documentation": "An options scope.",
                 "is_union": False,

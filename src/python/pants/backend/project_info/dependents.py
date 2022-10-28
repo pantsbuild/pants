@@ -19,31 +19,34 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
-class AddressToDependees:
+class AddressToDependents:
     mapping: FrozenDict[Address, FrozenOrderedSet[Address]]
 
 
-@rule(desc="Map all targets to their dependees", level=LogLevel.DEBUG)
-async def map_addresses_to_dependees(all_targets: AllUnexpandedTargets) -> AddressToDependees:
+@rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
+async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
     dependencies_per_target = await MultiGet(
         Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
         for tgt in all_targets
     )
 
-    address_to_dependees = defaultdict(set)
+    address_to_dependents = defaultdict(set)
     for tgt, dependencies in zip(all_targets, dependencies_per_target):
         for dependency in dependencies:
-            address_to_dependees[dependency].add(tgt.address)
-    return AddressToDependees(
+            address_to_dependents[dependency].add(tgt.address)
+    return AddressToDependents(
         FrozenDict(
-            {addr: FrozenOrderedSet(dependees) for addr, dependees in address_to_dependees.items()}
+            {
+                addr: FrozenOrderedSet(dependents)
+                for addr, dependents in address_to_dependents.items()
+            }
         )
     )
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class DependeesRequest:
+class DependentsRequest:
     addresses: FrozenOrderedSet[Address]
     transitive: bool
     include_roots: bool
@@ -56,21 +59,21 @@ class DependeesRequest:
         self.include_roots = include_roots
 
 
-class Dependees(DeduplicatedCollection[Address]):
+class Dependents(DeduplicatedCollection[Address]):
     sort_input = True
 
 
 @rule(level=LogLevel.DEBUG)
-def find_dependees(
-    request: DependeesRequest, address_to_dependees: AddressToDependees
-) -> Dependees:
+def find_dependents(
+    request: DependentsRequest, address_to_dependents: AddressToDependents
+) -> Dependents:
     check = set(request.addresses)
     known_dependents: Set[Address] = set()
     while True:
         dependents = set(known_dependents)
         for target in check:
-            target_dependees = address_to_dependees.mapping.get(target, FrozenOrderedSet())
-            dependents.update(target_dependees)
+            target_dependents = address_to_dependents.mapping.get(target, FrozenOrderedSet())
+            dependents.update(target_dependents)
         check = dependents - known_dependents
         if not check or not request.transitive:
             result = (
@@ -78,7 +81,7 @@ def find_dependees(
                 if request.include_roots
                 else dependents - set(request.addresses)
             )
-            return Dependees(result)
+            return Dependents(result)
         known_dependents = dependents
 
 
@@ -106,8 +109,8 @@ async def dependees_goal(
     specified_addresses: Addresses, dependees_subsystem: DependeesSubsystem, console: Console
 ) -> DependeesGoal:
     dependees = await Get(
-        Dependees,
-        DependeesRequest(
+        Dependents,
+        DependentsRequest(
             specified_addresses,
             transitive=dependees_subsystem.transitive,
             include_roots=dependees_subsystem.closed,
