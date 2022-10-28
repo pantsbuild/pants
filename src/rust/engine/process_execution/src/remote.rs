@@ -491,8 +491,10 @@ impl CommandRunner {
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
-            warn!("protocol violation: REv2 prohibits setting Operation::error");
-            return Err(ExecutionError::Fatal(format_error(&rpc_status).into()));
+            // Infrastructure error. Retry it.
+            let msg = format_error(&rpc_status);
+            debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+            return Err(ExecutionError::Retryable(msg));
           }
           None => {
             return Err(ExecutionError::Fatal(
