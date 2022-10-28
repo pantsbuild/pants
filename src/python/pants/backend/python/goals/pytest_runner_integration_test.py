@@ -736,3 +736,86 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         unittest.mock.ANY,
         "tests/python/pants_test/test_foo.py",
     )
+
+
+@pytest.mark.parametrize(
+    "root_build_contents,package_build_contents,expected_partitions",
+    (
+        # No batching by default:
+        [
+            "",
+            "python_tests()",
+            [[f"{PACKAGE}/test_1.py"], [f"{PACKAGE}/test_2.py"], [f"{PACKAGE}/test_3.py"]],
+        ],
+        # Compatibility at the `python_tests` level:
+        [
+            "",
+            "python_tests(batch_compatibility_tag='default')",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_2.py", f"{PACKAGE}/test_3.py"]],
+        ],
+        # Compatibility at a higher level via `__defaults__`:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default')))",
+            "python_tests()",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_2.py", f"{PACKAGE}/test_3.py"]],
+        ],
+        # Overriding compatibility from a higher __defaults__:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default')))",
+            "python_tests(overrides={'test_2.py': {'batch_compatibility_tag': 'other'}})",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_3.py"], [f"{PACKAGE}/test_2.py"]],
+        ],
+        # Partition on incompatible BUILD metadata:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default', extra_env_vars=['HOME'])))",
+            "python_tests(overrides={'test_2.py': {'extra_env_vars': []}})",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_3.py"], [f"{PACKAGE}/test_2.py"]],
+        ],
+    ),
+)
+def test_partition(
+    rule_runner: RuleRunner,
+    root_build_contents: str,
+    package_build_contents: str,
+    expected_partitions: list[list[str]],
+) -> None:
+    _configure_pytest_runner(rule_runner)
+    rule_runner.write_files(
+        {
+            "BUILD": root_build_contents,
+            f"{PACKAGE}/test_1.py": dedent(
+                """\
+                def test():
+                    assert 1 == 1
+                """
+            ),
+            f"{PACKAGE}/test_2.py": dedent(
+                """\
+                def test():
+                    assert 2 == 2
+                """
+            ),
+            f"{PACKAGE}/test_3.py": dedent(
+                """\
+                def test():
+                    assert 3 == 3
+                """
+            ),
+            f"{PACKAGE}/BUILD": package_build_contents,
+        }
+    )
+
+    field_sets = tuple(
+        PythonTestFieldSet.create(rule_runner.get_target(Address(PACKAGE, relative_file_path=path)))
+        for path in ("test_1.py", "test_2.py", "test_3.py")
+    )
+
+    partitions = rule_runner.request(
+        Partitions[PythonTestFieldSet, TestMetadata], [PyTestRequest.PartitionRequest(field_sets)]
+    )
+    sorted_partitions = sorted(
+        sorted(field_set.address.spec for field_set in partition.elements)
+        for partition in partitions
+    )
+
+    assert sorted_partitions == expected_partitions
