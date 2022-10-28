@@ -164,6 +164,7 @@ class TestMetadata:
     extra_env_vars: tuple[str, ...]
     xdist_concurrency: int | None
     resolve: str
+    environment: str
     compatability_tag: str | None = None
 
     # Prevent this class from being detected by pytest as a test class.
@@ -441,6 +442,7 @@ async def partition_python_tests(
             extra_env_vars=tuple(sorted(field_set.extra_env_vars.value or ())),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
+            environment=field_set.environment.value,
             compatability_tag=field_set.batch_compatibility_tag.value,
         )
 
