@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Iterable
+
 import pytest
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -19,15 +21,18 @@ from pants.core.goals.generate_lockfiles import (
     NO_TOOL_LOCKFILE,
     AmbiguousResolveNamesError,
     GenerateLockfile,
+    GenerateLockfileWithEnvironments,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
     WrappedGenerateLockfile,
+    _preferred_environment,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
+from pants.engine.environment import EnvironmentName
 from pants.engine.target import Dependencies, Target
 from pants.testutil.option_util import create_subsystem
 from pants.util.strutil import softwrap
@@ -266,3 +271,41 @@ def test_no_compatible_resolve_error() -> None:
             """
         )
     )
+
+
+_default = "_default"
+
+
+@pytest.mark.parametrize(
+    ("env_names", "expected", "in_output", "not_in_output"),
+    (
+        ((), _default, None, "anything"),
+        (("jeremy", "derek"), "jeremy", "`jeremy`, which may have ", None),
+        (("jeremy", "_default"), "_default", "`_default`, which may have ", None),
+        (("_default", "jeremy"), "_default", "`_default`, which may have ", None),
+        (("jeremy",), "jeremy", None, "anything"),
+    ),
+)
+def test_preferred_environment(
+    env_names: Iterable[str],
+    expected: str,
+    in_output: str | None,
+    not_in_output: str | None,
+    caplog,
+):
+
+    resolve_name = "boop"
+    resolve_dest = "beep"
+    if not env_names:
+        request = GenerateLockfile(resolve_name, resolve_dest)
+    else:
+        envs = tuple(EnvironmentName(name) for name in env_names)
+        request = GenerateLockfileWithEnvironments(resolve_name, resolve_dest, envs)
+
+    default = EnvironmentName(_default)
+
+    preferred_env = _preferred_environment(request, default)
+
+    assert preferred_env.val == expected
+    assert in_output is None or in_output in caplog.text
+    assert not_in_output is None or not_in_output not in caplog.text
