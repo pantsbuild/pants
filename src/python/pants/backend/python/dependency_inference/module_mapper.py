@@ -9,6 +9,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
+from itertools import chain
 from pathlib import PurePath
 from typing import DefaultDict, Iterable, Mapping, Tuple
 
@@ -85,9 +86,6 @@ class AllPythonTargets:
     third_party: tuple[Target, ...]
 
 
-NAMESPACES = {"internal"}  # Not sure how to replace this hard-coded set with an inference in `map_first_party_python_targets_to_modules` and `map_third_party_modules_to_addresses`.
-
-
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
 def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
     first_party = []
@@ -98,6 +96,28 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
     return AllPythonTargets(tuple(first_party), tuple(third_party))
+
+
+# -----------------------------------------------------------------------------------------------
+# Namespace packages collection
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonNamespacePackages(frozenset):
+    """A set of Python namespace packages."""
+
+
+@rule(desc="Creating a collection of namespace-packages", level=LogLevel.DEBUG)
+async def collect_namespace_packages(
+    all_python_targets: AllPythonTargets,
+    python_setup: PythonSetup,
+) -> PythonNamespacePackages:
+    return PythonNamespacePackages(
+        module.split(".")[0]
+        for tgt in chain(all_python_targets.first_party, all_python_targets.third_party)
+        for module in (tgt.get(PythonRequirementModulesField).value or [])
+        if "." in module
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -231,6 +251,7 @@ async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
+    python_namespace_packages: PythonNamespacePackages,
 ) -> FirstPartyPythonMappingImpl:
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
@@ -251,7 +272,7 @@ async def map_first_party_python_targets_to_modules(
             ModuleProvider(
                 tgt.address,
                 provider_type,
-                ModuleProviderHierarchy.PARENT if module in NAMESPACES else ModuleProviderHierarchy.MODULE,
+                ModuleProviderHierarchy.PARENT if module in python_namespace_packages else ModuleProviderHierarchy.MODULE,
             )
         )
 
@@ -302,14 +323,15 @@ class ThirdPartyPythonModuleMapping(
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses(
-    all_python_tgts: AllPythonTargets,
+    all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
+    python_namespace_packages: PythonNamespacePackages,
 ) -> ThirdPartyPythonModuleMapping:
     resolves_to_modules_to_providers: DefaultDict[
         ResolveName, DefaultDict[str, list[ModuleProvider]]
     ] = defaultdict(lambda: defaultdict(list))
 
-    for tgt in all_python_tgts.third_party:
+    for tgt in all_python_targets.third_party:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
@@ -318,7 +340,7 @@ async def map_third_party_modules_to_addresses(
                     ModuleProvider(
                         tgt.address,
                         ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
-                        ModuleProviderHierarchy.PARENT if module in NAMESPACES else ModuleProviderHierarchy.MODULE,
+                        ModuleProviderHierarchy.PARENT if module in python_namespace_packages else ModuleProviderHierarchy.MODULE,
                     )
                 )
 
