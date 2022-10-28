@@ -220,6 +220,7 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
+        batch_size=1,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
