@@ -5,8 +5,8 @@ from typing import List
 
 import pytest
 
-from pants.backend.project_info.dependees import DependeesGoal
-from pants.backend.project_info.dependees import rules as dependee_rules
+from pants.backend.project_info.dependents import DependeesGoal
+from pants.backend.project_info.dependents import rules as dependee_rules
 from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
     return runner
 
 
-def assert_dependees(
+def assert_dependents(
     rule_runner: RuleRunner,
     *,
     targets: List[str],
@@ -55,23 +55,23 @@ def assert_dependees(
 
 
 def test_no_targets(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=[], expected=[])
+    assert_dependents(rule_runner, targets=[], expected=[])
 
 
 def test_normal(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=["base"], expected=["intermediate:intermediate"])
+    assert_dependents(rule_runner, targets=["base"], expected=["intermediate:intermediate"])
 
 
 def test_no_dependees(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=["leaf"], expected=[])
+    assert_dependents(rule_runner, targets=["leaf"], expected=[])
 
 
 def test_closed(rule_runner: RuleRunner) -> None:
-    assert_dependees(rule_runner, targets=["leaf"], closed=True, expected=["leaf:leaf"])
+    assert_dependents(rule_runner, targets=["leaf"], closed=True, expected=["leaf:leaf"])
 
 
 def test_transitive(rule_runner: RuleRunner) -> None:
-    assert_dependees(
+    assert_dependents(
         rule_runner,
         targets=["base"],
         transitive=True,
@@ -82,7 +82,7 @@ def test_transitive(rule_runner: RuleRunner) -> None:
 def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
     # This tests that --output-format=text will deduplicate which dependee belongs to which
     # specified target.
-    assert_dependees(
+    assert_dependents(
         rule_runner,
         targets=["base", "intermediate"],
         transitive=True,
@@ -93,10 +93,10 @@ def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
 
 def test_special_cased_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"special/BUILD": "tgt(special_deps=['intermediate'])"})
-    assert_dependees(
+    assert_dependents(
         rule_runner, targets=["intermediate"], expected=["leaf:leaf", "special:special"]
     )
-    assert_dependees(
+    assert_dependents(
         rule_runner,
         targets=["base"],
         transitive=True,

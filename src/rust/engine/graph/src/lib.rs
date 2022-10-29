@@ -260,7 +260,7 @@ impl<N: Node> InnerGraph<N> {
 
     // And their transitive dependencies, which will be dirtied.
     //
-    // NB: We only dirty "through" a Node and into its dependees if it is Node::restartable.
+    // NB: We only dirty "through" a Node and into its dependents if it is Node::restartable.
     let transitive_ids: Vec<_> = self
       .walk(
         root_ids.iter().cloned().collect(),
