@@ -148,15 +148,15 @@ Piping to other Pants runs
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-./pants dependees helloworld/util | xargs ./pants  list
+./pants dependents helloworld/util | xargs ./pants  list
 ```
 
 You can, of course, pipe multiple times:
 
 ```bash
-# Run over the second-degree dependees of `utils.py`.
-❯ ./pants dependees helloworld/utils.py | \
-   xargs ./pants dependees | \
+# Run over the second-degree dependents of `utils.py`.
+❯ ./pants dependents helloworld/utils.py | \
+   xargs ./pants dependents | \
    xargs ./pants lint
 ```
 

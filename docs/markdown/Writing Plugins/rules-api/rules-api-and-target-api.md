@@ -256,7 +256,7 @@ async def demo(...) -> Foo:
     )
 ```
 
-Pants will include your special-cased dependencies with `./pants dependencies`, `./pants dependees`, and `./pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
+Pants will include your special-cased dependencies with `./pants dependencies`, `./pants dependents`, and `./pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
 
 `SourcesField`
 --------------

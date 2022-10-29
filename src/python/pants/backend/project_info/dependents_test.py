@@ -5,8 +5,8 @@ from typing import List
 
 import pytest
 
-from pants.backend.project_info.dependents import DependeesGoal
-from pants.backend.project_info.dependents import rules as dependee_rules
+from pants.backend.project_info.dependents import DependentsGoal
+from pants.backend.project_info.dependents import rules as dependent_rules
 from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
@@ -26,7 +26,7 @@ class MockTarget(Target):
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    runner = RuleRunner(rules=dependee_rules(), target_types=[MockTarget])
+    runner = RuleRunner(rules=dependent_rules(), target_types=[MockTarget])
     runner.write_files(
         {
             "base/BUILD": "tgt()",
@@ -50,7 +50,7 @@ def assert_dependents(
         args.append("--transitive")
     if closed:
         args.append("--closed")
-    result = rule_runner.run_goal_rule(DependeesGoal, args=[*args, *targets])
+    result = rule_runner.run_goal_rule(DependentsGoal, args=[*args, *targets])
     assert result.stdout.splitlines() == expected
 
 
@@ -62,7 +62,7 @@ def test_normal(rule_runner: RuleRunner) -> None:
     assert_dependents(rule_runner, targets=["base"], expected=["intermediate:intermediate"])
 
 
-def test_no_dependees(rule_runner: RuleRunner) -> None:
+def test_no_dependents(rule_runner: RuleRunner) -> None:
     assert_dependents(rule_runner, targets=["leaf"], expected=[])
 
 
@@ -80,7 +80,7 @@ def test_transitive(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_specified_targets(rule_runner: RuleRunner) -> None:
-    # This tests that --output-format=text will deduplicate which dependee belongs to which
+    # This tests that --output-format=text will deduplicate which dependent belongs to which
     # specified target.
     assert_dependents(
         rule_runner,
