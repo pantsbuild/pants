@@ -163,7 +163,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
 ///
 #[async_trait]
 pub trait SnapshotOps: Clone + Send + Sync + 'static {
-  type Error: Debug + Display + From<String>;
+  type Error: Debug + Display + From<String> + Send;
 
   async fn load_file_bytes_with<
     T: Send + 'static,
@@ -230,7 +230,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       directory::Entry::Directory(_) => (),
     });
 
-    Ok(DigestTrie::from_path_stats(path_stats, &files)?.into())
+    Ok(DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &files)?.into())
   }
 
   async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, Self::Error> {

@@ -18,11 +18,11 @@ use store::Store;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
-use crate::remote::{ensure_action_stored_locally, make_execute_request};
+use crate::remote::{ensure_action_stored_locally, make_execute_request, EntireExecuteRequest};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessError, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
-  RemoteCacheWarningsBehavior,
+  CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessResultMetadata, ProcessResultSource, RemoteCacheWarningsBehavior,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -67,6 +67,10 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
   }
 }
 
@@ -127,22 +131,22 @@ fn create_local_runner(
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store_setup: &StoreSetup,
-  eager_fetch: bool,
+  cache_content_behavior: CacheContentBehavior,
 ) -> Box<dyn CommandRunnerTrait> {
   Box::new(
     crate::remote_cache::CommandRunner::new(
       local.into(),
-      ProcessMetadata::default(),
+      None,
+      None,
       store_setup.executor.clone(),
       store_setup.store.clone(),
       &store_setup.cas.address(),
       None,
       BTreeMap::default(),
-      Platform::current().unwrap(),
       true,
       true,
       RemoteCacheWarningsBehavior::FirstOnly,
-      eager_fetch,
+      cache_content_behavior,
       256,
       CACHE_READ_TIMEOUT,
     )
@@ -156,8 +160,11 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   let process = Process::new(vec![
     "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
-  let (action, command, _exec_request) =
-    make_execute_request(&process, ProcessMetadata::default()).unwrap();
+  let EntireExecuteRequest {
+    action, command, ..
+  } = make_execute_request(&process, None, None, &store_setup.store)
+    .await
+    .unwrap();
   let (_command_digest, action_digest) =
     ensure_action_stored_locally(&store_setup.store, &command, &action)
       .await
@@ -170,7 +177,7 @@ async fn cache_read_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -194,7 +201,7 @@ async fn cache_read_skipped_on_action_cache_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -224,14 +231,14 @@ async fn cache_read_skipped_on_action_cache_errors() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
-/// If the cache has any issues during reads from the store during eager_fetch, we should gracefully
+/// If the cache cannot find a digest during a read from the store during fetch, we should gracefully
 /// fallback to the local runner.
 #[tokio::test]
-async fn cache_read_skipped_on_store_errors() {
+async fn cache_read_skipped_on_missing_digest() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, true);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch);
 
   // Claim that the process has a non-empty and not-persisted stdout digest.
   let (process, action_digest) = create_process(&store_setup).await;
@@ -243,7 +250,9 @@ async fn cache_read_skipped_on_store_errors() {
   );
 
   assert_eq!(
-    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    workunit_store
+      .get_metrics()
+      .get("remote_cache_requests_uncached"),
     None
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -253,8 +262,10 @@ async fn cache_read_skipped_on_store_errors() {
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
   assert_eq!(
-    workunit_store.get_metrics().get("remote_cache_read_errors"),
-    Some(&1)
+    workunit_store
+      .get_metrics()
+      .get("remote_cache_requests_uncached"),
+    Some(&1),
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
@@ -266,10 +277,13 @@ async fn cache_read_skipped_on_store_errors() {
 async fn cache_read_eager_fetch() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  async fn run_process(eager_fetch: bool, workunit: &mut RunningWorkunit) -> (i32, usize) {
+  async fn run_process(
+    cache_content_behavior: CacheContentBehavior,
+    workunit: &mut RunningWorkunit,
+  ) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-    let cache_runner = create_cached_runner(local_runner, &store_setup, eager_fetch);
+    let cache_runner = create_cached_runner(local_runner, &store_setup, cache_content_behavior);
 
     let (process, action_digest) = create_process(&store_setup).await;
     store_setup.cas.action_cache.insert(
@@ -289,11 +303,13 @@ async fn cache_read_eager_fetch() {
     (remote_result.exit_code, final_local_count)
   }
 
-  let (lazy_exit_code, lazy_local_call_count) = run_process(false, &mut workunit).await;
+  let (lazy_exit_code, lazy_local_call_count) =
+    run_process(CacheContentBehavior::Defer, &mut workunit).await;
   assert_eq!(lazy_exit_code, 0);
   assert_eq!(lazy_local_call_count, 0);
 
-  let (eager_exit_code, eager_local_call_count) = run_process(true, &mut workunit).await;
+  let (eager_exit_code, eager_local_call_count) =
+    run_process(CacheContentBehavior::Fetch, &mut workunit).await;
   assert_eq!(eager_exit_code, 1);
   assert_eq!(eager_local_call_count, 1);
 }
@@ -305,7 +321,10 @@ async fn cache_read_speculation() {
   async fn run_process(
     local_delay_ms: u64,
     remote_delay_ms: u64,
+    remote_cache_speculation_delay_ms: u64,
     cache_hit: bool,
+    cached_exit_code: i32,
+    cache_scope: ProcessCacheScope,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
     let store_setup = StoreSetup::new_with_stub_cas(
@@ -314,38 +333,134 @@ async fn cache_read_speculation() {
         .build(),
     );
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
-    let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+    let cache_runner =
+      create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
 
     let (process, action_digest) = create_process(&store_setup).await;
+    let process = process.cache_scope(cache_scope);
+    let process = process.remote_cache_speculation_delay(std::time::Duration::from_millis(
+      remote_cache_speculation_delay_ms,
+    ));
     if cache_hit {
-      store_setup
-        .cas
-        .action_cache
-        .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+      store_setup.cas.action_cache.insert(
+        action_digest,
+        cached_exit_code,
+        EMPTY_DIGEST,
+        EMPTY_DIGEST,
+      );
     }
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
-    let remote_result = cache_runner
+    let result = cache_runner
       .run(Context::default(), workunit, process.into())
       .await
       .unwrap();
 
     let final_local_count = local_runner_call_counter.load(Ordering::SeqCst);
-    (remote_result.exit_code, final_local_count)
+    (result.exit_code, final_local_count)
   }
 
   // Case 1: remote is faster than local.
-  let (exit_code, local_call_count) = run_process(200, 0, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    200,
+    0,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 0);
   assert_eq!(local_call_count, 0);
 
   // Case 2: local is faster than remote.
-  let (exit_code, local_call_count) = run_process(0, 200, true, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    0,
+    200,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 
   // Case 3: the remote lookup wins, but there is no cache entry so we fallback to local execution.
-  let (exit_code, local_call_count) = run_process(200, 0, false, &mut workunit).await;
+  let (exit_code, local_call_count) = run_process(
+    200,
+    0,
+    0,
+    false,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 4: the remote lookup wins, but it was a failed process with cache scope Successful.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    true,
+    5,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 5: the remote lookup wins, and even though it was a failed process, cache scope was Always.
+  let (exit_code, local_call_count) =
+    run_process(0, 0, 200, true, 5, ProcessCacheScope::Always, &mut workunit).await;
+  assert_eq!(exit_code, 5);
+  assert_eq!(local_call_count, 0);
+
+  // Case 6: remote is faster than speculation read delay.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
+  assert_eq!(exit_code, 0);
+  assert_eq!(local_call_count, 0);
+
+  // Case 7: remote is faster than speculation read delay, but there is no cache entry so we fallback to local execution.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    0,
+    200,
+    false,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
+  assert_eq!(exit_code, 1);
+  assert_eq!(local_call_count, 1);
+
+  // Case 8: local with speculation read delay is faster than remote.
+  let (exit_code, local_call_count) = run_process(
+    0,
+    200,
+    0,
+    true,
+    0,
+    ProcessCacheScope::Successful,
+    &mut workunit,
+  )
+  .await;
   assert_eq!(exit_code, 1);
   assert_eq!(local_call_count, 1);
 }
@@ -355,16 +470,18 @@ async fn cache_write_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
+  let context = Context::default();
   let local_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone().into())
     .await
     .unwrap();
+  context.tail_tasks.wait(Duration::from_secs(2)).await;
   assert_eq!(local_result.exit_code, 0);
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 
@@ -387,7 +504,7 @@ async fn cache_write_not_for_failures() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
   let (process, _action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -415,14 +532,15 @@ async fn cache_write_does_not_block() {
       .build(),
   );
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
+  let context = Context::default();
   let local_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);
@@ -432,7 +550,7 @@ async fn cache_write_does_not_block() {
   // CommandRunner::run().
   assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
-  sleep(Duration::from_secs(1)).await;
+  context.tail_tasks.wait(Duration::from_secs(2)).await;
   assert_eq!(store_setup.cas.action_cache.len(), 1);
   assert_eq!(
     store_setup
@@ -567,6 +685,10 @@ async fn make_action_result_basic() {
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       unimplemented!()
     }
+
+    async fn shutdown(&self) -> Result<(), String> {
+      Ok(())
+    }
   }
 
   let store_dir = TempDir::new().unwrap();
@@ -598,17 +720,17 @@ async fn make_action_result_basic() {
   let cas = StubCAS::builder().build();
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
-    ProcessMetadata::default(),
+    None,
+    None,
     executor.clone(),
     store.clone(),
     &cas.address(),
     None,
     BTreeMap::default(),
-    Platform::current().unwrap(),
     true,
     true,
     RemoteCacheWarningsBehavior::FirstOnly,
-    false,
+    CacheContentBehavior::Defer,
     256,
     CACHE_READ_TIMEOUT,
   )

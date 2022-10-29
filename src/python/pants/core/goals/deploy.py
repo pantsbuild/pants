@@ -12,9 +12,10 @@ from typing import Iterable
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
 from pants.engine.console import Console
+from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -25,11 +26,12 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import union
+from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class DeployFieldSet(FieldSet, metaclass=ABCMeta):
     """The FieldSet type for the `deploy` goal.
@@ -87,13 +89,21 @@ class DeploySubsystem(GoalSubsystem):
 @dataclass(frozen=True)
 class Deploy(Goal):
     subsystem_cls = DeploySubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
-@rule_helper
-async def _find_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
+@dataclass(frozen=True)
+class _PublishProcessesForTargetRequest:
+    target: Target
+
+
+@rule
+async def publish_process_for_target(
+    request: _PublishProcessesForTargetRequest,
+) -> PublishProcesses:
     package_field_sets, publish_field_sets = await MultiGet(
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets)),
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PublishFieldSet, targets)),
+        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, [request.target])),
+        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PublishFieldSet, [request.target])),
     )
 
     return await Get(
@@ -103,6 +113,15 @@ async def _find_publish_processes(targets: Iterable[Target]) -> PublishProcesses
             publish_field_sets=publish_field_sets.field_sets,
         ),
     )
+
+
+@rule_helper
+async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
+    processes_per_target = await MultiGet(
+        Get(PublishProcesses, _PublishProcessesForTargetRequest(target)) for target in targets
+    )
+
+    return PublishProcesses(chain.from_iterable(processes_per_target))
 
 
 @rule_helper
@@ -164,13 +183,14 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
     publish_targets = set(
         chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes])
     )
-    publish_processes = await _find_publish_processes(publish_targets)
+    logger.debug(f"Found {pluralize(len(publish_targets), 'dependency')}")
+    publish_processes = await _all_publish_processes(publish_targets)
 
     exit_code: int = 0
     results: list[str] = []
 
     if publish_processes:
-        logger.info("Publishing dependencies...")
+        logger.info(f"Publishing {pluralize(len(publish_processes), 'dependency')}...")
 
         # Publish all deployment dependencies first.
         for publish in publish_processes:

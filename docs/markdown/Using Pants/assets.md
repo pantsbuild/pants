@@ -11,7 +11,7 @@ There are two ways to include asset files in your project: `resource` and `file`
 `resources`
 -----------
 
-A [`resource`](doc:reference-resource) target is for files that are members of code packages, and are loaded via language-specific mechanisms, such as Python's `pkgutil.get_data()` or Java's `getResource()`.  
+A [`resource`](doc:reference-resource) target is for files that are members of code packages, and are loaded via language-specific mechanisms, such as Python's `importlib.resources.read_text()` or Java's `getResource()`.  
 
 Pants will make resources available on the appropriate runtime path, such as Python's `PYTHONPATH` or the JVM classpath. Resources can be loaded directly from a binary in which they are embedded, such as a Pex file, without first unpacking it.
 
@@ -20,10 +20,10 @@ To reduce boilerplate, the [`resources`](doc:reference-resources) target generat
 For example, to load resources in Python:
 
 ```python src/python/project/app.py
-import pkgutil
+import importlib.resources
 
 if __name__ == "__main__":
-    config = pkgutil.get_data("project", "config.json").decode("utf-8")
+    config = importlib.resources.read_text("project", "config.json")
     print(f"Config: {config}")
 ```
 ```python src/python/project/BUILD

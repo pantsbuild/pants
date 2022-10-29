@@ -16,7 +16,7 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  local, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
   ProcessError, RelativePath,
 };
@@ -373,7 +373,7 @@ async fn test_chroot_placeholder() {
   let result = run_command_locally_in_dir(
     Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
     work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     None,
     None,
@@ -438,7 +438,7 @@ async fn test_directory_preservation() {
   let result = run_command_locally_in_dir(
     process,
     preserved_work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -494,7 +494,7 @@ async fn test_directory_preservation_error() {
   run_command_locally_in_dir(
     Process::new(vec!["doesnotexist".to_owned()]),
     preserved_work_root.clone(),
-    false,
+    KeepSandboxes::Always,
     &mut workunit,
     None,
     None,
@@ -565,7 +565,7 @@ async fn timeout() {
   let argv = vec![
     find_bash(),
     "-c".to_owned(),
-    "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 0.5; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
@@ -575,9 +575,11 @@ async fn timeout() {
   let result = run_command_locally(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
-  assert_that(&error_msg).contains("sleepy-cat");
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
+  assert_that(&stdout).contains("Calculating...");
+  assert_that(&stderr).contains("Exceeded timeout");
+  assert_that(&stderr).contains("sleepy-cat");
 }
 
 #[tokio::test]
@@ -616,7 +618,7 @@ async fn working_directory() {
   let result = run_command_locally_in_dir(
     process,
     work_dir.path().to_owned(),
-    true,
+    KeepSandboxes::Never,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -679,7 +681,7 @@ async fn immutable_inputs() {
   let result = run_command_locally_in_dir(
     process,
     work_dir.path().to_owned(),
-    true,
+    KeepSandboxes::Never,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -747,6 +749,8 @@ async fn prepare_workdir_exclusive_relative() {
     executor,
     &named_caches,
     &immutable_inputs,
+    None,
+    None,
   )
   .await
   .unwrap();
@@ -754,7 +758,9 @@ async fn prepare_workdir_exclusive_relative() {
   assert_eq!(exclusive_spawn, true);
 }
 
-fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
+pub(crate) fn named_caches_and_immutable_inputs(
+  store: Store,
+) -> (TempDir, NamedCaches, ImmutableInputs) {
   let root = TempDir::new().unwrap();
   let root_path = root.path().to_owned();
   let named_cache_dir = root_path.join("named");
@@ -770,13 +776,21 @@ async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessErr
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
-  run_command_locally_in_dir(req, work_dir_path, true, &mut workunit, None, None).await
+  run_command_locally_in_dir(
+    req,
+    work_dir_path,
+    KeepSandboxes::Never,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
 }
 
 async fn run_command_locally_in_dir(
   req: Process,
   dir: PathBuf,
-  cleanup: bool,
+  cleanup: KeepSandboxes,
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,

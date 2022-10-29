@@ -24,12 +24,12 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DownloadFile,
+    FileDigest,
     FileEntry,
     MergeDigests,
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -187,7 +187,7 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
 
 
 # -----------------------------------------------------------------------------------------------
-# `file` and`files` targets
+# `file` and `files` targets
 # -----------------------------------------------------------------------------------------------
 class FileSourceField(AssetSourceField):
     uses_source_roots = False
@@ -591,7 +591,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
         """
         A private helper target type used by some target generators.
 
-        This tracks their `source` / `sources` field so that `--changed-since --changed-dependees`
+        This tracks their `source` / `sources` field so that `--changed-since --changed-dependents`
         works properly for generated targets.
         """
     )
@@ -719,6 +719,49 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         ),
     )
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
+
+
+# -----------------------------------------------------------------------------------------------
+# `_lockfile` and `_lockfiles` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class LockfileSourceField(SingleSourceField):
+    uses_source_roots = False
+    required = True
+
+
+class LockfileDependenciesField(Dependencies):
+    pass
+
+
+class LockfileTarget(Target):
+    alias = "_lockfile"
+    core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
+    help = softwrap(
+        """
+        A target for lockfiles in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
+        relying on a particular lockfile.
+        """
+    )
+
+
+class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+
+class LockfilesGeneratorTarget(TargetFilesGenerator):
+    alias = "_lockfiles"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        LockfilesGeneratorSourcesField,
+    )
+    generated_target_cls = LockfileTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (LockfileDependenciesField,)
+    help = "Generate a `_lockfile` target for each file in the `sources` field."
 
 
 def rules():

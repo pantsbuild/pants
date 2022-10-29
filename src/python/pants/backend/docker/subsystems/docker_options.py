@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.environment import Environment
+from pants.engine.env_vars import EnvironmentVars
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -33,6 +33,48 @@ doc_links = {
 class DockerOptions(Subsystem):
     options_scope = "docker"
     help = "Options for interacting with Docker."
+
+    class EnvironmentAware:
+        _env_vars = ShellStrListOption(
+            help=softwrap(
+                """
+                Environment variables to set for `docker` invocations.
+
+                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+                or just `ENV_VAR` to copy the value from Pants's own environment.
+                """
+            ),
+            advanced=True,
+        )
+        _executable_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+            The PATH value that will be used to find the Docker client and any tools required.
+
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @property
+        def env_vars(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._env_vars)))
+
+        @memoized_method
+        def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_paths:
+                    if entry == "<PATH>":
+                        path = env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))
 
     _registries = DictOption[Any](
         help=softwrap(
@@ -154,17 +196,6 @@ class DockerOptions(Subsystem):
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
     )
-    _env_vars = ShellStrListOption(
-        help=softwrap(
-            """
-            Environment variables to set for `docker` invocations.
-
-            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
-            or just `ENV_VAR` to copy the value from Pants's own environment.
-            """
-        ),
-        advanced=True,
-    )
     run_args = ShellStrListOption(
         default=["--interactive", "--tty"] if sys.stdout.isatty() else [],
         help=softwrap(
@@ -186,18 +217,6 @@ class DockerOptions(Subsystem):
             Defaults to `--interactive --tty` when stdout is connected to a terminal.
             """
         ),
-    )
-    _executable_search_paths = StrListOption(
-        default=["<PATH>"],
-        help=softwrap(
-            """
-            The PATH value that will be used to find the Docker client and any tools required.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
-            """
-        ),
-        advanced=True,
-        metavar="<binary-paths>",
     )
     _tools = StrListOption(
         default=[],
@@ -222,26 +241,9 @@ class DockerOptions(Subsystem):
         return tuple(sorted(set(self._build_args)))
 
     @property
-    def env_vars(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self._env_vars)))
-
-    @property
     def tools(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._tools)))
 
     @memoized_method
     def registries(self) -> DockerRegistries:
         return DockerRegistries.from_dict(self._registries)
-
-    @memoized_method
-    def executable_search_path(self, env: Environment) -> tuple[str, ...]:
-        def iter_path_entries():
-            for entry in self._executable_search_paths:
-                if entry == "<PATH>":
-                    path = env.get("PATH")
-                    if path:
-                        yield from path.split(os.pathsep)
-                else:
-                    yield entry
-
-        return tuple(OrderedSet(iter_path_entries()))

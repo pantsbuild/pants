@@ -4,6 +4,7 @@
 // File-specific allowances to silence internal warnings of `[pyclass]`.
 #![allow(clippy::used_underscore_binding)]
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
@@ -14,6 +15,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
+use smallvec::{smallvec, SmallVec};
 
 use logging::PythonLogLevel;
 
@@ -27,6 +29,7 @@ mod interface;
 #[cfg(test)]
 mod interface_tests;
 pub mod nailgun;
+pub mod process;
 pub mod scheduler;
 mod stdio;
 pub mod testutil;
@@ -56,6 +59,9 @@ pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   h1.eq(h2).unwrap()
 }
 
+/// Return true if the given type is a @union.
+///
+/// This function is also implemented in Python as `pants.engine.union.is_union`.
 pub fn is_union(py: Python, v: &PyType) -> PyResult<bool> {
   let is_union_for_attr = intern!(py, "_is_union_for");
   if !v.hasattr(is_union_for_attr)? {
@@ -64,6 +70,22 @@ pub fn is_union(py: Python, v: &PyType) -> PyResult<bool> {
 
   let is_union_for = v.getattr(is_union_for_attr)?;
   Ok(is_union_for.is(v))
+}
+
+/// If the given type is a @union, return its in-scope types.
+///
+/// This function is also implemented in Python as `pants.engine.union.union_in_scope_types`.
+pub fn union_in_scope_types<'p>(
+  py: Python<'p>,
+  v: &'p PyType,
+) -> PyResult<Option<Vec<&'p PyType>>> {
+  if !is_union(py, v)? {
+    return Ok(None);
+  }
+
+  let union_in_scope_types: Vec<&PyType> =
+    v.getattr(intern!(py, "_union_in_scope_types"))?.extract()?;
+  Ok(Some(union_in_scope_types))
 }
 
 pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {
@@ -230,17 +252,18 @@ pub fn generator_send(
       TypeId::new(b.0.as_ref(py).get_type()),
     ))
   } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
-    Ok(GeneratorResponse::Get(Get::new(py, get)?))
+    Ok(GeneratorResponse::Get(get.take()?))
   } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
     let gets = get_multi
       .0
       .as_ref(py)
       .iter()
-      .map(|g| {
-        let get = g
+      .map(|gr_get| {
+        let get = gr_get
           .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e))?;
-        Get::new(py, get)
+          .map_err(|e| Failure::from_py_err_with_gil(py, e))?
+          .take()?;
+        Ok::<Get, Failure>(get)
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
@@ -282,11 +305,18 @@ impl PyGeneratorResponseBreak {
   }
 }
 
+// Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseGet {
-  product: Py<PyType>,
-  declared_subject: Py<PyType>,
-  subject: PyObject,
+pub struct PyGeneratorResponseGet(RefCell<Option<Get>>);
+
+impl PyGeneratorResponseGet {
+  fn take(&self) -> Result<Get, String> {
+    self
+      .0
+      .borrow_mut()
+      .take()
+      .ok_or_else(|| "A `Get` may only be consumed once.".to_owned())
+  }
 }
 
 #[pymethods]
@@ -305,8 +335,9 @@ impl PyGeneratorResponseGet {
         `{product}` with type {actual_type}."
       ))
     })?;
+    let output = TypeId::new(product);
 
-    let (declared_subject, subject) = if let Some(input_arg1) = input_arg1 {
+    let (input_types, inputs) = if let Some(input_arg1) = input_arg1 {
       let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
         let input_arg0_type = input_arg0.get_type();
         PyTypeError::new_err(format!(
@@ -332,39 +363,113 @@ impl PyGeneratorResponseGet {
         )));
       }
 
-      (declared_type, input_arg1)
-    } else {
-      if input_arg0.is_instance_of::<PyType>()? {
-        return Err(PyTypeError::new_err(format!(
-          "Invalid Get. Because you are using the shorthand form \
+      (
+        smallvec![TypeId::new(declared_type)],
+        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
+      )
+    } else if input_arg0.is_instance_of::<PyType>()? {
+      return Err(PyTypeError::new_err(format!(
+        "Invalid Get. Because you are using the shorthand form \
           Get(OutputType, InputType(constructor args)), the second argument should be \
           a constructor call, rather than a type, but given {input_arg0}."
-        )));
+      )));
+    } else if let Ok(d) = input_arg0.cast_as::<PyDict>() {
+      let mut input_types = SmallVec::new();
+      let mut inputs = SmallVec::new();
+      for (value, declared_type) in d.iter() {
+        input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
+          |_| {
+            PyTypeError::new_err(
+              "Invalid Get. Because the second argument was a dict, we expected the keys of the \
+            dict to be the Get inputs, and the values of the dict to be the declared \
+            types of those inputs.",
+            )
+          },
+        )?));
+        inputs.push(INTERNS.key_insert(py, value.into())?);
       }
-
-      (input_arg0.get_type(), input_arg0)
+      (input_types, inputs)
+    } else {
+      (
+        smallvec![TypeId::new(input_arg0.get_type())],
+        smallvec![INTERNS.key_insert(py, input_arg0.into())?],
+      )
     };
 
-    Ok(Self {
-      product: product.into_py(py),
-      declared_subject: declared_subject.into_py(py),
-      subject: subject.into_py(py),
-    })
+    Ok(Self(RefCell::new(Some(Get {
+      output,
+      input_types,
+      inputs,
+    }))))
   }
 
   #[getter]
-  fn output_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
-    self.product.as_ref(py)
+  fn output_type<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyType> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .output
+        .as_py_type(py),
+    )
   }
 
   #[getter]
-  fn input_type<'p>(&'p self, py: Python<'p>) -> &'p PyType {
-    self.declared_subject.as_ref(py)
+  fn input_types<'p>(&'p self, py: Python<'p>) -> PyResult<Vec<&'p PyType>> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .input_types
+        .iter()
+        .map(|t| t.as_py_type(py))
+        .collect(),
+    )
   }
 
   #[getter]
-  fn input<'p>(&'p self, py: Python<'p>) -> &'p PyAny {
-    self.subject.as_ref(py)
+  fn inputs(&self) -> PyResult<Vec<PyObject>> {
+    Ok(
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .inputs
+        .iter()
+        .map(|k| {
+          let pyo: PyObject = k.value.clone().into();
+          pyo
+        })
+        .collect(),
+    )
+  }
+
+  fn __repr__(&self) -> PyResult<String> {
+    Ok(format!(
+      "{}",
+      self.0.borrow().as_ref().ok_or_else(|| {
+        PyException::new_err(
+          "A `Get` may not be consumed after being provided to the @rule engine.",
+        )
+      })?
+    ))
   }
 }
 
@@ -382,25 +487,28 @@ impl PyGeneratorResponseGetMulti {
 #[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
-  pub input_type: TypeId,
-  pub input: Key,
-}
-
-impl Get {
-  fn new(py: Python, get: PyRef<PyGeneratorResponseGet>) -> Result<Get, Failure> {
-    Ok(Get {
-      output: TypeId::new(get.product.as_ref(py)),
-      input_type: TypeId::new(get.declared_subject.as_ref(py)),
-      input: INTERNS
-        .key_insert(py, get.subject.clone_ref(py))
-        .map_err(|e| Failure::from_py_err_with_gil(py, e))?,
-    })
-  }
+  pub input_types: SmallVec<[TypeId; 2]>,
+  pub inputs: SmallVec<[Key; 2]>,
 }
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(f, "Get({}, {})", self.output, self.input)
+    write!(f, "Get({}", self.output)?;
+    match self.input_types.len() {
+      0 => write!(f, ")"),
+      1 => write!(f, ", {}, {})", self.input_types[0], self.inputs[0]),
+      _ => write!(
+        f,
+        ", {{{}}})",
+        self
+          .input_types
+          .iter()
+          .zip(self.inputs.iter())
+          .map(|(t, k)| { format!("{k}: {t}") })
+          .collect::<Vec<_>>()
+          .join(", ")
+      ),
+    }
   }
 }
 

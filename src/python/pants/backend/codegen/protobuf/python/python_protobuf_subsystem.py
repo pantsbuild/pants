@@ -11,7 +11,10 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -86,19 +89,15 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class MypyProtobufLockfileSentinel(GenerateToolLockfileSentinel):
+class MypyProtobufLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PythonProtobufMypyPlugin.options_scope
 
 
 @rule
 def setup_mypy_protobuf_lockfile(
-    _: MypyProtobufLockfileSentinel,
-    mypy_protobuf: PythonProtobufMypyPlugin,
-    python_setup: PythonSetup,
+    _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        mypy_protobuf, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(mypy_protobuf)
 
 
 @dataclass(frozen=True)

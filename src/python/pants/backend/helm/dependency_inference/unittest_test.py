@@ -19,7 +19,7 @@ from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
 from pants.build_graph.address import Address
@@ -50,7 +50,7 @@ def test_infers_single_chart(rule_runner: RuleRunner) -> None:
             ),
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "tests/BUILD": textwrap.dedent(
                 """\
                 helm_unittest_tests(name="foo_tests", sources=["*_test.yaml"])
@@ -80,20 +80,17 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
             "src/chart1/BUILD": """helm_chart()""",
             "src/chart1/Chart.yaml": gen_chart_file("chart1", version="0.1.0"),
             "src/chart1/values.yaml": HELM_VALUES_FILE,
-            "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart1/templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "src/chart1/tests/BUILD": """helm_unittest_tests(sources=["*_test.yaml"])""",
             "src/chart1/tests/service_test.yaml": "",
             "src/chart2/BUILD": """helm_chart()""",
             "src/chart2/Chart.yaml": gen_chart_file("chart2", version="0.1.0"),
             "src/chart2/values.yaml": HELM_VALUES_FILE,
-            "src/chart2/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart2/templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "src/chart2/tests/BUILD": """helm_unittest_tests(sources=["*_test.yaml"])""",
             "src/chart2/tests/service_test.yaml": "",
         }
     )
-
-    source_roots = ["src/*"]
-    rule_runner.set_options([f"--source-roots-patterns={repr(source_roots)}"])
 
     chart1_tgt = rule_runner.get_target(Address("src/chart1", target_name="chart1"))
     chart1_unittest_tgt = rule_runner.get_target(Address("src/chart1/tests", target_name="tests"))

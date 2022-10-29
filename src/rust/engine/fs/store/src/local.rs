@@ -1,6 +1,6 @@
 use super::{EntryType, ShrinkBehavior};
 
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
 use std::io::{self, Read};
 use std::path::Path;
@@ -336,6 +336,43 @@ impl ByteStore {
     dbs?
       .store(initial_lease, data_is_immutable, data_provider)
       .await
+  }
+
+  ///
+  /// Given a collection of Digests (digests),
+  /// returns the set of digests from that collection not present in the
+  /// underlying LMDB store.
+  ///
+  pub async fn get_missing_digests(
+    &self,
+    entry_type: EntryType,
+    digests: HashSet<Digest>,
+  ) -> Result<HashSet<Digest>, String> {
+    let fingerprints_to_check = digests
+      .iter()
+      .filter_map(|digest| {
+        // Avoid I/O for this case. This allows some client-provided operations (like
+        // merging snapshots) to work without needing to first store the empty snapshot.
+        if *digest == EMPTY_DIGEST {
+          None
+        } else {
+          Some(digest.hash)
+        }
+      })
+      .collect::<Vec<_>>();
+
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    }?;
+
+    let existing = dbs.exists_batch(fingerprints_to_check).await?;
+
+    let missing = digests
+      .into_iter()
+      .filter(|digest| *digest != EMPTY_DIGEST && !existing.contains(&digest.hash))
+      .collect::<HashSet<_>>();
+    Ok(missing)
   }
 
   ///

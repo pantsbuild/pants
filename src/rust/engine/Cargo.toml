@@ -5,6 +5,10 @@ name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
+# NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
+# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
+# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
+
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
 # but enables profiling of optimized builds.
@@ -119,7 +123,7 @@ async-oncecell = "0.2"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
-futures-core = "^0.3.0"
+futures-core = "^0.3.23"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
@@ -128,7 +132,7 @@ indexmap = "1.9"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
-libc = "0.2.126"
+libc = "0.2.137"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
@@ -141,7 +145,7 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = "1"
+smallvec = { version = "1", features=["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
@@ -149,11 +153,12 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
-tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
+tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.1"
+url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
@@ -163,4 +168,4 @@ fs = { path = "./fs" }
 env_logger = "0.9.0"
 
 [build-dependencies]
-pyo3-build-config = "0.16"
+pyo3-build-config = "0.17"

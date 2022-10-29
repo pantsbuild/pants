@@ -39,7 +39,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -53,13 +53,13 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
-    test_utils_filespec = Filespec(includes=list(PythonTestUtilsGeneratingSourcesField.default))
+    tests_filespec_matcher = FilespecMatcher(PythonTestsGeneratingSourcesField.default, ())
+    test_utils_filespec_matcher = FilespecMatcher(PythonTestUtilsGeneratingSourcesField.default, ())
 
     path_to_file_name = {path: os.path.basename(path) for path in paths}
-    test_file_names = set(matches_filespec(tests_filespec, paths=path_to_file_name.values()))
+    test_file_names = set(tests_filespec_matcher.matches(list(path_to_file_name.values())))
     test_util_file_names = set(
-        matches_filespec(test_utils_filespec, paths=path_to_file_name.values())
+        test_utils_filespec_matcher.matches(list(path_to_file_name.values()))
     )
 
     test_files = {
@@ -94,15 +94,6 @@ def is_entry_point(content: bytes) -> bool:
 async def _find_source_targets(
     py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
 ) -> list[PutativeTarget]:
-    ignore_solitary_explicitly_set = not python_setup.options.is_default(
-        "tailor_ignore_solitary_init_files"
-    )
-    ignore_solitary = (
-        python_setup.tailor_ignore_solitary_init_files
-        if ignore_solitary_explicitly_set
-        else python_setup.tailor_ignore_empty_init_files
-    )
-
     result = []
     check_if_init_file_empty: dict[str, tuple[str, str]] = {}  # full_path: (dirname, filename)
 
@@ -119,13 +110,12 @@ async def _find_source_targets(
             else:
                 name = None
             if (
-                ignore_solitary
+                python_setup.tailor_ignore_empty_init_files
                 and tgt_type == PythonSourcesGeneratorTarget
                 and filenames in ({"__init__.py"}, {"__init__.pyi"})
             ):
-                if not ignore_solitary_explicitly_set:
-                    f = next(iter(filenames))
-                    check_if_init_file_empty[os.path.join(dirname, f)] = (dirname, f)
+                f = next(iter(filenames))
+                check_if_init_file_empty[os.path.join(dirname, f)] = (dirname, f)
             else:
                 result.append(
                     PutativeTarget.for_target_type(

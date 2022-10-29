@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -15,7 +16,7 @@ from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
@@ -36,7 +37,8 @@ def rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, [Flake8Request]),
+            QueryRule(Partitions, [Flake8Request.PartitionRequest]),
+            QueryRule(LintResult, [Flake8Request.Batch]),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -53,13 +55,18 @@ def run_flake8(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    results = rule_runner.request(
-        LintResults,
-        [
-            Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
-        ],
+    partitions = rule_runner.request(
+        Partitions[Flake8FieldSet, Any],
+        [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
-    return results.results
+    results = []
+    for partition in partitions:
+        result = rule_runner.request(
+            LintResult,
+            [Flake8Request.Batch("", partition.elements, partition.metadata)],
+        )
+        results.append(result)
+    return tuple(results)
 
 
 def assert_success(
@@ -125,7 +132,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--flake8-lockfile=<none>"]
+    extra_args = ["--flake8-lockfile=<none>", "--flake8-version=flake8<4.0,>=3.9.2"]
 
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
@@ -185,21 +192,27 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+    # Test extra_files option
     rule_runner.write_files(
-        {"f.py": "'constant' and 'constant2'\n", "BUILD": "python_sources(name='t')"}
+        {
+            "f.py": "assert 1 == 1\n",
+            ".bandit": "[bandit]\nskips: B101\n",
+            "BUILD": "python_sources(name='t')",
+        }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
         rule_runner,
         [tgt],
         extra_args=[
-            "--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3",
+            "--flake8-extra-requirements=flake8-bandit==4.1.1",
+            "--flake8-extra-requirements=setuptools==65.5.0",
             "--flake8-lockfile=<none>",
+            "--flake8-extra-files=['.bandit']",
         ],
     )
     assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert "f.py:1:1: PB11" in result[0].stdout
+    assert result[0].exit_code == 0, result[0].stderr
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:

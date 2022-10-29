@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import pytest
 
@@ -20,7 +20,7 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
+from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
@@ -33,7 +33,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.test.junit import JunitTestFieldSet
+from pants.jvm.test.junit import JunitTestFieldSet, JunitTestRequest
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -62,8 +62,9 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *util_rules(),
             *non_jvm_dependencies_rules(),
+            get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (JunitTestFieldSet,)),
+            QueryRule(TestResult, (JunitTestRequest.Batch,)),
         ],
         target_types=[
             FileTarget,
@@ -74,11 +75,6 @@ def rule_runner() -> RuleRunner:
             JunitTestsGeneratorTarget,
             ScalaJunitTestsGeneratorTarget,
         ],
-    )
-    rule_runner.set_options(
-        # Makes JUnit output predictable and parseable across versions (#12933):
-        args=["--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']"],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
 
@@ -572,10 +568,78 @@ def test_vintage_relocated_files_dependency(
     assert re.search(r"1 tests found", test_result.stdout) is not None
 
 
+@maybe_skip_jdk_test
+def test_vintage_extra_env_vars(
+    rule_runner: RuleRunner, junit4_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": junit4_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": junit4_lockfile.requirements_as_jvm_artifact_targets(),
+            "BUILD": dedent(
+                """\
+            junit_tests(
+                name="example-test",
+                extra_env_vars=[
+                    "JUNIT_TESTS_VAR_WITHOUT_VALUE",
+                    "JUNIT_TESTS_VAR_WITH_VALUE=junit_tests_var_with_value",
+                    "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR=junit_tests_override_with_value_var_override",
+                ],
+            )
+            """
+            ),
+            "ExtraEnvVarsTest.java": dedent(
+                """\
+            package org.pantsbuild.example;
+
+            import junit.framework.TestCase;
+
+            public class ExtraEnvVarsTest extends TestCase {
+                public void testArgs() throws Exception {
+                    assertEquals(System.getenv("ARG_WITH_VALUE_VAR"), "arg_with_value_var");
+                    assertEquals(System.getenv("ARG_WITHOUT_VALUE_VAR"), "arg_without_value_var");
+                    assertEquals(System.getenv("JUNIT_TESTS_VAR_WITH_VALUE"), "junit_tests_var_with_value");
+                    assertEquals(System.getenv("JUNIT_TESTS_VAR_WITHOUT_VALUE"), "junit_tests_var_without_value");
+                    assertEquals(System.getenv("JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR"), "junit_tests_override_with_value_var_override");
+                }
+            }
+            """
+            ),
+        }
+    )
+
+    result = run_junit_test(
+        rule_runner,
+        "example-test",
+        "ExtraEnvVarsTest.java",
+        extra_args=[
+            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR"]'
+        ],
+        env={
+            "ARG_WITHOUT_VALUE_VAR": "arg_without_value_var",
+            "JUNIT_TESTS_VAR_WITHOUT_VALUE": "junit_tests_var_without_value",
+            "JUNIT_TESTS_OVERRIDE_WITH_VALUE_VAR": "junit_tests_override_with_value_var",
+        },
+    )
+    assert result.exit_code == 0
+
+
 def run_junit_test(
-    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+    rule_runner: RuleRunner,
+    target_name: str,
+    relative_file_path: str,
+    *,
+    extra_args: Iterable[str] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> TestResult:
+    args = [
+        "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        *(extra_args or ()),
+    ]
+    rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )
-    return rule_runner.request(TestResult, [JunitTestFieldSet.create(tgt)])
+    return rule_runner.request(
+        TestResult, [JunitTestRequest.Batch("", (JunitTestFieldSet.create(tgt),), None)]
+    )

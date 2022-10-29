@@ -17,11 +17,11 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  self, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs, Permissions,
+  RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
+use futures::{try_join, FutureExt, TryFutureExt};
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
@@ -32,15 +32,22 @@ use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError, ProcessResultMetadata, ProcessResultSource,
+  ProcessError, ProcessResultMetadata, ProcessResultSource, WorkdirSymlink,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum KeepSandboxes {
+  Always,
+  Never,
+  OnFailure,
+}
 
 pub struct CommandRunner {
   pub store: Store,
@@ -48,7 +55,7 @@ pub struct CommandRunner {
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
-  cleanup_local_dirs: bool,
+  keep_sandboxes: KeepSandboxes,
   platform: Platform,
   spawn_lock: RwLock<()>,
 }
@@ -60,7 +67,7 @@ impl CommandRunner {
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
-    cleanup_local_dirs: bool,
+    keep_sandboxes: KeepSandboxes,
   ) -> CommandRunner {
     CommandRunner {
       store,
@@ -68,7 +75,7 @@ impl CommandRunner {
       work_dir_base,
       named_caches,
       immutable_inputs,
-      cleanup_local_dirs,
+      keep_sandboxes,
       platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
     }
@@ -78,13 +85,13 @@ impl CommandRunner {
     self.platform
   }
 
-  fn construct_output_snapshot(
+  async fn construct_output_snapshot(
     store: Store,
     posix_fs: Arc<fs::PosixFS>,
     output_file_paths: BTreeSet<RelativePath>,
     output_dir_paths: BTreeSet<RelativePath>,
-  ) -> BoxFuture<'static, Result<Snapshot, String>> {
-    let output_paths: Result<Vec<String>, String> = output_dir_paths
+  ) -> Result<Snapshot, String> {
+    let output_paths = output_dir_paths
       .into_iter()
       .flat_map(|p| {
         let mut dir_glob = {
@@ -107,28 +114,25 @@ impl CommandRunner {
         s.into_string()
           .map_err(|e| format!("Error stringifying output paths: {:?}", e))
       })
-      .collect();
+      .collect::<Result<Vec<_>, _>>()?;
 
     // TODO: should we error when globs fail?
-    let output_globs = try_future!(PathGlobs::new(
-      try_future!(output_paths),
+    let output_globs = PathGlobs::new(
+      output_paths,
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
     )
-    .parse());
+    .parse()?;
 
-    Box::pin(async move {
-      let path_stats = posix_fs
-        .expand_globs(output_globs, None)
-        .map_err(|err| format!("Error expanding output globs: {}", err))
-        .await?;
-      Snapshot::from_path_stats(
-        OneOffStoreFileByDigest::new(store, posix_fs, true),
-        path_stats,
-      )
-      .await
-    })
-    .boxed()
+    let path_stats = posix_fs
+      .expand_globs(output_globs, None)
+      .map_err(|err| format!("Error expanding output globs: {}", err))
+      .await?;
+    Snapshot::from_path_stats(
+      OneOffStoreFileByDigest::new(store, posix_fs, true),
+      path_stats,
+    )
+    .await
   }
 
   pub fn named_caches(&self) -> &NamedCaches {
@@ -218,38 +222,24 @@ pub enum ChildOutput {
 }
 
 ///
-/// The fully collected outputs of a completed child process.
+/// Collect the outputs of a child process.
 ///
-pub struct ChildResults {
-  pub stdout: Bytes,
-  pub stderr: Bytes,
-  pub exit_code: i32,
-}
+async fn collect_child_outputs<'a>(
+  stdout: &'a mut BytesMut,
+  stderr: &'a mut BytesMut,
+  mut stream: BoxStream<'static, Result<ChildOutput, String>>,
+) -> Result<i32, String> {
+  let mut exit_code = 1;
 
-impl ChildResults {
-  pub fn collect_from(
-    mut stream: BoxStream<'static, Result<ChildOutput, String>>,
-  ) -> BoxFuture<'static, Result<ChildResults, String>> {
-    let mut stdout = BytesMut::with_capacity(8192);
-    let mut stderr = BytesMut::with_capacity(8192);
-    let mut exit_code = 1;
-
-    async move {
-      while let Some(child_output_res) = stream.next().await {
-        match child_output_res? {
-          ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-          ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-          ChildOutput::Exit(code) => exit_code = code.0,
-        };
-      }
-      Ok(ChildResults {
-        stdout: stdout.into(),
-        stderr: stderr.into(),
-        exit_code,
-      })
-    }
-    .boxed()
+  while let Some(child_output_res) = stream.next().await {
+    match child_output_res? {
+      ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+      ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+      ChildOutput::Exit(code) => exit_code = code.0,
+    };
   }
+
+  Ok(exit_code)
 }
 
 #[async_trait]
@@ -271,11 +261,11 @@ impl super::CommandRunner for CommandRunner {
       // renders at the Process's level.
       desc = Some(req.description.clone()),
       |workunit| async move {
-        let workdir = create_sandbox(
+        let mut workdir = create_sandbox(
           self.executor.clone(),
           &self.work_dir_base,
           &req.description,
-          self.cleanup_local_dirs,
+          self.keep_sandboxes,
         )?;
 
         // Start working on a mutable version of the process.
@@ -292,6 +282,8 @@ impl super::CommandRunner for CommandRunner {
           self.executor.clone(),
           &self.named_caches,
           &self.immutable_inputs,
+          None,
+          None,
         )
         .await?;
 
@@ -320,7 +312,11 @@ impl super::CommandRunner for CommandRunner {
           })
           .await;
 
-        if !self.cleanup_local_dirs {
+        if self.keep_sandboxes == KeepSandboxes::Always
+          || self.keep_sandboxes == KeepSandboxes::OnFailure
+            && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
+        {
+          workdir.keep(&req.description);
           setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
         }
 
@@ -329,19 +325,24 @@ impl super::CommandRunner for CommandRunner {
     )
     .await
   }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
   type WorkdirToken = ();
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    _context: &'c Context,
+    workdir_path: &'w Path,
     _workdir_token: (),
     req: Process,
     exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let cwd = if let Some(ref working_directory) = req.working_directory {
       workdir_path.join(working_directory)
     } else {
@@ -460,26 +461,34 @@ pub trait CapturedWorkdir {
     platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
+    let mut stdout = BytesMut::with_capacity(8192);
+    let mut stderr = BytesMut::with_capacity(8192);
 
     // Spawn the process.
-    // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
-    // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
-    // code. The idea going forward though is we eventually want to pass incremental results on
-    // down the line for streaming process results to console logs, etc. as tracked by:
-    //   https://github.com/pantsbuild/pants/issues/6089
-    let child_results_result = {
-      let child_results_future = ChildResults::collect_from(
+    // NB: We fully buffer the `Stream` into the stdout/stderr buffers, but the idea going forward
+    // is that we eventually want to pass incremental results on down the line for streaming
+    // process results to console logs, etc.
+    let exit_code_result = {
+      let exit_code_future = collect_child_outputs(
+        &mut stdout,
+        &mut stderr,
         self
-          .run_in_workdir(&workdir_path, workdir_token, req.clone(), exclusive_spawn)
+          .run_in_workdir(
+            &context,
+            &workdir_path,
+            workdir_token,
+            req.clone(),
+            exclusive_spawn,
+          )
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
-        timeout(req_timeout, child_results_future)
+        timeout(req_timeout, exit_code_future)
           .await
           .map_err(|e| e.to_string())
           .and_then(|r| r)
       } else {
-        child_results_future.await
+        exit_code_future.await
       }
     };
 
@@ -519,34 +528,39 @@ pub trait CapturedWorkdir {
       context.run_id,
     );
 
-    match child_results_result {
-      Ok(child_results) => {
-        let stdout = child_results.stdout;
-        let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
-
-        let stderr = child_results.stderr;
-        let stderr_digest = store.store_file_bytes(stderr.clone(), true).await?;
-
+    match exit_code_result {
+      Ok(exit_code) => {
+        let (stdout_digest, stderr_digest) = try_join!(
+          store.store_file_bytes(stdout.into(), true),
+          store.store_file_bytes(stderr.into(), true),
+        )?;
         Ok(FallibleProcessResultWithPlatform {
           stdout_digest,
           stderr_digest,
-          exit_code: child_results.exit_code,
+          exit_code,
           output_directory: output_snapshot.into(),
           platform,
           metadata: result_metadata,
         })
       }
       Err(msg) if msg == "deadline has elapsed" => {
-        let stdout = Bytes::from(format!(
-          "Exceeded timeout of {:.1} seconds when executing local process: {}",
-          req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
-          req.description
-        ));
-        let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+        stderr.extend_from_slice(
+          format!(
+            "\n\nExceeded timeout of {:.1} seconds when executing local process: {}",
+            req.timeout.map(|dur| dur.as_secs_f32()).unwrap_or(-1.0),
+            req.description
+          )
+          .as_bytes(),
+        );
+
+        let (stdout_digest, stderr_digest) = try_join!(
+          store.store_file_bytes(stdout.into(), true),
+          store.store_file_bytes(stderr.into(), true),
+        )?;
 
         Ok(FallibleProcessResultWithPlatform {
           stdout_digest,
-          stderr_digest: hashing::EMPTY_DIGEST,
+          stderr_digest,
           exit_code: -libc::SIGTERM,
           output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
           platform,
@@ -575,13 +589,14 @@ pub trait CapturedWorkdir {
   ///  fork+execs in the scheduler. For now we rely on the fact that the process_execution::nailgun
   ///  module is dead code in practice.
   ///
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    context: &'c Context,
+    workdir_path: &'w Path,
     workdir_token: Self::WorkdirToken,
     req: Process,
     exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
 }
 
 ///
@@ -620,13 +635,54 @@ pub async fn prepare_workdir(
   executor: Executor,
   named_caches: &NamedCaches,
   immutable_inputs: &ImmutableInputs,
+  named_caches_prefix: Option<&Path>,
+  immutable_inputs_prefix: Option<&Path>,
 ) -> Result<bool, StoreError> {
   // Collect the symlinks to create for immutable inputs or named caches.
-  let workdir_symlinks = immutable_inputs
-    .local_paths(&req.input_digests.immutable_inputs)
-    .await?
+  let immutable_inputs_symlinks = {
+    let symlinks = immutable_inputs
+      .local_paths(&req.input_digests.immutable_inputs)
+      .await?;
+
+    match immutable_inputs_prefix {
+      Some(prefix) => symlinks
+        .into_iter()
+        .map(|symlink| WorkdirSymlink {
+          src: symlink.src,
+          dst: prefix.join(
+            symlink
+              .dst
+              .strip_prefix(immutable_inputs.workdir())
+              .unwrap(),
+          ),
+        })
+        .collect::<Vec<_>>(),
+      None => symlinks,
+    }
+  };
+  let named_caches_symlinks = {
+    let symlinks = named_caches
+      .local_paths(&req.append_only_caches)
+      .map_err(|err| {
+        StoreError::Unclassified(format!(
+          "Failed to make named cache(s) for local execution: {:?}",
+          err
+        ))
+      })?;
+    match named_caches_prefix {
+      Some(prefix) => symlinks
+        .into_iter()
+        .map(|symlink| WorkdirSymlink {
+          src: symlink.src,
+          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_dir()).unwrap()),
+        })
+        .collect::<Vec<_>>(),
+      None => symlinks,
+    }
+  };
+  let workdir_symlinks = immutable_inputs_symlinks
     .into_iter()
-    .chain(named_caches.local_paths(&req.append_only_caches))
+    .chain(named_caches_symlinks.into_iter())
     .collect::<Vec<_>>();
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
@@ -690,14 +746,6 @@ pub async fn prepare_workdir(
       }
 
       for workdir_symlink in workdir_symlinks {
-        // TODO: Move initialization of the dst directory into NamedCaches.
-        safe_create_dir_all_ioerror(&workdir_symlink.dst).map_err(|err| {
-          format!(
-            "Error making {} for local execution: {:?}",
-            workdir_symlink.dst.display(),
-            err
-          )
-        })?;
         let src = workdir_path2.join(&workdir_symlink.src);
         symlink(&workdir_symlink.dst, &src).map_err(|err| {
           format!(
@@ -726,12 +774,17 @@ pub async fn prepare_workdir(
   Ok(exclusive_spawn)
 }
 
+///
 /// Creates an optionally-cleaned-up sandbox in the given base path.
+///
+/// If KeepSandboxes::Always, it is immediately marked preserved: otherwise, the caller should
+/// decide whether to preserve it.
+///
 pub fn create_sandbox(
   executor: Executor,
   base_directory: &Path,
   description: &str,
-  cleanup: bool,
+  keep_sandboxes: KeepSandboxes,
 ) -> Result<AsyncDropSandbox, String> {
   let workdir = tempfile::Builder::new()
     .prefix("pants-sandbox-")
@@ -743,22 +796,11 @@ pub fn create_sandbox(
       )
     })?;
 
-  let (workdir_path, maybe_workdir) = if cleanup {
-    // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
-    (workdir.path().to_owned(), Some(workdir))
-  } else {
-    // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-    // that the temporary directory will no longer be automatically deleted when dropped.
-    let preserved_path = workdir.into_path();
-    info!(
-      "Preserving local process execution dir {} for {}",
-      preserved_path.display(),
-      description,
-    );
-    (preserved_path, None)
-  };
-
-  Ok(AsyncDropSandbox(executor, workdir_path, maybe_workdir))
+  let mut sandbox = AsyncDropSandbox(executor, workdir.path().to_owned(), Some(workdir));
+  if keep_sandboxes == KeepSandboxes::Always {
+    sandbox.keep(description);
+  }
+  Ok(sandbox)
 }
 
 /// Dropping sandboxes can involve a lot of IO, so it is spawned to the background as a blocking
@@ -769,6 +811,21 @@ pub struct AsyncDropSandbox(Executor, PathBuf, Option<TempDir>);
 impl AsyncDropSandbox {
   pub fn path(&self) -> &Path {
     &self.1
+  }
+
+  ///
+  /// Consume the `TempDir` without deleting directory on the filesystem, meaning that the
+  /// temporary directory will no longer be automatically deleted when dropped.
+  ///
+  pub fn keep(&mut self, description: &str) {
+    if let Some(workdir) = self.2.take() {
+      let preserved_path = workdir.into_path();
+      info!(
+        "Preserving local process execution dir {} for {}",
+        preserved_path.display(),
+        description,
+      );
+    }
   }
 }
 
@@ -781,7 +838,7 @@ impl Drop for AsyncDropSandbox {
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
-fn setup_run_sh_script(
+pub fn setup_run_sh_script(
   env: &BTreeMap<String, String>,
   working_directory: &Option<RelativePath>,
   argv: &[String],

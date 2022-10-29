@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
@@ -14,19 +15,29 @@ from pants.engine.target import (
     AllTargets,
     BoolField,
     Dependencies,
+    DescriptionField,
+    DictStringToStringField,
     FieldSet,
+    IntField,
     MultipleSourcesField,
+    OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
     TargetFilesGenerator,
     Targets,
     TriBoolField,
+    ValidNumbers,
+    generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
+from pants.util.value_interpolation import InterpolationContext, InterpolationError
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Generic commonly used fields
@@ -215,7 +226,7 @@ class HelmUnitTestDependenciesField(Dependencies):
 
 
 class HelmUnitTestTimeoutField(TestTimeoutField):
-    help = "A timeout (in seconds) used by each Helm Unittest test file belonging to this target."
+    pass
 
 
 class HelmUnitTestSourceField(SingleSourceField):
@@ -269,18 +280,33 @@ class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
     )
 
 
+class HelmUnitTestOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        HelmUnitTestTestTarget.alias,
+        """
+        overrides={
+            "configmap_test.yaml": {"timeout": 120},
+            ("deployment_test.yaml", "pod_test.yaml"): {"tags": ["slow_tests"]},
+        }
+        """,
+    )
+
+
 class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     alias = "helm_unittest_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
+        HelmUnitTestOverridesField,
+    )
+    generated_target_cls = HelmUnitTestTestTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
         HelmUnitTestTimeoutField,
     )
-    generated_target_cls = HelmUnitTestTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestStrictField)
-    moved_fields = (HelmUnitTestDependenciesField, HelmUnitTestTimeoutField)
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field."
 
 
@@ -351,6 +377,181 @@ class AllHelmArtifactTargets(Targets):
 def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets:
     return AllHelmArtifactTargets(
         [tgt for tgt in all_targets if HelmArtifactFieldSet.is_applicable(tgt)]
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `helm_deployment` target
+# -----------------------------------------------------------------------------------------------
+
+
+class HelmDeploymentReleaseNameField(StringField):
+    alias = "release_name"
+    help = "Name of the release used in the deployment. If not set, the target name will be used instead."
+
+
+class HelmDeploymentNamespaceField(StringField):
+    alias = "namespace"
+    help = "Kubernetes namespace for the given deployment."
+
+
+class HelmDeploymentDependenciesField(Dependencies):
+    pass
+
+
+class HelmDeploymentSkipCrdsField(BoolField):
+    alias = "skip_crds"
+    default = False
+    help = "If true, then does not deploy the Custom Resource Definitions that are defined in the chart."
+
+
+class HelmDeploymentSourcesField(MultipleSourcesField):
+    default = ("*.yaml", "*.yml")
+    expected_file_extensions = (".yaml", ".yml")
+    help = "Helm configuration files for a given deployment."
+
+
+class HelmDeploymentValuesField(DictStringToStringField):
+    alias = "values"
+    required = False
+    help = softwrap(
+        """
+        Individual values to use when rendering a given deployment.
+
+        Value names should be defined using dot-syntax as in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "nameOverride": "my_custom_name",
+                "image.pullPolicy": "Always",
+            },
+        )
+        ```
+
+        Values can be dynamically calculated using interpolation as shown in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "configmap.deployedAt": "{env.DEPLOY_TIME}",
+            },
+        )
+        ```
+
+        Check the Helm backend documentation on what are the options available and its caveats when making
+        usage of dynamic values in your deployments.
+        """
+    )
+
+
+class HelmDeploymentCreateNamespaceField(BoolField):
+    alias = "create_namespace"
+    default = False
+    help = "If true, the namespace will be created if it doesn't exist."
+
+
+class HelmDeploymentNoHooksField(BoolField):
+    alias = "no_hooks"
+    default = False
+    help = "If true, none of the lifecycle hooks of the given chart will be included in the deployment."
+
+
+class HelmDeploymentTimeoutField(IntField):
+    alias = "timeout"
+    required = False
+    help = "Timeout in seconds when running a Helm deployment."
+    valid_numbers = ValidNumbers.positive_only
+
+
+class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
+    alias = "post_renderers"
+    help = softwrap(
+        """
+        List of runnable targets to be used to post-process the helm chart after being rendered by Helm.
+
+        This is equivalent to the same post-renderer feature already available in Helm with the difference
+        that this supports a list of executables instead of a single one.
+
+        When more than one post-renderer is given, they will be combined into a single one in which the
+        input of each of them would be output of the previous one.
+        """
+    )
+
+
+class HelmDeploymentTarget(Target):
+    alias = "helm_deployment"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmDeploymentReleaseNameField,
+        HelmDeploymentDependenciesField,
+        HelmDeploymentSourcesField,
+        HelmDeploymentNamespaceField,
+        HelmDeploymentSkipCrdsField,
+        HelmDeploymentValuesField,
+        HelmDeploymentCreateNamespaceField,
+        HelmDeploymentNoHooksField,
+        HelmDeploymentTimeoutField,
+        HelmDeploymentPostRenderersField,
+    )
+    help = "A Helm chart deployment."
+
+
+@dataclass(frozen=True)
+class HelmDeploymentFieldSet(FieldSet):
+    required_fields = (
+        HelmDeploymentDependenciesField,
+        HelmDeploymentSourcesField,
+    )
+
+    description: DescriptionField
+    release_name: HelmDeploymentReleaseNameField
+    namespace: HelmDeploymentNamespaceField
+    create_namespace: HelmDeploymentCreateNamespaceField
+    sources: HelmDeploymentSourcesField
+    skip_crds: HelmDeploymentSkipCrdsField
+    no_hooks: HelmDeploymentNoHooksField
+    dependencies: HelmDeploymentDependenciesField
+    values: HelmDeploymentValuesField
+    post_renderers: HelmDeploymentPostRenderersField
+
+    def format_values(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
+
+        def format_value(text: str) -> str | None:
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
+
+        result = {}
+        for key, value in (self.values.value or {}).items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        return result
+
+
+class AllHelmDeploymentTargets(Targets):
+    pass
+
+
+@rule
+def all_helm_deployment_targets(targets: AllTargets) -> AllHelmDeploymentTargets:
+    return AllHelmDeploymentTargets(
+        [tgt for tgt in targets if HelmDeploymentFieldSet.is_applicable(tgt)]
     )
 
 

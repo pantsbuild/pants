@@ -78,4 +78,4 @@ def test_download_artifacts(rule_runner: RuleRunner) -> None:
     assert len(fetched_artifacts) == len(expected_artifacts)
     for fetched, expected in zip(fetched_artifacts, expected_artifacts):
         assert fetched.artifact == expected
-        assert f"{expected.name}/Chart.yaml" in fetched.snapshot.files
+        assert "Chart.yaml" in fetched.snapshot.files

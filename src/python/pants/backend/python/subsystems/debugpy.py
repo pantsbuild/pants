@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -80,17 +82,13 @@ class DebugPy(PythonToolBase):
         )
 
 
-class DebugPyLockfileSentinel(GenerateToolLockfileSentinel):
+class DebugPyLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = DebugPy.options_scope
 
 
 @rule
-def setup_debugpy_lockfile(
-    _: DebugPyLockfileSentinel, debugpy: DebugPy, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        debugpy, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+def setup_debugpy_lockfile(_: DebugPyLockfileSentinel, debugpy: DebugPy) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(debugpy)
 
 
 def rules():

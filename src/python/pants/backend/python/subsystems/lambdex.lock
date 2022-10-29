@@ -4,13 +4,17 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 2,
+//   "version": 3,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<3.10,>=3.7"
 //   ],
 //   "generated_with_requirements": [
 //     "lambdex==0.1.6"
-//   ]
+//   ],
+//   "manylinux": "manylinux2014",
+//   "requirement_constraints": [],
+//   "only_binary": [],
+//   "no_binary": []
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -49,13 +53,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3743864e09e1017224c5dc6476463ed24b6fea3ac62d379fedc2c6182b2f2159",
-              "url": "https://files.pythonhosted.org/packages/ef/41/a242ae32220cd2951faedddfed3db85393906497526060954b064f9022b7/pex-2.1.102-py2.py3-none-any.whl"
+              "hash": "3ac1ae69dfca900b41853f80d3ab0530bdb40e578a8274245fa0bf4a4a748316",
+              "url": "https://files.pythonhosted.org/packages/5d/08/89438cc626ec77a6f7dc3ab17cad581d14882a2f51a37d24c8a4c127e7bc/pex-2.1.111-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "fa34cef083bede3ea45413638c24e84698949904ef0559994e734b6d21de363c",
-              "url": "https://files.pythonhosted.org/packages/71/f1/125bbeb76821dfe20fc78eb6ebaf963c67ee3a32cc37c907ae54f743c69e/pex-2.1.102.tar.gz"
+              "hash": "0bb8a122dc3db515f369a0f7581653d879e27e7652ffffe900e0e6c66a7fb15c",
+              "url": "https://files.pythonhosted.org/packages/1e/f2/7e05a54dd2655608e6ccadba75f79e9531cfefeb57ba06a4a250ee6fb736/pex-2.1.111.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -63,14 +67,15 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.102"
+          "version": "2.1.111"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.102",
+  "pex_version": "2.1.111",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "lambdex==0.1.6"

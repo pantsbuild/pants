@@ -3,4 +3,9 @@
 
 python_sources()
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        ("chart_test.py", "post_renderer_test.py"): {"timeout": 120},
+    },
+)

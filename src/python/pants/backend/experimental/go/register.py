@@ -3,7 +3,7 @@
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.go_sources import load_go_binary
-from pants.backend.go.goals import check, package_binary, run_binary, tailor, test
+from pants.backend.go.goals import check, generate, package_binary, run_binary, tailor, test
 from pants.backend.go.lint.gofmt import skip_field as gofmt_skip_field
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import (
@@ -14,8 +14,12 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules import (
     assembly,
+    binary,
     build_pkg,
     build_pkg_target,
+    cgo,
+    coverage,
+    coverage_output,
     first_party_pkg,
     go_bootstrap,
     go_mod,
@@ -36,10 +40,15 @@ def target_types():
 def rules():
     return [
         *assembly.rules(),
+        *binary.rules(),
         *build_pkg.rules(),
         *build_pkg_target.rules(),
         *check.rules(),
+        *coverage.rules(),
+        *coverage_output.rules(),
+        *cgo.rules(),
         *third_party_pkg.rules(),
+        *generate.rules(),
         *go_bootstrap.rules(),
         *goroot.rules(),
         *import_analysis.rules(),

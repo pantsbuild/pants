@@ -30,11 +30,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.specs_rules import (
-    AmbiguousImplementationsException,
-    NoApplicableTargetsException,
-    TooManyTargetsException,
-)
+from pants.engine.internals.specs_rules import NoApplicableTargetsException
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -153,7 +149,6 @@ def resolve_raw_specs_without_file_owners(
     specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
-        convert_dir_literal_to_address_literal=False,
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
@@ -533,7 +528,6 @@ def resolve_raw_specs_with_only_file_owners(
     specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
-        convert_dir_literal_to_address_literal=True,
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
@@ -641,7 +635,6 @@ def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs],
-        convert_dir_literal_to_address_literal=False,
         description_of_origin="tests",
     )
 
@@ -672,9 +665,7 @@ def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
     )
 
     def assert_resolved(specs: Iterable[str], expected: set[str]) -> None:
-        specs_obj = SpecsParser().parse_specs(
-            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
-        )
+        specs_obj = SpecsParser().parse_specs(specs, description_of_origin="tests")
         result = rule_runner.request(Addresses, [specs_obj])
         assert {addr.spec for addr in result} == expected
 
@@ -805,9 +796,7 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     def assert_paths(
         specs: Iterable[str], expected_files: set[str], expected_dirs: set[str]
     ) -> None:
-        specs_obj = SpecsParser().parse_specs(
-            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
-        )
+        specs_obj = SpecsParser().parse_specs(specs, description_of_origin="tests")
         result = rule_runner.request(SpecsPaths, [specs_obj])
         assert set(result.files) == expected_files
         assert set(result.dirs) == expected_dirs
@@ -901,24 +890,18 @@ def test_find_valid_field_sets(caplog) -> None:
         specs: Iterable[Spec],
         *,
         no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
-        expect_single_config: bool = False,
     ) -> TargetRootsToFieldSets:
         request = TargetRootsToFieldSetsRequest(
             superclass,
             goal_description="fake",
             no_applicable_targets_behavior=no_applicable_behavior,
-            expect_single_field_set=expect_single_config,
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
             [
                 request,
                 Specs(
-                    includes=RawSpecs.create(
-                        specs,
-                        convert_dir_literal_to_address_literal=True,
-                        description_of_origin="tests",
-                    ),
+                    includes=RawSpecs.create(specs, description_of_origin="tests"),
                     ignores=RawSpecs(description_of_origin="tests"),
                 ),
             ],
@@ -930,18 +913,6 @@ def test_find_valid_field_sets(caplog) -> None:
         FieldSetSubclass1.create(valid_tgt),
         FieldSetSubclass2.create(valid_tgt),
     )
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(FieldSetSuperclass, [valid_spec], expect_single_config=True)
-    assert AmbiguousImplementationsException.__name__ in str(exc.value)
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass,
-            [valid_spec, AddressLiteralSpec("", "valid2")],
-            expect_single_config=True,
-        )
-    assert TooManyTargetsException.__name__ in str(exc.value)
 
     no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_spec])
     assert no_valid_targets.targets == ()

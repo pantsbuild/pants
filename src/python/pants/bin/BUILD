@@ -13,7 +13,11 @@ python_sources(
 target(
     name="plugins",
     dependencies=[
+        "src/python/pants/backend/build_files/fix/deprecations",
+        "src/python/pants/backend/build_files/fmt/buildifier",
         "src/python/pants/backend/awslambda/python",
+        "src/python/pants/backend/build_files/fmt/black",
+        "src/python/pants/backend/build_files/fmt/yapf",
         "src/python/pants/backend/codegen/protobuf/lint/buf",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/codegen/thrift/apache/python",
@@ -35,13 +39,19 @@ target(
         "src/python/pants/backend/experimental/java",
         "src/python/pants/backend/experimental/java/debug_goals",
         "src/python/pants/backend/experimental/java/lint/google_java_format",
+        "src/python/pants/backend/experimental/javascript",
+        "src/python/pants/backend/experimental/javascript/lint/prettier",
         "src/python/pants/backend/experimental/kotlin",
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
+        "src/python/pants/backend/experimental/openapi",
+        "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
+        "src/python/pants/backend/experimental/python/lint/add_trailing_comma",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
+        "src/python/pants/backend/experimental/python/typecheck/pyright",
         "src/python/pants/backend/experimental/scala",
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
@@ -76,5 +86,6 @@ pex_binary(
     dependencies=[":pants_loader"],
     strip_pex_env=False,
 )
+
 
 python_tests(name="tests")

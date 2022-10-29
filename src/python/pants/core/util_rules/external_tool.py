@@ -102,11 +102,11 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool) -> Foo:
+    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
         downloaded_tool = await Get(
             DownloadedExternalTool,
             ExternalToolRequest,
-            my_external_tool.get_request(Platform.current)
+            my_external_tool.get_request(platform)
         )
         ...
     """
@@ -202,8 +202,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             if plat.value == version.platform and version.version == self.version:
                 return self.get_request_for(version.platform, version.sha256, version.filesize)
         raise UnknownVersion(
-            f"No known version of {self.name} {self.version} for {plat.value} found in "
-            f"{self.known_versions}"
+            softwrap(
+                f"""
+                No known version of {self.name} {self.version} for {plat.value} found in
+                {self.known_versions}
+                """
+            )
         )
 
     @classmethod
@@ -261,8 +265,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             logger.warning(" ".join(msg))
         elif self.use_unsupported_version is UnsupportedVersionUsage.RaiseError:
             msg.append(
-                f"Alternatively, update [{self.options_scope}].use_unsupported_version to be "
-                f"'warning'."
+                softwrap(
+                    f"""
+                Alternatively, update [{self.options_scope}].use_unsupported_version to be
+                'warning'.
+                """
+                )
             )
             raise UnsupportedVersion(" ".join(msg))
 

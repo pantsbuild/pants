@@ -4,9 +4,12 @@ print_stacktrace = true
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
+  "pants.backend.build_files.fix.deprecations",
+  "pants.backend.build_files.fmt.black",
   "pants.backend.python",
-  "pants.backend.experimental.python.lint.autoflake",
+  "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.explorer",
+  "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -32,7 +35,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.21.0",
+  "toolchain.pants.plugin==0.24.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -65,10 +68,10 @@ build_ignore.add = [
 
 unmatched_build_file_globs = "error"
 
-# NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
-# TODO: May cause tests which experience missing digests to hang.
-# See https://github.com/pantsbuild/pants/issues/16096.
-remote_cache_eager_fetch = false
+# TODO: May cause tests which experience missing digests to hang. If you experience an
+# issue, please change this to `fetch` and then report an issue on:
+#   https://github.com/pantsbuild/pants/issues/16096.
+cache_content_behavior = "validate"
 
 [anonymous-telemetry]
 enabled = true
@@ -76,7 +79,7 @@ repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 
 [cli.alias]
-all-changed = "--changed-since=HEAD --changed-dependees=transitive"
+all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 
 
@@ -94,6 +97,12 @@ root_patterns = [
   "/",
 ]
 
+[environments-preview.names]
+# We don't define any local environments because the options system covers our cases adequately.
+docker = "//:docker_env"
+# Used for iterating on remote-execution.
+remote = "//:buildgrid_remote"
+
 [tailor]
 build_file_header = """\
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
@@ -109,6 +118,10 @@ ignore_adding_targets = [
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
+[update-build-files]
+# We use `pants.backend.build_files.fmt.black`
+fmt = false
+
 [pex]
 venv_use_symlinks = true
 
@@ -119,9 +132,12 @@ venv_use_symlinks = true
 # + src/python/pants/testutil:testutil_wheel
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
-lockfile_generator = "pex"
+
+[python.resolves]
+python-default = "3rdparty/python/user_reqs.lock"
+helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
+helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python-infer]
 assets = true
@@ -133,9 +149,9 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
-  "flake8-2020>=1.6.0,<1.7.0",
+  "flake8-2020>=1.7.0,<2",
   "flake8-no-implicit-concat",
-  "flake8-comprehensions>=3.8.0,<4.0",
+  "flake8-comprehensions>=3.10.0,<4.0",
 ]
 lockfile = "3rdparty/python/flake8.lock"
 source_plugins = ["build-support/flake8"]
@@ -267,3 +283,4 @@ master = "src/python/pants/notes/master.rst"
 "2.12.x" = "src/python/pants/notes/2.12.x.md"
 "2.13.x" = "src/python/pants/notes/2.13.x.md"
 "2.14.x" = "src/python/pants/notes/2.14.x.md"
+"2.15.x" = "src/python/pants/notes/2.15.x.md"

@@ -1,22 +1,25 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import logging
-import textwrap
+from __future__ import annotations
 
-from pants.backend.terraform.style import StyleSetup, StyleSetupRequest
+import logging
+from dataclasses import dataclass
+from typing import cast
+
+from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.tool import rules as tool_rules
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules import external_tool
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.core.util_rules.partitions import Partition
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -29,51 +32,51 @@ class TfFmtSubsystem(Subsystem):
     skip = SkipOption("fmt", "lint")
 
 
-class TffmtRequest(FmtRequest):
+class TffmtRequest(FmtTargetsRequest):
     field_set_type = TerraformFieldSet
-    name = TfFmtSubsystem.options_scope
+    tool_subsystem = TfFmtSubsystem
+
+
+@dataclass(frozen=True)
+class PartitionMetadata:
+    directory: str
+
+    @property
+    def description(self) -> str:
+        return self.directory
+
+
+@rule
+async def partition_tffmt(
+    request: TffmtRequest.PartitionRequest, tffmt: TfFmtSubsystem
+) -> Partitions:
+    if tffmt.skip:
+        return Partitions()
+
+    source_files = await Get(
+        SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
+    )
+
+    return Partitions(
+        Partition(tuple(files), PartitionMetadata(directory))
+        for directory, files in partition_files_by_directory(source_files.files).items()
+    )
 
 
 @rule(desc="Format with `terraform fmt`")
-async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
-    if tffmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(StyleSetup, StyleSetupRequest(request, ("fmt",)))
-    results = await MultiGet(
-        Get(ProcessResult, TerraformProcess, process)
-        for _, (process, _) in setup.directory_to_process.items()
+async def tffmt_fmt(request: TffmtRequest.Batch, tffmt: TfFmtSubsystem) -> FmtResult:
+    directory = cast(PartitionMetadata, request.partition_metadata).directory
+    result = await Get(
+        ProcessResult,
+        TerraformProcess(
+            args=("fmt", directory),
+            input_digest=request.snapshot.digest,
+            output_files=request.files,
+            description=f"Run `terraform fmt` on {pluralize(len(request.files), 'file')}.",
+        ),
     )
 
-    def format(directory, output):
-        if len(output.strip()) == 0:
-            return ""
-
-        return textwrap.dedent(
-            f"""\
-        Output from `terraform fmt` on files in {directory}:
-        {output.decode("utf-8")}
-
-        """
-        )
-
-    stdout_content = ""
-    stderr_content = ""
-    for directory, result in zip(setup.directory_to_process.keys(), results):
-        stdout_content += format(directory, result.stdout)
-        stderr_content += format(directory, result.stderr)
-
-    # Merge all of the outputs into a single output.
-    output_digest = await Get(Digest, MergeDigests(r.output_digest for r in results))
-    output_snapshot = await Get(Snapshot, Digest, output_digest)
-
-    fmt_result = FmtResult(
-        input=setup.original_snapshot,
-        output=output_snapshot,
-        stdout=stdout_content,
-        stderr=stderr_content,
-        formatter_name=request.name,
-    )
-    return fmt_result
+    return await FmtResult.create(request, result)
 
 
 def rules():
@@ -81,5 +84,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *tool_rules(),
-        UnionRule(FmtRequest, TffmtRequest),
+        *TffmtRequest.rules(),
     ]

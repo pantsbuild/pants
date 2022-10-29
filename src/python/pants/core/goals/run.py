@@ -3,29 +3,37 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, Tuple
+from itertools import filterfalse, tee
+from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.environment import CompleteEnvironment
+from pants.core.util_rules.environments import _warn_on_non_local_environments
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.specs_rules import (
+    AmbiguousImplementationsException,
+    TooManyTargetsException,
+)
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule, rule_helper
 from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
+    SecondaryOwnerMixin,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -33,8 +41,10 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
 
-@union
+
+@union(in_scope_types=[EnvironmentName])
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
 
@@ -110,14 +120,17 @@ class RunSubsystem(GoalSubsystem):
     )
     cleanup = BoolOption(
         default=True,
+        deprecation_start_version="2.15.0.dev1",
+        removal_version="2.16.0.dev1",
+        removal_hint="Use the global `keep_sandboxes` option instead.",
         help=softwrap(
             """
             Whether to clean up the temporary directory in which the binary is chrooted.
             Set this to false to retain the directory, e.g., for debugging.
 
-            Note that setting the global --process-cleanup option to false will also conserve
-            this directory, along with those of all other processes that Pants executes.
-            This option is more selective and controls just the target binary's directory.
+            Note that setting the global --keep-sandboxes option may also conserve this directory,
+            along with those of all other processes that Pants executes. This option is more
+            selective and controls just the target binary's directory.
             """
         ),
     )
@@ -138,6 +151,73 @@ class RunSubsystem(GoalSubsystem):
 
 class Run(Goal):
     subsystem_cls = RunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
+class RankedFieldSets(NamedTuple):
+    primary: tuple[RunFieldSet, ...]
+    secondary: tuple[RunFieldSet, ...]
+
+
+def _partition(
+    iterable: Iterable[_T], pred: Callable[[_T], bool]
+) -> tuple[tuple[_T, ...], tuple[_T, ...]]:
+    t1, t2 = tee(iterable)
+    return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
+
+
+@rule_helper
+async def _find_what_to_run(
+    goal_description: str,
+) -> tuple[RunFieldSet, Target]:
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            RunFieldSet,
+            goal_description=goal_description,
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        ),
+    )
+
+    primary_target: Target | None = None
+    primary_target_rfs: RankedFieldSets | None = None
+
+    for target, field_sets in targets_to_valid_field_sets.mapping.items():
+        rfs = RankedFieldSets(
+            *_partition(
+                field_sets,
+                lambda field_set: not any(
+                    isinstance(field, SecondaryOwnerMixin)
+                    for field in dataclasses.astuple(field_set)
+                ),
+            )
+        )
+        # In the case of multiple Targets/FieldSets, prefer the "primary" ones to the "secondary" ones.
+        if (
+            primary_target is None
+            or primary_target_rfs is None  # impossible, but satisfies mypy
+            or (rfs.primary and not primary_target_rfs.primary)
+        ):
+            primary_target = target
+            primary_target_rfs = rfs
+        elif (rfs.primary and primary_target_rfs.primary) or (
+            rfs.secondary and primary_target_rfs.secondary
+        ):
+            raise TooManyTargetsException(
+                targets_to_valid_field_sets.mapping, goal_description=goal_description
+            )
+
+    assert primary_target is not None
+    assert primary_target_rfs is not None
+    field_sets = primary_target_rfs.primary or primary_target_rfs.secondary
+    if len(field_sets) > 1:
+        raise AmbiguousImplementationsException(
+            primary_target,
+            primary_target_rfs.primary + primary_target_rfs.secondary,
+            goal_description=goal_description,
+        )
+
+    return field_sets[0], primary_target
 
 
 @goal_rule
@@ -147,29 +227,23 @@ async def run(
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
-    complete_env: CompleteEnvironment,
+    complete_env: CompleteEnvironmentVars,
 ) -> Run:
-    targets_to_valid_field_sets = await Get(
-        TargetRootsToFieldSets,
-        TargetRootsToFieldSetsRequest(
-            RunFieldSet,
-            goal_description="the `run` goal",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            expect_single_field_set=True,
-        ),
-    )
-    field_set = targets_to_valid_field_sets.field_sets[0]
+    field_set, target = await _find_what_to_run("the `run` goal")
+
+    await _warn_on_non_local_environments((target,), "the `run` goal")
+
     request = await (
         Get(RunRequest, RunFieldSet, field_set)
         if not run_subsystem.debug_adapter
         else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
     )
-    wrapped_target = await Get(
-        WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
+    restartable = target.get(RestartableField).value
+    keep_sandboxes = (
+        global_options.keep_sandboxes
+        if run_subsystem.options.is_default("cleanup")
+        else (KeepSandboxes.never if run_subsystem.cleanup else KeepSandboxes.always)
     )
-    restartable = wrapped_target.target.get(RestartableField).value
-    # Cleanup is the default, so we want to preserve the chroot if either option is off.
-    cleanup = run_subsystem.cleanup and global_options.process_cleanup
 
     if run_subsystem.debug_adapter:
         logger.info(
@@ -189,7 +263,7 @@ async def run(
             input_digest=request.digest,
             run_in_workspace=True,
             restartable=restartable,
-            cleanup=cleanup,
+            keep_sandboxes=keep_sandboxes,
             immutable_input_digests=request.immutable_input_digests,
             append_only_caches=request.append_only_caches,
         ),

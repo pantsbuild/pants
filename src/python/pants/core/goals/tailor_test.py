@@ -10,7 +10,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -26,7 +25,6 @@ from pants.core.goals.tailor import (
     default_sources_for_target_type,
     group_by_dir,
     make_content_str,
-    specs_to_dirs,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
@@ -34,10 +32,11 @@ from pants.engine.internals.build_files import extract_build_file_options
 from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.target import MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec, matches_filespec
+from pants.source.filespec import FilespecMatcher
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.strutil import softwrap
 
 
 class MockPutativeTargetsRequest:
@@ -79,11 +78,9 @@ async def find_fortran_targets(
     all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
-    tests_filespec = Filespec(includes=list(FortranTestsSources.default))
+    tests_filespec_matcher = FilespecMatcher(FortranTestsSources.default, ())
     test_filenames = set(
-        matches_filespec(
-            tests_filespec, paths=[os.path.basename(path) for path in unowned_shell_files]
-        )
+        tests_filespec_matcher.matches([os.path.basename(path) for path in unowned_shell_files])
     )
     test_files = {path for path in unowned_shell_files if os.path.basename(path) in test_filenames}
     sources_files = set(unowned_shell_files) - test_files
@@ -433,54 +430,6 @@ def test_group_by_dir() -> None:
     } == group_by_dir(paths)
 
 
-def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(RawSpecs(description_of_origin="tests")) == ("",)
-    assert specs_to_dirs(
-        RawSpecs(
-            address_literals=(AddressLiteralSpec("src/python/foo"),), description_of_origin="tests"
-        )
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),), description_of_origin="tests")
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        RawSpecs(
-            address_literals=(
-                AddressLiteralSpec("src/python/foo"),
-                AddressLiteralSpec("src/python/bar"),
-            ),
-            description_of_origin="tests",
-        )
-    ) == ("src/python/foo", "src/python/bar")
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                file_literals=(FileLiteralSpec("src/python/foo.py"),), description_of_origin="tests"
-            )
-        )
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),),
-                description_of_origin="tests",
-            )
-        )
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            RawSpecs(
-                address_literals=(
-                    AddressLiteralSpec(
-                        "src/python/bar", target_component=None, generated_component="gen"
-                    ),
-                ),
-                description_of_origin="tests",
-            )
-        )
-
-
 def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -581,9 +530,11 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(AssertionError) as excinfo:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
-    expected_msg = (
-        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
-        "but this target type does not have a `source` or `sources` field."
+    expected_msg = softwrap(
+        """
+        A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90,
+        but this target type does not have a `source` or `sources` field.
+        """
     )
     assert str(excinfo.value) == expected_msg
 

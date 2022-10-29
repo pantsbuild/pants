@@ -194,7 +194,7 @@ class TestEngine(SchedulerTestBase):
         with pytest.raises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
         assert_equal_with_printing(
-            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.value)
+            "1 Exception encountered:\n\nException: An exception for B\n", str(cm.value)
         )
 
     def test_no_include_trace_error_multiple_paths_raises_executionerror(
@@ -209,8 +209,9 @@ class TestEngine(SchedulerTestBase):
                 """
                 2 Exceptions encountered:
 
-                  Exception: An exception for B
-                  Exception: An exception for B
+                Exception: An exception for B
+
+                (and 1 more)
                 """
             ).lstrip(),
             str(cm.value),
@@ -228,13 +229,17 @@ class TestEngine(SchedulerTestBase):
 
                 Engine traceback:
                   in select
+                    ..
                   in pants.engine.internals.engine_test.nested_raise
+                    ..
+
                 Traceback (most recent call last):
                   File LOCATION-INFO, in nested_raise
                     fn_raises(x)
                   File LOCATION-INFO, in fn_raises
                     raise Exception(f"An exception for {type(x).__name__}")
                 Exception: An exception for B
+
                 """
             ).lstrip(),
             remove_locations_from_traceback(str(cm.value)),
@@ -927,9 +932,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
         }
     )
     specs = SpecsParser().parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"],
-        convert_dir_literal_to_address_literal=False,
-        description_of_origin="tests",
+        ["src/python/somefiles::", "src/python/others/b.py"], description_of_origin="tests"
     )
 
     class Callback(WorkunitsCallback):

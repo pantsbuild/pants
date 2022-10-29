@@ -42,7 +42,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
@@ -53,7 +53,7 @@ class GenerateJavaFromProtobufRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-class GrpcJavaToolLockfileSentinel(GenerateToolLockfileSentinel):
+class GrpcJavaToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JavaProtobufGrpcSubsystem.options_scope
 
 
@@ -64,7 +64,7 @@ class ProtobufJavaGrpcPlugin:
 
 
 @rule
-async def resolve_protobuf_java_grpc_plugin() -> ProtobufJavaGrpcPlugin:
+async def resolve_protobuf_java_grpc_plugin(platform: Platform) -> ProtobufJavaGrpcPlugin:
     lockfile_request = await Get(GenerateJvmLockfileFromTool, GrpcJavaToolLockfileSentinel())
     classpath = await Get(
         ToolClasspath,
@@ -79,7 +79,7 @@ async def resolve_protobuf_java_grpc_plugin() -> ProtobufJavaGrpcPlugin:
         Platform.macos_x86_64: "exe_osx-x86_64",
         Platform.linux_arm64: "exe_linux-aarch_64",
         Platform.linux_x86_64: "exe_linux-x86_64",
-    }[Platform.current]
+    }[platform]
 
     classpath_entries = await Get(DigestEntries, Digest, classpath.digest)
     candidate_plugin_entries = []
@@ -112,9 +112,10 @@ async def generate_java_from_protobuf(
     request: GenerateJavaFromProtobufRequest,
     protoc: Protoc,
     grpc_plugin: ProtobufJavaGrpcPlugin,  # TODO: Don't access grpc plugin unless gRPC codegen is enabled.
+    platform: Platform,
 ) -> GeneratedSources:
     download_protoc_request = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
     )
 
     output_dir = "_generated_files"

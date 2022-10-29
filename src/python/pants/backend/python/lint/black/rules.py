@@ -1,48 +1,78 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
+from __future__ import annotations
 
-from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.lint.black.subsystem import Black
+from typing import cast
+
+from pants.backend.python.lint.black.subsystem import Black, BlackFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
 
-@dataclass(frozen=True)
-class BlackFieldSet(FieldSet):
-    required_fields = (PythonSourceField,)
-
-    source: PythonSourceField
-    interpreter_constraints: InterpreterConstraintsField
-
-    @classmethod
-    def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBlackField).value
-
-
-class BlackRequest(FmtRequest):
+class BlackRequest(FmtTargetsRequest):
     field_set_type = BlackFieldSet
-    name = Black.options_scope
+    tool_subsystem = Black
 
 
-@rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSetup) -> FmtResult:
+@rule_helper
+async def _run_black(
+    request: FmtRequest.Batch,
+    black: Black,
+    interpreter_constraints: InterpreterConstraints,
+) -> FmtResult:
+    black_pex_get = Get(
+        VenvPex,
+        PexRequest,
+        black.to_pex_request(interpreter_constraints=interpreter_constraints),
+    )
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+    )
+
+    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
+
+    input_digest = await Get(
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    )
+
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            black_pex,
+            argv=(
+                *(("--config", black.config) if black.config else ()),
+                "-W",
+                "{pants_concurrency}",
+                *black.args,
+                *request.files,
+            ),
+            input_digest=input_digest,
+            output_files=request.files,
+            concurrency_available=len(request.files),
+            description=f"Run Black on {pluralize(len(request.files), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
+    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
+
+
+@rule
+async def partition_black(
+    request: BlackRequest.PartitionRequest, black: Black, python_setup: PythonSetup
+) -> Partitions:
     if black.skip:
-        return FmtResult.skip(formatter_name=request.name)
+        return Partitions()
+
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
@@ -73,46 +103,22 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
         ):
             tool_interpreter_constraints = all_interpreter_constraints
 
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest,
-        black.to_pex_request(interpreter_constraints=tool_interpreter_constraints),
-    )
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+    return Partitions.single_partition(
+        (field_set.source.file_path for field_set in request.field_sets),
+        metadata=tool_interpreter_constraints,
     )
 
-    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
 
-    input_digest = await Get(
-        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+@rule(desc="Format with Black", level=LogLevel.DEBUG)
+async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
+    return await _run_black(
+        request, black, cast(InterpreterConstraints, request.partition_metadata)
     )
-
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            black_pex,
-            argv=(
-                *(("--config", black.config) if black.config else ()),
-                "-W",
-                "{pants_concurrency}",
-                *black.args,
-                *request.snapshot.files,
-            ),
-            input_digest=input_digest,
-            output_files=request.snapshot.files,
-            concurrency_available=len(request.field_sets),
-            description=f"Run Black on {pluralize(len(request.field_sets), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
-    )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, BlackRequest),
+        *BlackRequest.rules(),
         *pex.rules(),
     ]

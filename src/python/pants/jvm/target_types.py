@@ -9,7 +9,7 @@ from typing import Optional
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import TestTimeoutField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -310,11 +310,11 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 
 
 class JunitTestTimeoutField(TestTimeoutField):
-    help = softwrap(
-        """
-        A timeout (in seconds) used by each JUnit test file belonging to this target.
-        """
-    )
+    pass
+
+
+class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
 
 
 # -----------------------------------------------------------------------------------------------

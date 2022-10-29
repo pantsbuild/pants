@@ -180,8 +180,8 @@ For each `python_source` target S, the distribution in which S's code is publish
 1. A `python_distribution` that depends, directly or indirectly, on S.
 2. Is S's closest filesystem ancestor among those satisfying 1.
 
-If there are multiple such exported source files at the same degree of ancestry, the ownership  
-is ambiguous and an error is raised. If there is no `python_distribution` that depends on S  
+If there are multiple such exported source files at the same degree of ancestry, the ownership
+is ambiguous and an error is raised. If there is no `python_distribution` that depends on S
 and is its ancestor, then there is no owner and an error is raised.
 
 This algorithm implies that all source files published by a distribution must be below it in the filesystem. It also guarantees that a source file is only published by a single distribution.

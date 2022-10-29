@@ -17,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
@@ -88,6 +88,8 @@ class DockerBinary(BinaryPath):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            # We must run the docker build commands every time, even if nothing has changed,
+            # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
@@ -124,10 +126,12 @@ class DockerBinaryRequest:
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
 async def find_docker(
-    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+    docker_request: DockerBinaryRequest,
+    docker_options: DockerOptions,
+    docker_options_env_aware: DockerOptions.EnvironmentAware,
 ) -> DockerBinary:
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
-    search_path = docker_options.executable_search_path(env)
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    search_path = docker_options_env_aware.executable_search_path(env)
     request = BinaryPathRequest(
         binary_name="docker",
         search_path=search_path,

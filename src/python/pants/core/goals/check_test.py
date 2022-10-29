@@ -8,6 +8,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Type
 
+import pytest
+
 from pants.core.goals.check import (
     Check,
     CheckRequest,
@@ -17,8 +19,12 @@ from pants.core.goals.check import (
     check,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
+from pants.engine.environment import EnvironmentName
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
+from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
@@ -52,12 +58,12 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
         addresses = [config.address for config in self.field_sets]
         return CheckResults(
             [CheckResult(self.exit_code(addresses), "", "")],
-            checker_name=self.name,
+            checker_name=self.tool_name,
         )
 
 
 class SuccessfulRequest(MockCheckRequest):
-    name = "SuccessfulChecker"
+    tool_name = "SuccessfulChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -65,7 +71,7 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    name = "FailingChecker"
+    tool_name = "FailingChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -73,7 +79,7 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    name = "ConditionallySucceedsChecker"
+    tool_name = "ConditionallySucceedsChecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -83,7 +89,7 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    name = "SkippedChecker"
+    tool_name = "SkippedChecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -91,7 +97,7 @@ class SkippedRequest(MockCheckRequest):
 
     @property
     def check_results(self) -> CheckResults:
-        return CheckResults([], checker_name=self.name)
+        return CheckResults([], checker_name=self.tool_name)
 
 
 class InvalidField(MultipleSourcesField):
@@ -104,7 +110,7 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    name = "InvalidChecker"
+    tool_name = "InvalidChecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -140,8 +146,16 @@ def run_typecheck_rule(
             mock_gets=[
                 MockGet(
                     output_type=CheckResults,
-                    input_type=CheckRequest,
-                    mock=lambda field_set_collection: field_set_collection.check_results,
+                    input_types=(
+                        CheckRequest,
+                        EnvironmentName,
+                    ),
+                    mock=lambda field_set_collection, _: field_set_collection.check_results,
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda a: EnvironmentName(a.raw_value),
                 ),
             ],
             union_membership=union_membership,
@@ -179,7 +193,9 @@ def test_summary() -> None:
     )
 
     exit_code, stderr = run_typecheck_rule(
-        request_types=requests, targets=targets, only=[FailingRequest.name, SuccessfulRequest.name]
+        request_types=requests,
+        targets=targets,
+        only=[FailingRequest.tool_name, SuccessfulRequest.tool_name],
     )
     assert stderr == dedent(
         """\
@@ -242,3 +258,34 @@ def test_streaming_output_partitions() -> None:
 
         """
     )
+
+
+@pytest.mark.parametrize(
+    ("strip_chroot_path", "strip_formatting", "expected"),
+    [
+        (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
+        (False, True, "/var/pants-sandbox-123/red/path.py bold"),
+        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "red/path.py bold"),
+    ],
+)
+def test_from_fallible_process_result_output_prepping(
+    strip_chroot_path: bool, strip_formatting: bool, expected: str
+) -> None:
+    result = CheckResult.from_fallible_process_result(
+        FallibleProcessResult(
+            exit_code=0,
+            stdout=b"stdout \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            platform=Platform.create_for_localhost(),
+            metadata=ProcessResultMetadata(0, "ran_locally", 0),
+        ),
+        strip_chroot_path=strip_chroot_path,
+        strip_formatting=strip_formatting,
+    )
+
+    assert result.stdout == "stdout " + expected
+    assert result.stderr == "stderr " + expected

@@ -13,9 +13,11 @@ from typing import Any, MutableMapping, cast
 import toml
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
@@ -49,7 +51,7 @@ from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import KeepSandboxes
 from pants.option.option_types import (
     BoolOption,
     EnumListOption,
@@ -90,6 +92,7 @@ class CoverageReportType(Enum):
     HTML = ("html", None)
     RAW = ("raw", None)
     JSON = ("json", None)
+    LCOV = ("lcov", None)
 
     _report_name: str
 
@@ -112,7 +115,7 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=5.5,<5.6"
+    default_version = "coverage[toml]>=6.5,<6.6"
     default_main = ConsoleScript("coverage")
 
     register_interpreter_constraints = True
@@ -226,26 +229,24 @@ class CoverageSubsystem(PythonToolBase):
         )
 
 
-class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
+class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = CoverageSubsystem.options_scope
 
 
 @rule
 def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
+    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        coverage, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(coverage)
 
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
-    address: Address
+    addresses: tuple[Address, ...]
     digest: Digest
 
 
-class PytestCoverageDataCollection(CoverageDataCollection):
+class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
@@ -380,18 +381,20 @@ async def merge_coverage_data(
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
         coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
+        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
-    addresses = []
+    addresses: list[Address] = []
     for data in data_collection:
+        path_prefix = data.addresses[0].path_safe_spec
+        if len(data.addresses) > 1:
+            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(
-            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        )
-        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
-        addresses.append(data.address)
+        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_data_file_paths.append(f"{path_prefix}/.coverage")
+        addresses.extend(data.addresses)
 
     if coverage.global_report:
         # It's important to set the `branch` value in the empty base report to the value it will
@@ -487,7 +490,7 @@ async def generate_coverage_reports(
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
-    process_cleanup: ProcessCleanupOption,
+    keep_sandboxes: KeepSandboxes,
     distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
@@ -537,7 +540,8 @@ async def generate_coverage_reports(
         report_types.append(report_type)
         output_file = (
             f"coverage.{report_type.value}"
-            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            if report_type
+            in {CoverageReportType.XML, CoverageReportType.JSON, CoverageReportType.LCOV}
             else None
         )
         args = [report_type.report_name, f"--rcfile={coverage_config.path}"]
@@ -566,7 +570,7 @@ async def generate_coverage_reports(
                 res.stdout,
                 res.stderr,
                 proc.description,
-                process_cleanup=process_cleanup.val,
+                keep_sandboxes=keep_sandboxes,
             )
 
     # In practice if one result triggers --fail-under, they all will, but no need to rely on that.
@@ -594,15 +598,15 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
-    report_file: PurePath | None
-    if report_type == CoverageReportType.HTML:
-        report_file = output_dir / "htmlcov" / "index.html"
-    elif report_type == CoverageReportType.XML:
-        report_file = output_dir / "coverage.xml"
-    elif report_type == CoverageReportType.JSON:
-        report_file = output_dir / "coverage.json"
-    else:
-        raise ValueError(f"Invalid coverage report type: {report_type}")
+    try:
+        report_file = {
+            CoverageReportType.HTML: output_dir / "htmlcov" / "index.html",
+            CoverageReportType.XML: output_dir / "coverage.xml",
+            CoverageReportType.JSON: output_dir / "coverage.json",
+            CoverageReportType.LCOV: output_dir / "coverage.lcov",
+        }[report_type]
+    except KeyError:
+        raise ValueError(f"Invalid coverage report type: {report_type}") from None
 
     return FilesystemCoverageReport(
         coverage_insufficient=coverage_insufficient,

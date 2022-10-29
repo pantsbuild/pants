@@ -28,13 +28,24 @@ class PyOxidizerOutputPathField(OutputPathField):
         Regardless of whether you use the default or set this field, the path will end with
         PyOxidizer's file format of `<platform>/{{debug,release}}/install/<binary_name>`, where
         `platform` is a Rust platform triplet like `aarch-64-apple-darwin` and `binary_name` is
-        the `name` of the `pyoxidizer_target`. So, using the default for this field, the target
+        the value of the `binary_name` field. So, using the default for this field, the target
         `src/python/project:bin` might have a final path like
         `src.python.project/bin/aarch-64-apple-darwin/release/bin`.
 
         When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
 
         Warning: setting this value risks naming collisions with other package targets you may have.
+        """
+    )
+
+
+class PyOxidizerBinaryNameField(OutputPathField):
+    alias = "binary_name"
+    default = None
+    help = softwrap(
+        """
+        The name of the binary that will be output by PyOxidizer. If not set, this will default
+        to the name of this target.
         """
     )
 
@@ -122,6 +133,7 @@ class PyOxidizerTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PyOxidizerOutputPathField,
+        PyOxidizerBinaryNameField,
         PyOxidizerConfigSourceField,
         PyOxidizerDependenciesField,
         PyOxidizerEntryPointField,

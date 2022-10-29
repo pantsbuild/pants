@@ -8,12 +8,9 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -26,6 +23,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -55,12 +53,12 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, UseDeprecatedPexBinaryRunSemanticsOption
+from pants.option.global_options import GlobalOptions
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +70,10 @@ logger = logging.getLogger(__name__)
 
 @rule_helper
 async def _determine_literal_addresses_from_raw_specs(
-    literal_specs: tuple[AddressLiteralSpec, ...], *, description_of_origin: str
+    literal_specs: tuple[AddressLiteralSpec, ...],
+    local_environment_name: ChosenLocalEnvironmentName,
+    *,
+    description_of_origin: str,
 ) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
         Get(
@@ -96,10 +97,13 @@ async def _determine_literal_addresses_from_raw_specs(
     literal_parametrizations = await MultiGet(
         Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                address.maybe_convert_to_target_generator(),
-                description_of_origin=description_of_origin,
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    address.maybe_convert_to_target_generator(),
+                    description_of_origin=description_of_origin,
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         for address in literal_addresses
     )
@@ -119,17 +123,20 @@ async def _determine_literal_addresses_from_raw_specs(
     )
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_without_file_owners(
     specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
 
     literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
-        specs.address_literals, description_of_origin=specs.description_of_origin
+        specs.address_literals,
+        local_environment_name,
+        description_of_origin=specs.description_of_origin,
     )
     matched_addresses.update(
         wrapped_tgt.target.address
@@ -160,9 +167,12 @@ async def addresses_from_raw_specs_without_file_owners(
     target_parametrizations_list = await MultiGet(
         Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                base_address, description_of_origin=specs.description_of_origin
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    base_address, description_of_origin=specs.description_of_origin
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         for base_address in base_addresses
     )
@@ -196,7 +206,7 @@ async def addresses_from_raw_specs_without_file_owners(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners,
 ) -> Addresses:
@@ -207,7 +217,12 @@ async def addresses_from_raw_specs_with_only_file_owners(
     all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
     owners = await Get(
         Owners,
-        OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
+        OwnersRequest(
+            all_files,
+            filter_by_global_options=specs.filter_by_global_options,
+            # Specifying a BUILD file should not expand to all the targets it defines.
+            match_if_owning_build_file_included_in_sources=False,
+        ),
     )
     return Addresses(sorted(owners))
 
@@ -217,7 +232,7 @@ async def addresses_from_raw_specs_with_only_file_owners(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+@rule(_masked_types=[EnvironmentName])
 async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     without_file_owners, with_file_owners = await MultiGet(
         Get(Addresses, RawSpecsWithoutFileOwners, RawSpecsWithoutFileOwners.from_raw_specs(specs)),
@@ -229,7 +244,7 @@ async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     return Addresses(sorted({*without_file_owners, *with_file_owners}))
 
 
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+@rule(desc="Find targets from input specs", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     includes, ignores = await MultiGet(
         Get(Addresses, RawSpecs, specs.includes),
@@ -240,7 +255,7 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     return Addresses(FrozenOrderedSet(includes) - FrozenOrderedSet(ignores))
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
     return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
@@ -449,64 +464,9 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
-# NOTE: When this is removed in 2.15, also remove the `SecondaryOwnerMixin` of `PexBinaryEntryPoint`
-def _handle_ambiguous_result(
-    request: TargetRootsToFieldSetsRequest,
-    result: TargetRootsToFieldSets,
-    field_set_to_default_to: type[FieldSet],
-) -> TargetRootsToFieldSets:
-    assert len(result.targets) > 1
-    field_set_types = [type(field_set) for field_set in result.field_sets]
-
-    # NB: See https://github.com/pantsbuild/pants/pull/15849. We don't want to break clients as
-    # we shift behavior, so we add this temporary hackery here.
-    if (
-        # (We check for 2 targets because 3 would've been ambiguous pre-our-change)
-        len(result.targets) == 2
-        and PexBinaryFieldSet in field_set_types
-        and PythonSourceFieldSet in field_set_types
-    ):
-        if field_set_to_default_to is PexBinaryFieldSet:
-            warn_or_error(
-                "2.15.0.dev0",
-                "referring to a `pex_binary` by using the filename specified in `entry_point`",
-                softwrap(
-                    """
-                        In Pants 2.15, a `pex_binary` can no longer be referred to by the filename that
-                        the `entry_point` field uses.
-
-                        This is due to a change in Pants 2.13, which allows you to use the `run` goal
-                        directly on a `python_source` target without requiring a `pex_binary`. As a
-                        consequence the ability to refer to the `pex_binary` via its `entry_point` is
-                        being removed, as otherwise it would be ambiguous which target to use.
-
-                        Note that because of this change you are able to remove any `pex_binary` targets
-                        you have declared just to support the `run` goal
-                        (usually these are developer scripts), as using `run` on the `python_source` will
-                        have the equivalent behavior.
-
-                        To fix this deprecation, you can use the `pex_binary`'s address to refer to
-                        the `pex_binary`, or set the `[GLOBAL].use_deprecated_pex_binary_run_semantics`
-                        option to `false` (which, among other things, will have `run` on a Python
-                        filename run the `python_source`).
-                        """
-                ),
-            )
-        # Otherwise, the appropriate flag was set to select the new behavior, so roll with that.
-        return TargetRootsToFieldSets(
-            {
-                target: field_sets
-                for target, field_sets in result.mapping.items()
-                if field_set_to_default_to in {type(field_set) for field_set in field_sets}
-            }
-        )
-    raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-
-
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    use_deprecated_pex_binary_run_semantics: UseDeprecatedPexBinaryRunSemanticsOption,
     specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
@@ -558,28 +518,8 @@ async def find_valid_field_sets_for_target_roots(
             for tgt, value in targets_to_applicable_field_sets.items()
             if request.is_in_shard(tgt.address.spec)
         }
-        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
-    else:
-        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
-
-    if not request.expect_single_field_set:
-        return result
-    if len(result.targets) > 1:
-        return _handle_ambiguous_result(
-            request,
-            result,
-            cast(
-                "type[FieldSet]",
-                PexBinaryFieldSet
-                if use_deprecated_pex_binary_run_semantics.val
-                else PythonSourceFieldSet,
-            ),
-        )
-    if len(result.field_sets) > 1:
-        raise AmbiguousImplementationsException(
-            result.targets[0], result.field_sets, goal_description=request.goal_description
-        )
-    return result
+        return TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
+    return TargetRootsToFieldSets(targets_to_applicable_field_sets)
 
 
 def rules():

@@ -8,14 +8,8 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_type_rules import (
-    GoBinaryMainDependencyInferenceFieldSet,
-    InferGoBinaryMainDependencyRequest,
-)
 from pants.backend.go.target_types import (
-    GoBinaryMainPackage,
     GoBinaryMainPackageField,
-    GoBinaryMainPackageRequest,
     GoBinaryTarget,
     GoImportPathField,
     GoModTarget,
@@ -31,6 +25,12 @@ from pants.backend.go.util_rules import (
     link,
     sdk,
     third_party_pkg,
+)
+from pants.backend.go.util_rules.binary import (
+    GoBinaryMainDependencyInferenceFieldSet,
+    GoBinaryMainPackage,
+    GoBinaryMainPackageRequest,
+    InferGoBinaryMainDependencyRequest,
 )
 from pants.build_graph.address import Address, ResolveError
 from pants.core.target_types import (

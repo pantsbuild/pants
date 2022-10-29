@@ -43,7 +43,7 @@ Each target type has different _fields_, or individual metadata values. Run `./p
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
-Use [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automate generating BUILD files, and [`./pants update-build-files ::`](doc:reference-update-build-files) to reformat them (using `black`, [by default](doc:reference-update-build-files#section-formatter)).
+You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](doc:enabling-backends)). Then to format, run `./pants fmt '**/BUILD'` or `./pants fmt ::` (formats everything).
 
 Target addresses
 ================
@@ -55,18 +55,18 @@ Addresses are used in the `dependencies` field to depend on other targets. Addre
 (Both "generated targets" and "parametrized targets" have a variant of this syntax; see the below sections.)
 
 > 📘 Default for the `name` field
-> 
+>
 > The `name` field defaults to the directory name. So, this target has the address `helloworld/greet:greet`.
-> 
+>
 > ```python
 > # helloworld/greet/BUILD
 > python_sources()
 > ```
-> 
+>
 > You can refer to this target with either `helloworld/greet:greet` or the abbreviated form `helloworld/greet`.
 
 > 📘 Use `//:tgt` for the root of your repository
-> 
+>
 > Addressed defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
 
 `source` and `sources` field
@@ -88,26 +88,26 @@ python_tests(
 ```
 
 > 🚧 Be careful with overlapping `source` fields
-> 
-> It's legal to include the same file in the `source` / `sources` field for multiple targets. 
-> 
+>
+> It's legal to include the same file in the `source` / `sources` field for multiple targets.
+>
 > When would you do this? Sometimes you may have conflicting metadata for the same source file, such as wanting to check that a Shell test works with multiple shells. Normally, you should prefer Pants's `parametrize` mechanism to do this. See the below section "Parametrizing Targets".
-> 
+>
 > Often, however, it is not intentional when multiple targets own the same file. For example, this often happens when using `**` globs, like this:
-> 
+>
 > ```python
 > # project/BUILD
 > python_sources(sources=["**/*.py"])
-> 
+>
 > # project/subdir/BUILD
 > python_sources(sources=["**/*.py"])
 > ```
-> 
-> Including the same file in the `source` / `sources` field for multiple targets can result in two confusing behaviors: 
-> 
+>
+> Including the same file in the `source` / `sources` field for multiple targets can result in two confusing behaviors:
+>
 > - File arguments will run over all owning targets, e.g. `./pants test path/to/test.ext` would run both test targets as two separate subprocesses, even though you might only expect a single subprocess.
 > - Pants will sometimes no longer be able to infer dependencies on this file because it cannot disambiguate which of the targets you want to use. You must use explicit dependencies instead. (For some blessed fields, like the `resolve` field, if the targets have different values, then there will not be ambiguity.)
-> 
+>
 > You can run `./pants list path/to/file.ext` to see all "owning" targets to check if >1 target has the file in its `source` field.
 
 `dependencies` field
@@ -117,7 +117,7 @@ A target's dependencies determines which other first-party code and third-party 
 
 Usually, you leave off the `dependencies` field thanks to _dependency inference_. Pants will read your import statements and map those imports back to your first-party code and your third-party requirements. You can run `./pants dependencies path/to:target` to see what dependencies Pants infers.
 
-However, dependency inference cannot infer everything, such as dependencies on `resource` and `file` targets. 
+However, dependency inference cannot infer everything, such as dependencies on `resource` and `file` targets.
 
 To add an explicit dependency, add the target's address to the `dependencies` field. This augments any dependencies that were inferred.
 
@@ -134,51 +134,42 @@ python_sources(
 You only need to declare direct dependencies. Pants will pull in _transitive dependencies_—i.e. the dependencies of your dependencies—for you.
 
 > 📘 Relative addresses, `:tgt`
-> 
-> When depending on a target defined in the same BUILD file, you can simply use `:tgt_name`, rather than `helloworld/greet:tgt_name`, for example. 
-> 
+>
+> When depending on a target defined in the same BUILD file, you can simply use `:tgt_name`, rather than `helloworld/greet:tgt_name`, for example.
+>
 > Addresses for generated targets also support relative addresses in the `dependencies` field, as explained in the "Target Generation" section below.
 
 > 📘 Ignore dependencies with `!` and `!!`
-> 
+>
 > If you don't like that Pants inferred a certain dependency—as reported by [`./pants dependencies path/to:tgt`](doc:project-introspection)—tell Pants to ignore it with `!`:
-> 
+>
 > ```python
 > python_sources(
 >     name="lib",
 >     dependencies=["!3rdparty/python:numpy"],
 > )
 > ```
-> 
-> You can use the prefix `!!` to transitively exclude a dependency, meaning that even if a target's dependencies include the bad dependency, the final result will not include the value. 
-> 
+>
+> You can use the prefix `!!` to transitively exclude a dependency, meaning that even if a target's dependencies include the bad dependency, the final result will not include the value.
+>
 > Transitive excludes can only be used in target types that conventionally are not dependend upon by other targets, such as `pex_binary` and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 
 Field default values
 ====================
 
-As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And
-for specific cases it is easy to provide some other value to a specific target. The issue is if you
-want to apply a specific non-default value for a field on many targets. This can get unwieldy, error
-prone and hard to maintain. Enter `__defaults__`.
+As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And for specific cases it is easy to provide some other value to a specific target. The issue is if you  want to apply a specific non-default value for a field on many targets. This can get unwieldy, error  prone and hard to maintain. Enter `__defaults__`.
 
-Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the
-current subtree.
+Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the current subtree.
 
-The defaults are provided as a dictionary mapping targets to the default field values. Multiple
-targets may share the same set of default field values, when grouped together in parenthesis (as a
-Python tuple).
+The defaults are provided as a dictionary mapping targets to the default field values. Multiple targets may share the same set of default field values, when grouped together in parenthesis (as a Python tuple).
 
 Use the `all` keyword argument to provide default field values that should apply to all targets.
 
-The `extend=True` keyword argument allows to add to any existing default field values set by a
-previous `__defaults__` call rather than replacing them.
+The `extend=True` keyword argument allows to add to any existing default field values set by a previous `__defaults__` call rather than replacing them.
 
-Default fields and values are validated against their target types, except when provided using the
-`all` keyword, in which case only values for fields applicable to each target are validated.
+Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated.
 
-This means, that it is legal to provide a default value for `all` targets, even if it is only a
-subset of targets that actually supports that particular field.
+This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
 
 Examples:
 
@@ -273,13 +264,13 @@ Run [`./pants list dir:`](doc:project-introspection) in the directory of the tar
 You can use the address for the target generator as an alias for all of its generated targets. For example, if you have the `files` target `assets:logos`, adding `dependencies=["assets:logos"]`to another target will add a dependency on each generated `file` target. Likewise, if you have a `python_tests` target `project:tests`, then `./pants test project:tests` will run on each generated `python_test` target.
 
 > 📘 Tip: one BUILD file per directory
-> 
+>
 > Target generation means that it is technically possible to put everything in a single BUILD file.
-> 
-> However, we've found that it usually scales much better to use a single BUILD file per directory. Even if you start with using the defaults for everything, projects usually need to change some metadata over time, like adding a `timeout` to a test file or adding `dependencies` on resources. 
-> 
+>
+> However, we've found that it usually scales much better to use a single BUILD file per directory. Even if you start with using the defaults for everything, projects usually need to change some metadata over time, like adding a `timeout` to a test file or adding `dependencies` on resources.
+>
 > It's useful for metadata to be as fine-grained as feasible, such as by using the `overrides` field to only change the files you need to. Fine-grained metadata is key to having smaller cache keys (resulting in more cache hits), and allows you to more accurately reflect the status of your project. We have found that using one BUILD file per directory encourages fine-grained metadata by defining the metadata adjacent to where the code lives.
-> 
+>
 > [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) will automatically create targets that only apply metadata for the directory.
 
 Parametrizing targets
@@ -347,7 +338,7 @@ Parametrization can be combined with target generation. The `@key=value` will be
 #    example:tests@shell=zsh
 #
 # Generally, you can still use `example:tests`
-# without the `@` suffix as an alias to all the 
+# without the `@` suffix as an alias to all the
 # created targets.
 
 shunit2_tests(

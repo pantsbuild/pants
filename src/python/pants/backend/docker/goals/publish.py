@@ -20,9 +20,9 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import InteractiveProcess, InteractiveProcessRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import Get, collect_rules, rule
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,10 @@ class PublishDockerImageFieldSet(PublishFieldSet):
 
 @rule
 async def push_docker_images(
-    request: PublishDockerImageRequest, docker: DockerBinary, options: DockerOptions
+    request: PublishDockerImageRequest,
+    docker: DockerBinary,
+    options: DockerOptions,
+    options_env_aware: DockerOptions.EnvironmentAware,
 ) -> PublishProcesses:
     tags = tuple(
         chain.from_iterable(
@@ -71,11 +74,11 @@ async def push_docker_images(
             ]
         )
 
-    env = await Get(Environment, EnvironmentRequest(options.env_vars))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars))
     skip_push = defaultdict(set)
     jobs: list[PublishPackages] = []
     refs: list[str] = []
-    processes: list[Get] = []
+    processes: list[InteractiveProcess] = []
 
     for tag in tags:
         for registry in options.registries().registries.values():
@@ -84,12 +87,9 @@ async def push_docker_images(
                 break
         else:
             refs.append(tag)
-            processes.append(
-                Get(InteractiveProcess, InteractiveProcessRequest(docker.push_image(tag, env)))
-            )
+            processes.append(InteractiveProcess.from_process(docker.push_image(tag, env)))
 
-    interactive_processes = await MultiGet(processes)
-    for ref, process in zip(refs, interactive_processes):
+    for ref, process in zip(refs, processes):
         jobs.append(
             PublishPackages(
                 names=(ref,),

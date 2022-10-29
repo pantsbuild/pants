@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
 from typing_extensions import TypedDict
 
-from pants.engine.fs import PathGlobs
-from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import (  # noqa: F401 # explicit re-export
+    FilespecMatcher as FilespecMatcher,
+)
 
 
 class _IncludesDict(TypedDict, total=True):
@@ -24,13 +23,3 @@ class Filespec(_IncludesDict, total=False):
     """
 
     excludes: list[str]
-
-
-def matches_filespec(spec: Filespec, *, paths: Iterable[str]) -> tuple[str, ...]:
-    include_patterns = spec["includes"]
-    exclude_patterns = [f"!{e}" for e in spec.get("excludes", [])]
-    return tuple(
-        native_engine.match_path_globs(
-            PathGlobs((*include_patterns, *exclude_patterns)), tuple(paths)
-        )
-    )

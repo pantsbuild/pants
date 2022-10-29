@@ -4,12 +4,14 @@
 import logging
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.helm.dependency_inference.unittest import rules as dependency_rules
 from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
 from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
+    HelmChartMetaSourceField,
     HelmChartTarget,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
@@ -18,23 +20,24 @@ from pants.backend.helm.target_types import (
     HelmUnitTestTestTarget,
     HelmUnitTestTimeoutField,
 )
+from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
 from pants.core.target_types import ResourceSourceField
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     SourcesField,
@@ -68,12 +71,19 @@ class HelmUnitTestFieldSet(TestFieldSet):
     timeout: HelmUnitTestTimeoutField
 
 
+class HelmUnitTestRequest(TestRequest):
+    tool_subsystem = HelmUnitTestSubsystem
+    field_set_type = HelmUnitTestFieldSet
+
+
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
 async def run_helm_unittest(
-    field_set: HelmUnitTestFieldSet,
+    batch: HelmUnitTestRequest.Batch[HelmUnitTestFieldSet, Any],
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
+    field_set = batch.single_element
+
     direct_dep_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies)),
         Get(
@@ -85,10 +95,12 @@ async def run_helm_unittest(
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 
-    chart, source_files = await MultiGet(
-        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0])),
+    chart_target = chart_targets[0]
+    chart, chart_root, test_files = await MultiGet(
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
+        Get(HelmChartRoot, HelmChartRootRequest(chart_target[HelmChartMetaSourceField])),
         Get(
-            StrippedSourceFiles,
+            SourceFiles,
             SourceFilesRequest(
                 sources_fields=[
                     field_set.source,
@@ -103,16 +115,19 @@ async def run_helm_unittest(
             ),
         ),
     )
-    prefixed_test_files_digest = await Get(
-        Digest, AddPrefix(source_files.snapshot.digest, chart.path)
+
+    stripped_test_files = await Get(
+        Digest, RemovePrefix(test_files.snapshot.digest, chart_root.path)
     )
 
     reports_dir = "__reports_dir"
     reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
 
-    input_digest = await Get(
-        Digest, MergeDigests([chart.snapshot.digest, prefixed_test_files_digest])
+    merged_digests = await Get(
+        Digest,
+        MergeDigests([chart.snapshot.digest, stripped_test_files]),
     )
+    input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = (
@@ -132,7 +147,7 @@ async def run_helm_unittest(
                 unittest_subsystem.output_type.value,
                 "--output-file",
                 reports_file,
-                chart.path,
+                chart.name,
             ],
             description=f"Running Helm unittest suite {field_set.address}",
             input_digest=input_digest,
@@ -152,13 +167,13 @@ async def run_helm_unittest(
 
 
 @rule
-async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) -> TestDebugRequest:
+async def generate_helm_unittest_debug_request(_: HelmUnitTestRequest.Batch) -> TestDebugRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
 
 @rule
 async def generate_helm_unittest_debug_adapter_request(
-    field_set: HelmUnitTestFieldSet,
+    _: HelmUnitTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
@@ -168,5 +183,7 @@ def rules():
         *collect_rules(),
         *subsystem_rules(),
         *dependency_rules(),
+        *tool.rules(),
         UnionRule(TestFieldSet, HelmUnitTestFieldSet),
+        *HelmUnitTestRequest.rules(),
     ]

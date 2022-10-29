@@ -36,7 +36,11 @@ def consumes_a_and_b(a: A, b: B) -> str:
 
 
 def test_use_params() -> None:
-    rule_runner = RuleRunner(rules=[consumes_a_and_b, QueryRule(str, [A, B])])
+    rule_runner = RuleRunner(
+        rules=[consumes_a_and_b, QueryRule(str, [A, B])],
+        inherent_environment=None,
+    )
+
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
@@ -83,7 +87,8 @@ def transitive_params_rule_runner() -> RuleRunner:
             QueryRule(str, [A, C]),
             transitive_coroutine_rule,
             QueryRule(D, [C]),
-        ]
+        ],
+        inherent_environment=None,
     )
 
 
@@ -126,7 +131,12 @@ def test_strict_equals() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@dataclass(frozen=True)
+class Fuel:
+    pass
+
+
+@union(in_scope_types=[Fuel])
 class Vehicle(ABC):
     @abstractmethod
     def num_wheels(self) -> int:
@@ -144,7 +154,7 @@ class Motorcycle(Vehicle):
 
 
 @rule
-def car_num_wheels(car: Car) -> int:
+def car_num_wheels(car: Car, _: Fuel) -> int:
     return car.num_wheels()
 
 
@@ -163,7 +173,7 @@ async def generic_num_wheels(wrapped_vehicle: WrappedVehicle) -> int:
     return await Get(int, Vehicle, wrapped_vehicle.vehicle)
 
 
-def test_union_rules() -> None:
+def test_union_rules_in_scope_via_query() -> None:
     rule_runner = RuleRunner(
         rules=[
             car_num_wheels,
@@ -171,23 +181,48 @@ def test_union_rules() -> None:
             UnionRule(Vehicle, Car),
             UnionRule(Vehicle, Motorcycle),
             generic_num_wheels,
+            QueryRule(int, [WrappedVehicle, Fuel]),
+        ],
+    )
+    assert rule_runner.request(int, [WrappedVehicle(Car()), Fuel()]) == 4
+    assert rule_runner.request(int, [WrappedVehicle(Motorcycle()), Fuel()]) == 2
+
+    # Fails due to no union relationship between Vehicle -> str.
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(int, [WrappedVehicle("not a vehicle"), Fuel()])  # type: ignore[arg-type]
+    assert (
+        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
+        "annotated with `@union`, the value for that type should be a member of that union. Did you "
+        "intend to register a `UnionRule`?"
+    ) in str(exc.value.args[0])
+
+
+def test_union_rules_in_scope_computed() -> None:
+    @rule
+    def fuel_singleton() -> Fuel:
+        return Fuel()
+
+    rule_runner = RuleRunner(
+        rules=[
+            car_num_wheels,
+            motorcycle_num_wheels,
+            UnionRule(Vehicle, Car),
+            UnionRule(Vehicle, Motorcycle),
+            generic_num_wheels,
+            fuel_singleton,
             QueryRule(int, [WrappedVehicle]),
         ],
     )
     assert rule_runner.request(int, [WrappedVehicle(Car())]) == 4
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle())]) == 2
 
-    # Fails due to no union relationship between Vehicle -> str.
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [WrappedVehicle("not a vehicle")])  # type: ignore[arg-type]
-    assert (
-        "Invalid Get. Because the second argument to `Get(int, Vehicle, not a vehicle)` is "
-        "annotated with `@union`, the third argument should be a member of that union. Did you "
-        "intend to register `UnionRule(Vehicle, str)`?"
-    ) in str(exc.value.args[0])
+
+# -----------------------------------------------------------------------------------------------
+# Test invalid Gets
+# -----------------------------------------------------------------------------------------------
 
 
-def create_outlined_get() -> Get[int, str]:
+def create_outlined_get() -> Get[int]:
     return Get(int, str, "hello")
 
 
@@ -239,13 +274,17 @@ def test_trace_includes_rule_exception_traceback() -> None:
 
          Engine traceback:
            in select
+             ..
            in {__name__}.{nested_raise.__name__}
+             Nested raise
+
          Traceback (most recent call last):
            File LOCATION-INFO, in nested_raise
              fn_raises()
            File LOCATION-INFO, in fn_raises
              raise Exception("An exception!")
          Exception: An exception!
+
          """
     )
 

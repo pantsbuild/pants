@@ -179,6 +179,68 @@ You can also pass through arguments to the test runner with `--`, e.g.:
 ❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala -- -z hello
 ```
 
+### Timeouts
+
+Pants can cancel tests which take too long. This is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds in any of the supported targets, like this:
+
+```python BUILD
+java_junit_test(name="java_test", source="Test.java", timeout=120)
+scala_junit_test(name="scala_junit_test", source="Test.scala", timeout=100)
+scalatest_test(name="scalatest_test", source="Spec.scala", timeout=80)
+```
+
+When you set timeout on any of the target generators (i.e. `java_junit_tests`, `scalatest_tests`, etc.), the same timeout will apply to every generated corresponding target.
+
+```python BUILD
+java_junit_tests(
+    name="tests",
+    overrides={
+        "MyClass1Test.java": {"timeout": 20},
+        ("MyClass2Test.java", "MyClass3Test.java"): {"timeout": 35},
+    },
+)
+```
+
+You can also set a default value and a maximum value in `pants.toml`:
+
+```toml pants.toml
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
+Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+
+### Setting environment variables
+
+Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+
+To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `junit_test` / `junit_tests` / `scala_junit_test` / `scala_junit_tests` / `scalatest_test` / `scalatest_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
+
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+
+```toml pants.toml
+[test]
+extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+```
+```python project/BUILD
+junit_tests(
+    name="tests",
+    # Adds to all generated `junit_test` targets,
+    # i.e. each file in the `sources` field.
+    extra_env_vars=["VAR3", "VAR4=hardcoded"],
+    # Even better, use `overrides` to be more granular.
+    overrides={
+        "StrUtilTest.java": {"extra_env_vars": ["VAR"]},
+        ("DirUtilTest.java", "OSUtilTest.java"): {"extra_env_vars": ["VAR5"]},
+    },
+)
+```
+
 Lint and Format
 ---------------
 
@@ -232,13 +294,12 @@ After Setup (see below), and after IntelliJ has finished indexing your code, you
 # A "group" named `default`.
 # Multiple groups are supported: consider creating a group per project or team.
 [groups.default]
-addresses = 
-[  
+addresses = [  
   "src/jvm::",  
   "tests/jvm::",  
 ]
 
-resolve = "jvm-default"
+resolve = "jvm:jvm-default"
 ```
 ```Text ...
 

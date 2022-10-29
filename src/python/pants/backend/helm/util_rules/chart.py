@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
@@ -16,7 +17,13 @@ from pants.backend.helm.resolve.fetch import (
     FetchHelmArfifactsRequest,
 )
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
+from pants.backend.helm.target_types import (
+    HelmArtifactTarget,
+    HelmChartFieldSet,
+    HelmChartMetaSourceField,
+    HelmChartTarget,
+    HelmDeploymentFieldSet,
+)
 from pants.backend.helm.util_rules import chart_metadata, sources
 from pants.backend.helm.util_rules.chart_metadata import (
     HELM_CHART_METADATA_FILENAMES,
@@ -25,7 +32,8 @@ from pants.backend.helm.util_rules.chart_metadata import (
     ParseHelmChartMetadataDigest,
 )
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -35,34 +43,53 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Target, Targets
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Target, Targets
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidHelmChartTarget(ValueError):
+    def __init__(self, target: Target) -> None:
+        super().__init__(f"The target {target.address} is not a `{HelmChartTarget.alias}`.")
 
 
 @dataclass(frozen=True)
 class HelmChart:
     address: Address
-    metadata: HelmChartMetadata
+    info: HelmChartMetadata
     snapshot: Snapshot
     artifact: ResolvedHelmArtifact | None = None
 
     @property
-    def path(self) -> str:
-        return self.metadata.name
+    def name(self) -> str:
+        return self.info.name
+
+    @property
+    def description(self) -> str:
+        return self.name
+
+    @property
+    def immutable_input_digests(self) -> FrozenDict[str, Digest]:
+        return FrozenDict({self.name: self.snapshot.digest})
 
 
 @dataclass(frozen=True)
-class HelmChartRequest:
+class HelmChartRequest(EngineAwareParameter):
     field_set: HelmChartFieldSet
 
     @classmethod
     def from_target(cls, target: Target) -> HelmChartRequest:
+        if not HelmChartFieldSet.is_applicable(target):
+            raise InvalidHelmChartTarget(target)
         return cls(HelmChartFieldSet.create(target))
+
+    def debug_hint(self) -> str | None:
+        return self.field_set.address.spec
 
 
 @rule
@@ -71,8 +98,7 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
         HelmChartMetadata,
         ParseHelmChartMetadataDigest(
             fetched_artifact.snapshot.digest,
-            description_of_origin=fetched_artifact.address.spec,
-            prefix=fetched_artifact.artifact.name,
+            description_of_origin=f"the `helm_artifact` {fetched_artifact.address.spec}",
         ),
     )
     return HelmChart(
@@ -83,9 +109,18 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
     )
 
 
+@rule_helper
+async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
+    prefixed_chart_digests = await MultiGet(
+        Get(Digest, AddPrefix(chart.snapshot.digest, chart.name)) for chart in charts
+    )
+    merged_digests = await Get(Digest, MergeDigests(prefixed_chart_digests))
+    return await Get(Digest, AddPrefix(merged_digests, "charts"))
+
+
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
 async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) -> HelmChart:
-    dependencies, source_files, metadata = await MultiGet(
+    dependencies, source_files, chart_info = await MultiGet(
         Get(Targets, DependenciesRequest(request.field_set.dependencies)),
         Get(
             HelmChartSourceFiles,
@@ -121,19 +156,21 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     subcharts_digest = EMPTY_DIGEST
     if subcharts:
         logger.debug(
-            f"Found {pluralize(len(subcharts), 'subchart')} as direct dependencies on Helm chart at: {request.field_set.address}"
+            softwrap(
+                f"""
+                Found {pluralize(len(subcharts), 'subchart')} as direct dependencies
+                on Helm chart at: {request.field_set.address}.
+                """
+            )
         )
 
-        merged_subcharts = await Get(
-            Digest, MergeDigests([chart.snapshot.digest for chart in subcharts])
-        )
-        subcharts_digest = await Get(Digest, AddPrefix(merged_subcharts, "charts"))
+        subcharts_digest = await _merge_subchart_digests(subcharts)
 
         # Update subchart dependencies in the metadata and re-render it.
         remotes = subsystem.remotes()
-        subchart_map: dict[str, HelmChart] = {chart.metadata.name: chart for chart in subcharts}
+        subchart_map: dict[str, HelmChart] = {chart.info.name: chart for chart in subcharts}
         updated_dependencies: OrderedSet[HelmChartDependency] = OrderedSet()
-        for dep in metadata.dependencies:
+        for dep in chart_info.dependencies:
             updated_dep = dep
 
             if not dep.repository and remotes.default_registry:
@@ -146,7 +183,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
 
             if dep.name in subchart_map:
                 updated_dep = dataclasses.replace(
-                    updated_dep, version=subchart_map[dep.name].metadata.version
+                    updated_dep, version=subchart_map[dep.name].info.version
                 )
 
             updated_dependencies.add(updated_dep)
@@ -154,7 +191,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         # Include the explicitly provided subchats in the set of dependencies if not already present.
         updated_dependencies_names = {dep.name for dep in updated_dependencies}
         remaining_subcharts = [
-            chart for chart in subcharts if chart.metadata.name not in updated_dependencies_names
+            chart for chart in subcharts if chart.info.name not in updated_dependencies_names
         ]
         for chart in remaining_subcharts:
             if chart.artifact:
@@ -164,17 +201,15 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
                     repository=chart.artifact.location_url,
                 )
             else:
-                dependency = HelmChartDependency(
-                    name=chart.metadata.name, version=chart.metadata.version
-                )
+                dependency = HelmChartDependency(name=chart.info.name, version=chart.info.version)
             updated_dependencies.add(dependency)
 
         # Update metadata with the information about charts' dependencies.
-        metadata = dataclasses.replace(metadata, dependencies=tuple(updated_dependencies))
+        chart_info = dataclasses.replace(chart_info, dependencies=tuple(updated_dependencies))
 
     # Re-render the Chart.yaml file with the updated dependencies.
     metadata_digest, sources_without_metadata = await MultiGet(
-        Get(Digest, HelmChartMetadata, metadata),
+        Get(Digest, HelmChartMetadata, chart_info),
         Get(
             Digest,
             DigestSubset(
@@ -187,12 +222,84 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     )
 
     # Merge all digests that conform chart's content.
-    content_digest = await Get(
-        Digest, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
+    chart_snapshot = await Get(
+        Snapshot, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
     )
 
-    chart_snapshot = await Get(Snapshot, AddPrefix(content_digest, metadata.name))
-    return HelmChart(address=request.field_set.address, metadata=metadata, snapshot=chart_snapshot)
+    return HelmChart(address=request.field_set.address, info=chart_info, snapshot=chart_snapshot)
+
+
+class MissingHelmDeploymentChartError(ValueError):
+    def __init__(self, address: Address) -> None:
+        super().__init__(
+            (
+                f"The target '{address}' is missing a dependency on a `{HelmChartTarget.alias}` "
+                f"or a `{HelmArtifactTarget.alias}` target."
+            )
+        )
+
+
+class TooManyChartDependenciesError(ValueError):
+    def __init__(self, address: Address) -> None:
+        super().__init__(
+            (
+                f"The target '{address}' has more than one `{HelmChartTarget.alias}` "
+                f"or `{HelmArtifactTarget.alias}` addresses in its dependencies, it should have only one."
+            )
+        )
+
+
+@dataclass(frozen=True)
+class FindHelmDeploymentChart(EngineAwareParameter):
+    field_set: HelmDeploymentFieldSet
+
+    def debug_hint(self) -> str | None:
+        return self.field_set.address.spec
+
+
+@rule(desc="Find Helm deployment's chart", level=LogLevel.DEBUG)
+async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmChart:
+    explicit_dependencies = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    )
+    explicit_targets = await Get(
+        Targets,
+        Addresses(
+            [
+                addr
+                for addr in explicit_dependencies.includes
+                if addr not in explicit_dependencies.ignores
+            ]
+        ),
+    )
+
+    fetched_third_party_artifacts = await Get(
+        FetchedHelmArtifacts,
+        FetchHelmArfifactsRequest,
+        FetchHelmArfifactsRequest.for_targets(
+            explicit_targets, description_of_origin=request.field_set.address.spec
+        ),
+    )
+
+    find_charts: Iterable[Get[HelmChart]] = [
+        *(
+            Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(tgt))
+            for tgt in explicit_targets
+            if HelmChartFieldSet.is_applicable(tgt)
+        ),
+        *(
+            Get(HelmChart, FetchedHelmArtifact, fetched_artifact)
+            for fetched_artifact in fetched_third_party_artifacts
+        ),
+    ]
+    found_charts = await MultiGet(find_charts)
+
+    if not found_charts:
+        raise MissingHelmDeploymentChartError(request.field_set.address)
+    if len(found_charts) > 1:
+        raise TooManyChartDependenciesError(request.field_set.address)
+
+    return found_charts[0]
 
 
 def rules():

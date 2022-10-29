@@ -5,24 +5,28 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
+    TestExtraEnv,
+    TestExtraEnvVarsField,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
 )
@@ -33,7 +37,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -57,9 +61,15 @@ class JunitTestFieldSet(TestFieldSet):
     timeout: JunitTestTimeoutField
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
+    extra_env_vars: TestExtraEnvVarsField
 
 
-class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
+class JunitTestRequest(TestRequest):
+    tool_subsystem = JUnit
+    field_set_type = JunitTestFieldSet
+
+
+class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JUnit.options_scope
 
 
@@ -81,6 +91,7 @@ async def setup_junit_for_target(
     jvm: JvmSubsystem,
     junit: JUnit,
     test_subsystem: TestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestSetup:
 
     jdk, transitive_tgts = await MultiGet(
@@ -124,6 +135,10 @@ async def setup_junit_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
+    field_set_extra_env = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
+    )
+
     process = JvmProcess(
         jdk=jdk,
         classpath_entries=[
@@ -140,6 +155,7 @@ async def setup_junit_for_target(
             *junit.args,
         ],
         input_digest=input_digest,
+        extra_env={**test_extra_env.env, **field_set_extra_env},
         extra_jvm_options=junit.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
@@ -155,8 +171,10 @@ async def setup_junit_for_target(
 @rule(desc="Run JUnit", level=LogLevel.DEBUG)
 async def run_junit_test(
     test_subsystem: TestSubsystem,
-    field_set: JunitTestFieldSet,
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestResult:
+    field_set = batch.single_element
+
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -175,19 +193,19 @@ async def run_junit_test(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+async def setup_junit_debug_request(
+    batch: JunitTestRequest.Batch[JunitTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
-    interactive_process = await Get(
-        InteractiveProcess,
-        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
+    return TestDebugRequest(
+        InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
     )
-    return TestDebugRequest(interactive_process)
 
 
 @rule
 async def setup_junit_debug_adapter_request(
-    field_set: JunitTestFieldSet,
+    _: JunitTestRequest.Batch[JunitTestFieldSet, Any],
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError(
         "Debugging JUnit tests using a debug adapter has not yet been implemented."
@@ -207,4 +225,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, JunitTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
+        *JunitTestRequest.rules(),
     ]

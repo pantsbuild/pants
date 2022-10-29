@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from textwrap import fill, indent
 
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -55,6 +55,7 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
 
 class PyConstraintsGoal(Goal):
     subsystem_cls = PyConstraintsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -98,7 +99,7 @@ async def py_constraints(
         ]
 
         dependees_per_root = await MultiGet(
-            Get(Dependees, DependeesRequest([tgt.address], transitive=True, include_roots=False))
+            Get(Dependents, DependentsRequest([tgt.address], transitive=True, include_roots=False))
             for tgt in all_python_targets
         )
 

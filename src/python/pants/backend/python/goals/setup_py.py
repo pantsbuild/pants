@@ -57,7 +57,8 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -272,7 +273,7 @@ class SetupKwargs:
 # Note: This only exists as a hook for additional logic for the `setup()` kwargs, e.g. for plugin
 # authors. To resolve `SetupKwargs`, call `await Get(SetupKwargs, ExportedTarget)`, which handles
 # running any custom implementations vs. using the default implementation.
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)  # type: ignore[misc]
 class SetupKwargsRequest(ABC):
     """A request to allow setting the kwargs passed to the `setup()` function.
@@ -385,7 +386,7 @@ class NoDistTypeSelected(ValueError):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class DistBuildEnvironmentRequest:
     target_addresses: tuple[Address, ...]
@@ -431,9 +432,11 @@ async def package_python_dist(
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
     backend_env_vars = dist_tgt.get(BuildBackendEnvVarsField).value
     if backend_env_vars:
-        extra_build_time_env = await Get(Environment, EnvironmentRequest(sorted(backend_env_vars)))
+        extra_build_time_env = await Get(
+            EnvironmentVars, EnvironmentVarsRequest(sorted(backend_env_vars))
+        )
     else:
-        extra_build_time_env = Environment()
+        extra_build_time_env = EnvironmentVars()
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
@@ -450,7 +453,12 @@ async def package_python_dist(
     source_roots_result = await Get(
         SourceRootsResult,
         SourceRootsRequest(
-            files=[], dirs={PurePath(tgt.address.spec_path) for tgt in transitive_targets.closure}
+            files=[],
+            dirs={
+                PurePath(tgt.address.spec_path)
+                for tgt in transitive_targets.closure
+                if tgt.has_field(PythonSourceField) or tgt.has_field(ResourceSourceField)
+            },
         ),
     )
     source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
@@ -554,8 +562,9 @@ async def determine_explicitly_provided_setup_kwargs(
                 """
             )
         )
-    setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
-    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
+    setup_kwargs_request_type = tuple(applicable_setup_kwargs_requests)[0]
+    setup_kwargs_request: SetupKwargsRequest = setup_kwargs_request_type(target)  # type: ignore[abstract]
+    return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request)
 
 
 @dataclass(frozen=True)
@@ -868,14 +877,13 @@ async def get_requirements(
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
     req_strs = list(
-        PexRequirements.create_from_requirement_fields(
+        PexRequirements.req_strings_from_requirement_fields(
             (
                 tgt[PythonRequirementsField]
                 for tgt in direct_deps_with_excl
                 if tgt.has_field(PythonRequirementsField)
             ),
-            constraints_strings=(),
-        ).req_strings
+        )
     )
 
     # Add the requirements on any exported targets on which we depend.
@@ -967,7 +975,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                     softwrap(
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
-                        ancestor dependees of {target.address} and are therefore candidates to
+                        ancestor dependents of {target.address} and are therefore candidates to
                         own it: {', '.join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """

@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -25,7 +25,6 @@ use crate::context::{Context, Core};
 use crate::downloads;
 use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
-use crate::selectors;
 use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
@@ -33,13 +32,14 @@ use fs::{
   RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
-  self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
+  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
-use graph::{Entry, Node, NodeError, NodeVisualizer};
+use graph::{Node, NodeError};
 use hashing::Digest;
+use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -143,8 +143,8 @@ impl Select {
     entry: Intern<rule_graph::Entry<Rule>>,
   ) -> Select {
     params.retain(|k| match entry.as_ref() {
-      &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
-      &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
+      rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
+      rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
     });
     Select {
       params,
@@ -155,38 +155,59 @@ impl Select {
 
   pub fn new_from_edges(
     params: Params,
-    product: TypeId,
+    dependency_key: &DependencyKey<TypeId>,
     edges: &rule_graph::RuleEdges<Rule>,
   ) -> Select {
-    let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
-    // TODO: Is it worth propagating an error here?
-    let entry = edges
-      .entry_for(&dependency_key)
-      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product));
-    Select::new(params, product, entry)
+    let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
+      panic!(
+        "{:?} did not declare a dependency on {:?}",
+        edges, dependency_key
+      )
+    });
+    Select::new(params, dependency_key.product(), entry)
   }
 
-  fn select_product(
+  fn reenter<'a>(
     &self,
-    context: &Context,
-    product: TypeId,
+    context: Context,
+    query: &'a Query<TypeId>,
+  ) -> BoxFuture<'a, NodeResult<Value>> {
+    let edges = context
+      .core
+      .rule_graph
+      .find_root(query.params.iter().cloned(), query.product)
+      .map(|(_, edges)| edges);
+
+    let params = self.params.clone();
+    async move {
+      let edges = edges?;
+      Select::new_from_edges(params, &DependencyKey::new(query.product), &edges)
+        .run_node(context)
+        .await
+    }
+    .boxed()
+  }
+
+  fn select_product<'a>(
+    &self,
+    context: Context,
+    dependency_key: &'a DependencyKey<TypeId>,
     caller_description: &str,
-  ) -> BoxFuture<NodeResult<Value>> {
+  ) -> BoxFuture<'a, NodeResult<Value>> {
     let edges = context
       .core
       .rule_graph
       .edges_for_inner(&self.entry)
       .ok_or_else(|| {
         throw(format!(
-          "Tried to select product {} for {} but found no edges",
-          product, caller_description
+          "Tried to request {} for {} but found no edges",
+          dependency_key, caller_description
         ))
       });
     let params = self.params.clone();
-    let context = context.clone();
     async move {
       let edges = edges?;
-      Select::new_from_edges(params, product, &edges)
+      Select::new_from_edges(params, dependency_key, &edges)
         .run_node(context)
         .await
     }
@@ -196,7 +217,7 @@ impl Select {
   async fn run_node(self, context: Context) -> NodeResult<Value> {
     match self.entry.as_ref() {
       &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
-        rule_graph::EntryWithDeps::Inner(ref inner) => match inner.rule() {
+        rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
           &tasks::Rule::Task(ref task) => {
             context
               .get(Task {
@@ -212,7 +233,9 @@ impl Select {
               intrinsic
                 .inputs
                 .iter()
-                .map(|type_id| self.select_product(&context, *type_id, "intrinsic"))
+                .map(|dependency_key| {
+                  self.select_product(context.clone(), dependency_key, "intrinsic")
+                })
                 .collect::<Vec<_>>(),
             )
             .await?;
@@ -223,6 +246,17 @@ impl Select {
               .await
           }
         },
+        &rule_graph::EntryWithDeps::Reentry(ref reentry) => {
+          // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
+          // implemented: doing so would involve doing something similar to what we do for
+          // intrinsics above, and waiting to compute inputs before executing the query here.
+          //
+          // That doesn't block using a singleton to provide an API type, but it would block a more
+          // complex use case.
+          //
+          // see https://github.com/pantsbuild/pants/issues/16751
+          self.reenter(context, &reentry.query).await
+        }
         &rule_graph::EntryWithDeps::Root(_) => {
           panic!("Not a runtime-executable entry! {:?}", self.entry)
         }
@@ -232,8 +266,8 @@ impl Select {
           Ok(key.to_value())
         } else {
           Err(throw(format!(
-            "Expected a Param of type {} to be present.",
-            type_id
+            "Expected a Param of type {} to be present, but had only: {}",
+            type_id, self.params,
           )))
         }
       }
@@ -300,6 +334,7 @@ impl ExecuteProcess {
   fn lift_process_fields(
     value: &PyAny,
     input_digests: InputDigests,
+    process_config: externs::process::PyProcessConfigFromEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
@@ -351,14 +386,11 @@ impl ExecuteProcess {
         .try_into()?
     };
 
-    let platform_constraint =
-      if let Some(p) = externs::getattr_as_optional_string(value, "platform") {
-        Some(Platform::try_from(p)?)
-      } else {
-        None
-      };
+    let remote_cache_speculation_delay = std::time::Duration::from_millis(
+      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis").unwrap() as u64,
+    );
 
-    Ok(process_execution::Process {
+    Ok(Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
       working_directory,
@@ -370,22 +402,25 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform_constraint,
+      platform: process_config.platform,
       execution_slot_variable,
       concurrency_available,
       cache_scope,
+      execution_strategy: process_config.execution_strategy,
+      remote_cache_speculation_delay: remote_cache_speculation_delay,
     })
   }
 
-  pub async fn lift_process(store: &Store, value: Value) -> Result<Process, StoreError> {
+  pub async fn lift(
+    store: &Store,
+    value: Value,
+    process_config: externs::process::PyProcessConfigFromEnvironment,
+  ) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
-    Python::with_gil(|py| Self::lift_process_fields((*value).as_ref(py), input_digests))
-  }
-
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
-    Ok(Self {
-      process: Self::lift_process(store, value).await?,
-    })
+    let process = Python::with_gil(|py| {
+      Self::lift_process_fields((*value).as_ref(py), input_digests, process_config)
+    })?;
+    Ok(Self { process })
   }
 
   async fn run_node(
@@ -413,6 +448,7 @@ impl ExecuteProcess {
       context.session.workunit_store(),
       context.session.build_id().to_string(),
       context.session.run_id(),
+      context.session.tail_tasks(),
     );
 
     let res = command_runner
@@ -430,15 +466,15 @@ impl ExecuteProcess {
             user_metadata: vec![
               (
                 "definition".to_string(),
-                UserMetadataItem::ImmediateString(definition),
+                UserMetadataItem::String(definition),
               ),
               (
                 "source".to_string(),
-                UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+                UserMetadataItem::String(format!("{:?}", res.metadata.source)),
               ),
               (
                 "exit_code".to_string(),
-                UserMetadataItem::ImmediateInt(res.exit_code as i64),
+                UserMetadataItem::Int(res.exit_code as i64),
               ),
             ],
             ..initial
@@ -1000,11 +1036,9 @@ impl Task {
         let context = context.clone();
         let mut params = params.clone();
         async move {
-          let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
-            output: get.output,
-            input: *get.input.type_id(),
-          });
-          params.put(get.input.clone());
+          let dependency_key =
+            DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
+          params.extend(get.inputs.iter().cloned());
 
           let edges = context
             .core
@@ -1012,50 +1046,46 @@ impl Task {
             .edges_for_inner(&entry)
             .ok_or_else(|| throw(format!("No edges for task {:?} exist!", entry)))?;
 
-          // See if there is a Get: otherwise, a union (which is executed as a Query).
-          // See #12934 for further cleanup of this API.
+          // Find the entry for the Get.
           let select = edges
             .entry_for(&dependency_key)
             .map(|entry| {
-              // The subject of the get is a new parameter that replaces an existing param of the same
+              // The subject of the Get is a new parameter that replaces an existing param of the same
               // type.
               Select::new(params.clone(), get.output, entry)
             })
             .or_else(|| {
-              if get.input_type.is_union() {
-                // Is a union.
-                let (_, rule_edges) = context
-                  .core
-                  .rule_graph
-                  .find_root(vec![*get.input.type_id()], get.output)
-                  .ok()?;
-                Some(Select::new_from_edges(params, get.output, &rule_edges))
-              } else {
-                None
-              }
+              // The Get might have involved a @union: if so, include its in_scope types in the
+              // lookup.
+              let in_scope_types = get
+                .input_types
+                .iter()
+                .find_map(|t| t.union_in_scope_types())?;
+              edges
+                .entry_for(
+                  &DependencyKey::new(get.output)
+                    .provided_params(get.inputs.iter().map(|k| *k.type_id()))
+                    .in_scope_params(in_scope_types),
+                )
+                .map(|entry| Select::new(params.clone(), get.output, entry))
             })
             .ok_or_else(|| {
-              if get.input_type.is_union() {
+              if get.input_types.iter().any(|t| t.is_union()) {
                 throw(format!(
-                  "Invalid Get. Because the second argument to `Get({}, {}, {:?})` is annotated \
-                  with `@union`, the third argument should be a member of that union. Did you \
-                  intend to register `UnionRule({}, {})`? If not, you may be using the wrong \
-                  type ({}) for the third argument.",
-                  get.output,
-                  get.input_type,
-                  get.input,
-                  get.input_type,
-                  get.input.type_id(),
-                  get.input.type_id(),
+                  "Invalid Get. Because an input type for `{}` was annotated with `@union`, \
+                  the value for that type should be a member of that union. Did you \
+                  intend to register a `UnionRule`? If not, you may be using the incorrect \
+                  explicitly declared type.",
+                  get,
                 ))
               } else {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
                 throw(format!(
-                  "Get({}, {}, {}) was not detected in your @rule body at rule compile time. \
+                  "{} was not detected in your @rule body at rule compile time. \
                   Was the `Get` constructor called in a separate function, or perhaps \
                   dynamically? If so, it must be inlined into the @rule body.",
-                  get.output, get.input_type, get.input
+                  get,
                 ))
               }
             })?;
@@ -1115,10 +1145,10 @@ impl Task {
       future::try_join_all(
         self
           .task
-          .clause
+          .args
           .iter()
-          .map(|type_id| {
-            Select::new_from_edges(params.clone(), *type_id, edges).run_node(context.clone())
+          .map(|dependency_key| {
+            Select::new_from_edges(params.clone(), dependency_key, edges).run_node(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1191,32 +1221,6 @@ impl From<Task> for NodeKey {
   }
 }
 
-#[derive(Default)]
-pub struct Visualizer {
-  viz_colors: HashMap<String, String>,
-}
-
-impl NodeVisualizer<NodeKey> for Visualizer {
-  fn color_scheme(&self) -> &str {
-    "set312"
-  }
-
-  fn color(&mut self, entry: &Entry<NodeKey>, context: &<NodeKey as Node>::Context) -> String {
-    let max_colors = 12;
-    match entry.peek(context) {
-      None => "white".to_string(),
-      Some(_) => {
-        let viz_colors_len = self.viz_colors.len();
-        self
-          .viz_colors
-          .entry(entry.node().product_str())
-          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
-          .clone()
-      }
-    }
-  }
-}
-
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
@@ -1236,22 +1240,6 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  fn product_str(&self) -> String {
-    match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
-      &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => format!("{}", s.product),
-      &NodeKey::SessionValues(_) => "SessionValues".to_string(),
-      &NodeKey::RunId(_) => "RunId".to_string(),
-      &NodeKey::Task(ref t) => format!("{}", t.task.product),
-      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::Paths(..) => "Paths".to_string(),
-      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
-      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
-      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-    }
-  }
-
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
@@ -1314,9 +1302,29 @@ impl NodeKey {
   /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
   /// user-facing name should be the same as the `desc` annotation on the rule decorator.
   ///
-  fn user_facing_name(&self) -> Option<String> {
+  fn workunit_desc(&self, context: &Context) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => {
+        let task_desc = task.task.display_info.desc.as_ref().map(|s| s.to_owned())?;
+
+        let displayable_param_names: Vec<_> = Python::with_gil(|py| {
+          Self::engine_aware_params(context, py, &task.params)
+            .filter_map(|k| EngineAwareParameter::debug_hint((*k.value).as_ref(py)))
+            .collect()
+        });
+
+        let desc = if displayable_param_names.is_empty() {
+          task_desc
+        } else {
+          format!(
+            "{} - {}",
+            task_desc,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        };
+
+        Some(desc)
+      }
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
       NodeKey::ExecuteProcess(epr) => {
@@ -1353,22 +1361,17 @@ impl NodeKey {
   /// Filters the given Params to those which are subtypes of EngineAwareParameter.
   ///
   fn engine_aware_params<'a>(
-    context: Context,
+    context: &Context,
     py: Python<'a>,
     params: &'a Params,
-  ) -> impl Iterator<Item = Value> + 'a {
+  ) -> impl Iterator<Item = &'a Key> + 'a {
     let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
-    params.keys().filter_map(move |key| {
-      if key
+    params.keys().filter(move |key| {
+      key
         .type_id()
         .as_py_type(py)
         .is_subclass(engine_aware_param_ty)
         .unwrap_or(false)
-      {
-        Some(key.to_value())
-      } else {
-        None
-      }
     })
   }
 }
@@ -1382,22 +1385,27 @@ impl Node for NodeKey {
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let workunit_name = self.workunit_name();
-    let params = match &self {
-      NodeKey::Task(ref task) => task.params.clone(),
-      _ => Params::default(),
+    let workunit_desc = self.workunit_desc(&context);
+    let maybe_params = match &self {
+      NodeKey::Task(ref task) => Some(&task.params),
+      _ => None,
     };
     let context2 = context.clone();
 
     in_workunit!(
       workunit_name,
       self.workunit_level(),
-      desc = self.user_facing_name(),
+      desc = workunit_desc.clone(),
       user_metadata = {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        Self::engine_aware_params(context.clone(), py, &params)
-          .flat_map(|val| EngineAwareParameter::metadata((*val).as_ref(py)))
-          .collect()
+        if let Some(params) = maybe_params {
+          Python::with_gil(|py| {
+            Self::engine_aware_params(&context, py, params)
+              .flat_map(|k| EngineAwareParameter::metadata((*k.value).as_ref(py)))
+              .collect()
+          })
+        } else {
+          vec![]
+        }
       },
       |workunit| async move {
         // Ensure that we have installed filesystem watches before Nodes which inspect the
@@ -1437,33 +1445,7 @@ impl Node for NodeKey {
         }
 
         // If the node failed, expand the Failure with a new frame.
-        result = result.map_err(|failure| {
-          let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            Self::engine_aware_params(context2, py, &params)
-              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
-              .collect()
-          };
-          let failure_name = if displayable_param_names.is_empty() {
-            name.to_owned()
-          } else if displayable_param_names.len() == 1 {
-            format!(
-              "{} ({})",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          } else {
-            format!(
-              "{} {}",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          };
-
-          failure.with_pushed_frame(&failure_name)
-        });
+        result = result.map_err(|failure| failure.with_pushed_frame(workunit_name, workunit_desc));
 
         result
       }

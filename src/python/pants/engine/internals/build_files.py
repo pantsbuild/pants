@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import builtins
+import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -22,6 +23,10 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, P
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticAddressMapsRequest,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
@@ -48,7 +53,10 @@ def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOption
 
 
 @rule(desc="Expand macros")
-async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(
+    build_file_options: BuildFileOptions,
+    parser: Parser,
+) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
         PathGlobs(
@@ -58,6 +66,8 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
     )
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
+        **parser.builtin_symbols,
     }
     locals: dict[str, Any] = {}
     for file_content in prelude_digest_contents:
@@ -72,6 +82,9 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
     locals.pop("__builtins__", None)
+    # Ensure preludes can reference each other by populating the shared globals object with references
+    # to the other symbols
+    globals.update(locals)
     return BuildFilePreludeSymbols(FrozenDict(locals))
 
 
@@ -151,16 +164,20 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            globs=(
-                *(os.path.join(directory.path, p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
+    digest_contents, all_synthetic_address_maps = await MultiGet(
+        Get(
+            DigestContents,
+            PathGlobs(
+                globs=(
+                    *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                    *(f"!{p}" for p in build_file_options.ignores),
+                )
+            ),
         ),
+        Get(SyntheticAddressMaps, SyntheticAddressMapsRequest(directory.path)),
     )
-    if not digest_contents:
+    synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
+    if not digest_contents and not synthetic_address_maps:
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
@@ -184,10 +201,20 @@ async def parse_address_family(
         )
         for fc in digest_contents
     ]
+
+    # Freeze defaults.
+    frozen_defaults = defaults_parser_state.get_frozen_defaults()
+
+    # Process synthetic targets.
+    for address_map in address_maps:
+        for synthetic in synthetic_address_maps:
+            synthetic.process_declared_targets(address_map)
+            synthetic.apply_defaults(frozen_defaults)
+
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path, address_maps, defaults_parser_state.get_frozen_defaults()
+            directory.path, (*address_maps, *synthetic_address_maps), frozen_defaults
         ),
     )
 

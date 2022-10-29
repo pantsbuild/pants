@@ -29,12 +29,12 @@ To run against another branch, run:
 ./pants --changed-since=origin/main lint
 ```
 
-By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependees](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependees=direct` or ` --changed-dependees=transitive` for this:
+By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependents](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependents=direct` or ` --changed-dependents=transitive` for this:
 
 ```bash
 ❯ ./pants \
   --changed-since=origin/main \
-  --changed-dependees=transitive \
+  --changed-dependents=transitive \
   test
 ```
 
@@ -148,15 +148,15 @@ Piping to other Pants runs
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-./pants dependees helloworld/util | xargs ./pants  list
+./pants dependents helloworld/util | xargs ./pants  list
 ```
 
 You can, of course, pipe multiple times:
 
 ```bash
-# Run over the second-degree dependees of `utils.py`.
-❯ ./pants dependees helloworld/utils.py | \
-   xargs ./pants dependees | \
+# Run over the second-degree dependents of `utils.py`.
+❯ ./pants dependents helloworld/utils.py | \
+   xargs ./pants dependents | \
    xargs ./pants lint
 ```
 

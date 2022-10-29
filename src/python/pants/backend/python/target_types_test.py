@@ -13,7 +13,6 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
@@ -25,7 +24,6 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
-    PythonTestsTimeoutField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
@@ -41,7 +39,6 @@ from pants.backend.python.target_types_rules import (
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
-from pants.core.goals.test import TestSubsystem
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
@@ -52,8 +49,6 @@ from pants.engine.target import (
     InvalidTargetException,
     Tags,
 )
-from pants.option.ranked_value import Rank
-from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -70,84 +65,6 @@ def test_pex_binary_validation() -> None:
         create_tgt(script="foo", entry_point="foo")
     assert create_tgt(script="foo")[PexScriptField].value == ConsoleScript("foo")
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
-
-
-# TODO This test will not be necessary once the timeout-related deprecated options at the `pytest` subsystem are removed.
-@pytest.mark.parametrize("use_deprecated", (True, False))
-def test_timeout_calculation(use_deprecated: bool) -> None:
-    def assert_timeout_calculated(
-        *,
-        field_value: int | None,
-        expected: int | None,
-        global_default: int | None = None,
-        global_max: int | None = None,
-        timeouts_enabled: bool = True,
-    ) -> None:
-        field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
-        enabled_values = dict(
-            timeouts=timeouts_enabled,
-            timeout_default=global_default,
-            timeout_maximum=global_max,
-        )
-        disabled_values = dict(
-            timeouts=False,
-            timeout_default=3,
-            timeout_maximum=3,
-        )
-        if use_deprecated:
-            test_subsystem = create_subsystem(
-                TestSubsystem,
-                default_rank=Rank.NONE,
-                **disabled_values,
-            )
-            pytest = create_subsystem(
-                PyTest,
-                default_rank=Rank.FLAG,
-                **enabled_values,
-            )
-        else:
-            test_subsystem = create_subsystem(
-                TestSubsystem,
-                default_rank=Rank.FLAG,
-                **enabled_values,
-            )
-            pytest = create_subsystem(
-                PyTest,
-                default_rank=Rank.NONE,
-                **disabled_values,
-            )
-
-        assert field.calculate_from_global_options(test_subsystem, pytest) == expected
-
-    assert_timeout_calculated(
-        field_value=10,
-        expected=10,
-    )
-    assert_timeout_calculated(
-        field_value=20,
-        global_max=10,
-        expected=10,
-    )
-    assert_timeout_calculated(
-        field_value=None,
-        global_default=20,
-        expected=20,
-    )
-    assert_timeout_calculated(
-        field_value=None,
-        expected=None,
-    )
-    assert_timeout_calculated(
-        field_value=None,
-        global_default=20,
-        global_max=10,
-        expected=10,
-    )
-    assert_timeout_calculated(
-        field_value=10,
-        timeouts_enabled=False,
-        expected=None,
-    )
 
 
 @pytest.mark.parametrize(

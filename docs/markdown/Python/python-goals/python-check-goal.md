@@ -123,11 +123,16 @@ python_sources(name="lib")
 
 You can install third-party type stubs (e.g. `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, e.g. both `types-requests` and `requests`, which you can confirm by running `./pants dependencies path/to/f.py`.
 
-You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures the stubs are only used when running MyPy and are not included when, for example, [packaging a PEX](doc:python-package-goal).
+You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures
+the stubs are only used when running MyPy and are not included when, for example,
+[packaging a PEX](doc:python-package-goal). We recommend also setting
+`[mypy].extra_type_stubs_lockfile` for more reproducible builds and better supply-chain security.
 
 ```toml pants.toml
 [mypy]
 extra_type_stubs = ["types-requests==2.25.12"]
+# Set this to a path, then run `./pants generate-lockfiles --resolve=mypy-extra-type-stubs`. 
+extra_type_stubs_lockfile = "3rdparty/python/mypy_extra_type_stubs.lock
 ```
 
 ### Add a third-party plugin
@@ -260,13 +265,13 @@ If you're using a version of MyPy older than `0.700`, consider upgrading to unlo
 Additionally consider not providing `python_version` in your config or args.
 
 
-Tip: only run over changed files and their dependees
-----------------------------------------------------
+Tip: only run over changed files and their dependents
+-----------------------------------------------------
 
 When changing type hints code, you not only need to run over the changed files, but also any code that depends on the changed files:
 
 ```bash
-$ ./pants --changed-since=HEAD --changed-dependees=transitive check
+$ ./pants --changed-since=HEAD --changed-dependents=transitive check
 ```
 
 See [Advanced target selection](doc:advanced-target-selection) for more information.

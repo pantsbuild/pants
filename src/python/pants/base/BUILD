@@ -13,7 +13,7 @@ python_tests(
     name="exception_sink_test",
     sources=["exception_sink_test.py"],
     tags=["platform_specific_behavior"],
-    timeout=90,
+    timeout=120,
 )
 
 python_tests(

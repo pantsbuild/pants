@@ -55,13 +55,18 @@ impl<'x> Params {
   }
 
   ///
-  /// Adds the given param Key to these Params, replacing an existing param with the same type if
-  /// it exists.
+  /// Adds the given param Keys to these Params, replacing existing params with the same type if
+  /// they exist.
   ///
-  pub fn put(&mut self, param: Key) {
-    match self.binary_search(param.type_id) {
-      Ok(idx) => self.0[idx] = param,
-      Err(idx) => self.0.insert(idx, param),
+  /// TODO: This is currently O(N^2 * M) for N existing Params and M added params, but both N and M
+  /// are expected to be small. Should microbenchmark at some point.
+  ///
+  pub fn extend(&mut self, params: impl IntoIterator<Item = Key>) {
+    for param in params {
+      match self.binary_search(param.type_id) {
+        Ok(idx) => self.0[idx] = param,
+        Err(idx) => self.0.insert(idx, param),
+      }
     }
   }
 
@@ -142,13 +147,15 @@ impl TypeId {
   pub fn is_union(&self) -> bool {
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let unions_module = py.import("pants.engine.unions").unwrap();
-    let is_union_func = unions_module.getattr("is_union").unwrap();
-    is_union_func
-      .call1((self.as_py_type(py),))
-      .unwrap()
-      .extract()
-      .unwrap()
+    externs::is_union(py, self.as_py_type(py)).unwrap()
+  }
+
+  pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
+    Python::with_gil(|py| {
+      externs::union_in_scope_types(py, self.as_py_type(py))
+        .unwrap()
+        .map(|types| types.into_iter().map(TypeId::new).collect())
+    })
   }
 }
 
@@ -370,6 +377,15 @@ impl From<PyObject> for Value {
   }
 }
 
+///
+/// A short required name, and optional human readable description for a single frame of a Failure.
+///
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FailureFrame {
+  pub name: String,
+  pub desc: Option<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
@@ -384,8 +400,8 @@ pub enum Failure {
     val: Value,
     // A pre-formatted python exception traceback.
     python_traceback: String,
-    // A stack of engine-side "frame" information generated from Nodes.
-    engine_traceback: Vec<String>,
+    // A stack of FailureFrames.
+    engine_traceback: Vec<FailureFrame>,
   },
 }
 
@@ -393,7 +409,7 @@ impl Failure {
   ///
   /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
   ///
-  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+  pub fn with_pushed_frame(self, name: &str, desc: Option<String>) -> Failure {
     match self {
       Failure::Invalidated => Failure::Invalidated,
       md @ Failure::MissingDigest { .. } => {
@@ -401,14 +417,17 @@ impl Failure {
         // producer of the missing digest. So a Failure will only end up with a new frame if it
         // traversed the node boundary for some reason, in which case it is safe to discard the
         // type information and convert into a Throw.
-        throw(md.to_string()).with_pushed_frame(frame)
+        throw(md.to_string()).with_pushed_frame(name, desc)
       }
       Failure::Throw {
         val,
         python_traceback,
         mut engine_traceback,
       } => {
-        engine_traceback.push(format!("{}", frame));
+        engine_traceback.push(FailureFrame {
+          name: name.to_owned(),
+          desc,
+        });
         Failure::Throw {
           val,
           python_traceback,

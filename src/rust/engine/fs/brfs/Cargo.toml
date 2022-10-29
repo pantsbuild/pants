@@ -11,18 +11,17 @@ clap = "3"
 dirs-next = "2"
 env_logger = "0.9.0"
 errno = "0.2.8"
-fuser = "0.11.0"
+fuser = "0.11.1"
 futures = "0.3"
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-libc = "0.2.126"
+libc = "0.2.137"
 log = "0.4.17"
 parking_lot = "0.12"
-protobuf = { version = "2.27.1", features = ["with-bytes"] }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.3"
-tokio = { version = "1.16", features = ["rt-multi-thread", "macros", "signal"] }
+tokio = { version = "1.21", features = ["rt-multi-thread", "macros", "signal"] }
 tokio-stream = { version = "0.1", features = ["signal"] }
 workunit_store = { path = "../../workunit_store" }
 

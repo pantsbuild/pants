@@ -127,16 +127,14 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   system.refresh_process(pid);
   // Check that the recorded pid is a live process.
   match system.process(pid) {
-    None => {
-      return Err(format!(
-        "\
+    None => Err(format!(
+      "\
         The last pid for the pantsd controlling {working_dir} was {pid} but it no longer appears \
         to be running.\
         ",
-        working_dir = working_dir.display(),
-        pid = pid,
-      ))
-    }
+      working_dir = working_dir.display(),
+      pid = pid,
+    )),
     Some(process) => {
       // Check that the live process is in fact the expected pantsd process (i.e.: pids have not
       // wrapped).

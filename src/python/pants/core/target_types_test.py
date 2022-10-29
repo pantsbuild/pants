@@ -306,8 +306,7 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-@pytest.mark.parametrize("asset_type", ("file", "resource"))
-def test_url_assets(asset_type) -> None:
+def test_url_assets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
@@ -322,20 +321,20 @@ def test_url_assets(asset_type) -> None:
     )
     http_source_info = (
         'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
-        "len=500,"
-        'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
+        + "len=500,"
+        + 'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
     )
     rule_runner.write_files(
         {
             "assets/BUILD": dedent(
                 f"""\
-                {asset_type}(
+                resource(
                     name='antigravity',
                     source=http_source(
                         {http_source_info},
                     ),
                 )
-                {asset_type}(
+                resource(
                     name='antigravity_renamed',
                     source=http_source(
                         {http_source_info},
@@ -372,8 +371,7 @@ def test_url_assets(asset_type) -> None:
         rule_runner.run_goal_rule(
             run.Run,
             args=[
-                "app/app.py",
-                f"--use-deprecated-pex-binary-run-semantics={asset_type == 'file'}",
+                "app:app.py",
             ],
             env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )

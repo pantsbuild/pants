@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.addresses import Addresses
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals.native_engine import PyThreadLocals
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
@@ -102,7 +104,11 @@ class StreamingWorkunitContext:
         """Return a dict containing the canonicalized addresses of the specs for this run, and what
         files they expand to."""
 
-        params = Params(self._specs, self._options_bootstrapper)
+        params = Params(
+            self._specs,
+            self._options_bootstrapper,
+            determine_bootstrap_environment(self._scheduler),
+        )
         request = self._scheduler.execution_request([(Addresses, params), (Targets, params)])
         unexpanded_addresses, expanded_targets = self._scheduler.execute(request)
 
@@ -168,7 +174,7 @@ class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
     """A list of registered factories for WorkunitsCallback instances."""
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class WorkunitsCallbackFactoryRequest:
     """A request for a particular WorkunitsCallbackFactory."""
 
@@ -306,8 +312,8 @@ class _InnerHandler(threading.Thread):
 
 def rules():
     return [
-        QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
-        QueryRule(Targets, (Specs, OptionsBootstrapper)),
-        QueryRule(Addresses, (Specs, OptionsBootstrapper)),
+        QueryRule(WorkunitsCallbackFactories, (UnionMembership, EnvironmentName)),
+        QueryRule(Targets, (Specs, OptionsBootstrapper, EnvironmentName)),
+        QueryRule(Addresses, (Specs, OptionsBootstrapper, EnvironmentName)),
         *collect_rules(),
     ]

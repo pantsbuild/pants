@@ -28,10 +28,10 @@
 mod builder;
 mod rules;
 
-use std::collections::{HashMap, HashSet};
 use std::io;
 
 use deepsize::DeepSizeOf;
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
 
@@ -63,21 +63,23 @@ impl<R: Rule> UnreachableError<R> {
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum EntryWithDeps<R: Rule> {
   Root(RootEntry<R>),
-  Inner(InnerEntry<R>),
+  Rule(RuleEntry<R>),
+  Reentry(Reentry<R::TypeId>),
 }
 
 impl<R: Rule> EntryWithDeps<R> {
   pub fn rule(&self) -> Option<R> {
     match self {
-      &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule.clone()),
-      &EntryWithDeps::Root(_) => None,
+      EntryWithDeps::Rule(RuleEntry { rule, .. }) => Some(rule.clone()),
+      EntryWithDeps::Root(_) | EntryWithDeps::Reentry(_) => None,
     }
   }
 
   pub fn params(&self) -> &ParamTypes<R::TypeId> {
     match self {
-      EntryWithDeps::Inner(ref ie) => &ie.params,
+      EntryWithDeps::Rule(ref ie) => &ie.params,
       EntryWithDeps::Root(ref re) => &re.0.params,
+      EntryWithDeps::Reentry(ref re) => &re.params,
     }
   }
 }
@@ -89,15 +91,21 @@ pub enum Entry<R: Rule> {
 }
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
-pub struct RootEntry<R: Rule>(Query<R>);
+pub struct RootEntry<R: Rule>(Query<R::TypeId>);
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
-pub struct InnerEntry<R: Rule> {
+pub struct Reentry<T: TypeId> {
+  params: ParamTypes<T>,
+  pub query: Query<T>,
+}
+
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
+pub struct RuleEntry<R: Rule> {
   params: ParamTypes<R::TypeId>,
   rule: R,
 }
 
-impl<R: Rule> InnerEntry<R> {
+impl<R: Rule> RuleEntry<R> {
   pub fn rule(&self) -> &R {
     &self.rule
   }
@@ -117,7 +125,7 @@ struct Diagnostic<R: Rule> {
 ///
 #[derive(Debug)]
 pub struct RuleGraph<R: Rule> {
-  queries: Vec<Query<R>>,
+  queries: Vec<Query<R::TypeId>>,
   rule_dependency_edges: RuleDependencyEdges<R>,
   unreachable_rules: Vec<UnreachableError<R>>,
 }
@@ -181,8 +189,8 @@ impl DisplayForGraph for Palette {
 impl<R: Rule> DisplayForGraph for Entry<R> {
   fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
-      &Entry::WithDeps(ref e) => e.fmt_for_graph(display_args),
-      &Entry::Param(type_id) => format!("Param({})", type_id),
+      Entry::WithDeps(e) => e.fmt_for_graph(display_args),
+      Entry::Param(type_id) => format!("Param({})", type_id),
     }
   }
 }
@@ -190,7 +198,7 @@ impl<R: Rule> DisplayForGraph for Entry<R> {
 impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
   fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
-      &EntryWithDeps::Inner(InnerEntry {
+      &EntryWithDeps::Rule(RuleEntry {
         ref rule,
         ref params,
       }) => format!(
@@ -204,6 +212,12 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
         root.0.product,
         display_args.line_separator(),
         params_str(&root.0.params)
+      ),
+      &EntryWithDeps::Reentry(ref reentry) => format!(
+        "Reentry({}){}for {}",
+        reentry.query.product,
+        display_args.line_separator(),
+        params_str(&reentry.params)
       ),
     }
   }
@@ -230,7 +244,7 @@ pub fn visualize_entry<R: Rule>(
       }
     }
     &Entry::Param(_) => {
-      // Color "Param"s!
+      // Color "Param"s.
       Some(Palette::Orange.fmt_for_graph(display_args))
     }
   };
@@ -245,7 +259,10 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Result<RuleGraph<R>, String> {
+  pub fn new(
+    rules: IndexSet<R>,
+    queries: IndexSet<Query<R::TypeId>>,
+  ) -> Result<RuleGraph<R>, String> {
     Builder::new(rules, queries).graph()
   }
 
@@ -271,7 +288,7 @@ impl<R: Rule> RuleGraph<R> {
 
     // Walk the graph, starting from root entries.
     let mut entry_stack: Vec<_> = vec![root];
-    let mut reachable = HashMap::new();
+    let mut reachable = HashMap::default();
     while let Some(entry) = entry_stack.pop() {
       if reachable.contains_key(&entry) {
         continue;
@@ -472,7 +489,7 @@ impl<R: Rule> RuleGraph<R> {
       .rule_dependency_edges
       .iter()
       .filter_map(|(k, deps)| match k.as_ref() {
-        &EntryWithDeps::Inner(_) => {
+        &EntryWithDeps::Rule(_) => {
           let mut dep_entries = deps
             .all_dependencies()
             .map(|d| visualize_entry(d, display_args))
@@ -511,11 +528,11 @@ impl<R: Rule> RuleGraph<R> {
 ///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
-  dependencies: HashMap<R::DependencyKey, Intern<Entry<R>>>,
+  dependencies: HashMap<DependencyKey<R::TypeId>, Intern<Entry<R>>>,
 }
 
 impl<R: Rule> RuleEdges<R> {
-  pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<Intern<Entry<R>>> {
+  pub fn entry_for(&self, dependency_key: &DependencyKey<R::TypeId>) -> Option<Intern<Entry<R>>> {
     self.dependencies.get(dependency_key).cloned()
   }
 

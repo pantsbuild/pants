@@ -10,19 +10,14 @@ use std::time::{Duration, Instant, SystemTime};
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
-use concrete_time::TimeSpan;
-use fs::{self, DirectoryDigest, File, PathStat, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::{self, BoxFuture, TryFutureExt};
-use futures::FutureExt;
-use futures::{Stream, StreamExt};
-use grpc_util::headers_to_http_header_map;
-use grpc_util::prost::MessageExt;
-use grpc_util::{layered_service, status_to_str, LayeredService};
-use hashing::{Digest, Fingerprint};
+use futures::{FutureExt, Stream, StreamExt};
 use log::{debug, trace, warn, Level};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::gen::google::longrunning::Operation;
+use protos::gen::google::longrunning::{
+  operations_client::OperationsClient, CancelOperationRequest, Operation,
+};
 use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
 use protos::require_digest;
 use rand::{thread_rng, Rng};
@@ -31,25 +26,37 @@ use remexec::{
   ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
   WaitExecutionRequest,
 };
-use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use tonic::metadata::BinaryMetadataValue;
 use tonic::{Code, Request, Status};
 use tryfuture::try_future;
 use uuid::Uuid;
+
+use concrete_time::TimeSpan;
+use fs::{self, DirectoryDigest, File, PathStat, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use grpc_util::headers_to_http_header_map;
+use grpc_util::prost::MessageExt;
+use grpc_util::{layered_service, status_to_str, LayeredService};
+use hashing::{Digest, Fingerprint};
+use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
+use task_executor::Executor;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
-  WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+
+// Environment variable which is used to differentiate between running in Docker vs. local vs.
+// remote execution.
+pub const CACHE_KEY_EXECUTION_STRATEGY: &str = "PANTS_CACHE_KEY_EXECUTION_STRATEGY";
 
 // Environment variable which is used to include a unique value for cache busting of processes that
 // have indicated that they should never be cached.
@@ -66,7 +73,7 @@ pub enum OperationOrStatus {
   Status(StatusProto),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecutionError {
   Fatal(ProcessError),
   // Digests are Files and Directories which have been reported to be missing remotely (unlike
@@ -97,10 +104,12 @@ pub enum ExecutionError {
 /// optimizations to shave off a round-trip in the future.
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ProcessMetadata,
-  platform: Platform,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
   store: Store,
+  executor: Executor,
   execution_client: Arc<ExecutionClient<LayeredService>>,
+  operations_client: Arc<OperationsClient<LayeredService>>,
   overall_deadline: Duration,
   retry_interval_duration: Duration,
   capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
@@ -109,18 +118,59 @@ pub struct CommandRunner {
 
 enum StreamOutcome {
   Complete(OperationOrStatus),
-  StreamClosed(Option<String>),
+  StreamClosed,
+}
+
+/// A single remote Operation, with a `Drop` implementation to cancel the work if our client goes
+/// away.
+struct RunningOperation {
+  name: Option<String>,
+  operations_client: Arc<OperationsClient<LayeredService>>,
+  executor: Executor,
+}
+
+impl RunningOperation {
+  fn new(operations_client: Arc<OperationsClient<LayeredService>>, executor: Executor) -> Self {
+    Self {
+      name: None,
+      operations_client,
+      executor,
+    }
+  }
+
+  /// Marks the operation completed, which will avoid attempts to cancel it when this struct is
+  /// dropped.
+  fn completed(&mut self) {
+    let _ = self.name.take();
+  }
+}
+
+impl Drop for RunningOperation {
+  fn drop(&mut self) {
+    if let Some(operation_name) = self.name.take() {
+      debug!("Canceling remote operation {operation_name}");
+      let mut operations_client = self.operations_client.as_ref().clone();
+      let _ = self.executor.spawn(async move {
+        operations_client
+          .cancel_operation(CancelOperationRequest {
+            name: operation_name,
+          })
+          .await
+      });
+    }
+  }
 }
 
 impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     execution_address: &str,
-    metadata: ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: Platform,
+    executor: Executor,
     overall_deadline: Duration,
     retry_interval_duration: Duration,
     execution_concurrency_limit: usize,
@@ -147,14 +197,16 @@ impl CommandRunner {
       execution_http_headers,
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
-
+    let operations_client = Arc::new(OperationsClient::new(execution_channel.clone()));
     let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
-      metadata,
+      instance_name,
+      process_cache_namespace,
       execution_client,
+      operations_client,
       store,
-      platform,
+      executor,
       overall_deadline,
       retry_interval_duration,
       capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
@@ -164,14 +216,10 @@ impl CommandRunner {
     Ok(command_runner)
   }
 
-  pub fn platform(&self) -> Platform {
-    self.platform
-  }
-
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
     let capabilities_fut = async {
       let mut request = remexec::GetCapabilitiesRequest::default();
-      if let Some(s) = self.metadata.instance_name.as_ref() {
+      if let Some(s) = self.instance_name.as_ref() {
         request.instance_name = s.clone();
       }
 
@@ -195,11 +243,15 @@ impl CommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S, context: &Context) -> StreamOutcome
+  async fn wait_on_operation_stream<S>(
+    &self,
+    mut stream: S,
+    context: &Context,
+    running_operation: &mut RunningOperation,
+  ) -> StreamOutcome
   where
     S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
-    let mut operation_name_opt: Option<String> = None;
     let mut start_time_opt = Some(Instant::now());
 
     trace!(
@@ -234,7 +286,7 @@ impl CommandRunner {
           // Extract the operation name.
           // Note: protobuf can return empty string for an empty field so convert empty strings
           // to None.
-          operation_name_opt = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
+          running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
 
           // Continue monitoring if the operation is not complete.
           if !operation.done {
@@ -258,7 +310,7 @@ impl CommandRunner {
         None => {
           // Stream disconnected unexpectedly.
           debug!("wait_on_operation_stream: unexpected disconnect from RE server");
-          return StreamOutcome::StreamClosed(operation_name_opt);
+          return StreamOutcome::StreamClosed;
         }
       }
     }
@@ -422,6 +474,7 @@ impl CommandRunner {
   pub(crate) async fn extract_execute_response(
     &self,
     run_id: RunId,
+    platform: Platform,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -438,8 +491,10 @@ impl CommandRunner {
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
-            warn!("protocol violation: REv2 prohibits setting Operation::error");
-            return Err(ExecutionError::Fatal(format_error(&rpc_status).into()));
+            // Infrastructure error. Retry it.
+            let msg = format_error(&rpc_status);
+            debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+            return Err(ExecutionError::Retryable(msg));
           }
           None => {
             return Err(ExecutionError::Fatal(
@@ -477,7 +532,7 @@ impl CommandRunner {
             self.store.clone(),
             run_id,
             action_result,
-            self.platform,
+            platform,
             false,
             if execute_response.cached_result {
               ProcessResultSource::HitRemotely
@@ -569,7 +624,8 @@ impl CommandRunner {
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
     let start_time = Instant::now();
-    let mut current_operation_name: Option<String> = None;
+    let mut running_operation =
+      RunningOperation::new(self.operations_client.clone(), self.executor.clone());
     let mut num_retries = 0;
 
     loop {
@@ -584,7 +640,7 @@ impl CommandRunner {
         tokio::time::sleep(sleep_time).await;
       }
 
-      let rpc_result = match current_operation_name {
+      let rpc_result = match running_operation.name {
         None => {
           // The request has not been submitted yet. Submit the request using the REv2
           // Execute method.
@@ -623,7 +679,7 @@ impl CommandRunner {
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
           let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, context)
+            .wait_on_operation_stream(operation_stream, context, &mut running_operation)
             .await;
 
           match stream_outcome {
@@ -633,10 +689,17 @@ impl CommandRunner {
                 context.build_id,
                 status
               );
+              // We completed this operation.
+              running_operation.completed();
               status
             }
-            StreamOutcome::StreamClosed(operation_name_opt) => {
-              trace!("wait_on_operation_stream (build_id={}) returned stream close, will retry operation_name={:?}", context.build_id, operation_name_opt);
+            StreamOutcome::StreamClosed => {
+              trace!(
+                "wait_on_operation_stream (build_id={}) returned stream close, \
+                     will retry operation_name={:?}",
+                context.build_id,
+                running_operation.name
+              );
 
               // Check if the number of request attempts sent thus far have exceeded the number
               // of retries allowed since the last successful connection. (There is no point in
@@ -652,7 +715,6 @@ impl CommandRunner {
               }
 
               // Iterate the loop to reconnect to the operation.
-              current_operation_name = operation_name_opt;
               continue;
             }
           }
@@ -663,12 +725,15 @@ impl CommandRunner {
             message: status.message().to_owned(),
             ..StatusProto::default()
           };
+          // `OperationOrStatus` always represents a completed operation, so this operation
+          // is completed.
+          running_operation.completed();
           OperationOrStatus::Status(status_proto)
         }
       };
 
       match self
-        .extract_execute_response(context.run_id, actionable_result)
+        .extract_execute_response(context.run_id, process.platform, actionable_result)
         .await
       {
         Ok(result) => return Ok(result),
@@ -711,7 +776,7 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              self.platform,
+              process.platform,
             )
             .await?;
             return Ok(result);
@@ -743,7 +808,18 @@ impl crate::CommandRunner for CommandRunner {
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
+    let EntireExecuteRequest {
+      action,
+      command,
+      execute_request,
+      input_root_digest,
+    } = make_execute_request(
+      &request,
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
+      &self.store,
+    )
+    .await?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
@@ -765,7 +841,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete.clone()),
+      Some(input_root_digest),
     )
     .await?;
 
@@ -777,42 +853,43 @@ impl crate::CommandRunner for CommandRunner {
       // renders at the Process's level.
       request.level,
       desc = Some(request.description.clone()),
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
-        let result = tokio::time::timeout(deadline_duration, result_fut).await;
-        if result.is_err() {
-          workunit.update_metadata(|initial| {
-            let initial = initial.map(|(m, _)| m).unwrap_or_default();
-            Some((
-              WorkunitMetadata {
-                desc: Some(format!(
-                  "remote execution timed out after {:?}",
-                  deadline_duration
-                )),
-                ..initial
-              },
-              Level::Error,
-            ))
-          })
-        }
 
         // Detect whether the operation ran or hit the deadline timeout.
-        match result {
-          Ok(result) => {
-            if result.is_ok() {
-              workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
-            } else {
-              workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
-            }
-            result
+        match tokio::time::timeout(deadline_duration, result_fut).await {
+          Ok(Ok(result)) => {
+            workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            Ok(result)
           }
-          Err(_) => {
+          Ok(Err(err)) => {
+            workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            Err(err.enrich(&format!("For action {action_digest:?}")))
+          }
+          Err(tokio::time::error::Elapsed { .. }) => {
             // The Err in this match arm originates from the timeout future.
             debug!(
               "remote execution for build_id={} timed out after {:?}",
               &build_id, deadline_duration
             );
+            workunit.update_metadata(|initial| {
+              let initial = initial.map(|(m, _)| m).unwrap_or_default();
+              Some((
+                WorkunitMetadata {
+                  desc: Some(format!(
+                    "remote execution timed out after {:?}",
+                    deadline_duration
+                  )),
+                  ..initial
+                },
+                Level::Error,
+              ))
+            });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             Err(format!("remote execution timed out after {:?}", deadline_duration).into())
           }
@@ -820,6 +897,10 @@ impl crate::CommandRunner for CommandRunner {
       },
     )
     .await
+  }
+
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
   }
 }
 
@@ -839,10 +920,22 @@ fn maybe_add_workunit(
   }
 }
 
-pub fn make_execute_request(
+/// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
+/// a particular `Process`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntireExecuteRequest {
+  pub action: Action,
+  pub command: Command,
+  pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
+}
+
+pub async fn make_execute_request(
   req: &Process,
-  metadata: ProcessMetadata,
-) -> Result<(remexec::Action, remexec::Command, remexec::ExecuteRequest), String> {
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+  _store: &Store,
+) -> Result<EntireExecuteRequest, String> {
   let mut command = remexec::Command {
     arguments: req.argv.clone(),
     ..remexec::Command::default()
@@ -866,11 +959,10 @@ pub fn make_execute_request(
       });
   }
 
-  let ProcessMetadata {
-    instance_name,
-    cache_key_gen_version,
-    mut platform_properties,
-  } = metadata;
+  let mut platform_properties = match req.execution_strategy.clone() {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+    _ => vec![],
+  };
 
   // TODO: Disabling append-only caches in remoting until server support exists due to
   //       interaction with how servers match platform properties.
@@ -889,6 +981,13 @@ pub fn make_execute_request(
         value: cache_key_gen_version,
       });
   }
+
+  command
+    .environment_variables
+    .push(remexec::command::EnvironmentVariable {
+      name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
+      value: req.execution_strategy.cache_value(),
+    });
 
   if matches!(
     req.cache_scope,
@@ -909,10 +1008,7 @@ pub fn make_execute_request(
       .environment_variables
       .push(remexec::command::EnvironmentVariable {
         name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
-        value: match req.platform_constraint {
-          Some(plat) => plat.into(),
-          None => "none".to_string(),
-        },
+        value: req.platform.into(),
       });
   }
 
@@ -995,9 +1091,11 @@ pub fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
+  let input_root_digest = req.input_digests.complete.clone();
+
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
     ..remexec::Action::default()
   };
 
@@ -1008,10 +1106,20 @@ pub fn make_execute_request(
   let execute_request = remexec::ExecuteRequest {
     action_digest: Some((&digest(&action)?).into()),
     instance_name: instance_name.unwrap_or_else(|| "".to_owned()),
+    // We rely on the RemoteCache command runner for caching with remote execution. We always
+    // disable remote servers from doing caching themselves not only to avoid wasted work, but
+    // more importantly because they do not have our same caching semantics, e.g.
+    // `ProcessCacheScope.SUCCESSFUL` vs `ProcessCacheScope.ALWAYS`.
+    skip_cache_lookup: true,
     ..remexec::ExecuteRequest::default()
   };
 
-  Ok((action, command, execute_request))
+  Ok(EntireExecuteRequest {
+    action,
+    command,
+    execute_request,
+    input_root_digest,
+  })
 }
 
 async fn populate_fallible_execution_result_for_timeout(

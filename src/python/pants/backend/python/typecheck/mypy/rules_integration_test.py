@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 import pytest
@@ -20,14 +21,13 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
 )
 from pants.backend.python.typecheck.mypy.rules import (
-    MyPyFieldSet,
     MyPyPartition,
     MyPyPartitions,
     MyPyRequest,
     determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
-from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.mypy.subsystem import MyPy, MyPyFieldSet
 from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.check import CheckResult, CheckResults
@@ -281,6 +281,81 @@ def test_thirdparty_plugin(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/app.py:4" in result[0].stdout
+
+
+def test_extra_type_stubs_lockfile(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/app.py": dedent(
+                """\
+                from pkg_resources import Requirement
+
+                assert Requirement(123) == 123
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+            "stubs.lock": dedent(
+                """
+                {
+                  "allow_builds": true,
+                  "allow_prereleases": false,
+                  "allow_wheels": true,
+                  "build_isolation": true,
+                  "constraints": [],
+                  "locked_resolves": [
+                    {
+                      "locked_requirements": [
+                        {
+                          "artifacts": [
+                            {
+                              "algorithm": "sha256",
+                              "hash": "f568830d82b48783a0df00646bc84effeddb4886bf0f19708fbbadeb552b6ece",
+                              "url": "https://files.pythonhosted.org/packages/ff/62/7de9f8c8378e46ec7dc68257cd9577c65d2c0b3dd4abc31ae92e97fa98e8/types_setuptools-63.4.0-py3-none-any.whl"
+                            }
+                          ],
+                          "project_name": "types-setuptools",
+                          "requires_dists": [],
+                          "requires_python": null,
+                          "version": "63.4"
+                        }
+                      ],
+                      "platform_tag": null
+                    }
+                  ],
+                  "path_mappings": {},
+                  "pex_version": "2.1.103",
+                  "prefer_older_binary": false,
+                  "requirements": [
+                    "types-setuptools"
+                  ],
+                  "requires_python": [
+                    "==3.9.*"
+                  ],
+                  "resolver_version": "pip-2020-resolver",
+                  "style": "universal",
+                  "target_systems": [
+                    "linux",
+                    "mac"
+                  ],
+                  "transitive": true,
+                  "use_pep517": null
+                }
+                """
+            ),
+        }
+    )
+    result = run_mypy(
+        rule_runner,
+        [rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))],
+        extra_args=[
+            "--mypy-extra-type-stubs==types-setuptools",
+            "--mypy-extra-type-stubs-lockfile=stubs.lock",
+            "--python-invalid-lockfile-behavior=ignore",
+        ],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert f"{PACKAGE}/app.py:3" in result[0].stdout
 
 
 def test_transitive_dependencies(rule_runner: RuleRunner) -> None:
@@ -770,8 +845,8 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {fs.address for fs in partition.root_field_sets} == root_addresses
-        assert {t.address for t in partition.closure} == {
+        assert {fs.address for fs in partition.field_sets} == root_addresses
+        assert {t.address for t in partition.root_targets.closure()} == {
             *root_addresses,
             *(t.address for t in deps),
         }
@@ -797,3 +872,33 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
     assert determine_python_files(["f.json"]) == ()
+
+
+def test_colors_and_formatting(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                class incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890:
+                    pass
+
+                x = incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890()
+                x.incredibly_long_attribute_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    result = run_mypy(rule_runner, [tgt], extra_args=["--colors=true", "--mypy-args=--pretty"])
+
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    # all one line
+    assert re.search(
+        "error:.*incredibly_long_type_name.*incredibly_long_attribute_name", result[0].stdout
+    )
+    # at least one escape sequence that sets text color (red)
+    assert "\033[31m" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST

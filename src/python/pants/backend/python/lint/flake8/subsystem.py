@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-import itertools
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -19,7 +21,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
@@ -30,19 +32,13 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
-from pants.engine.target import (
-    AllTargets,
-    AllTargetsRequest,
-    FieldSet,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    FileListOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -70,7 +66,7 @@ class Flake8(PythonToolBase):
     name = "Flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
-    default_version = "flake8>=3.9.2,<4.0"
+    default_version = "flake8>=5.0.4,<5.1"
     default_main = ConsoleScript("flake8")
 
     register_lockfile = True
@@ -92,6 +88,14 @@ class Flake8(PythonToolBase):
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
             """
+        ),
+    )
+    extra_files = FileListOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """Paths to extra files to include in the sandbox. This can be useful for Flake8 plugins,
+            like including config files for the `flake8-bandit` plugin."""
         ),
     )
     config_discovery = BoolOption(
@@ -217,51 +221,12 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     )
 
     return Flake8FirstPartyPlugins(
-        requirement_strings=PexRequirements.create_from_requirement_fields(
+        requirement_strings=PexRequirements.req_strings_from_requirement_fields(
             requirements_fields,
-            constraints_strings=(),
-        ).req_strings,
+        ),
         interpreter_constraints_fields=FrozenOrderedSet(interpreter_constraints_fields),
         sources_digest=prefixed_sources,
     )
-
-
-# --------------------------------------------------------------------------------------
-# Interpreter constraints
-# --------------------------------------------------------------------------------------
-
-
-@rule_helper
-async def _flake8_interpreter_constraints(
-    first_party_plugins: Flake8FirstPartyPlugins,
-    python_setup: PythonSetup,
-) -> InterpreterConstraints:
-    # While Flake8 will run in partitions, we need a set of constraints that works with every
-    # partition.
-    #
-    # This ORs all unique interpreter constraints. The net effect is that every possible Python
-    # interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    unique_constraints = {
-        InterpreterConstraints.create_from_compatibility_fields(
-            (
-                tgt[InterpreterConstraintsField],
-                *first_party_plugins.interpreter_constraints_fields,
-            ),
-            python_setup,
-        )
-        for tgt in all_tgts
-        if Flake8FieldSet.is_applicable(tgt)
-    }
-    if not unique_constraints:
-        unique_constraints.add(
-            InterpreterConstraints.create_from_compatibility_fields(
-                first_party_plugins.interpreter_constraints_fields,
-                python_setup,
-            )
-        )
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
 # --------------------------------------------------------------------------------------
@@ -269,7 +234,7 @@ async def _flake8_interpreter_constraints(
 # --------------------------------------------------------------------------------------
 
 
-class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
+class Flake8LockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Flake8.options_scope
 
 
@@ -289,16 +254,17 @@ async def setup_flake8_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not flake8.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            flake8, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(flake8)
 
-    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(
+        python_setup,
+        Flake8FieldSet,
+        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
+    )
     return GeneratePythonLockfile.from_tool(
         flake8,
         constraints,
         extra_requirements=first_party_plugins.requirement_strings,
-        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 
@@ -328,7 +294,11 @@ async def flake8_export(
 ) -> ExportPythonTool:
     if not flake8.export:
         return ExportPythonTool(resolve_name=flake8.options_scope, pex_request=None)
-    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(
+        python_setup,
+        Flake8FieldSet,
+        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
+    )
     return ExportPythonTool(
         resolve_name=flake8.options_scope,
         pex_request=flake8.to_pex_request(

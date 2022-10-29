@@ -17,6 +17,7 @@ from pants.backend.shell.shunit2_test_runner import (
     Shunit2FieldSet,
     Shunit2Runner,
     Shunit2RunnerRequest,
+    Shunit2TestRequest,
 )
 from pants.backend.shell.target_types import (
     ShellSourceTarget,
@@ -51,8 +52,8 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             build_runtime_package_dependencies,
             get_filtered_environment,
-            QueryRule(TestResult, [Shunit2FieldSet]),
-            QueryRule(TestDebugRequest, [Shunit2FieldSet]),
+            QueryRule(TestResult, [Shunit2TestRequest.Batch]),
+            QueryRule(TestDebugRequest, [Shunit2TestRequest.Batch]),
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
         target_types=[
@@ -90,9 +91,11 @@ def run_shunit2(
         env=env,
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    inputs = [Shunit2FieldSet.create(test_target)]
-    test_result = rule_runner.request(TestResult, inputs)
-    debug_request = rule_runner.request(TestDebugRequest, inputs)
+    input: Shunit2TestRequest.Batch = Shunit2TestRequest.Batch(
+        "", (Shunit2FieldSet.create(test_target),), None
+    )
+    test_result = rule_runner.request(TestResult, [input])
+    debug_request = rule_runner.request(TestDebugRequest, [input])
     if debug_request.process is not None:
         with mock_console(rule_runner.options_bootstrapper):
             debug_result = rule_runner.run_interactive_process(debug_request.process)

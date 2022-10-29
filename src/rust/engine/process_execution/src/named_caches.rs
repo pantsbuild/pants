@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
 use serde::Serialize;
 
 use crate::WorkdirSymlink;
-use fs::{default_cache_path, RelativePath};
+use fs::{default_cache_path, safe_create_dir_all_ioerror, RelativePath};
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
@@ -40,6 +40,10 @@ impl NamedCaches {
     NamedCaches { local_base }
   }
 
+  pub fn base_dir(&self) -> &Path {
+    &self.local_base
+  }
+
   // This default suffix is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     default_cache_path().join("named_caches")
@@ -51,13 +55,26 @@ impl NamedCaches {
   pub fn local_paths<'a>(
     &'a self,
     caches: &'a BTreeMap<CacheName, RelativePath>,
-  ) -> impl Iterator<Item = WorkdirSymlink> + 'a {
-    caches
+  ) -> Result<Vec<WorkdirSymlink>, String> {
+    let symlinks = caches
       .iter()
       .map(move |(cache_name, workdir_rel_path)| WorkdirSymlink {
         src: workdir_rel_path.clone(),
         dst: self.local_base.join(&cache_name.0),
       })
+      .collect::<Vec<_>>();
+
+    for symlink in &symlinks {
+      safe_create_dir_all_ioerror(&symlink.dst).map_err(|err| {
+        format!(
+          "Error creating directory {}: {:?}",
+          symlink.dst.display(),
+          err
+        )
+      })?
+    }
+
+    Ok(symlinks)
   }
 
   ///

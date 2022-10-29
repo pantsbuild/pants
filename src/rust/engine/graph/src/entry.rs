@@ -122,10 +122,12 @@ impl<N: Node> EntryResult<N> {
   /// If the value is in a Clean state, mark it Dirty.
   fn dirty(&mut self) {
     match self {
-      EntryResult::Clean(v) | EntryResult::UncacheableDependencies(v, _) => {
+      EntryResult::Clean(v)
+      | EntryResult::UncacheableDependencies(v, _)
+      | EntryResult::Uncacheable(v, _) => {
         *self = EntryResult::Dirty(v.clone());
       }
-      EntryResult::Dirty(_) | EntryResult::Uncacheable(_, _) => {}
+      EntryResult::Dirty(_) => {}
     }
   }
 
@@ -838,7 +840,14 @@ impl<N: Node> Entry<N> {
 
   pub(crate) fn format(&self, context: &N::Context) -> String {
     let state = match self.peek(context) {
-      Some(ref nr) => format!("{:?}", nr),
+      Some(ref nr) => {
+        let item = format!("{:?}", nr);
+        if item.len() <= 1024 {
+          item
+        } else {
+          item.chars().take(1024).collect()
+        }
+      }
       None => "<None>".to_string(),
     };
     format!("{} == {}", self.node, state).replace('"', "\\\"")

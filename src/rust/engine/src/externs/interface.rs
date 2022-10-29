@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::RemoteCacheWarningsBehavior;
+use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,7 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
-use rule_graph::{self, RuleGraph};
+use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -46,6 +46,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
+use crate::externs::process::PyProcessConfigFromEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -58,6 +59,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
+  externs::process::register(m)?;
   externs::scheduler::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
@@ -100,8 +102,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
-  m.add_function(wrap_pyfunction!(tasks_add_union, m)?)?;
-  m.add_function(wrap_pyfunction!(tasks_add_select, m)?)?;
+  m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
   m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
 
   m.add_function(wrap_pyfunction!(write_digest, m)?)?;
@@ -134,6 +135,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
   m.add_function(wrap_pyfunction!(session_record_test_observation, m)?)?;
   m.add_function(wrap_pyfunction!(session_isolated_shallow_clone, m)?)?;
+  m.add_function(wrap_pyfunction!(session_wait_for_tail_tasks, m)?)?;
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
@@ -191,6 +193,8 @@ impl PyTypes {
     interactive_process: &PyType,
     interactive_process_result: &PyType,
     engine_aware_parameter: &PyType,
+    docker_resolve_image_request: &PyType,
+    docker_resolve_image_result: &PyType,
     py: Python,
   ) -> Self {
     Self(RefCell::new(Some(Types {
@@ -213,6 +217,9 @@ impl PyTypes {
       platform: TypeId::new(platform),
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
+      process_config_from_environment: TypeId::new(
+        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+      ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
       session_values: TypeId::new(session_values),
@@ -220,6 +227,8 @@ impl PyTypes {
       interactive_process: TypeId::new(interactive_process),
       interactive_process_result: TypeId::new(interactive_process_result),
       engine_aware_parameter: TypeId::new(engine_aware_parameter),
+      docker_resolve_image_request: TypeId::new(docker_resolve_image_request),
+      docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
     })))
   }
 }
@@ -244,7 +253,7 @@ impl PyExecutionStrategyOptions {
   fn __new__(
     local_parallelism: usize,
     remote_parallelism: usize,
-    local_cleanup: bool,
+    local_keep_sandboxes: String,
     local_cache: bool,
     local_enable_nailgun: bool,
     remote_cache_read: bool,
@@ -256,7 +265,10 @@ impl PyExecutionStrategyOptions {
     Self(ExecutionStrategyOptions {
       local_parallelism,
       remote_parallelism,
-      local_cleanup,
+      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(
+        &local_keep_sandboxes,
+      )
+      .unwrap(),
       local_cache,
       local_enable_nailgun,
       remote_cache_read,
@@ -289,10 +301,9 @@ impl PyRemotingOptions {
     store_rpc_concurrency: usize,
     store_batch_api_size_limit: usize,
     cache_warnings_behavior: String,
-    cache_eager_fetch: bool,
+    cache_content_behavior: String,
     cache_rpc_concurrency: usize,
     cache_read_timeout_millis: u64,
-    execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
@@ -312,10 +323,9 @@ impl PyRemotingOptions {
       store_batch_api_size_limit,
       cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior)
         .unwrap(),
-      cache_eager_fetch,
+      cache_content_behavior: CacheContentBehavior::from_str(&cache_content_behavior).unwrap(),
       cache_rpc_concurrency,
       cache_read_timeout: Duration::from_millis(cache_read_timeout_millis),
-      execution_extra_platform_properties,
       execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
@@ -465,7 +475,7 @@ struct PyResult {
   #[pyo3(get)]
   python_traceback: Option<String>,
   #[pyo3(get)]
-  engine_traceback: Vec<String>,
+  engine_traceback: Vec<(String, Option<String>)>,
 }
 
 fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
@@ -497,7 +507,10 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
         is_throw: true,
         result: val.into(),
         python_traceback: Some(python_traceback),
-        engine_traceback,
+        engine_traceback: engine_traceback
+          .into_iter()
+          .map(|ff| (ff.name, ff.desc))
+          .collect(),
       }
     }
   }
@@ -801,7 +814,7 @@ async fn workunit_to_py_value(
           .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest_handle) => {
-        let digest = (&**digest_handle)
+        let digest = (**digest_handle)
           .as_any()
           .downcast_ref::<DirectoryDigest>()
           .ok_or_else(|| {
@@ -831,9 +844,9 @@ async fn workunit_to_py_value(
   let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => v.into_py(py),
-      UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+      UserMetadataItem::String(v) => v.into_py(py),
+      UserMetadataItem::Int(n) => n.into_py(py),
+      UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
         .as_any()
         .downcast_ref::<Value>()
         .ok_or_else(|| {
@@ -975,10 +988,12 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
+  process_config_from_environment: PyProcessConfigFromEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
   let interactive_process: Value = interactive_process.into();
+  let process_config = Value::new(process_config_from_environment.into_py(py));
   py.allow_threads(|| {
     core.executor.clone().block_on(nodes::maybe_side_effecting(
       true,
@@ -986,10 +1001,13 @@ fn session_run_interactive_process(
       core.intrinsics.run(
         &Intrinsic {
           product: core.types.interactive_process_result,
-          inputs: vec![core.types.interactive_process],
+          inputs: vec![
+            DependencyKey::new(core.types.interactive_process),
+            DependencyKey::new(core.types.process_config_from_environment),
+          ],
         },
         context,
-        vec![interactive_process],
+        vec![interactive_process, process_config],
       ),
     ))
   })
@@ -1096,6 +1114,8 @@ fn tasks_task_begin(
   py_tasks: &PyTasks,
   func: PyObject,
   output_type: &PyType,
+  arg_types: Vec<&PyType>,
+  masked_types: Vec<&PyType>,
   side_effecting: bool,
   engine_aware_return_type: bool,
   cacheable: bool,
@@ -1108,12 +1128,16 @@ fn tasks_task_begin(
     .map_err(|e| PyException::new_err(format!("{}", e)))?;
   let func = Function(Key::from_value(func.into())?);
   let output_type = TypeId::new(output_type);
+  let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+  let masked_types = masked_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
   tasks.task_begin(
     func,
     output_type,
     side_effecting,
     engine_aware_return_type,
+    arg_types,
+    masked_types,
     cacheable,
     name,
     if desc.is_empty() { None } else { Some(desc) },
@@ -1129,26 +1153,25 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 }
 
 #[pyfunction]
-fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, input: &PyType) {
+fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
   let output = TypeId::new(output);
-  let input = TypeId::new(input);
+  let inputs = inputs.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_get(output, input);
+  tasks.add_get(output, inputs);
 }
 
 #[pyfunction]
-fn tasks_add_union(py_tasks: &PyTasks, output_type: &PyType, input_types: Vec<&PyType>) {
+fn tasks_add_get_union(
+  py_tasks: &PyTasks,
+  output_type: &PyType,
+  input_types: Vec<&PyType>,
+  in_scope_types: Vec<&PyType>,
+) {
   let product = TypeId::new(output_type);
-  let params = input_types.into_iter().map(TypeId::new).collect();
+  let input_types = input_types.into_iter().map(TypeId::new).collect();
+  let in_scope_types = in_scope_types.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_union(product, params);
-}
-
-#[pyfunction]
-fn tasks_add_select(py_tasks: &PyTasks, selector: &PyType) {
-  let selector = TypeId::new(selector);
-  let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_select(selector);
+  tasks.add_get_union(product, input_types, in_scope_types);
 }
 
 #[pyfunction]
@@ -1283,6 +1306,25 @@ fn session_isolated_shallow_clone(
     .isolated_shallow_clone(build_id)
     .map_err(PyException::new_err)?;
   Ok(PySession(session_clone))
+}
+
+#[pyfunction]
+fn session_wait_for_tail_tasks(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_session: &PySession,
+  timeout: f64,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  let timeout = Duration::from_secs_f64(timeout);
+  core.executor.enter(|| {
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(py_session.0.tail_tasks().wait(timeout));
+    })
+  });
+  Ok(())
 }
 
 #[pyfunction]

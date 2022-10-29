@@ -22,6 +22,7 @@ def test_build_file_prelude() -> None:
         run = run_pants(
             [
                 "--backend-packages=pants.backend.python",
+                "--print-stacktrace",
                 f"--build-file-prelude-globs={os.path.join(tmpdir, 'prelude.py')}",
                 "run",
                 f"{tmpdir}:main",

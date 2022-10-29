@@ -78,7 +78,7 @@ def fmt_rule(
     gets_str = ""
     if gets:
         get_members = f",{line_sep}".join(
-            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
+            f"Get({product_subject_pair[0]}, [{product_subject_pair[1]}])"
             for product_subject_pair in gets
         )
         gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
@@ -264,6 +264,7 @@ class ExampleSubsystem(GoalSubsystem):
 
 class Example(Goal):
     subsystem_cls = ExampleSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -278,7 +279,7 @@ class TestRule:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(output_type=A, input_type=str, mock=lambda _: A())],
+            mock_gets=[MockGet(output_type=A, input_types=(str,), mock=lambda _: A())],
         )
         assert res == Example(0)
 
@@ -1013,12 +1014,38 @@ def test_duplicated_rules() -> None:
             return B()
 
 
+def test_param_type_overrides() -> None:
+    type1 = int  # use a runtime type
+
+    @rule(_param_type_overrides={"param1": type1, "param2": dict})
+    async def dont_injure_humans(param1: str, param2, param3: list) -> A:
+        return A()
+
+    assert dont_injure_humans.rule.input_selectors == (int, dict, list)
+
+    with pytest.raises(ValueError, match="paramX"):
+
+        @rule(_param_type_overrides={"paramX": int})
+        async def obey_human_orders() -> A:
+            return A()
+
+    with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
+
+        @rule(_param_type_overrides={"param1": "A string"})
+        async def protect_existence(param1) -> A:
+            return A()
+
+
 def test_invalid_rule_helper_name() -> None:
     with pytest.raises(ValueError, match="must be private"):
 
         @rule_helper
         async def foo() -> A:
             pass
+
+    @rule_helper(_public=True)
+    async def bar() -> A:
+        pass
 
 
 def test_cant_be_both_rule_and_rule_helper() -> None:

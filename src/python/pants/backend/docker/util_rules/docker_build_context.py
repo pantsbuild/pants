@@ -7,10 +7,9 @@ import logging
 import re
 from abc import ABC
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from pants.backend.docker.package_types import BuiltDockerImage
-from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import (
@@ -23,11 +22,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.utils import get_hash, suggest_renames
-from pants.backend.docker.value_interpolation import (
-    DockerBuildArgsInterpolationValue,
-    DockerInterpolationContext,
-    DockerInterpolationValue,
-)
+from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
@@ -50,6 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
+from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +100,9 @@ class DockerBuildContext:
     build_args: DockerBuildArgs
     digest: Digest
     build_env: DockerBuildEnvironment
+    upstream_image_ids: tuple[str, ...]
     dockerfile: str
-    interpolation_context: DockerInterpolationContext
+    interpolation_context: InterpolationContext
     copy_source_vs_context_source: tuple[tuple[str, str], ...]
     stages: tuple[str, ...]
 
@@ -115,9 +112,10 @@ class DockerBuildContext:
         build_args: DockerBuildArgs,
         snapshot: Snapshot,
         build_env: DockerBuildEnvironment,
+        upstream_image_ids: Iterable[str],
         dockerfile_info: DockerfileInfo,
     ) -> DockerBuildContext:
-        interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
+        interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
         if build_args:
             interpolation_context["build_args"] = cls._merge_build_args(
@@ -146,7 +144,8 @@ class DockerBuildContext:
             digest=snapshot.digest,
             dockerfile=dockerfile_info.source,
             build_env=build_env,
-            interpolation_context=DockerInterpolationContext.from_dict(interpolation_context),
+            upstream_image_ids=tuple(sorted(upstream_image_ids)),
+            interpolation_context=InterpolationContext.from_dict(interpolation_context),
             copy_source_vs_context_source=tuple(
                 suggest_renames(
                     tentative_paths=(
@@ -256,9 +255,7 @@ class DockerBuildContext:
 
 
 @rule
-async def create_docker_build_context(
-    request: DockerBuildContextRequest, docker_options: DockerOptions
-) -> DockerBuildContext:
+async def create_docker_build_context(request: DockerBuildContextRequest) -> DockerBuildContext:
     # Get all targets to include in context.
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([request.address]))
     docker_image = transitive_targets.roots[0]
@@ -330,6 +327,7 @@ async def create_docker_build_context(
         context_request, build_args_request, build_env_request
     )
 
+    upstream_image_ids = []
     if request.build_upstream_images:
         # Update build arg values for FROM image build args.
 
@@ -360,6 +358,12 @@ async def create_docker_build_context(
             for image in built.artifacts
             if isinstance(image, BuiltDockerImage)
         }
+        upstream_image_ids = [
+            image.image_id
+            for built in embedded_pkgs
+            for image in built.artifacts
+            if isinstance(image, BuiltDockerImage)
+        ]
         # Create the FROM image build args.
         from_image_build_args = [
             f"{arg_name}={address_to_built_image_tag[addr]}"
@@ -371,6 +375,7 @@ async def create_docker_build_context(
     return DockerBuildContext.create(
         build_args=build_args,
         snapshot=context,
+        upstream_image_ids=upstream_image_ids,
         dockerfile_info=dockerfile_info,
         build_env=build_env,
     )

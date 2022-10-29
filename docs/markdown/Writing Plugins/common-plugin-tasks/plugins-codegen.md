@@ -193,10 +193,10 @@ You will likely need to add logic for handling [source roots](doc:source-roots).
 ```python
 @rule
 async def generate_python_from_protobuf(
-    request: GeneratePythonFromProtobufRequest, protoc: Protoc
+    request: GeneratePythonFromProtobufRequest, protoc: Protoc, platform: Platform
 ) -> GeneratedSources:
     download_protoc_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
     )
 
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't

@@ -11,8 +11,8 @@ use testutil::relative_paths;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, ImmutableInputs,
-  NamedCaches, Process, ProcessError, ProcessMetadata,
+  local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Process, ProcessError,
 };
 
 struct RoundtripResults {
@@ -32,7 +32,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     base_dir.path().to_owned(),
     NamedCaches::new(named_cache_dir),
     ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
-    true,
+    KeepSandboxes::Never,
   ));
   (runner, store, base_dir)
 }
@@ -59,8 +59,8 @@ fn create_cached_runner(
     cache,
     store,
     true,
-    true,
-    ProcessMetadata::default(),
+    CacheContentBehavior::Fetch,
+    None,
   ));
 
   (runner, cache_dir)

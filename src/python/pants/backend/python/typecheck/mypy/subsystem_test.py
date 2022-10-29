@@ -14,6 +14,7 @@ from pants.backend.python.typecheck.mypy import skip_field, subsystem
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
     MyPyConfigFile,
+    MyPyExtraTypeStubsLockfileSentinel,
     MyPyFirstPartyPlugins,
     MyPyLockfileSentinel,
 )
@@ -40,6 +41,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(MyPyConfigFile, []),
             QueryRule(MyPyFirstPartyPlugins, []),
             QueryRule(GeneratePythonLockfile, [MyPyLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [MyPyExtraTypeStubsLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, GenericTarget],
     )
@@ -194,8 +196,8 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         MyPy.default_interpreter_constraints,
     )
 
-    # If no Python targets in repo, fall back to MyPy constraints.
-    assert_lockfile_request("target()", MyPy.default_interpreter_constraints)
+    # If no Python targets in repo, fall back to global Python constraint.
+    assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.
     assert_lockfile_request(
@@ -243,7 +245,74 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             python_requirement(name="thirdparty", requirements=["ansicolors"])
             """
         ),
-        MyPy.default_interpreter_constraints,
+        [global_constraint],
         extra_args=["--mypy-source-plugins=project"],
         extra_expected_requirements=["ansicolors"],
+    )
+
+
+def test_setup_extra_type_stubs_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
+    global_constraint = "==3.9.*"
+
+    def assert_lockfile_request(build_file: str, expected_ics: list[str]) -> None:
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
+        rule_runner.set_options(
+            ["--mypy-extra-type-stubs-lockfile=lockfile.txt"],
+            env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        )
+        lockfile_request = rule_runner.request(
+            GeneratePythonLockfile, [MyPyExtraTypeStubsLockfileSentinel()]
+        )
+        assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
+
+    assert_lockfile_request("python_sources()", [global_constraint])
+    assert_lockfile_request("python_sources(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
+    assert_lockfile_request(
+        "python_sources(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
+    )
+
+    # If no Python targets in repo, fall back to global [python] constraints.
+    assert_lockfile_request("target()", [global_constraint])
+
+    # Ignore targets that are skipped.
+    assert_lockfile_request(
+        dedent(
+            """\
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.8.*'], skip_mypy=True)
+            """
+        ),
+        ["==2.7.*"],
+    )
+
+    # If there are multiple distinct ICs in the repo, we OR them because the lockfile needs to be
+    # compatible with every target.
+    assert_lockfile_request(
+        dedent(
+            """\
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.8.*'])
+            """
+        ),
+        ["==2.7.*", "==3.8.*"],
+    )
+    assert_lockfile_request(
+        dedent(
+            """\
+            python_sources(name='a', interpreter_constraints=['==2.7.*', '==3.8.*'])
+            python_sources(name='b', interpreter_constraints=['>=3.8'])
+            """
+        ),
+        ["==2.7.*", "==3.8.*", ">=3.8"],
+    )
+    assert_lockfile_request(
+        dedent(
+            """\
+            python_sources(name='a')
+            python_sources(name='b', interpreter_constraints=['==2.7.*'])
+            python_sources(name='c', interpreter_constraints=['>=3.8'])
+            """
+        ),
+        ["==2.7.*", global_constraint, ">=3.8"],
     )

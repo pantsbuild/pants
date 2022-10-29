@@ -4,14 +4,12 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple
 
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
-from pants.core.goals.test import TestTimeoutField
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
-from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -21,7 +19,6 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
-    StringSequenceField,
     Target,
     TargetGenerator,
     ValidNumbers,
@@ -150,8 +147,26 @@ class GoModTarget(TargetGenerator):
 
 
 class GoPackageSourcesField(MultipleSourcesField):
-    default = ("*.go", "*.s")
-    expected_file_extensions = (".go", ".s")
+    default = ("*.go",)
+    expected_file_extensions = (
+        ".go",
+        ".s",
+        ".S",
+        ".sx",
+        ".c",
+        ".h",
+        ".hh",
+        ".hpp",
+        ".hxx",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".m",
+        ".f",
+        ".F",
+        ".for",
+        ".f90",
+    )
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`"
@@ -180,27 +195,12 @@ class SkipGoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
-class GoTestExtraEnvVarsField(StringSequenceField):
+class GoTestExtraEnvVarsField(TestExtraEnvVarsField):
     alias = "test_extra_env_vars"
-    help = softwrap(
-        """
-         Additional environment variables to include in test processes.
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
-         This will be merged with and override values from [test].extra_env_vars.
-        """
-    )
 
 
 class GoTestTimeoutField(TestTimeoutField):
     alias = "test_timeout"
-    help = softwrap(
-        """
-        A timeout (in seconds) when running this package's tests.
-
-        If this field is not set, the test will never time out.
-        """
-    )
     valid_numbers = ValidNumbers.positive_and_zero
 
 
@@ -242,19 +242,6 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     value: str
 
 
-@dataclass(frozen=True)
-class GoBinaryMainPackage:
-    address: Address
-
-
-@dataclass(frozen=True)
-class GoBinaryMainPackageRequest(EngineAwareParameter):
-    field: GoBinaryMainPackageField
-
-    def debug_hint(self) -> str:
-        return self.field.address.spec
-
-
 class GoBinaryDependenciesField(Dependencies):
     # This is only used to inject a dependency from the `GoBinaryMainPackageField`. Users should
     # add any explicit dependencies to the `go_package`.
@@ -271,3 +258,24 @@ class GoBinaryTarget(Target):
         RestartableField,
     )
     help = "A Go binary."
+
+
+# -----------------------------------------------------------------------------------------------
+# Support for codegen targets that need to specify an owning go_mod target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoOwningGoModAddressField(StringField):
+    alias = "go_mod_address"
+    help = softwrap(
+        """
+        Address of the `go_mod` target representing the Go module that this target is part of.
+
+        This field is similar to the `resolve` field used in the Python and JVM backends. If a codegen
+        target such as `protobuf_sources` will be used in multiple Go modules, then you should use
+        the `parametrize` built-in to parametrize that `protobuf_sources` target for each Go module.
+
+        If there is a single `go_mod` target in the repository, then this field defaults to the address
+        for that single `go_mod` target.
+        """
+    )

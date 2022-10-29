@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(
+    dependencies=[":resources"],
     overrides={
         # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
         "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
-        "version.py": {"dependencies": ["./VERSION:resources"]},
     },
 )
 
@@ -13,7 +13,10 @@ python_test_utils(name="test_utils")
 
 python_distribution(
     name="pants-packaged",
-    dependencies=["./__main__.py", ":resources"],
+    dependencies=[
+        "./__main__.py",
+        ":resources",
+    ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp36m-macosx_10_15_x86_64`.
     sdist=False,

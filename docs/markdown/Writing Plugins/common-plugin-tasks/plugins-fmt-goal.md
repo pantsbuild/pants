@@ -6,18 +6,24 @@ hidden: false
 createdAt: "2020-07-01T04:52:28.820Z"
 updatedAt: "2022-04-27T18:37:11.334Z"
 ---
-In Pants, every formatter is (typically) also a linter, meaning that if you can run a tool with `./pants fmt`, you can run the same tool in check-only mode with `./pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work. 
+In Pants, every formatter is also a linter, meaning that if you can run a tool with `./pants fmt`,
+you can run the same tool in check-only mode with `./pants lint`.
+Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
 
 This guide assumes that you are running a formatter that already exists outside of Pants as a stand-alone binary, such as running Black or Prettier.
 
 If you are instead writing your own formatting logic inline, you can skip Step 1. In Step 4, you will not need to use `Process`.
 
-1. Install your formatter
--------------------------
+# 1. Install your formatter
 
-There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
+There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools).
+This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
 
-You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options from `pants.option.option_types`.
+You will also likely want to register some options, like `--config`, `--skip`, and `--args`.
+Options are registered through a [`Subsystem`](doc:rules-api-subsystems).
+If you are using `ExternalTool`, this is already a subclass of `Subsystem`.
+Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the
+name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options from `pants.option.option_types`.
 
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
@@ -61,8 +67,7 @@ class Shfmt(ExternalTool):
         return f"./shfmt_{self.version}_{plat_str}"
 ```
 
-2. Set up a `FieldSet` and `FmtRequest`
----------------------------------------
+# 2. Set up a `FieldSet` and `FmtTargetsRequest`
 
 As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
@@ -89,40 +94,22 @@ Then, hook this up to a new subclass of `FmtRequest`.
 ```python
 from pants.core.goals.fmt import FmtRequest
 
-class ShfmtRequest(FmtRequest):
+class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
-    name = "shfmt"
+    tool_subsystem = Shfmt
 ```
 
-Finally, register your new `FmtRequest` with a [`UnionRule`](doc:rules-api-unions) so that Pants knows your formatter exists:
+# 3. Create `fmt` rules
 
-```python
-from pants.engine.unions import UnionRule
-
-...
-
-def rules():
-    return [
-      	*collect_rules(),
-        UnionRule(FmtRequest, ShfmtRequest),
-    ]
-```
-
-3. Create `fmt` rules
----------------------
-
-You will need a rule for `fmt` which takes the `FmtRequest` from step 3  (e.g. `ShfmtRequest`) as a parameter and returns a `FmtResult`.
+You will need a rule for `fmt` which takes the `FmtTargetsRequest.Batch` from step 3  (e.g. `ShfmtRequest`) as a parameter and returns a `FmtResult`.
 
 ```python
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    if shfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-
+async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platform) -> FmtResult:
     download_shfmt_get = Get(
         DownloadedExternalTool,
         ExternalToolRequest,
-        shfmt.get_request(Platform.current),
+        shfmt.get_request(platform),
     )
 
     # If the user specified `--shfmt-config`, we must search for the file they specified with
@@ -157,22 +144,29 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
         argv=argv,
         input_digest=input_digest,
         output_files=request.snapshot.files,
-        description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
+        description=f"Run shfmt on {pluralize(len(request.snapshot.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
     result = await Get(ProcessResult, Process, process)
-    output_snapshot = await Get(Snapshot, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest` has properties `.field_sets` and `.snapshot`, which store collections of the `FieldSet`s defined in step 2, and their sources. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances.
-
-If you have a `--skip` option, you should check if it was used at the beginning of your `fmt` and `lint` rules and, if so, to early return an empty `LintResults()` and return `FmtResult.skip()`.
+The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 
 Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files and downloaded tool.
+
+At the bottom of your file, tell Pants about your rules:
+
+```python
+def rules():
+    return [
+      	*collect_rules(),
+        *ShfmtRequest.rules(partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION),
+    ]
+```
 
 Finally, update your plugin's `register.py` to activate this file's rules. Note that we must register the rules added in Step 2, as well.
 
@@ -184,9 +178,8 @@ def rules():
     return [*shfmt.rules()]
 ```
 
-Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run. 
+Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run.
 
-5. Add tests (optional)
------------------------
+# 4. Add tests (optional)
 
 Refer to [Testing rules](doc:rules-api-testing).

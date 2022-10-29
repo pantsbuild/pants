@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import (
+    GeneratePythonLockfile,
+    GeneratePythonToolLockfileSentinel,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
@@ -30,17 +32,15 @@ class SetuptoolsSCM(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
 
-class SetuptoolsSCMLockfileSentinel(GenerateToolLockfileSentinel):
+class SetuptoolsSCMLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = SetuptoolsSCM.options_scope
 
 
 @rule
 def setup_setuptools_scm_lockfile(
-    _: SetuptoolsSCMLockfileSentinel, setuptools_scm: SetuptoolsSCM, python_setup: PythonSetup
+    _: SetuptoolsSCMLockfileSentinel, setuptools_scm: SetuptoolsSCM
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        setuptools_scm, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(setuptools_scm)
 
 
 def rules():

@@ -15,17 +15,18 @@ from typing import Iterable, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, pluralize
+from pants.util.strutil import create_path_env_var, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -158,9 +159,11 @@ class BinaryNotFoundError(EnvironmentError):
             beyond installing the program. For example, "Alternatively, you can set the option
             `--python-bootstrap-search-path` to change the paths searched."
         """
-        msg = (
-            f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "
-            "ensure that it is installed"
+        msg = softwrap(
+            f"""
+            Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`.
+            Please ensure that it is installed
+            """
         )
         msg += f" so that Pants can {rationale}." if rationale else "."
         if alternative_solution:
@@ -326,11 +329,19 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class TouchBinary(BinaryPath):
+    pass
+
+
 class CpBinary(BinaryPath):
     pass
 
 
 class MvBinary(BinaryPath):
+    pass
+
+
+class CatBinary(BinaryPath):
     pass
 
 
@@ -424,11 +435,8 @@ async def create_binary_shims(
             *(
                 " && ".join(
                     [
-                        (
-                            # The `printf` cmd is a bash builtin, so always available.
-                            f"printf '{_create_shim(bash.path, binary_path)}'"
-                            f" > '{bin_relpath}/{os.path.basename(binary_path)}'"
-                        ),
+                        # The `printf` cmd is a bash builtin, so always available.
+                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
                         f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
                     ]
                 )
@@ -479,7 +487,7 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
+async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -530,11 +538,6 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
-    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
-    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
-    #      processes since all known remoting configurations include a static container image as
-    #      part of their cache key which automatically avoids this problem. See #10769 for a
-    #      solution that is less of a tradeoff.
     search_path = create_path_env_var(request.search_path)
     result = await Get(
         ProcessResult,
@@ -544,7 +547,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             input_digest=script_digest,
             argv=[script_path, request.binary_name],
             env={"PATH": search_path},
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
 
@@ -560,9 +563,9 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
                 description=f"Test binary {path}.",
                 level=LogLevel.DEBUG,
                 argv=[path, *request.test.args],
-                # NB: Since a failure is a valid result for this script, we always cache it for
-                # `pantsd`'s lifetime, regardless of success or failure.
-                cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
+                # NB: Since a failure is a valid result for this script, we always cache it,
+                # regardless of success or failure.
+                cache_scope=env_target.executable_search_path_cache_scope(cache_failures=True),
             ),
         )
         for path in found_paths
@@ -585,7 +588,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
+    interpreter_search_paths = python_bootstrap.interpreter_search_paths
     all_python_binary_paths = await MultiGet(
         Get(
             BinaryPaths,
@@ -641,10 +644,17 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
             )
 
     raise BinaryNotFoundError(
-        "Was not able to locate a Python interpreter to execute rule code.\n"
-        "Please ensure that Python is available in one of the locations identified by "
-        "`[python-bootstrap] search_path`, which currently expands to:\n"
-        f"  {interpreter_search_paths}"
+        # TODO(#7735): Update error message to mention local_environment.
+        softwrap(
+            f"""
+            Was not able to locate a Python interpreter to execute rule code.
+
+            Please ensure that Python is available in one of the locations identified by
+            `[python-bootstrap].search_path`, which currently expands to:
+
+            {interpreter_search_paths}
+        """
+        )
     )
 
 
@@ -687,12 +697,28 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
+async def find_cat() -> CatBinary:
+    request = BinaryPathRequest(binary_name="cat", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
+    return CatBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
 async def find_mkdir() -> MkdirBinary:
     request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
+async def find_touch() -> TouchBinary:
+    request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="touch file")
+    return TouchBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
@@ -776,7 +802,10 @@ class GunzipBinaryRequest:
     pass
 
 
-@dataclass(frozen=True)
+class CatBinaryRequest:
+    pass
+
+
 class TarBinaryRequest:
     pass
 
@@ -824,6 +853,11 @@ async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> G
 @rule
 async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
     return tar_binary
+
+
+@rule
+async def find_cat_wrapper(_: CatBinaryRequest, cat_binary: CatBinary) -> CatBinary:
+    return cat_binary
 
 
 @rule

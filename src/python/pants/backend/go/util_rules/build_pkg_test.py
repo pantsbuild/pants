@@ -69,8 +69,9 @@ def assert_built(
 def test_build_pkg(rule_runner: RuleRunner) -> None:
     transitive_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep/transitive",
+        pkg_name="transitive",
         dir_path="dep/transitive",
-        go_file_names=("f.go",),
+        go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
                 "dep/transitive/f.go": dedent(
@@ -86,14 +87,15 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                 )
             }
         ).digest,
-        s_file_names=(),
+        s_files=(),
         direct_dependencies=(),
         minimum_go_version=None,
     )
     direct_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",
+        pkg_name="dep",
         dir_path="dep",
-        go_file_names=("f.go",),
+        go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
                 "dep/f.go": dedent(
@@ -109,14 +111,15 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                 )
             }
         ).digest,
-        s_file_names=(),
+        s_files=(),
         direct_dependencies=(transitive_dep,),
         minimum_go_version=None,
     )
     main = BuildGoPackageRequest(
         import_path="example.com/foo",
+        pkg_name="foo",
         dir_path="",
-        go_file_names=("f.go",),
+        go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
                 "f.go": dedent(
@@ -133,7 +136,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                 )
             }
         ).digest,
-        s_file_names=(),
+        s_files=(),
         direct_dependencies=(direct_dep,),
         minimum_go_version=None,
     )
@@ -160,22 +163,24 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
 def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
     invalid_dep = BuildGoPackageRequest(
         import_path="example.com/foo/dep",
+        pkg_name="dep",
         dir_path="dep",
-        go_file_names=("f.go",),
+        go_files=("f.go",),
         digest=rule_runner.make_snapshot({"dep/f.go": "invalid!!!"}).digest,
-        s_file_names=(),
+        s_files=(),
         direct_dependencies=(),
         minimum_go_version=None,
     )
     main = BuildGoPackageRequest(
         import_path="example.com/foo",
+        pkg_name="main",
         dir_path="",
-        go_file_names=("f.go",),
+        go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
                 "f.go": dedent(
                     """\
-                    package foo
+                    package main
 
                     import "example.com/foo/dep"
 
@@ -186,7 +191,7 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
                 )
             }
         ).digest,
-        s_file_names=(),
+        s_files=(),
         direct_dependencies=(invalid_dep,),
         minimum_go_version=None,
     )

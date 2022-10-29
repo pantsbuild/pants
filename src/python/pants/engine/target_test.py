@@ -158,6 +158,10 @@ def test_invalid_fields_rejected() -> None:
         FortranTarget({"invalid_field": True}, Address("", target_name="lib"))
     assert "Unrecognized field `invalid_field=True`" in str(exc)
     assert "//:lib" in str(exc)
+    with no_exception():
+        FortranTarget(
+            {"invalid_field": True}, Address("", target_name="lib"), ignore_unrecognized_fields=True
+        )
 
 
 def test_get_field() -> None:
@@ -299,10 +303,6 @@ def test_add_custom_fields() -> None:
 def test_subclassed_target_inherits_plugin_fields() -> None:
     class CustomFortranTarget(FortranTarget):
         alias = "custom_fortran"
-
-    # Ensure that any `PluginField` is not lost on subclasses.
-    assert issubclass(CustomFortranTarget._plugin_field_cls, FortranTarget._plugin_field_cls)
-    assert issubclass(FortranTarget._plugin_field_cls, Target._plugin_field_cls)
 
     class CustomField(BoolField):
         alias = "custom_field"

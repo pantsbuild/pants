@@ -232,6 +232,10 @@ def create_parser() -> argparse.ArgumentParser:
 def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
+        "pants.backend.build_files.fix.deprecations",
+        "pants.backend.build_files.fmt.black",
+        "pants.backend.build_files.fmt.buildifier",
+        "pants.backend.build_files.fmt.yapf",
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.lint.buf",
         "pants.backend.codegen.protobuf.python",
@@ -247,7 +251,10 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.java.lint.google_java_format",
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
+        "pants.backend.experimental.openapi",
+        "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
+        "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
         "pants.backend.experimental.python.packaging.pyoxidizer",

@@ -6,8 +6,10 @@ from typing import cast
 
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
@@ -35,9 +37,6 @@ def calculate_specs(
         options.specs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
-        convert_dir_literal_to_address_literal=(
-            global_options.use_deprecated_directory_cli_args_semantics
-        ),
     )
 
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
@@ -56,9 +55,13 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    (git_binary,) = session.product_request(GitBinary, [Params(GitBinaryRequest())])
+    bootstrap_environment = determine_bootstrap_environment(session)
+
+    (git_binary,) = session.product_request(
+        GitBinary, [Params(GitBinaryRequest(), bootstrap_environment)]
+    )
     (maybe_git_worktree,) = session.product_request(
-        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
+        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
     )
     if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
@@ -68,9 +71,10 @@ def calculate_specs(
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    changed_request = ChangedRequest(changed_files, changed_options.dependees)
+    changed_request = ChangedRequest(changed_files, changed_options.dependents)
     (changed_addresses,) = session.product_request(
-        ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+        ChangedAddresses,
+        [Params(changed_request, options_bootstrapper, bootstrap_environment)],
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
@@ -103,7 +107,7 @@ def calculate_specs(
 
 def rules():
     return [
-        QueryRule(ChangedAddresses, [ChangedRequest]),
-        QueryRule(GitBinary, [GitBinaryRequest]),
-        QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary]),
+        QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
+        QueryRule(GitBinary, [GitBinaryRequest, EnvironmentName]),
+        QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
     ]

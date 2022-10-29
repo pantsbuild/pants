@@ -26,6 +26,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Bruno Bieth
 + Caitie McCaffrey
 + Caleb Lloyd
++ Carina C. Zona
 + Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
@@ -73,12 +74,15 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Eric Arellano
 + Eric Ayers
 + Eric Danielson
++ Eric Jacob
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Evgeny Kravchenko
 + Fatin H
 + Fedor Korotkov
 + Fiona Condone
++ Flo
 + Florian Leibert
 + Fredrik Ekholdt
 + Gabriel Gonzalez
@@ -90,10 +94,12 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Guy Marom
 + Harley Cooper
 + Henry Fuller
++ Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
 + Ikai Lan
++ In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
@@ -126,6 +132,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Joseph Tilahun
 + Josh Reed
 + Josh Soref
 + Josh Suereth
@@ -185,6 +192,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Neil Sanchala
 + Nicholas Santos
 + Nik Shkrob
++ Nimrod Shlagman
 + Nitay Joffe
 + Nora Howard
 + Ny Saechao
@@ -223,6 +231,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + SergeKireev
 + Sergey Serebryakov
 + Shane Delmore
++ Shantanu Kumar
 + Shuo Li
 + Simeon Franklin
 + Srikanth Kotagiri
@@ -230,6 +239,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stephan Erb
 + Stu Hood
 + Suresh Joshi
++ Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
