@@ -35,6 +35,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.option.option_types import EnumOption
+from pants.util.strutil import softwrap
 
 
 class AnalysisFlavor(Enum):
@@ -49,7 +50,15 @@ class DumpPythonSourceAnalysisSubsystem(GoalSubsystem):
     flavor = EnumOption(
         "--analysis-flavor",
         default=AnalysisFlavor.dependency_inference,
-        help="What type of information should be returned",
+        help=softwrap(
+            f"""\
+            The type of information that should be returned.\n
+            * `{AnalysisFlavor.dependency_inference.value}`: The results of dependency inference, for every detected import in every file.\n
+            * `{AnalysisFlavor.raw_dependency_inference.value}`: The raw intermediate results of the dependency inference process,
+            at every stage they're available.
+            Potentially useful for debugging the dependency inference process.\n
+            """
+        ),
     )
 
 
