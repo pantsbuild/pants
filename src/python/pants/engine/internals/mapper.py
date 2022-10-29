@@ -13,6 +13,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.visibility import BuildFileVisibility, BuildFileVisibilityParserState
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized_property
@@ -40,6 +41,8 @@ class AddressMap:
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
+        dependents_visibility: BuildFileVisibilityParserState,
+        dependencies_visibility: BuildFileVisibilityParserState,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -47,7 +50,14 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
+            target_adaptors = parser.parse(
+                filepath,
+                build_file_content,
+                extra_symbols,
+                defaults,
+                dependents_visibility,
+                dependencies_visibility,
+            )
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
         return cls.create(filepath, target_adaptors)
@@ -93,6 +103,8 @@ class AddressFamily:
     namespace: str
     name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
     defaults: BuildFileDefaults
+    dependents_visibility: BuildFileVisibility | None
+    dependencies_visibility: BuildFileVisibility | None
 
     @classmethod
     def create(
@@ -100,6 +112,8 @@ class AddressFamily:
         spec_path: str,
         address_maps: Iterable[AddressMap],
         defaults: BuildFileDefaults = BuildFileDefaults({}),
+        dependents_visibility: BuildFileVisibility | None = None,
+        dependencies_visibility: BuildFileVisibility | None = None,
     ) -> AddressFamily:
         """Creates an address family from the given set of address maps.
 
@@ -131,6 +145,8 @@ class AddressFamily:
             namespace=spec_path,
             name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
             defaults=defaults,
+            dependents_visibility=dependents_visibility,
+            dependencies_visibility=dependencies_visibility,
         )
 
     @memoized_property

@@ -28,6 +28,7 @@ from pants.engine.internals import (
     platform_rules,
     specs_rules,
     synthetic_targets,
+    visibility,
 )
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
@@ -281,6 +282,7 @@ class EngineInitializer:
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
                 *synthetic_targets.rules(),
+                *visibility.rules(),
                 *rules,
             )
         )

@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from fnmatch import fnmatch
-from typing import ClassVar, Iterable, Literal, Mapping, Tuple, Union
+from typing import ClassVar, Iterable, Literal, Mapping, Tuple, Union, cast
 
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 
 SetVisibilityValueT = Tuple[str, ...]
@@ -88,9 +90,9 @@ class BuildFileVisibility:
             return self.all
 
     def get_action(self, type_alias: str, path: str, relpath: str) -> VisibilityAction:
-        for rule in self.get_rules(type_alias):
-            if rule.match(path, relpath):
-                return rule.action
+        for visibility_rule in self.get_rules(type_alias):
+            if visibility_rule.match(path, relpath):
+                return visibility_rule.action
         return self.default
 
     @staticmethod
@@ -123,16 +125,19 @@ class BuildFileVisibility:
 
 @dataclass
 class BuildFileVisibilityParserState:
-    parent: BuildFileVisibility
+    parent: BuildFileVisibility | None
     default: VisibilityAction = VisibilityAction.ALLOW
     all: VisibilityRules = ()
     targets: dict[str, VisibilityRules] = field(default_factory=dict)
-    build_file_visibility_class: type[BuildFileVisibility] = BuildFileVisibility
+    build_file_visibility_class: type[BuildFileVisibility] | None = BuildFileVisibility
 
-    def get_frozen_visibility(self) -> BuildFileVisibility:
-        return self.build_file_visibility_class(
-            default=self.default, all=self.all, targets=FrozenDict(self.targets)
-        )
+    def get_frozen_visibility(self) -> BuildFileVisibility | None:
+        if self.build_file_visibility_class is None:
+            return None
+        else:
+            return self.build_file_visibility_class(
+                default=self.default, all=self.all, targets=FrozenDict(self.targets)
+            )
 
     def set_visibility(
         self,
@@ -143,17 +148,22 @@ class BuildFileVisibilityParserState:
         extend: bool = False,
         **kwargs,
     ) -> None:
+        if self.build_file_visibility_class is None:
+            return None
+
         if all is not None:
             self.all = self._process_visibility(all, build_file)
-        elif extend:
+        elif extend and self.parent is not None:
             self.all = self.parent.all
 
         if default is not None:
             self.default = VisibilityAction(default)
-        elif extend:
+        elif extend and self.parent is not None:
             self.default = self.parent.default
 
-        visibility: dict[str, VisibilityRules] = {} if not extend else dict(self.parent.targets)
+        visibility: dict[str, VisibilityRules] = {}
+        if extend and self.parent is not None:
+            visibility = dict(self.parent.targets)
 
         for targets_visibility in args:
             if not isinstance(targets_visibility, dict):
@@ -174,11 +184,50 @@ class BuildFileVisibilityParserState:
             else:
                 self.targets[tgt] = rules
 
-    def _process_visibility(self, rules: Iterable[str], build_file: str):
+    def _process_visibility(self, rules: Iterable[str], build_file: str) -> VisibilityRules:
+        """Must only be called after ensuring self.build_file_visibility_class != None."""
         if not isinstance(rules, (list, tuple)):
             raise ValueError(
                 f"Invalid visibility rule values in {build_file}, "
                 f"must be a sequence of strings but was `{type(rules).__name__}`: {rules!r}"
             )
 
-        return self.build_file_visibility_class.parse_visibility_rules(rules)
+        return cast(
+            "type[BuildFileVisibility]", self.build_file_visibility_class
+        ).parse_visibility_rules(rules)
+
+
+@union
+class BuildFileVisibilityImplementationRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class BuildFileVisibilityImplementation:
+    build_file_visibility_class: type[BuildFileVisibility]
+
+
+@dataclass(frozen=True)
+class MaybeBuildFileVisibilityImplementation:
+    build_file_visibility_class: type[BuildFileVisibility] | None
+
+
+@rule
+async def get_build_file_visibility_implementation(
+    union_membership: UnionMembership,
+) -> MaybeBuildFileVisibilityImplementation:
+    request_types = union_membership.get(BuildFileVisibilityImplementationRequest)
+    assert len(request_types) <= 1  # TODO: provide proper error message in case of multiple
+    # visibility implementations.
+    for request_type in request_types:
+        impl = await Get(
+            BuildFileVisibilityImplementation,
+            BuildFileVisibilityImplementationRequest,
+            request_type,
+        )
+        return MaybeBuildFileVisibilityImplementation(impl.build_file_visibility_class)
+    return MaybeBuildFileVisibilityImplementation(None)
+
+
+def rules():
+    return collect_rules()

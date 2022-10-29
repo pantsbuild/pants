@@ -28,6 +28,11 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.internals.visibility import (
+    BuildFileVisibility,
+    BuildFileVisibilityParserState,
+    MaybeBuildFileVisibilityImplementation,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -159,6 +164,7 @@ async def parse_address_family(
     directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
+    maybe_build_file_visibility_implementation: MaybeBuildFileVisibilityImplementation,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -181,6 +187,8 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
+    dependents_visibility: BuildFileVisibility | None = None
+    dependencies_visibility: BuildFileVisibility | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await MultiGet(
@@ -189,15 +197,32 @@ async def parse_address_family(
         )
         for maybe_parent in maybe_parents:
             if maybe_parent.address_family is not None:
-                defaults = maybe_parent.address_family.defaults
+                family = maybe_parent.address_family
+                defaults = family.defaults
+                dependents_visibility = family.dependents_visibility
+                dependencies_visibility = family.dependencies_visibility
                 break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
+    dependents_visibility_parser_state = BuildFileVisibilityParserState(
+        dependents_visibility,
+        build_file_visibility_class=maybe_build_file_visibility_implementation.build_file_visibility_class,
+    )
+    dependencies_visibility_parser_state = BuildFileVisibilityParserState(
+        dependencies_visibility,
+        build_file_visibility_class=maybe_build_file_visibility_implementation.build_file_visibility_class,
+    )
     address_maps = [
         AddressMap.parse(
-            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+            fc.path,
+            fc.content.decode(),
+            parser,
+            prelude_symbols,
+            defaults_parser_state,
+            dependents_visibility_parser_state,
+            dependencies_visibility_parser_state,
         )
         for fc in digest_contents
     ]
@@ -214,7 +239,11 @@ async def parse_address_family(
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path, (*address_maps, *synthetic_address_maps), frozen_defaults
+            directory.path,
+            (*address_maps, *synthetic_address_maps),
+            frozen_defaults,
+            dependents_visibility_parser_state.get_frozen_visibility(),
+            dependencies_visibility_parser_state.get_frozen_visibility(),
         ),
     )
 
