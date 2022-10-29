@@ -22,7 +22,6 @@ Example demonstrating how to register synthetic targets:
     class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
         path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
-        path: str = "fixed/path/..."  # Get a single request for named directory only.
 
 
     @rule
