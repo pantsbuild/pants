@@ -10,6 +10,7 @@ from typing import List, cast
 from pants.backend.project_info import dependents
 from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -108,13 +109,15 @@ class ChangedOptions:
 
     @classmethod
     def from_options(cls, options: OptionValueContainer) -> ChangedOptions:
-        return cls(
-            options.since,
-            options.diffspec,
-            options.dependees
-            if options.dependents == DependentsOption.NONE
-            else options.dependents,
+        dependents = resolve_conflicting_options(
+            old_option="dependees",
+            new_option="dependents",
+            old_scope=Changed.options_scope,
+            new_scope=Changed.options_scope,
+            old_container=options,
+            new_container=options,
         )
+        return cls(options.since, options.diffspec, dependents)
 
     @property
     def provided(self) -> bool:
@@ -161,7 +164,7 @@ class Changed(Subsystem):
     dependees = EnumOption(
         default=DependentsOption.NONE,
         help="Include direct or transitive dependents of changed targets.",
-        removal_version="2.17.0.dev0",
+        removal_version="2.23.0.dev0",
         removal_hint="Use --dependents instead",
     )
 
