@@ -1,0 +1,184 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from fnmatch import fnmatch
+from typing import ClassVar, Iterable, Literal, Mapping, Tuple, Union
+
+from pants.util.frozendict import FrozenDict
+
+SetVisibilityValueT = Tuple[str, ...]
+SetVisibilityKeyT = Union[str, Tuple[str, ...]]
+SetVisibilityT = Mapping[SetVisibilityKeyT, SetVisibilityValueT]
+
+
+class VisibilityAction(Enum):
+    ALLOW = "allow"
+    DENY = "deny"
+    WARN = "warn"
+
+
+SetDefaultVisibilityT = Union[Literal["allow"], Literal["deny"], Literal["warn"]]
+
+
+@dataclass(frozen=True)
+class VisibilityRule:
+    action: VisibilityAction
+    pattern: str
+
+    @classmethod
+    def parse(cls, rule: str) -> VisibilityRule:
+        if rule.startswith("!"):
+            action = VisibilityAction.DENY
+            pattern = rule[1:]
+        elif rule.startswith("?"):
+            action = VisibilityAction.WARN
+            pattern = rule[1:]
+        else:
+            action = VisibilityAction.ALLOW
+            pattern = rule
+        return cls(action, pattern)
+
+    def match(self, path: str, relpath: str) -> bool:
+        pattern = relpath if self.pattern == "." else self.pattern
+        if pattern.startswith("./"):
+            pattern = relpath + pattern[1:]
+        return fnmatch(path, pattern)
+
+
+VisibilityRules = Tuple[VisibilityRule, ...]
+
+
+@dataclass(frozen=True)
+class BuildFileVisibility:
+    rule_class: ClassVar[type[VisibilityRule]] = VisibilityRule
+
+    default: VisibilityAction
+    all: VisibilityRules
+    targets: FrozenDict[str, VisibilityRules]
+
+    @classmethod
+    def create(
+        cls,
+        default: SetDefaultVisibilityT = "allow",
+        all: Iterable[str] = (),
+        targets: Mapping[str, Iterable[str]] = {},
+    ) -> BuildFileVisibility:
+        return cls(
+            VisibilityAction(default),
+            cls.parse_visibility_rules(all),
+            FrozenDict(
+                {
+                    type_alias: cls.parse_visibility_rules(rules)
+                    for type_alias, rules in targets.items()
+                }
+            ),
+        )
+
+    @classmethod
+    def parse_visibility_rules(cls, rules: Iterable[str]) -> VisibilityRules:
+        return tuple(map(cls.rule_class.parse, rules))
+
+    def get_rules(self, type_alias: str) -> VisibilityRules:
+        if type_alias in self.targets:
+            return self.targets[type_alias]
+        else:
+            return self.all
+
+    def get_action(self, type_alias: str, path: str, relpath: str) -> VisibilityAction:
+        for rule in self.get_rules(type_alias):
+            if rule.match(path, relpath):
+                return rule.action
+        return self.default
+
+    @staticmethod
+    def check_dependency(
+        *,
+        source_type: str,
+        source_path: str,
+        dependencies_visibility: BuildFileVisibility,
+        target_type: str,
+        target_path: str,
+        dependents_visibility: BuildFileVisibility,
+    ) -> VisibilityAction:
+        """The source of the dependency has the dependencies field, the target of the dependency is
+        the one listed as a value in the dependencies field.
+
+        The `__dependencies_visibility__` are the rules applicable for the source path.
+        The `__dependents_visibility__` are the rules applicable for the target path.
+
+        Return visibility action ALLOW, DENY or WARN. WARN is effectively the same as ALLOW, but
+        with a logged warning.
+        """
+        # Check outgoing dependency action
+        outgoing = dependencies_visibility.get_action(source_type, target_path, relpath=source_path)
+        if outgoing == VisibilityAction.DENY:
+            return outgoing
+        # Check incoming dependency action
+        incoming = dependents_visibility.get_action(target_type, source_path, relpath=target_path)
+        return incoming if incoming != VisibilityAction.ALLOW else outgoing
+
+
+@dataclass
+class BuildFileVisibilityParserState:
+    parent: BuildFileVisibility
+    default: VisibilityAction = VisibilityAction.ALLOW
+    all: VisibilityRules = ()
+    targets: dict[str, VisibilityRules] = field(default_factory=dict)
+    build_file_visibility_class: type[BuildFileVisibility] = BuildFileVisibility
+
+    def get_frozen_visibility(self) -> BuildFileVisibility:
+        return self.build_file_visibility_class(
+            default=self.default, all=self.all, targets=FrozenDict(self.targets)
+        )
+
+    def set_visibility(
+        self,
+        build_file: str,
+        *args: SetVisibilityT,
+        all: SetVisibilityValueT | None = None,
+        default: SetDefaultVisibilityT | None = None,
+        extend: bool = False,
+        **kwargs,
+    ) -> None:
+        if all is not None:
+            self.all = self._process_visibility(all, build_file)
+        elif extend:
+            self.all = self.parent.all
+
+        if default is not None:
+            self.default = VisibilityAction(default)
+        elif extend:
+            self.default = self.parent.default
+
+        visibility: dict[str, VisibilityRules] = {} if not extend else dict(self.parent.targets)
+
+        for targets_visibility in args:
+            if not isinstance(targets_visibility, dict):
+                raise ValueError(
+                    f"Expected dictionary mapping targets to visibility rules in {build_file} "
+                    f"but got: {type(targets_visibility).__name__}."
+                )
+            for target, rules in targets_visibility.items():
+                targets: Iterable[str]
+                targets = target if isinstance(target, tuple) else (target,)
+                for type_alias in map(str, targets):
+                    visibility[type_alias] = self._process_visibility(rules, build_file)
+
+        # Update with new visibility, dropping targets without any rules.
+        for tgt, rules in visibility.items():
+            if not rules:
+                self.targets.pop(tgt, None)
+            else:
+                self.targets[tgt] = rules
+
+    def _process_visibility(self, rules: Iterable[str], build_file: str):
+        if not isinstance(rules, (list, tuple)):
+            raise ValueError(
+                f"Invalid visibility rule values in {build_file}, "
+                f"must be a sequence of strings but was `{type(rules).__name__}`: {rules!r}"
+            )
+
+        return self.build_file_visibility_class.parse_visibility_rules(rules)
