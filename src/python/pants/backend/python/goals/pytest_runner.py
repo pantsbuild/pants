@@ -333,7 +333,9 @@ async def setup_pytest_for_target(
                 f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
             )
         results_file_name = f"{results_file_prefix}.xml"
-        pytest_args.append(f"--junit-xml={results_file_name}")
+        pytest_args.extend(
+            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
+        )
         output_files.append(results_file_name)
 
     if test_subsystem.use_coverage and not request.is_debug:
