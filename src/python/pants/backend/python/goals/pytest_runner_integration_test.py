@@ -451,18 +451,17 @@ def test_pytest_addopts(rule_runner: RuleRunner) -> None:
                 import os
 
                 def test_addopts():
-                    assert "-vv" in os.getenv("PYTEST_ADDOPTS")
-                    assert "--maxfail=2" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-vv" not in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" not in os.getenv("PYTEST_ADDOPTS")
                     assert "-ra" in os.getenv("PYTEST_ADDOPTS")
                     assert "-q" in os.getenv("PYTEST_ADDOPTS")
-                    assert "--color=no" in os.getenv("PYTEST_ADDOPTS")
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests(
                     extra_env_vars=(
-                        "PYTEST_ADDOPTS=-ra -q --color=no",
+                        "PYTEST_ADDOPTS=-ra -q",
                     )
                 )
                 """
@@ -474,7 +473,7 @@ def test_pytest_addopts(rule_runner: RuleRunner) -> None:
         rule_runner,
         tgt,
         extra_args=[
-            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",  # should be overriden by `python_tests`
         ],
     )
     assert result.exit_code == 0
@@ -650,5 +649,6 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "--wait-for-client",
         "-c",
         unittest.mock.ANY,
+        "--color=no",
         "tests/python/pants_test/test_foo.py",
     )

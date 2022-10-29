@@ -280,20 +280,15 @@ async def setup_pytest_for_target(
         ),
     )
 
-    add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
-    pants_add_opts = ["--color"]
+    pytest_args = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
     results_file_name = None
     if not request.is_debug:
         results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
-        add_opts.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
-        )
-        pants_add_opts.extend(["--junitxml", "--junit-xml", "junit_family"])
+        pytest_args.append(f"--junit-xml={results_file_name}")
         output_files.append(results_file_name)
 
-    coverage_args = []
     if test_subsystem.use_coverage and not request.is_debug:
         pytest.validate_pytest_cov_included()
         output_files.append(".coverage")
@@ -308,27 +303,13 @@ async def setup_pytest_for_target(
             # materialized to the Process chroot.
             cov_args = [f"--cov={source_root}" for source_root in prepared_sources.source_roots]
 
-        coverage_args = [
-            "--cov-report=",  # Turn off output.
-            f"--cov-config={coverage_config.path}",
-            *cov_args,
-        ]
-        pants_add_opts.extend(["--cov-report", "--cov-config"])  # --cov not there as multi-allowed.
-
-    # Get extra PYTEST_ADDOPTS env var from each possible sources.
-    extra_add_opts = []
-    if "PYTEST_ADDOPTS" in field_set_extra_env:
-        extra_add_opts.append(field_set_extra_env["PYTEST_ADDOPTS"])
-    if "PYTEST_ADDOPTS" in test_extra_env.env:
-        extra_add_opts.append(test_extra_env.env["PYTEST_ADDOPTS"])
-    add_opts.extend(extra_add_opts)
-
-    # Warn the user if there is an option in PYTEST_ADDOPTS already set by Pants.
-    for popt in pants_add_opts:
-        if any(popt in eopt for eopt in extra_add_opts):
-            logger.warning(
-                f"The option '{popt}' is set by Pants but also in PYTEST_ADDOPTS environment variable. This can cause unexpected behavior."
+        pytest_args.extend(
+            (
+                "--cov-report=",  # Turn off output.
+                f"--cov-config={coverage_config.path}",
+                *cov_args,
             )
+        )
 
     extra_env = {
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
@@ -336,9 +317,6 @@ async def setup_pytest_for_target(
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
         # `python_tests`.
         **field_set_extra_env,
-        # NOTE: PYTEST_ADDOPTS after all others envs to avoid stomping comm channel between Pants
-        # and pytest.
-        "PYTEST_ADDOPTS": " ".join(add_opts),
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
@@ -352,7 +330,7 @@ async def setup_pytest_for_target(
             argv=(
                 *request.prepend_argv,
                 *pytest.args,
-                *coverage_args,
+                *pytest_args,
                 *field_set_source_files.files,
             ),
             extra_env=extra_env,
