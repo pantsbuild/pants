@@ -29,12 +29,12 @@ To run against another branch, run:
 ./pants --changed-since=origin/main lint
 ```
 
-By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependees](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependees=direct` or ` --changed-dependees=transitive` for this:
+By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependents](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependents=direct` or ` --changed-dependents=transitive` for this:
 
 ```bash
 ❯ ./pants \
   --changed-since=origin/main \
-  --changed-dependees=transitive \
+  --changed-dependents=transitive \
   test
 ```
 

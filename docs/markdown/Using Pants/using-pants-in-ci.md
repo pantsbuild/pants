@@ -99,13 +99,13 @@ We recommend running these commands in CI:
   lint
 ❯ ./pants \
   --changed-since=origin/main \
-  --changed-dependees=transitive \
+  --changed-dependents=transitive \
   check test
 ```
 
-Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependees of those changes.
+Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependents of those changes.
 
-Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependees=transitive`. `check` should also run on any transitive changes.
+Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependents=transitive`. `check` should also run on any transitive changes.
 
 See [Advanced target selection](doc:advanced-target-selection) for more information on `--changed-since` and alternative techniques to select targets to run in CI.
 
