@@ -46,11 +46,11 @@ class CliOptions(Subsystem):
 
                 [cli.alias]
                 green = "fmt lint check"
-                all-changed = "--changed-since=HEAD --changed-dependees=transitive"
+                all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 
             This would allow you to run `{bin_name()} green all-changed`, which is shorthand for
-            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependees=transitive`.
+            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependents=transitive`.
 
             Notice: this option must be placed in a config file (e.g. `pants.toml` or `pantsrc`)
             to have any effect.
