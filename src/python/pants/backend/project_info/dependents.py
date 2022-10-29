@@ -85,41 +85,43 @@ def find_dependents(
         known_dependents = dependents
 
 
-class DependeesSubsystem(LineOriented, GoalSubsystem):
-    name = "dependees"
+class DependentsSubsystem(LineOriented, GoalSubsystem):
+    name = "dependents"
     help = "List all targets that depend on any of the input files/targets."
+    deprecated_options_scope = "dependees"
+    deprecated_options_scope_removal_version = "2.23.0.dev0"
 
     transitive = BoolOption(
         default=False,
-        help="List all transitive dependees. If unspecified, list direct dependees only.",
+        help="List all transitive dependents. If unspecified, list direct dependents only.",
     )
     closed = BoolOption(
         default=False,
-        help="Include the input targets in the output, along with the dependees.",
+        help="Include the input targets in the output, along with the dependents.",
     )
 
 
-class DependeesGoal(Goal):
-    subsystem_cls = DependeesSubsystem
+class DependentsGoal(Goal):
+    subsystem_cls = DependentsSubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
-async def dependees_goal(
-    specified_addresses: Addresses, dependees_subsystem: DependeesSubsystem, console: Console
-) -> DependeesGoal:
-    dependees = await Get(
+async def dependents_goal(
+    specified_addresses: Addresses, dependents_subsystem: DependentsSubsystem, console: Console
+) -> DependentsGoal:
+    dependents = await Get(
         Dependents,
         DependentsRequest(
             specified_addresses,
-            transitive=dependees_subsystem.transitive,
-            include_roots=dependees_subsystem.closed,
+            transitive=dependents_subsystem.transitive,
+            include_roots=dependents_subsystem.closed,
         ),
     )
-    with dependees_subsystem.line_oriented(console) as print_stdout:
-        for address in dependees:
+    with dependents_subsystem.line_oriented(console) as print_stdout:
+        for address in dependents:
             print_stdout(address.spec)
-    return DependeesGoal(exit_code=0)
+    return DependentsGoal(exit_code=0)
 
 
 def rules():
