@@ -9,7 +9,6 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
-from itertools import chain
 from pathlib import PurePath
 from typing import DefaultDict, Iterable, Mapping, Tuple
 
@@ -54,23 +53,10 @@ class ModuleProviderType(enum.Enum):
         return self.name < other.name
 
 
-@total_ordering
-class ModuleProviderHierarchy(enum.Enum):
-    MODULE = enum.auto()
-    PARENT = enum.auto()
-
-    def __lt__(self, other) -> bool:
-        if not isinstance(other, ModuleProviderHierarchy):
-            return NotImplemented
-        return self.name < other.name
-# Not sure about the naming above, maybe change it to a `is_namespace_package` boolean or `ModuleProviderPackage` with `.NAMESPACE` and `.STANDARD`?
-
-
 @dataclass(frozen=True, order=True)
 class ModuleProvider:
     addr: Address
     typ: ModuleProviderType
-    hierarchy: ModuleProviderHierarchy
 
 
 def module_from_stripped_path(path: PurePath) -> str:
@@ -96,28 +82,6 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
     return AllPythonTargets(tuple(first_party), tuple(third_party))
-
-
-# -----------------------------------------------------------------------------------------------
-# Namespace packages collection
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonNamespacePackages(frozenset):
-    """A set of Python namespace packages."""
-
-
-@rule(desc="Creating a collection of namespace-packages", level=LogLevel.DEBUG)
-async def collect_namespace_packages(
-    all_python_targets: AllPythonTargets,
-    python_setup: PythonSetup,
-) -> PythonNamespacePackages:
-    return PythonNamespacePackages(
-        module.split(".")[0]
-        for tgt in chain(all_python_targets.first_party, all_python_targets.third_party)
-        for module in (tgt.get(PythonRequirementModulesField).value or [])
-        if "." in module
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -192,8 +156,7 @@ class FirstPartyPythonModuleMapping(
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        parent_result = mapping.get(parent_module, ())
-        return tuple(r for r in parent_result if r.hierarchy == ModuleProviderHierarchy.MODULE)
+        return mapping.get(parent_module, ())
 
     def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
         """Find all providers for the module.
@@ -251,7 +214,6 @@ async def map_first_party_python_targets_to_modules(
     _: FirstPartyPythonTargetsMappingMarker,
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
-    python_namespace_packages: PythonNamespacePackages,
 ) -> FirstPartyPythonMappingImpl:
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
@@ -269,11 +231,7 @@ async def map_first_party_python_targets_to_modules(
         )
         module = module_from_stripped_path(stripped_f)
         resolves_to_modules_to_providers[resolve][module].append(
-            ModuleProvider(
-                tgt.address,
-                provider_type,
-                ModuleProviderHierarchy.PARENT if module in python_namespace_packages else ModuleProviderHierarchy.MODULE,
-            )
+            ModuleProvider(tgt.address, provider_type)
         )
 
     return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
@@ -325,7 +283,6 @@ class ThirdPartyPythonModuleMapping(
 async def map_third_party_modules_to_addresses(
     all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
-    python_namespace_packages: PythonNamespacePackages,
 ) -> ThirdPartyPythonModuleMapping:
     resolves_to_modules_to_providers: DefaultDict[
         ResolveName, DefaultDict[str, list[ModuleProvider]]
@@ -340,7 +297,6 @@ async def map_third_party_modules_to_addresses(
                     ModuleProvider(
                         tgt.address,
                         ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
-                        ModuleProviderHierarchy.PARENT if module in python_namespace_packages else ModuleProviderHierarchy.MODULE,
                     )
                 )
 
@@ -434,6 +390,7 @@ async def map_module_to_address(
         *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     ]
+
     addresses = tuple(provider.addr for provider in providers)
 
     # There's no ambiguity if there are only 0-1 providers.
@@ -446,6 +403,18 @@ async def map_module_to_address(
         providers[1].typ == ModuleProviderType.TYPE_STUB
     ):
         return PythonModuleOwners(addresses)
+
+    MODULE_MAPPING = {  # Exists in, and should be taken from `BUILD.__defaults__.python_requirements.module_mapping`
+      "pacifica-cli": ["pacifica.cli"],
+    }
+
+    addresses_for_mapped_modules = tuple(
+        provider.addr
+        for provider in providers
+        if request.module in MODULE_MAPPING.get(provider.addr.generated_name, ())
+    )
+    if len(addresses_for_mapped_modules) == 1:
+        return PythonModuleOwners(addresses_for_mapped_modules)
 
     return PythonModuleOwners((), ambiguous=addresses)
 
