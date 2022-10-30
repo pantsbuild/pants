@@ -8,6 +8,7 @@ import hashlib
 import logging
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
+SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin/")
 
 
 @frozen_after_init
@@ -321,7 +322,7 @@ class TarBinary(BinaryPath):
     ) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" else ()
+        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" and sys.platform == "linux" else ()
         return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 

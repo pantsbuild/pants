@@ -142,7 +142,8 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 2
     assert (
-        "./f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
+        "./f.go:4:5: fmt.Printf format %s reads arg #1, but call has 0 args"
+        in lint_results[0].stderr
     )
 
 
@@ -165,7 +166,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 2
     assert (
-        "bad/f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
+        "bad/f.go:4:5: fmt.Printf format %s reads arg #1, but call has 0 args"
+        in lint_results[0].stderr
     )
     assert "good/f.go" not in lint_results[0].stdout
 
