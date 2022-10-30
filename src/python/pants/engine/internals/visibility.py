@@ -8,15 +8,11 @@ from enum import Enum
 from fnmatch import fnmatch
 from typing import ClassVar, Iterable, Mapping, Tuple, Union, cast
 
+from typing_extensions import Literal
+
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
-
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal  # type: ignore[misc]
-
 
 logger = logging.getLogger(__name__)
 
