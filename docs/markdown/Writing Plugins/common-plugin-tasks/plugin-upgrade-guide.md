@@ -711,7 +711,7 @@ This is tracked by <https://github.com/pantsbuild/pants/issues/10917>.
 
 If you have any custom fields that act like the dependencies field, but do not subclass `Dependencies`, there are two new mechanisms for better support.
 
-1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependees`.
+1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependents`.
 2. You can use `UnparsedAddressInputs` from `pants.engine.addresses` to resolve the addresses:
 
 ```python
