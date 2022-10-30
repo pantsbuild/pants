@@ -244,8 +244,11 @@ async def get_build_file_visibility_implementation(
     union_membership: UnionMembership,
 ) -> MaybeBuildFileVisibilityImplementation:
     request_types = union_membership.get(BuildFileVisibilityImplementationRequest)
-    assert len(request_types) <= 1  # TODO: provide proper error message in case of multiple
-    # visibility implementations.
+    if len(request_types) > 1:
+        impls = ", ".join(map(str, request_types))
+        raise AssertionError(
+            f"There must be at most one BUILD file visibility implementation, got: {impls}"
+        )
     for request_type in request_types:
         impl = await Get(
             BuildFileVisibilityImplementation,

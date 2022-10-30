@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import logging
 from collections import namedtuple
+from textwrap import dedent
 
 import pytest
 
+from pants.backend.experimental.visibility.register import rules
+from pants.core.target_types import GenericTarget
+from pants.engine.addresses import Address
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.internals.visibility import (
     BuildFileVisibility,
     BuildFileVisibilityParserState,
@@ -16,6 +21,15 @@ from pants.engine.internals.visibility import (
     VisibilityRule,
 )
 from pants.testutil.pytest_util import assert_logged, no_exception
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[*rules(), QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
+        target_types=[GenericTarget],
+    )
 
 
 def test_create_default_visibility() -> None:
@@ -163,3 +177,92 @@ def test_visibility_action(caplog) -> None:
     with pytest.raises(VisibilityActionDeniedError, match=violation_msg):
         VisibilityAction("deny").execute(description_of_origin="test")
     assert_logged(caplog, expect_logged=None)
+
+
+def denied():
+    return engine_error(VisibilityActionDeniedError, contains="Visibility violation for test")
+
+
+@pytest.mark.parametrize(
+    "rules, kwargs, expect_error",
+    [
+        ([], {}, None),
+        ([], dict(default="deny"), denied()),
+        (["src/origin"], dict(default="deny"), None),
+        (["!src/origin"], dict(default="allow"), denied()),
+        (["!src/origin/nested"], dict(default="allow"), None),
+        (["src/origin/nested"], dict(default="deny"), denied()),
+        (["!src/a", "!src/b", "!src/origin", "!src/c"], dict(default="allow"), denied()),
+        (["!src/a", "!src/b", "!src/c"], dict(default="allow"), None),
+        (["src/a", "src/b", "src/origin", "src/c"], dict(default="deny"), None),
+        (["src/a", "src/b", "src/c"], dict(default="deny"), denied()),
+    ],
+)
+def test_dependents_visibility(
+    rule_runner: RuleRunner, rules: list[str], kwargs, expect_error
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/dependency/BUILD": dedent(
+                f"""\
+                __dependents_visibility__({{target:{rules}}}, **{kwargs})
+                target()
+                """
+            ),
+            "src/origin/BUILD": dedent(
+                """\
+                target(dependencies=["src/dependency:tgt"])
+                """
+            ),
+        },
+    )
+
+    with expect_error or no_exception():
+        rule_runner.request(
+            TargetAdaptor,
+            [
+                TargetAdaptorRequest(
+                    Address("src/dependency"),
+                    address_of_origin=Address("src/origin"),
+                    description_of_origin="test",
+                )
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    "rules, kwargs, expect_error",
+    [
+        ([], {}, None),
+        (["src/dependency"], dict(default="deny"), None),
+        (["src/dependency/nested"], dict(default="deny"), denied()),
+        (["src/*"], dict(default="deny"), None),
+        (["!src/*"], dict(default="allow"), denied()),
+    ],
+)
+def test_dependencies_visibility(
+    rule_runner: RuleRunner, rules: list[str], kwargs, expect_error
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/dependency/BUILD": "target()",
+            "src/origin/BUILD": dedent(
+                f"""\
+                __dependencies_visibility__({{target:{rules}}}, **{kwargs})
+                target(dependencies=["src/dependency:tgt"])
+                """
+            ),
+        },
+    )
+
+    with expect_error or no_exception():
+        rule_runner.request(
+            TargetAdaptor,
+            [
+                TargetAdaptorRequest(
+                    Address("src/dependency"),
+                    address_of_origin=Address("src/origin"),
+                    description_of_origin="test",
+                )
+            ],
+        )

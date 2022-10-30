@@ -206,13 +206,18 @@ async def parse_address_family(
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
+    # Without a backend registering a BUILD file visibility implementation, the visibility checks
+    # becomes no-ops.
+    build_file_visibility_class = (
+        maybe_build_file_visibility_implementation.build_file_visibility_class
+    )
     dependents_visibility_parser_state = BuildFileVisibilityParserState(
         dependents_visibility,
-        build_file_visibility_class=maybe_build_file_visibility_implementation.build_file_visibility_class,
+        build_file_visibility_class=build_file_visibility_class,
     )
     dependencies_visibility_parser_state = BuildFileVisibilityParserState(
         dependencies_visibility,
-        build_file_visibility_class=maybe_build_file_visibility_implementation.build_file_visibility_class,
+        build_file_visibility_class=build_file_visibility_class,
     )
     address_maps = [
         AddressMap.parse(
@@ -269,7 +274,10 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
 
 
 @rule
-async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
+async def find_target_adaptor(
+    request: TargetAdaptorRequest,
+    maybe_build_file_visibility_implementation: MaybeBuildFileVisibilityImplementation,
+) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address = request.address
     if address.is_generated_target:
@@ -290,6 +298,17 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )
+
+    # Visibility checks will only be applied on requests with an `address_of_origin`.
+    if not maybe_origin_family:
+        return target_adaptor
+
+    build_file_visibility_class = (
+        maybe_build_file_visibility_implementation.build_file_visibility_class
+    )
+    if build_file_visibility_class is None:
+        return target_adaptor
+
     for origin_family in maybe_origin_family:
         if (
             address_family.dependents_visibility is None
@@ -299,7 +318,7 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
         origin_target = origin_family.get_target_adaptor(cast(Address, request.address_of_origin))
         if origin_target is None:
             break
-        action = BuildFileVisibility.check_visibility(
+        action = build_file_visibility_class.check_visibility(
             source_type=origin_target.type_alias,
             source_path=origin_family.namespace,
             dependencies_visibility=origin_family.dependencies_visibility,
