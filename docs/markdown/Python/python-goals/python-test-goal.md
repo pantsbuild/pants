@@ -499,3 +499,21 @@ report = true
 ```
 
 This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
+
+PYTEST_ADDOPTS environment variable
+-----------------------------------
+
+You can set `PYTEST_ADDOPTS` environment variable to add your own command line options, like this:
+
+```python BUILD
+python_tests(
+    name="tests",
+    ...
+    extra_env_vars=[
+        "PYTEST_ADDOPTS=-p myplugin --reuse-db",
+    ],
+    ...
+)
+```
+
+Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). In order to preserve the communication channel with Pytest, `PYTEST_ADDOPTS` is not allowed to override these hardwired CLI args.

@@ -334,7 +334,7 @@ async def setup_pytest_for_target(
             )
         results_file_name = f"{results_file_prefix}.xml"
         pytest_args.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
+            (f"--junit-xml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
         output_files.append(results_file_name)
 

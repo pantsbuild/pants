@@ -566,10 +566,42 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_pytest_addopts(rule_runner: RuleRunner) -> None:
+def test_pytest_addopts_test_extra_env(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/test_pytest_addopts.py": dedent(
+            f"{PACKAGE}/test_pytest_addopts_test_extra_env.py": dedent(
+                """\
+                import os
+
+                def test_addopts():
+                    assert "-vv" in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" in os.getenv("PYTEST_ADDOPTS")
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests()
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_test_extra_env.py")
+    )
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_pytest_addopts_field_set_extra_env(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_pytest_addopts_field_set_extra_env.py": dedent(
                 """\
                 import os
 
@@ -591,12 +623,14 @@ def test_pytest_addopts(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_pytest_addopts.py"))
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_field_set_extra_env.py")
+    )
     result = run_pytest(
         rule_runner,
         [tgt],
         extra_args=[
-            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",  # should be overriden by `python_tests`
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",  # should be overridden by `python_tests`
         ],
     )
     assert result.exit_code == 0
