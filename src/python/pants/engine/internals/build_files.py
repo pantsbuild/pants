@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import builtins
 import itertools
-import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -33,7 +32,6 @@ from pants.engine.internals.visibility import (
     BuildFileVisibility,
     BuildFileVisibilityParserState,
     MaybeBuildFileVisibilityImplementation,
-    VisibilityAction,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
@@ -41,8 +39,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -311,21 +307,7 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             target_path=address_family.namespace,
             dependents_visibility=address_family.dependents_visibility,
         )
-        if action == VisibilityAction.ALLOW:
-            break
-        if action == VisibilityAction.WARN:
-            # TODO: fix msg
-            logger.warning(
-                f"visibility violation {request.address_of_origin} from {request.description_of_origin}"
-                f" to {address}"
-            )
-            break
-        if action == VisibilityAction.DENY:
-            # TODO: fix msg and error type
-            raise Exception(
-                f"visibility violation {request.address_of_origin} from {request.description_of_origin}"
-                f" to {address}"
-            )
+        action.execute(description_of_origin=request.description_of_origin)
     return target_adaptor
 
 

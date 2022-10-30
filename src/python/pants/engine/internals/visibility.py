@@ -2,24 +2,51 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from fnmatch import fnmatch
-from typing import ClassVar, Iterable, Literal, Mapping, Tuple, Union, cast
+from typing import ClassVar, Iterable, Mapping, Tuple, Union, cast
 
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal  # type: ignore[misc]
+
+
+logger = logging.getLogger(__name__)
+
 
 SetVisibilityValueT = Tuple[str, ...]
 SetVisibilityKeyT = Union[str, Tuple[str, ...]]
 SetVisibilityT = Mapping[SetVisibilityKeyT, SetVisibilityValueT]
 
 
+class VisibilityError(Exception):
+    pass
+
+
+class VisibilityActionDeniedError(VisibilityError):
+    pass
+
+
 class VisibilityAction(Enum):
     ALLOW = "allow"
     DENY = "deny"
     WARN = "warn"
+
+    def execute(self, *, description_of_origin: str) -> None:
+        if self is VisibilityAction.ALLOW:
+            return
+        msg = f"Visibility violation for {description_of_origin}"
+        if self is VisibilityAction.DENY:
+            raise VisibilityActionDeniedError(msg)
+        if self is VisibilityAction.WARN:
+            logger.warning(msg)
 
 
 SetDefaultVisibilityT = Union[Literal["allow"], Literal["deny"], Literal["warn"]]

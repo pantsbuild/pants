@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import namedtuple
 
 import pytest
@@ -11,9 +12,10 @@ from pants.engine.internals.visibility import (
     BuildFileVisibility,
     BuildFileVisibilityParserState,
     VisibilityAction,
+    VisibilityActionDeniedError,
     VisibilityRule,
 )
-from pants.testutil.pytest_util import no_exception
+from pants.testutil.pytest_util import assert_logged, no_exception
 
 
 def test_create_default_visibility() -> None:
@@ -145,3 +147,19 @@ def test_check_visibility(source_path: str, target_path: str, expected_action: s
         target_path=target_path,
         dependents_visibility=dependents_visibility,
     ) == VisibilityAction(expected_action)
+
+
+def test_visibility_action(caplog) -> None:
+    violation_msg = "Visibility violation for test"
+
+    VisibilityAction("allow").execute(description_of_origin="test")
+    assert_logged(caplog, expect_logged=None)
+    caplog.clear()
+
+    VisibilityAction("warn").execute(description_of_origin="test")
+    assert_logged(caplog, expect_logged=[(logging.WARNING, violation_msg)])
+    caplog.clear()
+
+    with pytest.raises(VisibilityActionDeniedError, match=violation_msg):
+        VisibilityAction("deny").execute(description_of_origin="test")
+    assert_logged(caplog, expect_logged=None)

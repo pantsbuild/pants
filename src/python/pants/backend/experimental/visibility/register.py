@@ -47,7 +47,9 @@ async def visibility_validate_dependencies(
             TargetAdaptorRequest(
                 address=dependency_address.maybe_convert_to_target_generator(),
                 address_of_origin=address,
-                description_of_origin=f"dependency visibility validation for {request.field_set.address}",
+                description_of_origin=(
+                    f"dependency validation of {request.field_set.address} on {dependency_address}"
+                ),
             ),
         )
         for dependency_address in request.dependencies
