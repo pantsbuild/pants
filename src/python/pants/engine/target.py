@@ -711,13 +711,10 @@ class WrappedTargetRequest:
 
     `description_of_origin` is used for error messages when the address does not actually exist. If
     you are confident this cannot happen, set the string to something like `<infallible>`.
-
-    Provide `address_of_origin` to check visibility rules between the two target addresses.
     """
 
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
-    address_of_origin: Address | None = None
 
 
 @dataclass(frozen=True)

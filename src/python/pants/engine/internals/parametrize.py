@@ -143,7 +143,6 @@ class _TargetParametrization:
 class _TargetParametrizationsRequest(EngineAwareParameter):
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
-    address_of_origin: Address | None = None
 
     def __post_init__(self) -> None:
         if self.address.is_parametrized or self.address.is_generated_target:

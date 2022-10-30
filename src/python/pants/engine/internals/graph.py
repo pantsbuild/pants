@@ -173,19 +173,11 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
 
 @rule_helper
 async def _determine_target_adaptor_and_type(
-    address: Address,
-    registered_target_types: RegisteredTargetTypes,
-    *,
-    address_of_origin: Address | None,
-    description_of_origin: str,
+    address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
 ) -> tuple[TargetAdaptor, type[Target]]:
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(
-            address,
-            address_of_origin=address_of_origin,
-            description_of_origin=description_of_origin,
-        ),
+        TargetAdaptorRequest(address, description_of_origin=description_of_origin),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -211,10 +203,7 @@ async def resolve_target_parametrizations(
 ) -> _TargetParametrizations:
     address = request.address
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
-        address,
-        registered_target_types,
-        address_of_origin=request.address_of_origin,
-        description_of_origin=request.description_of_origin,
+        address, registered_target_types, description_of_origin=request.description_of_origin
     )
 
     target = None
@@ -366,9 +355,7 @@ async def resolve_target(
         _TargetParametrizations,
         {
             _TargetParametrizationsRequest(
-                base_address,
-                address_of_origin=request.address_of_origin,
-                description_of_origin=request.description_of_origin,
+                base_address, description_of_origin=request.description_of_origin
             ): _TargetParametrizationsRequest,
             local_environment_name.val: EnvironmentName,
         },
@@ -411,7 +398,6 @@ async def resolve_target_for_bootstrapping(
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
         request.address,
         registered_target_types,
-        address_of_origin=request.address_of_origin,
         description_of_origin=request.description_of_origin,
     )
     target = target_type(
@@ -1164,7 +1150,6 @@ async def _fill_parameters(
             {
                 _TargetParametrizationsRequest(
                     address.maybe_convert_to_target_generator(),
-                    address_of_origin=consumer_tgt.address,
                     description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
                 ): _TargetParametrizationsRequest,
                 local_environment_name.val: EnvironmentName,

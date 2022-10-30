@@ -60,11 +60,7 @@ async def determine_main_pkg_for_go_binary(
         )
         wrapped_specified_tgt = await Get(
             WrappedTarget,
-            WrappedTargetRequest(
-                specified_address,
-                address_of_origin=addr,
-                description_of_origin=description_of_origin,
-            ),
+            WrappedTargetRequest(specified_address, description_of_origin=description_of_origin),
         )
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(
