@@ -148,6 +148,7 @@ async def _find_explict_owning_go_mod_address(
         WrappedTarget,
         WrappedTargetRequest(
             candidate_go_mod_address,
+            address_of_origin=address,
             description_of_origin=f"the `{GoOwningGoModAddressField.alias}` field of target `{address}`",
         ),
     )

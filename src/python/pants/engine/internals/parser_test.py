@@ -13,6 +13,7 @@ from pants.engine.internals.parser import (
     Parser,
     _extract_symbol_from_name_error,
 )
+from pants.engine.internals.visibility import BuildFileVisibilityParserState
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.testutil.pytest_util import no_exception
@@ -40,6 +41,8 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
             defaults_parser_state,
+            dependents_visibility=BuildFileVisibilityParserState(None),
+            dependencies_visibility=BuildFileVisibilityParserState(None),
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
@@ -65,13 +68,16 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
+                dependents_visibility=BuildFileVisibilityParserState(None),
+                dependencies_visibility=BuildFileVisibilityParserState(None),
             )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
             "If you expect to see more symbols activated in the below list,"
             f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
-            f"All registered symbols: ['__defaults__', 'build_file_dir', 'caof', {fmt_extra_sym}"
+            "All registered symbols: ['__defaults__', '__dependencies_visibility__', "
+            f"'__dependents_visibility__', 'build_file_dir', 'caof', {fmt_extra_sym}"
             "'obj', 'prelude', 'tgt']"
         )
 
@@ -87,6 +93,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
+                dependents_visibility=BuildFileVisibilityParserState(None),
+                dependencies_visibility=BuildFileVisibilityParserState(None),
             )
 
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]

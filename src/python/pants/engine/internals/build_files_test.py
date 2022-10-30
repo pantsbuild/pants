@@ -29,6 +29,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.internals.visibility import MaybeBuildFileVisibilityImplementation
 from pants.engine.target import (
     Dependencies,
     MultipleSourcesField,
@@ -64,6 +65,7 @@ def test_parse_address_family_empty() -> None:
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
+            MaybeBuildFileVisibilityImplementation(None),
         ],
         mock_gets=[
             MockGet(

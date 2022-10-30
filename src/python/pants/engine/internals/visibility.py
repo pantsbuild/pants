@@ -96,7 +96,7 @@ class BuildFileVisibility:
         return self.default
 
     @staticmethod
-    def check_dependency(
+    def check_visibility(
         *,
         source_type: str,
         source_path: str,

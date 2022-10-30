@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import builtins
 import itertools
+import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any
+from typing import Any, cast
 
 from pants.build_graph.address import (
     Address,
@@ -32,6 +33,7 @@ from pants.engine.internals.visibility import (
     BuildFileVisibility,
     BuildFileVisibilityParserState,
     MaybeBuildFileVisibilityImplementation,
+    VisibilityAction,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
@@ -39,6 +41,8 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -277,7 +281,11 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             "Generated targets are not defined in BUILD files, and so do not have "
             f"TargetAdaptors: {request}"
         )
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family, *maybe_origin_family = await MultiGet(
+        Get(AddressFamily, AddressFamilyDir(addr.spec_path))
+        for addr in (address, request.address_of_origin)
+        if addr is not None
+    )
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
         raise ResolveError.did_you_mean(
@@ -286,6 +294,38 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )
+    for origin_family in maybe_origin_family:
+        if (
+            address_family.dependents_visibility is None
+            or origin_family.dependencies_visibility is None
+        ):
+            break
+        origin_target = origin_family.get_target_adaptor(cast(Address, request.address_of_origin))
+        if origin_target is None:
+            break
+        action = BuildFileVisibility.check_visibility(
+            source_type=origin_target.type_alias,
+            source_path=origin_family.namespace,
+            dependencies_visibility=origin_family.dependencies_visibility,
+            target_type=target_adaptor.type_alias,
+            target_path=address_family.namespace,
+            dependents_visibility=address_family.dependents_visibility,
+        )
+        if action == VisibilityAction.ALLOW:
+            break
+        if action == VisibilityAction.WARN:
+            # TODO: fix msg
+            logger.warning(
+                f"visibility violation {request.address_of_origin} from {request.description_of_origin}"
+                f" to {address}"
+            )
+            break
+        if action == VisibilityAction.DENY:
+            # TODO: fix msg and error type
+            raise Exception(
+                f"visibility violation {request.address_of_origin} from {request.description_of_origin}"
+                f" to {address}"
+            )
     return target_adaptor
 
 

@@ -540,7 +540,9 @@ async def validate_python_dependencies(
         Get(
             WrappedTarget,
             WrappedTargetRequest(
-                d, description_of_origin=f"the dependencies of {request.field_set.address}"
+                d,
+                address_of_origin=request.field_set.address,
+                description_of_origin=f"the dependencies of {request.field_set.address}",
             ),
         )
         for d in request.dependencies

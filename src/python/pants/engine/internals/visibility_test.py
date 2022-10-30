@@ -126,7 +126,7 @@ def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: st
         ("src/blocked/a", "tgt/blocked/b", "deny"),
     ],
 )
-def test_check_dependency(source_path: str, target_path: str, expected_action: str) -> None:
+def test_check_visibility(source_path: str, target_path: str, expected_action: str) -> None:
     # Source rules.
     dependencies_visibility = BuildFileVisibility.create(
         # Rules for outgoing visibility.
@@ -137,7 +137,7 @@ def test_check_dependency(source_path: str, target_path: str, expected_action: s
         # Rules for incoming visibility.
         all=("src/ok/*", "?src/dubious/*", "!src/blocked/*"),
     )
-    assert BuildFileVisibility.check_dependency(
+    assert BuildFileVisibility.check_visibility(
         source_type="dependent_target",
         source_path=source_path,
         dependencies_visibility=dependencies_visibility,

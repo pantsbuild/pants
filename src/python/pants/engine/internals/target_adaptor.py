@@ -17,6 +17,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 class TargetAdaptorRequest(EngineAwareParameter):
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+    address_of_origin: Address | None = None
 
     def debug_hint(self) -> str:
         return self.address.spec
