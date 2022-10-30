@@ -40,16 +40,17 @@ def default_build_file_visibility_implementation(
 async def visibility_validate_dependencies(
     request: VisibilityValidateDependenciesRequest,
 ) -> ValidatedDependencies:
+    address = request.field_set.address.maybe_convert_to_target_generator()
     _ = await MultiGet(
         Get(
             TargetAdaptor,
             TargetAdaptorRequest(
-                address=address,
-                address_of_origin=request.field_set.address,
+                address=dependency_address.maybe_convert_to_target_generator(),
+                address_of_origin=address,
                 description_of_origin=f"dependency visibility validation for {request.field_set.address}",
             ),
         )
-        for address in request.dependencies
+        for dependency_address in request.dependencies
     )
     return ValidatedDependencies()
 
