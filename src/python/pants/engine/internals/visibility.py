@@ -223,7 +223,7 @@ async def get_build_file_visibility_implementation(
         impl = await Get(
             BuildFileVisibilityImplementation,
             BuildFileVisibilityImplementationRequest,
-            request_type,
+            request_type(),
         )
         return MaybeBuildFileVisibilityImplementation(impl.build_file_visibility_class)
     return MaybeBuildFileVisibilityImplementation(None)
