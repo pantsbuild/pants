@@ -39,7 +39,10 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import ChosenLocalEnvironmentName
+from pants.core.util_rules.environments import (
+    ChosenLocalEnvironmentName,
+    SingleEnvironmentNameRequest,
+)
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -301,8 +304,8 @@ def run_test_rule(
                 ),
                 MockGet(
                     output_type=EnvironmentName,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=lambda _b, _e: EnvironmentName(None),
+                    input_types=(SingleEnvironmentNameRequest,),
+                    mock=lambda _a: EnvironmentName(None),
                 ),
                 MockGet(
                     output_type=TestResult,
