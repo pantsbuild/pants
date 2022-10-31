@@ -930,9 +930,12 @@ fn maybe_add_workunit(
 fn make_wrapper_for_append_only_caches(
   caches: &BTreeMap<CacheName, RelativePath>,
   base_path: &str,
+  working_directory: Option<&str>,
 ) -> Result<String, String> {
   let mut script = String::new();
   writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+  // Setup the append-only caches.
   for (cache_name, path) in caches {
     writeln!(
       &mut script,
@@ -954,6 +957,28 @@ fn make_wrapper_for_append_only_caches(
     )
     .map_err(|err| format!("write! failed: {err}"))?;
   }
+
+  // Change into any working directory.
+  //
+  // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
+  // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
+  // first.
+  if let Some(path) = working_directory {
+    writeln!(
+      &mut script,
+      concat!(
+        "cd '{0}'\n",
+        "if [ \"$?\" != 0 ]; then\n",
+        "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+        "  exit 1\n",
+        "fi\n",
+      ),
+      path
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Finally, execute the process.
   writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
   Ok(script)
 }
@@ -975,24 +1000,22 @@ pub async fn make_execute_request(
   store: &Store,
   append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
-  const CACHES_WRAPPER: &str = "./__wrapper__";
+  const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
 
-  // Implement append-only caches by running a wrapper script before the actual
-
+  // Implement append-only caches by running a wrapper script before the actual program
+  // to be invoked in the remote environment.
   let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
     (Some(base_path), caches) if !caches.is_empty() => {
-      if req.working_directory.is_some() {
-        return Err(
-          "TODO-DEV: Append-only caches and working directory cannot be set together in remote execution.".into()
-        );
-      }
-      // TODO-WIP: Make the base path configurable.
-      let script = make_wrapper_for_append_only_caches(caches, base_path)?;
+      let script = make_wrapper_for_append_only_caches(
+        caches,
+        base_path,
+        req.working_directory.as_ref().and_then(|p| p.to_str()),
+      )?;
       let digest = store
         .store_file_bytes(Bytes::from(script), false)
         .await
-        .map_err(|err| format!("Failed to store wrapper script: {err}"))?;
-      let path = RelativePath::new(Path::new(CACHES_WRAPPER))?;
+        .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+      let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
       let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
       let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
       Some(directory_digest)
@@ -1003,7 +1026,7 @@ pub async fn make_execute_request(
   let arguments = match &wrapper_script_digest_opt {
     Some(_) => {
       let mut args = Vec::with_capacity(req.argv.len() + 1);
-      args.push(CACHES_WRAPPER.to_string());
+      args.push(WRAPPER_SCRIPT.to_string());
       args.extend(req.argv.iter().cloned());
       args
     }
@@ -1103,10 +1126,14 @@ pub async fn make_execute_request(
   command.output_directories = output_directories;
 
   if let Some(working_directory) = &req.working_directory {
-    command.working_directory = working_directory
-      .to_str()
-      .map(str::to_owned)
-      .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    // Do not set `working_directory` if a wrapper script is in use because the wrapper script
+    // will change to the working directory itself.
+    if wrapper_script_digest_opt.is_none() {
+      command.working_directory = working_directory
+        .to_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    }
   }
 
   if req.jdk_home.is_some() {
