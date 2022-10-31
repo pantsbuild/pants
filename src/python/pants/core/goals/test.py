@@ -21,7 +21,6 @@ from pants.core.util_rules.environments import (
     EnvironmentNameRequest,
 )
 from pants.core.util_rules.partitions import (
-    PartitionElementT,
     PartitionerType,
     PartitionMetadataT,
     Partitions,
@@ -311,12 +310,13 @@ class TestRequest:
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class PartitionRequest(_PartitionFieldSetsRequestBase[_TestFieldSetT]):
-        pass
+        def metadata(self) -> dict[str, Any]:
+            return {"addresses": [field_set.address.spec for field_set in self.field_sets]}
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
+    class Batch(_BatchBase[_TestFieldSetT, PartitionMetadataT]):
         @property
-        def single_element(self) -> PartitionElementT:
+        def single_element(self) -> _TestFieldSetT:
             """Return the single element of this batch.
 
             NOTE: Accessing this property will raise a `TypeError` if this `Batch` contains
@@ -333,6 +333,18 @@ class TestRequest:
                 )
 
             return self.elements[0]
+
+        def debug_hint(self) -> str:
+            if len(self.elements) == 1:
+                return self.elements[0].address.spec
+
+            return f"{self.elements[0].address.spec} and {len(self.elements)-1} other files"
+
+        def metadata(self) -> dict[str, Any]:
+            return {
+                "addresses": [field_set.address.spec for field_set in self.elements],
+                "partition_description": self.partition_metadata.description,
+            }
 
     @classmethod
     def rules(cls) -> Iterable:
