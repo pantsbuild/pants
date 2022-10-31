@@ -939,18 +939,18 @@ fn make_wrapper_for_append_only_caches(
   for (cache_name, path) in caches {
     writeln!(
       &mut script,
-      "mkdir -p '{}/{}'",
+      "/bin/mkdir -p '{}/{}'",
       base_path,
       cache_name.name()
     )
     .map_err(|err| format!("write! failed: {err:?}"))?;
     if let Some(parent) = path.parent() {
-      writeln!(&mut script, "mkdir -p '{}'", parent.to_string_lossy())
+      writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
         .map_err(|err| format!("write! failed: {err}"))?;
     }
     writeln!(
       &mut script,
-      "ln -s '{}/{}' '{}'",
+      "/bin/ln -s '{}/{}' '{}'",
       base_path,
       cache_name.name(),
       path.as_path().to_string_lossy()
