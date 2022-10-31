@@ -12,12 +12,16 @@ from typing import Optional, cast
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
+from pants import ox
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
+from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
@@ -125,22 +129,24 @@ class PluginResolver:
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-        for resolved_plugin_location in self._resolve_plugins(
-            options_bootstrapper, env, self._request
-        ):
-            site.addsitedir(
-                resolved_plugin_location
-            )  # Activate any .pth files plugin wheels may have.
-            self._working_set.add_entry(resolved_plugin_location)
+
+        with ox.traditional_import_machinery():
+            for resolved_plugin_location in self._resolve_plugins(
+                options_bootstrapper, env, self._request
+            ):
+                site.addsitedir(
+                    resolved_plugin_location
+                )  # Activate any .pth files plugin wheels may have.
+                self._working_set.add_entry(resolved_plugin_location)
         return self._working_set
 
     def _resolve_plugins(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         request: PluginsRequest,
     ) -> ResolvedPluginDistributions:
         session = self._scheduler.scheduler.new_session(
@@ -148,18 +154,19 @@ class PluginResolver:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
-                    CompleteEnvironment: env,
+                    CompleteEnvironmentVars: env,
                 }
             ),
         )
+        params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [request])[0],
+            session.product_request(ResolvedPluginDistributions, [params])[0],
         )
 
 
 def rules():
     return [
-        QueryRule(ResolvedPluginDistributions, [PluginsRequest]),
+        QueryRule(ResolvedPluginDistributions, [PluginsRequest, EnvironmentName]),
         *collect_rules(),
     ]

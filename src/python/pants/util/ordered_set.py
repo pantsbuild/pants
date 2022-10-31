@@ -62,7 +62,9 @@ class _AbstractOrderedSet(AbstractSet[T]):
         """Returns True if other is the same type with the same elements and same order."""
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return all(x == y for x, y in itertools.zip_longest(self._items, other._items))
+        return len(self._items) == len(other._items) and all(
+            x == y for x, y in zip(self._items, other._items)
+        )
 
     def __or__(self: _TAbstractOrderedSet, other: Iterable[T]) -> _TAbstractOrderedSet:  # type: ignore[override]
         return self.union(other)

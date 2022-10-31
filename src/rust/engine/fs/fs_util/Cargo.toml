@@ -14,6 +14,7 @@ grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
 futures = "0.3"
 hashing = { path = "../../hashing" }
+log = "0.4"
 parking_lot = "0.12"
 prost = "0.9"
 rand = "0.8"
@@ -22,5 +23,5 @@ serde_json = "1.0"
 serde_derive = "1.0"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-tokio = { version = "1.16", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../../workunit_store" }

@@ -141,6 +141,7 @@ async fn fetch_multiple_chunks_nonfactor() {
 
 #[tokio::test]
 async fn write_file_one_chunk() {
+  let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
 
@@ -197,6 +198,7 @@ async fn write_file_multiple_chunks() {
 
 #[tokio::test]
 async fn write_empty_file() {
+  let _ = WorkunitStore::setup_for_tests();
   let empty_file = TestData::empty();
   let cas = StubCAS::empty();
 
@@ -212,6 +214,7 @@ async fn write_empty_file() {
 
 #[tokio::test]
 async fn write_file_errors() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);

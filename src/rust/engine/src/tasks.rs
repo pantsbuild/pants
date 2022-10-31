@@ -5,13 +5,12 @@ use std::fmt;
 
 use crate::intrinsics::Intrinsics;
 use crate::python::{Function, TypeId};
-use crate::selectors::{DependencyKey, Get, Select};
 
 use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
 use internment::Intern;
 use log::Level;
-use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
+use rule_graph::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Query};
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
@@ -28,7 +27,7 @@ impl DisplayForGraph for Rule {
         let task_name = task.func.full_name();
         let product = format!("{}", task.product);
 
-        let clause_portion = Self::formatted_select_clause(&task.clause, display_args);
+        let clause_portion = Self::formatted_positional_arguments(&task.args, display_args);
 
         let get_clauses = task
           .gets
@@ -63,7 +62,7 @@ impl DisplayForGraph for Rule {
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, display_args),
+        Self::formatted_positional_arguments(&intrinsic.inputs, display_args),
         intrinsic.product,
       ),
     }
@@ -72,7 +71,6 @@ impl DisplayForGraph for Rule {
 
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
-  type DependencyKey = DependencyKey;
 
   fn product(&self) -> TypeId {
     match self {
@@ -81,26 +79,24 @@ impl rule_graph::Rule for Rule {
     }
   }
 
-  fn dependency_keys(&self) -> Vec<DependencyKey> {
+  fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
     match self {
-      &Rule::Task(task) => task
-        .clause
-        .iter()
-        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .chain(task.gets.iter().map(|g| DependencyKey::JustGet(*g)))
-        .collect(),
-      &Rule::Intrinsic(intrinsic) => intrinsic
-        .inputs
-        .iter()
-        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .collect(),
+      Rule::Task(task) => task.args.iter().chain(task.gets.iter()).collect(),
+      Rule::Intrinsic(intrinsic) => intrinsic.inputs.iter().collect(),
+    }
+  }
+
+  fn masked_params(&self) -> Vec<Self::TypeId> {
+    match self {
+      Rule::Task(task) => task.masked_types.clone(),
+      Rule::Intrinsic(_) => vec![],
     }
   }
 
   fn require_reachable(&self) -> bool {
     match self {
-      &Rule::Task(_) => true,
-      &Rule::Intrinsic(_) => false,
+      Rule::Task(_) => true,
+      Rule::Intrinsic(_) => false,
     }
   }
 
@@ -113,7 +109,10 @@ impl rule_graph::Rule for Rule {
 }
 
 impl Rule {
-  fn formatted_select_clause(clause: &[TypeId], display_args: DisplayForGraphArgs) -> String {
+  fn formatted_positional_arguments(
+    clause: &[DependencyKey<TypeId>],
+    display_args: DisplayForGraphArgs,
+  ) -> String {
     let select_clauses = clause
       .iter()
       .map(|type_id| type_id.to_string())
@@ -147,11 +146,9 @@ pub struct Task {
   pub product: TypeId,
   pub side_effecting: bool,
   pub engine_aware_return_type: bool,
-  pub clause: Vec<TypeId>,
-  pub gets: Vec<Get>,
-  // TODO: This is a preliminary implementation of #12934: we should overhaul naming to
-  // align Query and @union/Protocol as described there.
-  pub unions: Vec<Query<Rule>>,
+  pub args: Vec<DependencyKey<TypeId>>,
+  pub gets: Vec<DependencyKey<TypeId>>,
+  pub masked_types: Vec<TypeId>,
   pub func: Function,
   pub cacheable: bool,
   pub display_info: DisplayInfo,
@@ -167,7 +164,16 @@ pub struct DisplayInfo {
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Intrinsic {
   pub product: TypeId,
-  pub inputs: Vec<TypeId>,
+  pub inputs: Vec<DependencyKey<TypeId>>,
+}
+
+impl Intrinsic {
+  pub fn new(product: TypeId, input: TypeId) -> Self {
+    Self {
+      product,
+      inputs: vec![DependencyKey::new(input)],
+    }
+  }
 }
 
 ///
@@ -176,9 +182,9 @@ pub struct Intrinsic {
 #[derive(Clone, Debug)]
 pub struct Tasks {
   rules: IndexSet<Rule>,
+  queries: IndexSet<Query<TypeId>>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
-  queries: IndexSet<Query<Rule>>,
 }
 
 ///
@@ -204,7 +210,7 @@ impl Tasks {
     &self.rules
   }
 
-  pub fn queries(&self) -> &IndexSet<Query<Rule>> {
+  pub fn queries(&self) -> &IndexSet<Query<TypeId>> {
     &self.queries
   }
 
@@ -225,6 +231,8 @@ impl Tasks {
     return_type: TypeId,
     side_effecting: bool,
     engine_aware_return_type: bool,
+    arg_types: Vec<TypeId>,
+    masked_types: Vec<TypeId>,
     cacheable: bool,
     name: String,
     desc: Option<String>,
@@ -234,47 +242,41 @@ impl Tasks {
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
+    let args = arg_types.into_iter().map(DependencyKey::new).collect();
 
     self.preparing = Some(Task {
       cacheable,
       product: return_type,
       side_effecting,
       engine_aware_return_type,
-      clause: Vec::new(),
+      args,
       gets: Vec::new(),
-      unions: Vec::new(),
+      masked_types,
       func,
       display_info: DisplayInfo { name, desc, level },
     });
   }
 
-  pub fn add_get(&mut self, output: TypeId, input: TypeId) {
+  pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get { output, input });
+      .push(DependencyKey::new(output).provided_params(inputs));
   }
 
-  pub fn add_union(&mut self, product: TypeId, params: Vec<TypeId>) {
-    let query = Query::new(product, params);
-    self.queries.insert(query.clone());
+  pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {
     self
       .preparing
       .as_mut()
-      .expect("Must `begin()` a task creation before adding unions!")
-      .unions
-      .push(query);
-  }
-
-  pub fn add_select(&mut self, selector: TypeId) {
-    self
-      .preparing
-      .as_mut()
-      .expect("Must `begin()` a task creation before adding clauses!")
-      .clause
-      .push(selector);
+      .expect("Must `begin()` a task creation before adding a union get!")
+      .gets
+      .push(
+        DependencyKey::new(output)
+          .provided_params(inputs)
+          .in_scope_params(in_scope),
+      );
   }
 
   pub fn task_end(&mut self) {

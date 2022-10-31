@@ -225,6 +225,46 @@ the value from the environment will be used.
 > 
 > We are looking into making some common dynamic data, such as the git sha, automatically available in the core Docker plugin in the future.
 
+
+Providing additional image tags with a plugin
+---------------------------------------------
+
+For cases where more customization is required and using environment variables and interpolation is
+not enough, the next option is to write a plugin to provide additional tags when building images.
+
+Demonstrated with an example:
+
+```python example/plugin.py
+from pants.backend.docker.target_types import DockerImageTagsRequest, DockerImageTags
+from pants.engine.unions import UnionRule
+from pants.engine.rules import rule, collect_rules
+from pants.engine.target import Target
+
+
+class CustomDockerImageTagsRequest(DockerImageTagsRequest):
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        # Optional. Opt-out on a per target basis.
+        if some-condition:
+            return False
+        else:
+            return True
+
+
+@rule
+async def custom_image_tags(request: CustomDockerImageTagsRequest) -> DockerImageTags:
+    custom_tags = ["some", "tags"]
+    return DockerImageTags(custom_tags)
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(DockerImageTagsRequest, CustomDockerImageTagsRequest),
+    )
+```
+
+
 All together: Registries, Repositories and Tags
 -----------------------------------------------
 

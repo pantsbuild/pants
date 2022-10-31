@@ -18,7 +18,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
@@ -93,6 +92,7 @@ class CoverageReportType(Enum):
     HTML = ("html", None)
     RAW = ("raw", None)
     JSON = ("json", None)
+    LCOV = ("lcov", None)
 
     _report_name: str
 
@@ -115,7 +115,7 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=5.5,<5.6"
+    default_version = "coverage[toml]>=6.5,<6.6"
     default_main = ConsoleScript("coverage")
 
     register_interpreter_constraints = True
@@ -235,20 +235,18 @@ class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
+    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(
-        coverage, use_pex=python_setup.generate_lockfiles_with_pex
-    )
+    return GeneratePythonLockfile.from_tool(coverage)
 
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
-    address: Address
+    addresses: tuple[Address, ...]
     digest: Digest
 
 
-class PytestCoverageDataCollection(CoverageDataCollection):
+class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
@@ -383,18 +381,20 @@ async def merge_coverage_data(
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
         coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
+        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
-    addresses = []
+    addresses: list[Address] = []
     for data in data_collection:
+        path_prefix = data.addresses[0].path_safe_spec
+        if len(data.addresses) > 1:
+            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(
-            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        )
-        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
-        addresses.append(data.address)
+        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_data_file_paths.append(f"{path_prefix}/.coverage")
+        addresses.extend(data.addresses)
 
     if coverage.global_report:
         # It's important to set the `branch` value in the empty base report to the value it will
@@ -540,7 +540,8 @@ async def generate_coverage_reports(
         report_types.append(report_type)
         output_file = (
             f"coverage.{report_type.value}"
-            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            if report_type
+            in {CoverageReportType.XML, CoverageReportType.JSON, CoverageReportType.LCOV}
             else None
         )
         args = [report_type.report_name, f"--rcfile={coverage_config.path}"]
@@ -597,15 +598,15 @@ def _get_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return ConsoleCoverageReport(coverage_insufficient, result_stdout.decode())
 
-    report_file: PurePath | None
-    if report_type == CoverageReportType.HTML:
-        report_file = output_dir / "htmlcov" / "index.html"
-    elif report_type == CoverageReportType.XML:
-        report_file = output_dir / "coverage.xml"
-    elif report_type == CoverageReportType.JSON:
-        report_file = output_dir / "coverage.json"
-    else:
-        raise ValueError(f"Invalid coverage report type: {report_type}")
+    try:
+        report_file = {
+            CoverageReportType.HTML: output_dir / "htmlcov" / "index.html",
+            CoverageReportType.XML: output_dir / "coverage.xml",
+            CoverageReportType.JSON: output_dir / "coverage.json",
+            CoverageReportType.LCOV: output_dir / "coverage.lcov",
+        }[report_type]
+    except KeyError:
+        raise ValueError(f"Invalid coverage report type: {report_type}") from None
 
     return FilesystemCoverageReport(
         coverage_insufficient=coverage_insufficient,

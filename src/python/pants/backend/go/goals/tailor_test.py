@@ -24,6 +24,7 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.goals.tailor import rules as core_tailor_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -33,6 +34,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *go_tailor_rules(),
+            *core_tailor_rules(),
             *go_mod.rules(),
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
@@ -51,7 +53,13 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"unowned/go.mod": "", "owned/go.mod": "", "owned/BUILD": "go_mod()"})
+    rule_runner.write_files(
+        {
+            "unowned/go.mod": "module pantsbuild.org/unowned\n",
+            "owned/go.mod": "module pantsbuild.org/owned\n",
+            "owned/BUILD": "go_mod()",
+        }
+    )
     putative_targets = rule_runner.request(
         PutativeTargets,
         [PutativeGoTargetsRequest(("unowned", "owned")), AllOwnedSources(["owned/go.mod"])],
@@ -68,12 +76,13 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
 def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "unowned/go.mod": "",
+            "unowned/go.mod": "module pantsbuild.org/unowned\n",
             "unowned/f.go": "",
             "unowned/f1.go": "",
-            "owned/go.mod": "",
+            "unowned/BUILD": "go_mod(name='mod')",
+            "owned/go.mod": "module pantsbuild.org/owned\n",
             "owned/f.go": "",
-            "owned/BUILD": "go_package()",
+            "owned/BUILD": "go_package()\ngo_mod(name='mod')\n",
             # Any `.go` files under a `testdata` or `vendor` folder should be ignored.
             "unowned/testdata/f.go": "",
             "unowned/testdata/subdir/f.go": "",
@@ -117,21 +126,57 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_cgo_sources(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod()",
+            "foo/go.mod": "module pantsbuild.org/example\n",
+            "foo/main.go": "",
+            "foo/native.c": "",
+            "foo/another.c": "",
+            "foo/native.h": "",
+            "foo/assembly.s": "",
+            "c_only/native.c": "",
+            "c_only/assembly.s": "",
+            "c_only/header.h": "",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativeGoTargetsRequest(("foo",)),
+            AllOwnedSources(["foo/go.mod"]),
+        ],
+    )
+    assert putative_targets == PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path="foo",
+                name=None,
+                kwargs={"sources": ("*.go", "*.c", "*.s", "*.h")},
+                triggering_sources=["main.go", "another.c", "assembly.s", "native.c", "native.h"],
+            ),
+        ]
+    )
+
+
 def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "missing_binary_tgt/go.mod": "",
+            "missing_binary_tgt/go.mod": "module pantsbuild.org/missing_binary_tgt\n",
             "missing_binary_tgt/app.go": "package main",
-            "missing_binary_tgt/BUILD": "go_package()",
-            "tgt_already_exists/go.mod": "",
+            "missing_binary_tgt/BUILD": "go_package()\ngo_mod(name='mod')\n",
+            "tgt_already_exists/go.mod": "module pantsbuild.org/tgt_already_exists\n",
             "tgt_already_exists/app.go": "package main",
-            "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()",
-            "missing_pkg_and_binary_tgt/go.mod": "",
+            "tgt_already_exists/BUILD": "go_binary(name='bin')\ngo_package()\ngo_mod(name='mod')\n",
+            "missing_pkg_and_binary_tgt/go.mod": "module pantsbuild.org/missing_pkg_and_binary_tgt\n",
             "missing_pkg_and_binary_tgt/app.go": "package main",
-            "main_set_to_different_dir/go.mod": "",
+            "missing_pkg_and_binary_tgt/BUILD": "go_mod(name='mod')\n",
+            "main_set_to_different_dir/go.mod": "module pantsbuild.org/main_set_to_different_dir\n",
             "main_set_to_different_dir/subdir/app.go": "package main",
             "main_set_to_different_dir/subdir/BUILD": "go_package()",
-            "main_set_to_different_dir/BUILD": "go_binary(main='main_set_to_different_dir/subdir')",
+            "main_set_to_different_dir/BUILD": "go_binary(main='main_set_to_different_dir/subdir')\ngo_mod(name='mod')",
             "no_go_mod/app.go": "package main",
         }
     )
@@ -195,8 +240,8 @@ def test_has_package_main() -> None:
 
 
 def test_has_go_mod_ancestor() -> None:
-    assert has_go_mod_ancestor("dir/subdir", {"dir/subdir"}) is True
-    assert has_go_mod_ancestor("dir/subdir", {"dir/subdir/child"}) is False
-    assert has_go_mod_ancestor("dir/subdir", {"dir/another"}) is False
-    assert has_go_mod_ancestor("dir/subdir", {""}) is True
-    assert has_go_mod_ancestor("dir/subdir", {"another", "dir/another", "dir"}) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/subdir"})) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/subdir/child"})) is False
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"dir/another"})) is False
+    assert has_go_mod_ancestor("dir/subdir", frozenset({""})) is True
+    assert has_go_mod_ancestor("dir/subdir", frozenset({"another", "dir/another", "dir"})) is True

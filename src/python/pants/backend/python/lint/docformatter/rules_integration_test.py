@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *docformatter_subsystem_rules(),
             *source_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, (DocformatterRequest,)),
+            QueryRule(FmtResult, (DocformatterRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -59,7 +59,12 @@ def run_docformatter(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            DocformatterRequest(field_sets, snapshot=input_sources.snapshot),
+            DocformatterRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
         ],
     )
     return fmt_result
@@ -121,14 +126,6 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
         extra_args=["--docformatter-args='--make-summary-multi-line'"],
     )
     assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
-    assert fmt_result.did_change is False
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_docformatter(rule_runner, [tgt], extra_args=["--docformatter-skip"])
-    assert fmt_result.skipped is True
     assert fmt_result.did_change is False
 
 

@@ -20,7 +20,7 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.backend.scala.target_types import rules as target_types_rules
-from pants.backend.scala.test.scalatest import ScalatestTestFieldSet
+from pants.backend.scala.test.scalatest import ScalatestTestFieldSet, ScalatestTestRequest
 from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
@@ -64,7 +64,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (ScalatestTestFieldSet,)),
+            QueryRule(TestResult, (ScalatestTestRequest.Batch,)),
             QueryRule(Scalatest, ()),
         ],
         target_types=[
@@ -276,4 +276,6 @@ def run_scalatest_test(
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )
-    return rule_runner.request(TestResult, [ScalatestTestFieldSet.create(tgt)])
+    return rule_runner.request(
+        TestResult, [ScalatestTestRequest.Batch("", (ScalatestTestFieldSet.create(tgt),), None)]
+    )

@@ -9,7 +9,6 @@ import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
-from pants.backend.python.subsystems.ipython import rules as ipython_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
@@ -38,7 +37,6 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *repl_rules(),
-            *ipython_subsystem_rules(),
             *python_repl.rules(),
             *pex_from_targets.rules(),
             *local_dists.rules(),

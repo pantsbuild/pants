@@ -9,9 +9,11 @@ from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
@@ -28,7 +30,7 @@ class ExportError(Exception):
     pass
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ExportRequest:
     """A union for exportable data provided by a backend.
@@ -42,7 +44,7 @@ class ExportRequest:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PostProcessingCommand:
-    """A command to run as a local processe after an exported digest is materialized."""
+    """A command to run as a local process after an exported digest is materialized."""
 
     # Values in the argv tuple can contain the format specifier "{digest_root}", which will be
     # substituted with the (absolute) path to the location under distdir in which the
@@ -70,11 +72,6 @@ class ExportResult:
     # Materialize this digest.
     digest: Digest
     # Run these commands as local processes after the digest is materialized.
-    # Values in each args string tuple can contain the format specifier "{digest_root}", which
-    # will be substituted with the (absolute) path to the location under distdir in which the
-    # digest is materialized.
-    # Each command will be run with an environment consistent of just PATH, set to the Pants
-    # process's own PATH env var.
     post_processing_cmds: tuple[PostProcessingCommand, ...]
 
     def __init__(
@@ -102,6 +99,7 @@ class ExportSubsystem(GoalSubsystem):
 
 class Export(Goal):
     subsystem_cls = ExportSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -118,6 +116,8 @@ async def export(
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
     flattened_results = [res for results in all_results for res in results]
 
+    await _warn_on_non_local_environments(targets, "the `export` goal")
+
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
     )
@@ -126,7 +126,7 @@ async def export(
     merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
-    environment = await Get(Environment, EnvironmentRequest(["PATH"]))
+    environment = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     for result in flattened_results:
         result_dir = os.path.join(output_dir, result.reldir)
         digest_root = os.path.join(build_root.path, result_dir)

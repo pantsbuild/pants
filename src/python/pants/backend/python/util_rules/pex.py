@@ -17,7 +17,6 @@ import packaging.specifiers
 import packaging.version
 from pkg_resources import Requirement
 
-from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
@@ -31,7 +30,7 @@ from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
-    PexRuntimeEnvironment,
+    PexSubsystem,
     PythonExecutable,
 )
 from pants.backend.python.util_rules.pex_requirements import (
@@ -49,6 +48,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     validate_metadata,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -56,7 +56,6 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
@@ -288,7 +287,9 @@ class OptionalPex:
 
 @rule(desc="Find Python interpreter for constraints", level=LogLevel.DEBUG)
 async def find_interpreter(
-    interpreter_constraints: InterpreterConstraints, pex_runtime_env: PexRuntimeEnvironment
+    interpreter_constraints: InterpreterConstraints,
+    pex_subsystem: PexSubsystem,
+    env_target: EnvironmentTarget,
 ) -> PythonExecutable:
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
@@ -327,15 +328,12 @@ async def find_interpreter(
                 ),
             ),
             level=LogLevel.DEBUG,
-            # NB: We want interpreter discovery to re-run fairly frequently
-            # (PER_RESTART_SUCCESSFUL), but not on every run of Pants (NEVER, which is effectively
-            # per-Session). See #10769 for a solution that is less of a tradeoff.
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
+            cache_scope=env_target.executable_search_path_cache_scope(),
         ),
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
-    if pex_runtime_env.verbosity > 0:
+    if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
@@ -403,19 +401,25 @@ class _BuildPexRequirementsSetup:
 
 @rule_helper
 async def _setup_pex_requirements(
-    request: PexRequest, python_repos: PythonRepos, python_setup: PythonSetup
+    request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
-    pex_lock_resolver_args = list(python_repos.pex_args)
-    pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
+    resolve_name: str | None
+    if isinstance(request.requirements, EntireLockfile):
+        resolve_name = request.requirements.lockfile.resolve_name
+    elif isinstance(request.requirements.from_superset, LoadedLockfile):
+        resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
+    else:
+        # This implies that, currently, per-resolve options are only configurable for resolves.
+        # However, if no resolve is specified, we will still load options that apply to every
+        # resolve, like `[python-repos].indexes`.
+        resolve_name = None
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
+
+    pex_lock_resolver_args = list(resolve_config.pex_args())
+    pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
 
     if isinstance(request.requirements, EntireLockfile):
-        lockfile, resolve_config = await MultiGet(
-            Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)),
-            Get(
-                ResolvePexConfig,
-                ResolvePexConfigRequest(request.requirements.lockfile.resolve_name),
-            ),
-        )
+        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
         argv = (
             ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
             if lockfile.is_pex_native
@@ -430,7 +434,7 @@ async def _setup_pex_requirements(
                 lockfile.original_lockfile,
                 request.requirements.complete_req_strings,
                 python_setup,
-                constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
+                resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -454,10 +458,6 @@ async def _setup_pex_requirements(
         loaded_lockfile = request.requirements.from_superset
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
-        resolve_config = await Get(
-            ResolvePexConfig,
-            ResolvePexConfigRequest(loaded_lockfile.original_lockfile.resolve_name),
-        )
         if not request.requirements.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
 
@@ -468,7 +468,7 @@ async def _setup_pex_requirements(
                 loaded_lockfile.original_lockfile,
                 request.requirements.req_strings,
                 python_setup,
-                constraints_file_path_and_hash=resolve_config.constraints_file_path_and_hash,
+                resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -501,18 +501,13 @@ async def _setup_pex_requirements(
 
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
-    request: PexRequest,
-    python_setup: PythonSetup,
-    python_repos: PythonRepos,
-    platform: Platform,
-    pex_runtime_env: PexRuntimeEnvironment,
+    request: PexRequest, python_setup: PythonSetup, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
     argv = [
         "--output-file",
         request.output_filename,
         "--no-emit-warnings",
-        *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
 
@@ -535,7 +530,7 @@ async def build_pex(
     )
 
     # Include any additional arguments and input digests required by the requirements.
-    requirements_setup = await _setup_pex_requirements(request, python_repos, python_setup)
+    requirements_setup = await _setup_pex_requirements(request, python_setup)
     argv.extend(requirements_setup.argv)
 
     merged_digest = await Get(
@@ -559,8 +554,8 @@ async def build_pex(
     else:
         output_directories = [request.output_filename]
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         PexCliProcess(
             python=pex_python_setup.python,
             subcommand=(),
@@ -573,14 +568,7 @@ async def build_pex(
         ),
     )
 
-    process = dataclasses.replace(process, platform=platform)
-
-    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
-    # without cross-building, we specify that our PEX command should be run on the current local
-    # platform.
-    result = await Get(ProcessResult, Process, process)
-
-    if pex_runtime_env.verbosity > 0:
+    if pex_subsystem.verbosity > 0:
         log_output = result.stderr.decode()
         if log_output:
             logger.info("%s", log_output)
@@ -760,8 +748,7 @@ class VenvScriptWriter:
 
             # If the seeded venv has been removed from the PEX_ROOT, we re-seed from the original
             # `--venv` mode PEX file.
-            if [ ! -e "${{target_venv_executable}}" ]; then
-                rm -rf "${{venv_dir}}" || true
+            if [ ! -e "${{venv_dir}}" ]; then
                 PEX_INTERPRETER=1 ${{execute_pex_args}} -c ''
             fi
 

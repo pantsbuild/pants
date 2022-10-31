@@ -44,6 +44,10 @@ impl ImmutableInputs {
     })))
   }
 
+  pub fn workdir(&self) -> &Path {
+    self.0.workdir.path()
+  }
+
   /// Returns an absolute Path to immutably consume the given Digest from.
   async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, StoreError> {
     let digest = directory_digest.as_digest();

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -22,25 +21,23 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
+    PythonResolveField,
+    PythonTestsBatchCompatibilityTagField,
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
-from pants.engine.target import (
-    AllTargets,
-    AllTargetsRequest,
-    Target,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, IntOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -56,6 +53,10 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
+    xdist_concurrency: PythonTestsXdistConcurrencyField
+    batch_compatibility_tag: PythonTestsBatchCompatibilityTagField
+    resolve: PythonResolveField
+    environment: EnvironmentField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -75,7 +76,7 @@ class PyTest(PythonToolBase):
     # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
-    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
+    default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
 
     default_main = ConsoleScript("pytest")
 
@@ -85,38 +86,6 @@ class PyTest(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
-    timeouts = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            Enable test target timeouts. If timeouts are enabled then test targets with a
-            timeout= parameter set on their target will time out after the given number of
-            seconds if not completed. If no timeout is set, then either the default timeout
-            is used or no timeout is configured.
-            """
-        ),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeouts` option in the `test` scope instead.",
-    )
-    timeout_default = IntOption(
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            The default timeout (in seconds) for a test target if the `timeout` field is not
-            set on the target.
-            """
-        ),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeout_default` option in the `test` scope instead.",
-    )
-    timeout_maximum = IntOption(
-        default=None,
-        advanced=True,
-        help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
-        removal_version="2.15.0.dev1",
-        removal_hint="Use `timeout_maximum` option in the `test` scope instead.",
-    )
     junit_family = StrOption(
         default="xunit2",
         advanced=True,
@@ -164,8 +133,24 @@ class PyTest(PythonToolBase):
             """
         ),
     )
+    xdist_enabled = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            """
+            If true, Pants will use `pytest-xdist` (https://pytest-xdist.readthedocs.io/en/latest/)
+            to parallelize tests within each `python_test` target.
+
+            NOTE: Enabling `pytest-xdist` can cause high-level scoped fixtures (for example `session`)
+            to execute more than once. See the `pytest-xdist` docs for more info:
+            https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once
+            """
+        ),
+    )
 
     export = ExportToolOption()
+
+    skip = SkipOption("test")
 
     @property
     def all_requirements(self) -> tuple[str, ...]:
@@ -216,31 +201,6 @@ class PyTest(PythonToolBase):
         )
 
 
-@rule_helper
-async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
-    # Even though we run each python_tests target in isolation, we need a single set of constraints
-    # that works with them all (and their transitive deps).
-    #
-    # This first computes the constraints for each individual `python_test` target
-    # (which will AND across each target in the closure). Then, it ORs all unique resulting
-    # interpreter constraints. The net effect is that every possible Python interpreter used will
-    # be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    transitive_targets_per_test = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_tgts
-        if PythonTestFieldSet.is_applicable(tgt)
-    )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-        for transitive_targets in transitive_targets_per_test
-    }
-    constraints = InterpreterConstraints(
-        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
-    )
-    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
-
-
 class PytestLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = PyTest.options_scope
 
@@ -258,16 +218,10 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            pytest, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(pytest)
 
-    constraints = await _pytest_interpreter_constraints(python_setup)
-    return GeneratePythonLockfile.from_tool(
-        pytest,
-        constraints,
-        use_pex=python_setup.generate_lockfiles_with_pex,
-    )
+    constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
+    return GeneratePythonLockfile.from_tool(pytest, constraints)
 
 
 class PytestExportSentinel(ExportPythonToolSentinel):
@@ -288,7 +242,7 @@ async def pytest_export(
 ) -> ExportPythonTool:
     if not pytest.export:
         return ExportPythonTool(resolve_name=pytest.options_scope, pex_request=None)
-    constraints = await _pytest_interpreter_constraints(python_setup)
+    constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
     return ExportPythonTool(
         resolve_name=pytest.options_scope,
         pex_request=pytest.to_pex_request(interpreter_constraints=constraints),

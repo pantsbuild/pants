@@ -14,7 +14,7 @@ use log::debug;
 use tokio::time;
 
 use crate::context::{Context, Core};
-use crate::nodes::{NodeKey, Select, Visualizer};
+use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Params, TypeId, Value};
 use crate::session::{ObservedValueResult, Root, Session};
 
@@ -71,12 +71,10 @@ impl Scheduler {
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
     let context = Context::new(self.core.clone(), session.clone());
-    self.core.graph.visualize(
-      Visualizer::default(),
-      &session.roots_nodes(),
-      path,
-      &context,
-    )
+    self
+      .core
+      .graph
+      .visualize(&session.roots_nodes(), path, &context)
   }
 
   pub fn add_root_select(
@@ -89,9 +87,11 @@ impl Scheduler {
       .core
       .rule_graph
       .find_root_edges(params.type_ids(), product)?;
-    request
-      .roots
-      .push(Select::new_from_edges(params, product, &edges));
+    request.roots.push(Select::new_from_edges(
+      params,
+      &rule_graph::DependencyKey::new(product),
+      &edges,
+    ));
     Ok(())
   }
 

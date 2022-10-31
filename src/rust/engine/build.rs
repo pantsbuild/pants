@@ -31,4 +31,7 @@ fn main() {
   // NB: The native extension only works with the Python interpreter version it was built with
   // (e.g. Python 3.7 vs 3.8).
   println!("cargo:rerun-if-env-changed=PY");
+  if let Ok(py_var) = std::env::var("PY") {
+    println!("cargo:rerun-if-changed={py_var}");
+  }
 }

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 import pytest
@@ -20,14 +21,13 @@ from pants.backend.python.target_types import (
     PythonSourceTarget,
 )
 from pants.backend.python.typecheck.mypy.rules import (
-    MyPyFieldSet,
     MyPyPartition,
     MyPyPartitions,
     MyPyRequest,
     determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
-from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.mypy.subsystem import MyPy, MyPyFieldSet
 from pants.backend.python.typecheck.mypy.subsystem import rules as mypy_subystem_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.check import CheckResult, CheckResults
@@ -845,8 +845,8 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {fs.address for fs in partition.root_field_sets} == root_addresses
-        assert {t.address for t in partition.closure} == {
+        assert {fs.address for fs in partition.field_sets} == root_addresses
+        assert {t.address for t in partition.root_targets.closure()} == {
             *root_addresses,
             *(t.address for t in deps),
         }
@@ -872,3 +872,33 @@ def test_determine_python_files() -> None:
     assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
     assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
     assert determine_python_files(["f.json"]) == ()
+
+
+def test_colors_and_formatting(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": dedent(
+                """\
+                class incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890:
+                    pass
+
+                x = incredibly_long_type_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890()
+                x.incredibly_long_attribute_name_to_force_wrapping_if_mypy_wrapped_error_messages_12345678901234567890123456789012345678901234567890
+                """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    result = run_mypy(rule_runner, [tgt], extra_args=["--colors=true", "--mypy-args=--pretty"])
+
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    # all one line
+    assert re.search(
+        "error:.*incredibly_long_type_name.*incredibly_long_attribute_name", result[0].stdout
+    )
+    # at least one escape sequence that sets text color (red)
+    assert "\033[31m" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST

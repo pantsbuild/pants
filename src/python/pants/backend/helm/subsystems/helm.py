@@ -10,16 +10,22 @@ from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, DictOption, StrOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    DictOption,
+    StrListOption,
+    StrOption,
+)
 from pants.util.memo import memoized_method
 from pants.util.strutil import bullet_list, softwrap
 
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
-    "--dry-run",
+    "--cleanup-on-fail",
     "--debug",
+    "--dry-run",
     "--force",
-    "--replace",
     "--wait",
     "--wait-for-jobs",
 ]
@@ -82,8 +88,12 @@ class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
     help = "The Helm command line (https://helm.sh)"
 
-    default_version = "3.8.0"
+    default_version = "3.10.0"
     default_known_versions = [
+        "3.10.0|linux_arm64 |3b72f5f8a60772fb156d0a4ab93272e8da7ef4d18e6421a7020d7c019f521fc1|13055719",
+        "3.10.0|linux_x86_64|bf56beb418bb529b5e0d6d43d56654c5a03f89c98400b409d1013a33d9586474|14530566",
+        "3.10.0|macos_arm64 |f7f6558ebc8211824032a7fdcf0d55ad064cb33ec1eeec3d18057b9fe2e04dbe|14446277",
+        "3.10.0|macos_x86_64|1e7fd528482ac2ef2d79fe300724b3e07ff6f846a2a9b0b0fe6f5fa05691786b|15237557",
         "3.8.0|linux_arm64 |23e08035dc0106fe4e0bd85800fd795b2b9ecd9f32187aa16c49b0a917105161|12324642",
         "3.8.0|linux_x86_64|8408c91e846c5b9ba15eb6b1a5a79fc22dd4d33ac6ea63388e5698d1b2320c8b|13626774",
         "3.8.0|macos_arm64 |751348f1a4a876ffe089fd68df6aea310fd05fe3b163ab76aa62632e327122f3|14078604",
@@ -110,6 +120,15 @@ class HelmSubsystem(TemplatedExternalTool):
             the OCI registry.
             """
         ),
+    )
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            """
+            Additional environment variables that would be made available to all Helm processes
+            or during value interpolation.
+            """
+        ),
+        advanced=True,
     )
     tailor = BoolOption(
         default=True,

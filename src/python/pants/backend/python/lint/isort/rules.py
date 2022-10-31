@@ -10,14 +10,13 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -33,9 +32,10 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest):
+class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
-    name = Isort.options_scope
+    tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 def generate_argv(
@@ -62,9 +62,7 @@ def generate_argv(
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
-    if isort.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
@@ -86,20 +84,19 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(request.snapshot.files, isort, is_isort5=is_isort5),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=request.snapshot.files,
-            description=f"Run isort on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run isort on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, IsortRequest),
+        *IsortRequest.rules(),
         *pex.rules(),
     ]

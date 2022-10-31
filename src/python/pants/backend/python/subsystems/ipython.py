@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import itertools
-
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
@@ -13,10 +11,10 @@ from pants.backend.python.goals.lockfile import (
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import AllTargets, AllTargetsRequest
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.util.docutil import git_url
@@ -58,6 +56,10 @@ class IPythonLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = IPython.options_scope
 
 
+class _IpythonFieldSetForLockfiles(FieldSet):
+    required_fields = (InterpreterConstraintsField,)
+
+
 @rule(
     desc=softwrap(
         """
@@ -71,31 +73,12 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            ipython, use_pex=python_setup.generate_lockfiles_with_pex
-        )
+        return GeneratePythonLockfile.from_tool(ipython)
 
-    # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
-    # on subsets of the codebase with disjoint interpreter constraints, such as
-    # `./pants repl py2::` and then `./pants repl py3::`. Still, even with those subsets possible,
-    # we need a single lockfile that works with all possible Python interpreters in use.
-    #
-    # This ORs all unique interpreter constraints. The net effect is that every possible Python
-    # interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    unique_constraints = {
-        InterpreterConstraints.create_from_compatibility_fields(
-            [tgt[InterpreterConstraintsField]], python_setup
-        )
-        for tgt in all_tgts
-        if tgt.has_field(InterpreterConstraintsField)
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-    return GeneratePythonLockfile.from_tool(
-        ipython,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
-        use_pex=python_setup.generate_lockfiles_with_pex,
+    interpreter_constraints = await _find_all_unique_interpreter_constraints(
+        python_setup, _IpythonFieldSetForLockfiles
     )
+    return GeneratePythonLockfile.from_tool(ipython, interpreter_constraints)
 
 
 def rules():

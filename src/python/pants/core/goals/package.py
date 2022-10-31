@@ -8,7 +8,10 @@ import os
 from abc import ABCMeta
 from dataclasses import dataclass
 
+from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -32,7 +35,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
 
@@ -88,6 +91,26 @@ class OutputPathField(StringField, AsyncFieldMixin):
         return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 
+@dataclass(frozen=True)
+class EnvironmentAwarePackageRequest:
+    """Request class to request a `BuiltPackage` in an environment-aware fashion."""
+
+    field_set: PackageFieldSet
+
+
+@rule
+async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
+    environment_name = await Get(
+        EnvironmentName,
+        EnvironmentNameRequest,
+        EnvironmentNameRequest.from_field_set(request.field_set),
+    )
+    package = await Get(
+        BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
+    )
+    return package
+
+
 class PackageSubsystem(GoalSubsystem):
     name = "package"
     help = "Create a distributable package."
@@ -99,6 +122,7 @@ class PackageSubsystem(GoalSubsystem):
 
 class Package(Goal):
     subsystem_cls = PackageSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 class AllPackageableTargets(Targets):
@@ -131,9 +155,10 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         return Package(exit_code=0)
 
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in target_roots_to_field_sets.field_sets
     )
+
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
     workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
     for pkg in packages:
@@ -148,4 +173,4 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), *distdir.rules())

@@ -34,7 +34,9 @@ def test_initialises_basic_helm_binary(rule_runner: RuleRunner) -> None:
     helm_binary = rule_runner.request(HelmBinary, [])
 
     assert helm_binary
-    assert helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.current)}"
+    assert (
+        helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.create_for_localhost())}"
+    )
 
 
 def test_create_helm_process(rule_runner: RuleRunner) -> None:
@@ -58,9 +60,9 @@ def test_create_helm_process(rule_runner: RuleRunner) -> None:
     assert process.level == helm_process.level
     assert process.input_digest == helm_process.input_digest
     assert process.immutable_input_digests == FrozenDict(
-        {**helm_binary.immutable_input_digests, **helm_process.extra_immutable_input_digests}
+        {**helm_process.extra_immutable_input_digests, **helm_binary.immutable_input_digests}
     )
-    assert process.env == FrozenDict({**helm_binary.env, **helm_process.extra_env})
+    assert process.env == FrozenDict({**helm_process.extra_env, **helm_binary.env})
     assert process.output_directories == helm_process.output_directories
     assert process.cache_scope == helm_process.cache_scope
     assert process.timeout_seconds == helm_process.timeout_seconds

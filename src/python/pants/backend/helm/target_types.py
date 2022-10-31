@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
@@ -21,6 +22,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -33,6 +35,9 @@ from pants.engine.target import (
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
+from pants.util.value_interpolation import InterpolationContext, InterpolationError
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Generic commonly used fields
@@ -409,7 +414,35 @@ class HelmDeploymentSourcesField(MultipleSourcesField):
 class HelmDeploymentValuesField(DictStringToStringField):
     alias = "values"
     required = False
-    help = "Individual values to use when rendering a given deployment."
+    help = softwrap(
+        """
+        Individual values to use when rendering a given deployment.
+
+        Value names should be defined using dot-syntax as in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "nameOverride": "my_custom_name",
+                "image.pullPolicy": "Always",
+            },
+        )
+        ```
+
+        Values can be dynamically calculated using interpolation as shown in the following example:
+
+        ```
+        helm_deployment(
+            values={
+                "configmap.deployedAt": "{env.DEPLOY_TIME}",
+            },
+        )
+        ```
+
+        Check the Helm backend documentation on what are the options available and its caveats when making
+        usage of dynamic values in your deployments.
+        """
+    )
 
 
 class HelmDeploymentCreateNamespaceField(BoolField):
@@ -431,6 +464,21 @@ class HelmDeploymentTimeoutField(IntField):
     valid_numbers = ValidNumbers.positive_only
 
 
+class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
+    alias = "post_renderers"
+    help = softwrap(
+        """
+        List of runnable targets to be used to post-process the helm chart after being rendered by Helm.
+
+        This is equivalent to the same post-renderer feature already available in Helm with the difference
+        that this supports a list of executables instead of a single one.
+
+        When more than one post-renderer is given, they will be combined into a single one in which the
+        input of each of them would be output of the previous one.
+        """
+    )
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -444,6 +492,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
+        HelmDeploymentPostRenderersField,
     )
     help = "A Helm chart deployment."
 
@@ -464,6 +513,35 @@ class HelmDeploymentFieldSet(FieldSet):
     no_hooks: HelmDeploymentNoHooksField
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
+    post_renderers: HelmDeploymentPostRenderersField
+
+    def format_values(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
+
+        def format_value(text: str) -> str | None:
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
+
+        result = {}
+        for key, value in (self.values.value or {}).items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        return result
 
 
 class AllHelmDeploymentTargets(Targets):

@@ -27,6 +27,7 @@ from typing import (
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
@@ -79,7 +80,9 @@ class OptionHelpInfo:
                             scope context (e.g., [--baz, --no-baz, --qux])
     env_var: The environment variable that set's the option.
     config_key: The config key for this option (in the section named for its scope).
-
+    target_field_name: The name for the field that overrides this option in `local_environment`,
+                       `remote_environment`, or `docker_environment`, if the option is environment-
+                       aware, else `None`.
     typ: The type of the option.
     default: The value of this option if no flags are specified (derived from config and env vars).
     help: The help message registered for this option.
@@ -96,6 +99,7 @@ class OptionHelpInfo:
     unscoped_cmd_line_args: tuple[str, ...]
     env_var: str
     config_key: str
+    target_field_name: str | None
     typ: type
     default: Any
     help: str
@@ -311,7 +315,7 @@ class PluginAPITypeInfo:
     union_type: str | None
     union_members: tuple[str, ...]
     dependencies: tuple[str, ...]
-    dependees: tuple[str, ...]
+    dependents: tuple[str, ...]
     returned_by_rules: tuple[str, ...]
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
@@ -364,7 +368,7 @@ class PluginAPITypeInfo:
     def _rule_uses(api_type: type) -> Callable[[TaskRule], bool]:
         def satisfies(rule: TaskRule) -> bool:
             return any(
-                api_type in (constraint.input_type, constraint.output_type)
+                api_type in (*constraint.input_types, constraint.output_type)
                 for constraint in rule.input_gets
             )
 
@@ -439,7 +443,9 @@ class HelpInfoExtracter:
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
                     scope_info.description,
                     options.get_parser(scope_info.scope),
-                    scope_info.is_goal,
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    scope_info.is_goal if scope_info.scope != "filter" else False,
                     provider,
                     scope_info.deprecated_scope,
                 )
@@ -477,7 +483,7 @@ class HelpInfoExtracter:
                     ),
                     get_field_type_provider=lambda field_type: cls.get_provider(
                         build_configuration.union_rule_to_providers.get(
-                            UnionRule(target_type._plugin_field_cls, field_type)
+                            UnionRule(target_type.PluginField, field_type)
                         )
                         if build_configuration is not None
                         else None
@@ -499,7 +505,13 @@ class HelpInfoExtracter:
             {
                 scope_info.scope: goal_help_info_loader_for(scope_info)
                 for scope_info in known_scope_infos
-                if scope_info.is_goal and not scope_info.scope.startswith("_")
+                if (
+                    scope_info.is_goal
+                    and not scope_info.scope.startswith("_")
+                    # `filter` should be treated as a subsystem for `help`, even though it still
+                    # works as a goal for backwards compatibility.
+                    and scope_info.scope != "filter"
+                )
             }
         )
 
@@ -507,11 +519,7 @@ class HelpInfoExtracter:
             {
                 alias: target_type_info_for(target_type)
                 for alias, target_type in registered_target_types.aliases_to_types.items()
-                if (
-                    not alias.startswith("_")
-                    and target_type.removal_version is None
-                    and alias != target_type.deprecated_alias
-                )
+                if (target_type.removal_version is None and alias != target_type.deprecated_alias)
             }
         )
 
@@ -673,7 +681,8 @@ class HelpInfoExtracter:
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
                 for constraint in rule.input_gets:
-                    yield constraint.input_type, _find_provider(constraint.input_type), ()
+                    for input_type in constraint.input_types:
+                        yield input_type, _find_provider(input_type), ()
 
             union_bases: set[type] = set()
             for union_rule, providers in bc.union_rule_to_providers.items():
@@ -690,7 +699,7 @@ class HelpInfoExtracter:
 
         # Calculate type graph.
         for api_type in all_types:
-            # Collect all providers first, as we need them up-front for the dependencies/dependees.
+            # Collect all providers first, as we need them up-front for the dependencies/dependents.
             type_graph[api_type]["providers"] = tuple(
                 sorted(
                     {
@@ -722,19 +731,19 @@ class HelpInfoExtracter:
                 )
             )
 
-        # Add a dependee on the target type for each dependency.
-        type_dependees: DefaultDict[type, set[str]] = defaultdict(set)
+        # Add a dependent on the target type for each dependency.
+        type_dependents: DefaultDict[type, set[str]] = defaultdict(set)
         for _, provider, dependencies in all_types_with_dependencies:
             if not provider:
                 continue
             for target_type in dependencies:
-                type_dependees[target_type].add(provider)
-        for api_type, dependees in type_dependees.items():
-            type_graph[api_type]["dependees"] = tuple(
+                type_dependents[target_type].add(provider)
+        for api_type, dependents in type_dependents.items():
+            type_graph[api_type]["dependents"] = tuple(
                 sorted(
-                    dependees
+                    dependents
                     - set(
-                        # Exclude providers from list of dependees.
+                        # Exclude providers from list of dependents.
                         type_graph[api_type]["providers"][0]
                     )
                 )
@@ -757,7 +766,7 @@ class HelpInfoExtracter:
                     rules,
                     provider=", ".join(type_graph[api_type]["providers"]),
                     dependencies=type_graph[api_type]["dependencies"],
-                    dependees=type_graph[api_type].get("dependees", ()),
+                    dependents=type_graph[api_type].get("dependents", ()),
                     union_members=tuple(
                         sorted(member.__name__ for member in union_membership.get(api_type))
                     ),
@@ -867,6 +876,9 @@ class HelpInfoExtracter:
         # Global options have three env var variants. The last one is the most human-friendly.
         env_var = Parser.get_env_var_names(self._scope, dest)[-1]
 
+        target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
+        environment_aware = kwargs.get("environment_aware") is True
+
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
@@ -874,6 +886,7 @@ class HelpInfoExtracter:
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             env_var=env_var,
             config_key=dest,
+            target_field_name=target_field_name if environment_aware else None,
             typ=typ,
             default=default,
             help=help_msg,

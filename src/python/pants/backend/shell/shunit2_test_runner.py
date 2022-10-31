@@ -3,8 +3,10 @@
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.shell.shell_setup import ShellSetup
+from pants.backend.shell.shunit2 import Shunit2
 from pants.backend.shell.target_types import (
     ShellSourceField,
     Shunit2Shell,
@@ -22,10 +24,12 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
@@ -34,16 +38,8 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.addresses import Address
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    DownloadFile,
-    FileContent,
-    FileDigest,
-    MergeDigests,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.platform import Platform
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
@@ -73,6 +69,11 @@ class Shunit2FieldSet(TestFieldSet):
         return tgt.get(SkipShunit2TestsField).value
 
 
+class Shunit2TestRequest(TestRequest):
+    tool_subsystem = Shunit2
+    field_set_type = Shunit2FieldSet
+
+
 @dataclass(frozen=True)
 class TestSetupRequest:
     field_set: Shunit2FieldSet
@@ -90,9 +91,9 @@ class ShellNotConfigured(Exception):
 SOURCE_SHUNIT2_REGEX = re.compile(rb"(?:source|\.)\s+[.${}/'\"\w]*shunit2\b['\"]?")
 
 
-def add_source_shunit2(fc: FileContent) -> FileContent:
+def add_source_shunit2(fc: FileContent, binary_name: str) -> FileContent:
     # NB: We always run tests from the build root, so we source `shunit2` relative to there.
-    source_line = b"source ./shunit2"
+    source_line = f"source ./{binary_name}".encode()
 
     lines = []
     already_had_source = False
@@ -124,7 +125,8 @@ class Shunit2Runner:
 
 @rule(desc="Determine shunit2 shell")
 async def determine_shunit2_shell(
-    request: Shunit2RunnerRequest, shell_setup: ShellSetup
+    request: Shunit2RunnerRequest,
+    shell_setup: ShellSetup.EnvironmentAware,
 ) -> Shunit2Runner:
     if request.shell_field.value is not None:
         tgt_shell = Shunit2Shell(request.shell_field.value)
@@ -140,10 +142,9 @@ async def determine_shunit2_shell(
             )
         tgt_shell = parse_result
 
-    env = await Get(Environment, EnvironmentRequest(["PATH"]))
     path_request = BinaryPathRequest(
         binary_name=tgt_shell.name,
-        search_path=shell_setup.executable_search_path(env),
+        search_path=shell_setup.executable_search_path,
         test=tgt_shell.binary_path_test,
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
@@ -158,23 +159,19 @@ async def determine_shunit2_shell(
 @rule(desc="Setup shunit2", level=LogLevel.DEBUG)
 async def setup_shunit2_for_target(
     request: TestSetupRequest,
-    shell_setup: ShellSetup,
+    shell_setup: ShellSetup.EnvironmentAware,
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
+    shunit2: Shunit2,
 ) -> TestSetup:
-    shunit2_download_file = DownloadFile(
-        "https://raw.githubusercontent.com/kward/shunit2/b9102bb763cc603b3115ed30a5648bf950548097/shunit2",
-        FileDigest("1f11477b7948150d1ca50cdd41d89be4ed2acd137e26d2e0fe23966d0e272cc5", 40987),
-    )
-    shunit2_script, transitive_targets, built_package_dependencies, env = await MultiGet(
-        Get(Digest, DownloadFile, shunit2_download_file),
+    shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
+        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(Platform.current)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
         Get(
             BuiltPackageDependencies,
             BuildPackageDependenciesRequest(request.field_set.runtime_package_dependencies),
         ),
-        Get(Environment, EnvironmentRequest(["PATH"])),
     )
 
     dependencies_source_files_request = Get(
@@ -193,7 +190,7 @@ async def setup_shunit2_for_target(
     field_set_digest_content = await Get(DigestContents, Digest, field_set_sources.snapshot.digest)
     # `ShellTestSourceField` validates that there's exactly one file.
     test_file_content = field_set_digest_content[0]
-    updated_test_file_content = add_source_shunit2(test_file_content)
+    updated_test_file_content = add_source_shunit2(test_file_content, shunit2_script.exe)
 
     updated_test_digest, runner = await MultiGet(
         Get(Digest, CreateDigest([updated_test_file_content])),
@@ -209,7 +206,7 @@ async def setup_shunit2_for_target(
         Digest,
         MergeDigests(
             (
-                shunit2_script,
+                shunit2_script.digest,
                 updated_test_digest,
                 dependencies_source_files.snapshot.digest,
                 *(pkg.digest for pkg in built_package_dependencies),
@@ -218,7 +215,7 @@ async def setup_shunit2_for_target(
     )
 
     env_dict = {
-        "PATH": create_path_env_var(shell_setup.executable_search_path(env)),
+        "PATH": create_path_env_var(shell_setup.executable_search_path),
         "SHUNIT_COLOR": "always" if global_options.colors else "none",
         **test_extra_env.env,
     }
@@ -245,8 +242,10 @@ async def setup_shunit2_for_target(
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
 async def run_tests_with_shunit2(
-    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any], test_subsystem: TestSubsystem
 ) -> TestResult:
+    field_set = batch.single_element
+
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
@@ -257,8 +256,10 @@ async def run_tests_with_shunit2(
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
-async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set))
+async def setup_shunit2_debug_test(
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -267,9 +268,15 @@ async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugReque
 
 
 @rule
-async def setup_shunit2_debug_adapter_test(field_set: Shunit2FieldSet) -> TestDebugAdapterRequest:
+async def setup_shunit2_debug_adapter_test(
+    _: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
 
 
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, Shunit2FieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, Shunit2FieldSet),
+        *Shunit2TestRequest.rules(),
+    ]

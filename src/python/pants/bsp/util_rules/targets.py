@@ -42,6 +42,7 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import DigestContents, PathGlobs, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -66,7 +67,7 @@ _logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     """Hook to allow language backends to provide metadata for BSP build targets."""
@@ -137,9 +138,7 @@ class _ParseOneBSPMappingRequest:
 async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
     specs = specs_parser.parse_specs(
-        request.definition.addresses,
-        description_of_origin=f"the BSP mapping {request.name}",
-        convert_dir_literal_to_address_literal=False,
+        request.definition.addresses, description_of_origin=f"the BSP mapping {request.name}"
     ).includes
     return BSPBuildTargetInternal(request.name, specs, request.definition)
 
@@ -540,7 +539,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
@@ -638,7 +637,7 @@ async def bsp_dependency_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
@@ -668,7 +667,7 @@ class BSPCompileResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""

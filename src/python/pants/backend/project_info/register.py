@@ -5,9 +5,10 @@
 
 from pants.backend.project_info import (
     count_loc,
-    dependees,
     dependencies,
+    dependents,
     filedeps,
+    filter_targets,
     list_roots,
     list_targets,
     paths,
@@ -19,9 +20,10 @@ from pants.backend.project_info import (
 def rules():
     return [
         *count_loc.rules(),
-        *dependees.rules(),
         *dependencies.rules(),
+        *dependents.rules(),
         *filedeps.rules(),
+        *filter_targets.rules(),
         *list_roots.rules(),
         *list_targets.rules(),
         *paths.rules(),

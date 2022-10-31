@@ -23,7 +23,11 @@ from pants.backend.docker.goals.package_image import (
 from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
-from pants.backend.docker.target_types import DockerImageTarget
+from pants.backend.docker.target_types import (
+    DockerImageTags,
+    DockerImageTagsRequest,
+    DockerImageTarget,
+)
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
@@ -39,10 +43,6 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
-from pants.backend.docker.value_interpolation import (
-    DockerInterpolationContext,
-    DockerInterpolationError,
-)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
@@ -53,11 +53,13 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
+from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 
 @pytest.fixture
@@ -76,6 +78,10 @@ def rule_runner() -> RuleRunner:
     )
 
 
+class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
+    pass
+
+
 def assert_build(
     rule_runner: RuleRunner,
     address: Address,
@@ -86,6 +92,7 @@ def assert_build(
     copy_sources: tuple[str, ...] = (),
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
+    plugin_tags: tuple[str, ...] = (),
 ) -> None:
     tgt = rule_runner.get_target(address)
 
@@ -117,7 +124,7 @@ def assert_build(
             stderr=b"stderr",
             stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
-            platform=Platform.current,
+            platform=Platform.create_for_localhost(),
             metadata=ProcessResultMetadata(0, "ran_locally", 0),
         )
 
@@ -148,21 +155,29 @@ def assert_build(
             global_options,
             DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
+            UnionMembership.from_rules(
+                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+            ),
         ],
         mock_gets=[
             MockGet(
                 output_type=DockerBuildContext,
-                input_type=DockerBuildContextRequest,
+                input_types=(DockerBuildContextRequest,),
                 mock=build_context_mock,
             ),
             MockGet(
                 output_type=WrappedTarget,
-                input_type=WrappedTargetRequest,
+                input_types=(WrappedTargetRequest,),
                 mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
+                output_type=DockerImageTags,
+                input_types=(DockerImageTagsRequestPlugin,),
+                mock=lambda _: DockerImageTags(plugin_tags),
+            ),
+            MockGet(
                 output_type=FallibleProcessResult,
-                input_type=Process,
+                input_types=(Process,),
                 mock=run_process_mock,
             ),
         ],
@@ -362,7 +377,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
 
 
 def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
-    interpolation_context = DockerInterpolationContext.from_dict(
+    interpolation_context = InterpolationContext.from_dict(
         {
             "baseimage": {"tag": "3.8"},
             "stage0": {"tag": "3.8"},
@@ -435,6 +450,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=True",
             "--tag",
             "env1:1.2.3",
             "--file",
@@ -456,6 +472,77 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_build_pull(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=False)'})
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--tag",
+            "args1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="args1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_squash(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+            docker_image(name="args1", squash=True)
+            docker_image(name="args2", squash=False)
+            """
+            )
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=True",
+            "--squash",
+            "--tag",
+            "args1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    def check_docker_proc_no_squash(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=True",
+            "--tag",
+            "args2:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="args1"),
+        process_assertions=check_docker_proc,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="args2"),
+        process_assertions=check_docker_proc_no_squash,
+    )
+
+
 def test_docker_build_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"docker/test/BUILD": 'docker_image(name="args1", image_tags=["1.2.3"])'}
@@ -472,6 +559,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=True",
             "--tag",
             "args1:1.2.3",
             "--build-arg",
@@ -566,6 +654,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=True",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -623,6 +712,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             f"id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
             "--secret",
             f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
+            "--pull=True",
             "--tag",
             "img1:latest",
             "--file",
@@ -657,6 +747,7 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             "build",
             "--ssh",
             "default",
+            "--pull=True",
             "--tag",
             "img1:latest",
             "--file",
@@ -700,6 +791,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             "build.host=tbs06",
             "--label",
             "build.job=13934",
+            "--pull=True",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -840,6 +932,7 @@ def test_build_target_stage(
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=True",
             "--target",
             expected_target,
             "--tag",
@@ -1026,7 +1119,7 @@ ImageRefTest = namedtuple(
             docker_image=dict(repository="{default_repository}/a"),
             default_repository="{target_repository}/b",
             expect_error=pytest.raises(
-                DockerInterpolationError,
+                InterpolationError,
                 match=(
                     r"Invalid value for the `repository` field of the `docker_image` target at "
                     r"src/test/docker:image: '\{default_repository\}/a'\.\n\n"
@@ -1043,9 +1136,34 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
     tgt = DockerImageTarget(test.docker_image, address)
     field_set = DockerFieldSet.create(tgt)
     registries = DockerRegistries.from_dict(test.registries)
-    interpolation_context = DockerInterpolationContext.from_dict({})
+    interpolation_context = InterpolationContext.from_dict({})
     with test.expect_error or no_exception():
         assert (
             field_set.image_refs(test.default_repository, registries, interpolation_context)
             == test.expect_refs
         )
+
+
+def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="plugin")'})
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=True",
+            "--tag",
+            "plugin:latest",
+            "--tag",
+            "plugin:1.2.3",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="plugin"),
+        process_assertions=check_docker_proc,
+        plugin_tags=("1.2.3",),
+    )

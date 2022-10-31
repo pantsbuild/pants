@@ -22,6 +22,7 @@ pub struct Types {
   pub download_file: TypeId,
   pub platform: TypeId,
   pub process: TypeId,
+  pub process_config_from_environment: TypeId,
   pub process_result: TypeId,
   pub process_result_metadata: TypeId,
   pub coroutine: TypeId,
@@ -30,4 +31,6 @@ pub struct Types {
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
   pub engine_aware_parameter: TypeId,
+  pub docker_resolve_image_request: TypeId,
+  pub docker_resolve_image_result: TypeId,
 }

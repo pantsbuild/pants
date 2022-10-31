@@ -23,9 +23,10 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional, resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import resolve_conflicting_options
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
@@ -306,7 +307,7 @@ class DynamicRemoteOptions:
     def from_options(
         cls,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
@@ -370,11 +371,10 @@ class DynamicRemoteOptions:
         cls,
         bootstrap_options: OptionValueContainer,
         full_options: Options,
-        env: CompleteEnvironment,
+        env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None,
         remote_auth_plugin_func_from_entry_point: Callable | None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        auth_plugin_result: AuthPluginResult | None = None
         if not remote_auth_plugin_func_from_entry_point:
             remote_auth_plugin_func = cls._get_auth_plugin_from_option(
                 bootstrap_options.remote_auth_plugin
@@ -509,7 +509,6 @@ class ExecutionOptions:
     remote_cache_read_timeout_millis: int
 
     remote_execution_address: str | None
-    remote_execution_extra_platform_properties: list[str]
     remote_execution_headers: dict[str, str]
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
@@ -536,7 +535,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            cache_content_behavior=GlobalOptions.resolve_cache_content_behavior(bootstrap_options),
+            cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
@@ -553,7 +552,6 @@ class ExecutionOptions:
             remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
-            remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
@@ -639,7 +637,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
-    remote_execution_extra_platform_properties=[],
     remote_execution_headers={
         "user-agent": f"pants/{VERSION}",
     },
@@ -1158,7 +1155,7 @@ class BootstrapOptions:
     process_cleanup = BoolOption(
         default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
         deprecation_start_version="2.15.0.dev1",
-        removal_version="2.16.0.dev1",
+        removal_version="3.0.0.dev0",
         removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
             """
@@ -1212,9 +1209,16 @@ class BootstrapOptions:
         advanced=True,
         default=None,
         help=softwrap(
-            """
+            f"""
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+
+            Even when using the `docker_environment` and `remote_environment` targets, this path
+            will be read from the local host, and those certs will be used in the environment.
+
+            This option cannot be overridden via environment targets, so if you need a different
+            value than what the rest of your organization is using, override the value via an
+            environment variable, CLI argument, or `.pants.rc` file. See {doc_url('options')}.
             """
         ),
     )
@@ -1302,6 +1306,16 @@ class BootstrapOptions:
         ),
         advanced=True,
     )
+    session_end_tasks_timeout = FloatOption(
+        default=3.0,
+        help=softwrap(
+            """
+            The time in seconds to wait for still-running "session end" tasks to complete before finishing
+            completion of a Pants invocation. "Session end" tasks include, for example, writing data that was
+            generated during the applicable Pants invocation to a configured remote cache.
+            """
+        ),
+    )
     remote_execution = BoolOption(
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
         help=softwrap(
@@ -1378,6 +1392,18 @@ class BootstrapOptions:
     remote_auth_plugin = StrOption(
         default=None,
         advanced=True,
+        deprecation_start_version="2.15.0.dev2",
+        removal_version="2.16.0.dev1",
+        removal_hint=softwrap(
+            """
+            Remote auth plugins should now provide the function by implementing an entry point called remote_auth.
+
+            If you are developing a plugin, switch to using an entry point.
+
+            If you are only consuming a plugin from someone else, you can delete the remote_auth_plugin option
+            and now only need the plugin to be included in [GLOBAL].plugins
+            """
+        ),
         help=softwrap(
             """
             Path to a plugin to dynamically configure remote caching and execution options.
@@ -1474,20 +1500,6 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_cache_eager_fetch = BoolOption(
-        advanced=True,
-        default=(DEFAULT_EXECUTION_OPTIONS.cache_content_behavior != CacheContentBehavior.defer),
-        removal_version="2.15.0.dev1",
-        removal_hint="Use the `cache_content_behavior` option instead.",
-        help=softwrap(
-            """
-            Eagerly fetch relevant content from the remote store instead of lazily fetching.
-
-            This may result in worse performance, but reduce the frequency of errors
-            encountered by reducing the surface area of when remote caching is used.
-            """
-        ),
-    )
     remote_cache_rpc_concurrency = IntOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
@@ -1511,17 +1523,6 @@ class BootstrapOptions:
             You must also set `[GLOBAL].remote_store_address`, which will often be the same value.
             """
         ),
-    )
-    remote_execution_extra_platform_properties = StrListOption(
-        advanced=True,
-        help=softwrap(
-            """
-            Platform properties to set on remote execution requests.
-            Format: property=value. Multiple values should be specified as multiple
-            occurrences of this flag. Pants itself may add additional platform properties.
-            """
-        ),
-        default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
     )
     remote_execution_headers = DictOption(
         advanced=True,
@@ -1710,66 +1711,38 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
-    use_deprecated_directory_cli_args_semantics = BoolOption(
-        default=False,
+    docker_execution = BoolOption(
+        default=True,
+        advanced=True,
         help=softwrap(
-            f"""
-            If true, Pants will use the old, deprecated semantics for directory arguments like
-            `{bin_name()} test dir`: directories are shorthand for the target `dir:dir`, i.e. the
-            target that leaves off `name=`.
-
-            If false, Pants will use the new semantics: directory arguments will match all files
-            and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
-
-            This also impacts the behavior of the `tailor` goal. If this option is true,
-            `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
-            false, specifying a directory will only add targets for that directory.
             """
-        ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            f"""
-            If `use_deprecated_directory_cli_args_semantics` is already set explicitly to `false`,
-            simply delete the option from `pants.toml` because `false` is now the default.
+            If true, `docker_environment` targets can be used to run builds inside a Docker
+            container.
 
-            If set to true, removing the option will cause directory arguments like `{bin_name()}
-            test project/dir` to now match all files and targets in the directory, whereas before
-            it matched the target `project/dir:dir`. To keep the old semantics, use the explicit
-            address syntax.
+            If false, anytime a `docker_environment` target is used, Pants will instead fallback to
+            whatever the target's `fallback_environment` field is set to.
+
+            This can be useful, for example, if you want to always use Docker locally, but disable
+            it in CI, or vice versa.
             """
         ),
     )
-
-    use_deprecated_pex_binary_run_semantics = BoolOption(
-        default=False,
+    remote_execution_extra_platform_properties = StrListOption(
+        advanced=True,
         help=softwrap(
             """
-            If `true`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
-            a sandbox (while still using a PEX for thirdparty dependencies). Additionally, you can
-            refer to the `pex_binary` using the value of its `entry_point` field (if it is a filename).
+            Platform properties to set on remote execution requests.
 
-            If `false`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
-            This makes `run` equivalent to using `package` and running the artifact. Additionally,
-            the binary must be `run` using the `pex_binary`'s address, as passing a filename to `run`
-            will run the `python_source`.
+            Format: property=value. Multiple values should be specified as multiple
+            occurrences of this flag.
 
-            Note that support has been added to Pants to allow you to `run` any `python_source`,
-            so setting this to `true` should be reserved for maintaining backwards-compatibility
-            with previous versions of Pants. Additionally, you can remove any `pex_binary` targets
-            that exist solely for running Python code (and aren't meant to be packaged).
+            Pants itself may add additional platform properties.
+
+            If you are using the remote_environment target mechanism, set this value as a field
+            on the target instead. This option will be ignored.
             """
         ),
-        removal_version="2.15.0.dev0",
-        removal_hint=softwrap(
-            """
-            If `use_deprecated_pex_binary_run_semantics` is already set explicitly to `false`,
-            simply delete the option from `pants.toml` because `false` is now the default.
-
-            If set to `true`, removing the option will cause `run` on a `pex_binary` to package and
-            run the built PEX file. Additionally, the `pex_binary` must be referred to by its address.
-            To keep the old `run` semantics, use `run` on the relevant `python_source` target.
-            """
-        ),
+        default=[],
     )
 
     @classmethod
@@ -1807,41 +1780,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                     """
                 )
             )
-
-        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
-        # removed as well.
-        deprecated_conditional(
-            lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
-            removal_version="2.15.0.dev0",
-            entity="Setting `[GLOBAL].remote_execution` at the same time as `[GLOBAL].remote_cache_eager-fetch`.",
-            hint=softwrap(
-                """
-                Use of `[GLOBAL].remote_execution` currently implies use of
-                `[GLOBAL].remote_cache_eager-fetch=false`, but in future versions, use of eager fetch with
-                remote execution will be optional. To preserve the current behavior in future
-                versions, `[GLOBAL].remote_cache_eager-fetch` should be disabled.
-                """
-            ),
-        )
-
-        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
-        # removed as well.
-        deprecated_conditional(
-            lambda: (
-                opts.remote_execution
-                and (not opts.remote_cache_read or not opts.remote_cache_write)
-            ),
-            removal_version="2.15.0.dev0",
-            entity="Using `[GLOBAL].remote_execution` without setting `[GLOBAL].remote_cache_read` and `[GLOBAL].remote_cache_write`.",
-            hint=softwrap(
-                """
-                Use of `[GLOBAL].remote_execution` currently implies use of a remote cache, but in future
-                versions, use of the remote cache with remote execution will be optional. To
-                preserve the current behavior in future versions, both `[GLOBAL].remote_cache_read` and
-                `[GLOBAL].remote_cache_write` should be enabled.
-                """
-            ),
-        )
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
@@ -1898,29 +1836,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         )
 
     @staticmethod
-    def resolve_cache_content_behavior(
-        bootstrap_options: OptionValueContainer,
-    ) -> CacheContentBehavior:
-        resolved_value = resolve_conflicting_options(
-            old_option="remote_cache_eager_fetch",
-            new_option="cache_content_behavior",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
-        )
-
-        if isinstance(resolved_value, bool):
-            # Is `remote_cache_eager_fetch`.
-            return CacheContentBehavior.fetch if resolved_value else CacheContentBehavior.defer
-        elif isinstance(resolved_value, CacheContentBehavior):
-            return resolved_value
-        else:
-            raise TypeError(
-                f"Unexpected option value for `cache_content_behavior`: {resolved_value}"
-            )
-
-    @staticmethod
     def resolve_keep_sandboxes(
         bootstrap_options: OptionValueContainer,
     ) -> KeepSandboxes:
@@ -1935,11 +1850,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if isinstance(resolved_value, bool):
             # Is `process_cleanup`.
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="--process-cleanup",
-                hint="Instead, use `--keep-sandboxes`.",
-            )
             return KeepSandboxes.never if resolved_value else KeepSandboxes.always
         elif isinstance(resolved_value, KeepSandboxes):
             return resolved_value
@@ -2039,6 +1949,16 @@ class GlobalOptionsFlags:
 
 
 @dataclass(frozen=True)
+class ProcessCleanupOption:
+    """A wrapper around the global option `process_cleanup`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool
+
+
+@dataclass(frozen=True)
 class NamedCachesDirOption:
     """A wrapper around the global option `named_caches_dir`.
 
@@ -2048,11 +1968,19 @@ class NamedCachesDirOption:
     val: PurePath
 
 
-@dataclass(frozen=True)
-class UseDeprecatedPexBinaryRunSemanticsOption:
-    """A wrapper around the global option `use_deprecated_pex_binary_run_semantics`.
+def ca_certs_path_to_file_content(path: str) -> FileContent:
+    """Set up FileContent for using the ca_certs_path locally in a process sandbox.
 
-    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    This helper can be used when setting up a Process so that the certs are included in the process.
+    Use `Get(Digest, CreateDigest)`, and then include this in the `input_digest` for the Process.
+    Typically, you will also need to configure the invoking tool to load those certs, via its argv
+    or environment variables.
+
+    Note that the certs are always read on the localhost, even when using Docker and remote
+    execution. Then, those certs can be copied into the process.
+
+    Warning: this will not detect when the contents of cert files changes, because we use
+    `pathlib.Path.read_bytes()`. Better would be
+    # https://github.com/pantsbuild/pants/issues/10842
     """
-
-    val: bool
+    return FileContent(os.path.basename(path), Path(path).read_bytes())

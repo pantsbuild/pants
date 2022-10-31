@@ -8,7 +8,7 @@ updatedAt: "2021-11-16T02:52:06.072Z"
 ---
 The Target API defines how you interact with targets in your plugin. For example, you would use the Target API to read the `source` / `sources` field of a target to know which files to run on.
 
-The Target API can also be used to add new target types—such as adding support for a new language. Additionally, the Target API can be used to extend existing target types.
+The Target API can also be used to add new target types—such as adding support for a new language. Additionally, the Target API can be used to extend existing target types and even declare synthetic targets as if they came from a BUILD file.
 
 Targets and Fields - the core building blocks
 ---------------------------------------------
@@ -127,3 +127,72 @@ This subclass mechanism is key to how the Target API behaves:
 
 - You can use subclasses of fields—along with `Target.has_field()`— to filter out irrelevant targets. For example, the Black formatter doesn't work with any plain `SourcesField` field; it needs `PythonSourceField`. The Python test runner is even more specific: it needs `PythonTestSourceField`.
 - You can create custom fields and custom target types that still work with pre-existing functionality. For example, you can subclass `PythonSourceField` to create `DjangoSourceField`, and the Black formatter will still be able to operate on your target.
+
+
+Synthetic Targets API
+---------------------
+
+Normally targets are declared in BUILD files to provide meta data about the project's sources and artifacts etc. Occassionally there may be instances of project meta data that is not served well by being declared explicitly in a BUILD file, for instance if the meta data itself is inferred from other sources of information. For these cases, there is a Target API for declaring synthetic targets, that is targets that are not declared in a BUILD file on disk but instead come from a Plugin's rule.
+
+### Example
+
+To declare synthetic targets from a Plugin, first subclass the `SyntheticTargetsRequest` union type and register it as a union member with `UnionRule(SyntheticTargetsRequest, SubclassedType)`. Secondly there needs to be a rule that takes this union member type as input and returns a `SyntheticAddressMaps`.
+
+    from dataclasses import dataclass
+    from pants.engine.internals.synthetic_targets import (
+        SyntheticAddressMaps,
+        SyntheticTargetsRequest,
+    )
+    from pants.engine.internals.target_adaptor import TargetAdaptor
+    from pants.engine.unions import UnionRule
+    from pants.engine.rules import collect_rules, rule
+
+
+    @dataclass(frozen=True)
+    class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
+        pass
+
+
+    @rule
+    async def example_synthetic_targets(request: SyntheticExampleTargetsRequest) -> SyntheticAddressMaps:
+        return SyntheticAddressMaps.for_targets_request(
+            request,
+            [
+                (
+                  "BUILD.synthetic-example",
+                  (
+                    TargetAdaptor("<target-type>", "<name>", **target_field_values),
+                    ...
+                  ),
+                ),
+                ...
+            ]
+        )
+
+
+    def rules():
+        return (
+            *collect_rules(),
+            UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+            ...
+        )
+
+### Register synthetic targets per directory or globally
+
+Depending on the source information for the synthetic targets, it may make sense to either register them with a request per directory or for all directories at once with a single request.
+
+If the source information is derived from parsing files from the project source tree, then go with the per directory request style (which also is the default mode of operation), where as if the information is known up-front without consulting the project sources or otherwise does not depend on which directory is being parsed for BUILD files, it may be more performant to return all synthetic targets in a single request.
+
+The mode of operation is declared per union member (i.e. on the subclass of the `SyntheticTargetsRequest` class) by providing a default value to the `path` field:
+
+    @dataclass(frozen=True)
+    class SyntheticExamplePerDirectoryTargetsRequest(SyntheticTargetsRequest):
+        path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
+
+    @dataclass(frozen=True)
+    class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
+        path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+Any other default value for `path` should be considered invalid and yield undefined behaviour. (that is it may change without notice in future versions of Pants.)
+
+During rule execution, the `path` field of the `request` instance will hold the value for the path currently being parsed in case of a per directory mode of operation otherwise it will be `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS`.

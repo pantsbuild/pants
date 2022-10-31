@@ -206,12 +206,6 @@ class FrozenYamlIndex(Generic[T]):
             data[file_path] = Collection(doc_list)
         self._data = FrozenDict(data)
 
-    def _items(self) -> Iterator[tuple[PurePath, int, YamlPath, T]]:
-        for file_path, doc_indexes in self._data.items():
-            for idx, doc_index in enumerate(doc_indexes):
-                for yaml_path, item in doc_index.paths.items():
-                    yield file_path, idx, yaml_path, item
-
     def transform_values(self, func: Callable[[T], Optional[R]]) -> FrozenYamlIndex[R]:
         """Transforms the values of the given indexed collection into those that are returned from
         the received function.
@@ -223,7 +217,7 @@ class FrozenYamlIndex(Generic[T]):
         """
 
         mutable_index: MutableYamlIndex[R] = MutableYamlIndex()
-        for file_path, doc_index, yaml_path, item in self._items():
+        for file_path, doc_index, yaml_path, item in self:
             new_item = func(item)
             if new_item is not None:
                 mutable_index.insert(
@@ -236,8 +230,7 @@ class FrozenYamlIndex(Generic[T]):
 
     def values(self) -> Iterator[T]:
         """Returns an iterator over the values of this index."""
-
-        for _, _, _, item in self._items():
+        for _, _, _, item in self:
             yield item
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -247,6 +240,12 @@ class FrozenYamlIndex(Generic[T]):
         for file_path, documents in self._data.items():
             result[str(file_path)] = [doc_idx.to_json_dict() for doc_idx in documents]
         return result
+
+    def __iter__(self):
+        for file_path, doc_indexes in self._data.items():
+            for idx, doc_index in enumerate(doc_indexes):
+                for yaml_path, item in doc_index.paths.items():
+                    yield file_path, idx, yaml_path, item
 
 
 def _to_snake_case(str: str) -> str:

@@ -12,8 +12,10 @@ from pants.backend.explorer.graphql.rules import rules
 from pants.backend.explorer.graphql.setup import create_schema
 from pants.backend.explorer.rules import validate_explorer_dependencies
 from pants.backend.project_info import peek
+from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
 from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import AllHelpInfo, HelpInfoExtracter
 from pants.testutil.rule_runner import RuleRunner
 
@@ -27,7 +29,10 @@ def schema():
 def context(all_help_info: AllHelpInfo, rule_runner: RuleRunner) -> dict:
     return dict(
         pants_request_state=RequestState(
-            all_help_info, rule_runner.build_config, rule_runner.scheduler
+            all_help_info,
+            rule_runner.build_config,
+            rule_runner.scheduler,
+            env_name=EnvironmentName(None),
         )
     )
 
@@ -38,7 +43,9 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
 
     return HelpInfoExtracter.get_all_help_info(
-        options=rule_runner.options_bootstrapper.full_options(rule_runner.build_config),
+        options=rule_runner.options_bootstrapper.full_options(
+            rule_runner.build_config, union_membership=UnionMembership({})
+        ),
         union_membership=rule_runner.union_membership,
         consumed_scopes_mapper=fake_consumed_scopes_mapper,
         registered_target_types=RegisteredTargetTypes.create(rule_runner.build_config.target_types),

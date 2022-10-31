@@ -12,16 +12,16 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
+from pants.engine.unions import UnionMembership
 from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.custom_types import ListValueComponent
+from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
 from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
-from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
@@ -167,12 +167,8 @@ class OptionsBootstrapper:
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
             alias_vals = post_bootstrap_config.get("cli", "alias")
-            alias_dict = parse_expression(
-                name="cli.alias",
-                val=alias_vals[-1] if alias_vals else "{}",
-                acceptable_types=dict,
-            )
-            alias = CliAlias.from_dict(alias_dict)
+            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
+            alias = CliAlias.from_dict(val)
 
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
@@ -241,7 +237,10 @@ class OptionsBootstrapper:
 
     @memoized_method
     def _full_options(
-        self, known_scope_infos: FrozenOrderedSet[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: FrozenOrderedSet[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
@@ -258,12 +257,15 @@ class OptionsBootstrapper:
             if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue
             distinct_subsystem_classes.add(ksi.subsystem_cls)
-            ksi.subsystem_cls.register_options_on_scope(options)
+            ksi.subsystem_cls.register_options_on_scope(options, union_membership)
 
         return options
 
     def full_options_for_scopes(
-        self, known_scope_infos: Iterable[ScopeInfo], allow_unknown_options: bool = False
+        self,
+        known_scope_infos: Iterable[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
     ) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
@@ -273,10 +275,13 @@ class OptionsBootstrapper:
         """
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),
+            union_membership,
             allow_unknown_options=allow_unknown_options,
         )
 
-    def full_options(self, build_configuration: BuildConfiguration) -> Options:
+    def full_options(
+        self, build_configuration: BuildConfiguration, union_membership: UnionMembership
+    ) -> Options:
         global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
@@ -289,7 +294,9 @@ class OptionsBootstrapper:
             subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
         ]
         options = self.full_options_for_scopes(
-            known_scope_infos, allow_unknown_options=build_configuration.allow_unknown_options
+            known_scope_infos,
+            union_membership,
+            allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
         self.alias.check_name_conflicts(options.known_scope_to_info)

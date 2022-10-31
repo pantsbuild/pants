@@ -21,6 +21,7 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
+from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
@@ -30,10 +31,10 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.subsystems.poetry import PoetrySubsystem
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -98,6 +99,9 @@ class DefaultTool:
 
 AllTools = (
     # Python
+    DefaultTool.python(
+        AddTrailingComma, backend="pants.backend.experimental.python.lint.add_trailing_comma"
+    ),
     DefaultTool.python(Autoflake),
     DefaultTool.python(Bandit, backend="pants.backend.python.lint.bandit"),
     DefaultTool.python(Black),
@@ -111,11 +115,11 @@ AllTools = (
     DefaultTool.python(Isort),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
     DefaultTool.python(MyPy, source_plugins=True),
-    DefaultTool.python(PoetrySubsystem),
     DefaultTool.python(PyTest),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
+    DefaultTool.python(PyOxidizer),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
@@ -189,6 +193,7 @@ def update_internal_lockfiles(specified: list[str] | None) -> None:
     args = [
         "./pants",
         "--concurrent",
+        f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
         # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
         # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
         # restore it here so that the lockfile gets generated properly.

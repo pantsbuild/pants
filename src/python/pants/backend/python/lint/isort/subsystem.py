@@ -13,7 +13,6 @@ from pants.backend.python.goals.lockfile import (
     GeneratePythonToolLockfileSentinel,
 )
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -110,10 +109,8 @@ class IsortLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 
 @rule
-def setup_isort_lockfile(
-    _: IsortLockfileSentinel, isort: Isort, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(isort, use_pex=python_setup.generate_lockfiles_with_pex)
+def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(isort)
 
 
 class IsortExportSentinel(ExportPythonToolSentinel):

@@ -42,6 +42,7 @@ from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
@@ -49,14 +50,14 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, FilespecMatcher
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -238,12 +239,11 @@ class AsyncFieldMixin(Field):
         super().__init__(raw_value, address)
         # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
         # subclasses from adding arbitrary fields.
-        self._unfreeze_instance()  # type: ignore[attr-defined]
-        # N.B.: We store the address here and not in the Field base class, because the memory usage
-        # of storing this value in every field was shown to be excessive / lead to performance
-        # issues.
-        self.address = address
-        self._freeze_instance()  # type: ignore[attr-defined]
+        with self._unfrozen():  # type: ignore[attr-defined]
+            # N.B.: We store the address here and not in the Field base class, because the memory usage
+            # of storing this value in every field was shown to be excessive / lead to performance
+            # issues.
+            self.address = address
 
     def __repr__(self) -> str:
         return (
@@ -376,6 +376,7 @@ class Target:
         *,
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
+        ignore_unrecognized_fields: bool = False,
     ) -> None:
         """Create a target.
 
@@ -391,6 +392,8 @@ class Target:
             its file. A file-less target like `go_third_party_package` should keep the default of
             `address.spec_path`. This field impacts how command line specs work, so that globs
             like `dir:` know whether to match the target or not.
+        :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
+            intended for when Pants is bootstrapping itself.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -408,18 +411,26 @@ class Target:
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
         self.name_explicitly_set = name_explicitly_set
-        self.field_values = self._calculate_field_values(unhydrated_values, address)
+        self.field_values = self._calculate_field_values(
+            unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
+        )
         self.validate()
 
     @final
     def _calculate_field_values(
-        self, unhydrated_values: dict[str, Any], address: Address
+        self,
+        unhydrated_values: dict[str, Any],
+        address: Address,
+        *,
+        ignore_unrecognized_fields: bool,
     ) -> FrozenDict[type[Field], Field]:
         field_values = {}
         aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if ignore_unrecognized_fields:
+                    continue
                 valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
@@ -464,25 +475,9 @@ class Target:
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
-    @final
-    @memoized_classproperty
-    def _plugin_field_cls(cls) -> type:
-        # NB: We ensure that each Target subtype has its own `PluginField` class so that
-        # registering a plugin field doesn't leak across target types.
-
-        baseclass = (
-            object
-            if cast("Type[Target]", cls) is Target
-            else next(
-                base for base in cast("Type[Target]", cls).__bases__ if issubclass(base, Target)
-            )._plugin_field_cls
-        )
-
-        @union
-        class PluginField(baseclass):  # type: ignore[misc, valid-type]
-            pass
-
-        return PluginField
+    @distinct_union_type_per_subclass
+    class PluginField:
+        pass
 
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
@@ -515,7 +510,15 @@ class Target:
     @final
     @classmethod
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
-        return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, Target):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
+
+        return tuple(result)
 
     @final
     @classmethod
@@ -683,7 +686,6 @@ class Target:
             )
         return result
 
-    @final
     @classmethod
     def register_plugin_field(cls, field: Type[Field]) -> UnionRule:
         """Register a new field on the target type.
@@ -692,7 +694,7 @@ class Target:
         `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
         citizen. Plugins can use this new field like any other.
         """
-        return UnionRule(cls._plugin_field_cls, field)
+        return UnionRule(cls.PluginField, field)
 
     def validate(self) -> None:
         """Validate the target, such as checking for mutually exclusive fields.
@@ -1073,7 +1075,7 @@ class TargetFilesGenerator(TargetGenerator):
             )
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class TargetFilesGeneratorSettingsRequest:
     """An optional union to provide dynamic settings for a `TargetFilesGenerator`.
 
@@ -1099,7 +1101,7 @@ class TargetFilesGeneratorSettings:
 _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
     generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
@@ -1298,16 +1300,18 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
+def _get_field_set_fields(field_set: Type[FieldSet]) -> Dict[str, Type[Field]]:
+    return {
+        name: field_type
+        for name, field_type in get_type_hints(field_set).items()
+        if isinstance(field_type, type) and issubclass(field_type, Field)
+    }
 
 
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields: Dict[str, Type[Field]] = {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
+    all_expected_fields = _get_field_set_fields(field_set)
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
@@ -1470,7 +1474,6 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
-    expect_single_field_set: bool
     shard: int
     num_shards: int
 
@@ -1480,19 +1483,12 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
-        expect_single_field_set: bool = False,
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        if expect_single_field_set and num_shards != -1:
-            raise ValueError(
-                "At most one of shard_spec and expect_single_field_set may be set"
-                " on a TargetRootsToFieldSetsRequest instance"
-            )
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.expect_single_field_set = expect_single_field_set
         self.shard = shard
         self.num_shards = num_shards
 
@@ -2071,7 +2067,7 @@ class SourcesField(AsyncFieldMixin, Field):
             ),
         )
 
-    @property
+    @memoized_property
     def filespec(self) -> Filespec:
         """The original globs, returned in the Filespec dict format.
 
@@ -2088,6 +2084,12 @@ class SourcesField(AsyncFieldMixin, Field):
         if excludes:
             result["excludes"] = excludes
         return result
+
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
 
 
 class MultipleSourcesField(SourcesField, StringSequenceField):
@@ -2305,7 +2307,7 @@ class HydratedSources:
     sources_type: type[SourcesField] | None
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
@@ -2408,6 +2410,12 @@ class SecondaryOwnerMixin(ABC):
         the build root.
         """
 
+    @memoized_property
+    def filespec_matcher(self) -> FilespecMatcher:
+        # Note: memoized because parsing the globs is expensive:
+        # https://github.com/pantsbuild/pants/issues/16122
+        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
+
 
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
@@ -2450,10 +2458,9 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
         result.
 
-        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
-        more about how addresses are formed, including for generated targets. You can also run
-        `{bin_name()} list ::` to find all addresses in your project, or
-        `{bin_name()} list dir:` to find all addresses defined in that directory.
+        See {doc_url('targets')} for more about how addresses are formed, including for generated
+        targets. You can also run `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir` to find all addresses defined in that directory.
 
         If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
         `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
@@ -2606,7 +2613,7 @@ class ExplicitlyProvidedDependencies:
 FS = TypeVar("FS", bound="FieldSet")
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
@@ -2661,7 +2668,7 @@ class InferredDependencies:
         self.exclude = FrozenOrderedSet(sorted(exclude))
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.
@@ -2690,7 +2697,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,

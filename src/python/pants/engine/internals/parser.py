@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 import threading
 import tokenize
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDef
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -81,17 +83,19 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        ignore_unrecognized_symbols: bool,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
             build_root, target_type_aliases, object_aliases
         )
+        self.ignore_unrecognized_symbols = ignore_unrecognized_symbols
 
     @staticmethod
     def _generate_symbols(
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
-    ) -> tuple[dict[str, Any], ParseState]:
+    ) -> tuple[FrozenDict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
         # file parse with a reset of the ParseState for the calling thread.
@@ -138,7 +142,11 @@ class Parser:
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
 
-        return symbols, parse_state
+        return FrozenDict(symbols), parse_state
+
+    @property
+    def builtin_symbols(self) -> FrozenDict[str, Any]:
+        return self._symbols
 
     def parse(
         self,
@@ -149,29 +157,32 @@ class Parser:
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
-        # We update the known symbols with Build File Preludes. This is subtle code; functions have
-        # their own globals set on __globals__ which they derive from the environment where they
-        # were executed. So for each extra_symbol which comes from a separate execution
-        # environment, we need to to add all of our self._symbols to those __globals__, otherwise
-        # those extra symbols will not see our target aliases etc. This also means that if multiple
-        # prelude files are present, they probably cannot see each others' symbols. We may choose
-        # to change this at some point.
+        global_symbols = {**self._symbols, **extra_symbols.symbols}
 
-        global_symbols = dict(self._symbols)
-        for k, v in extra_symbols.symbols.items():
-            if hasattr(v, "__globals__"):
-                v.__globals__.update(global_symbols)
-            global_symbols[k] = v
+        if self.ignore_unrecognized_symbols:
+            while True:
+                try:
+                    exec(build_file_content, global_symbols)
+                except NameError as e:
+                    bad_symbol = _extract_symbol_from_name_error(e)
+                    global_symbols[bad_symbol] = _unrecognized_symbol_func
+                    self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+                    continue
+                break
+
+            error_on_imports(build_file_content, filepath)
+            return self._parse_state.parsed_targets()
 
         try:
             exec(build_file_content, global_symbols)
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
-            help_str = (
-                "If you expect to see more symbols activated in the below list,"
-                f" refer to {doc_url('enabling-backends')} for all available"
-                " backends to activate."
+            help_str = softwrap(
+                f"""
+                If you expect to see more symbols activated in the below list, refer to
+                {doc_url('enabling-backends')} for all available backends to activate.
+                """
             )
 
             candidates = get_close_matches(build_file_content, valid_symbols)
@@ -188,7 +199,6 @@ class Parser:
             )
 
         error_on_imports(build_file_content, filepath)
-
         return self._parse_state.parsed_targets()
 
 
@@ -210,3 +220,23 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
             f"writing a plugin ({doc_url('plugins-overview')}."
         )
+
+
+def _extract_symbol_from_name_error(err: NameError) -> str:
+    result = re.match(r"^name '(\w*)'", err.args[0])
+    if result is None:
+        raise AssertionError(
+            softwrap(
+                f"""
+                Failed to extract symbol from NameError: {err}
+
+                Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose
+                """
+            )
+        )
+    return result.group(1)
+
+
+def _unrecognized_symbol_func(**kwargs):
+    """Allows us to not choke on unrecognized symbols, including when they're called as
+    functions."""

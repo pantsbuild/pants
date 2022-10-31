@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import (
@@ -17,18 +18,18 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
     FallibleProcessResult,
     InteractiveProcess,
-    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
 )
@@ -59,6 +60,11 @@ class ScalatestTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: ScalatestTestExtraEnvVarsField
+
+
+class ScalatestTestRequest(TestRequest):
+    tool_subsystem = Scalatest
+    field_set_type = ScalatestTestFieldSet
 
 
 class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -128,7 +134,7 @@ async def setup_scalatest_for_target(
         extra_jvm_args.extend(jvm.debug_args)
 
     field_set_extra_env = await Get(
-        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+        EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
     )
 
     process = JvmProcess(
@@ -166,8 +172,10 @@ async def setup_scalatest_for_target(
 @rule(desc="Run Scalatest", level=LogLevel.DEBUG)
 async def run_scalatest_test(
     test_subsystem: TestSubsystem,
-    field_set: ScalatestTestFieldSet,
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any],
 ) -> TestResult:
+    field_set = batch.single_element
+
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -186,20 +194,19 @@ async def run_scalatest_test(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
-
+async def setup_scalatest_debug_request(
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
-    interactive_process = await Get(
-        InteractiveProcess,
-        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
+    return TestDebugRequest(
+        InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
     )
-    return TestDebugRequest(interactive_process)
 
 
 @rule
 async def setup_scalatest_debug_adapter_request(
-    field_set: ScalatestTestFieldSet,
+    _: ScalatestTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
 
@@ -217,4 +224,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        *ScalatestTestRequest.rules(),
     ]

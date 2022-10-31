@@ -66,18 +66,21 @@ class NpxProcess:
 
 @rule(level=LogLevel.DEBUG)
 async def setup_npx_process(
-    request: NpxProcess, nodejs: NodeJS, named_caches_dir: NamedCachesDirOption
+    request: NpxProcess,
+    nodejs: NodeJS,
+    named_caches_dir: NamedCachesDirOption,
+    platform: Platform,
 ) -> Process:
     # Ensure nodejs is installed
     downloaded_nodejs = await Get(
-        DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
 
     input_digest = await Get(Digest, MergeDigests((request.input_digest, downloaded_nodejs.digest)))
 
     # Get reference to npx
     assert nodejs.default_url_platform_mapping is not None
-    plat_str = nodejs.default_url_platform_mapping[Platform.current.value]
+    plat_str = nodejs.default_url_platform_mapping[platform.value]
     nodejs_dir = f"node-{nodejs.version}-{plat_str}"
     # TODO: Investigate if ./{nodejs_dir}/bin/npx can work - as that will be more stable in the long-term
     npx_exe = (

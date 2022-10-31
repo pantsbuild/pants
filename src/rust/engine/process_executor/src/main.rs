@@ -37,7 +37,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
-  Platform, ProcessCacheScope, ProcessMetadata,
+  Platform, ProcessCacheScope, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -46,6 +46,12 @@ use protos::require_digest;
 use store::Store;
 use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
+
+#[derive(Clone, Debug, Default)]
+struct ProcessMetadata {
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+}
 
 #[derive(StructOpt)]
 struct CommandSpec {
@@ -60,7 +66,7 @@ struct CommandSpec {
   #[structopt(long)]
   input_digest_length: Option<usize>,
 
-  /// Extra platform properties to set on the execution request.
+  /// Extra platform properties to set on the execution request during remote execution.
   #[structopt(long)]
   extra_platform_property: Vec<String>,
 
@@ -293,11 +299,12 @@ async fn main() {
 
       let remote_runner = process_execution::remote::CommandRunner::new(
         &address,
-        process_metadata.clone(),
+        process_metadata.instance_name.clone(),
+        process_metadata.cache_key_gen_version.clone(),
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
-        Platform::Linux_x86_64,
+        executor.clone(),
         Duration::from_secs(args.overall_deadline_secs),
         Duration::from_millis(100),
         args.execution_rpc_concurrency,
@@ -309,13 +316,13 @@ async fn main() {
         Box::new(
           process_execution::remote_cache::CommandRunner::new(
             Arc::new(remote_runner),
-            process_metadata,
+            process_metadata.instance_name.clone(),
+            process_metadata.cache_key_gen_version.clone(),
             executor,
             store.clone(),
             &address,
             root_ca_certs,
             headers,
-            Platform::Linux_x86_64,
             true,
             true,
             process_execution::remote_cache::RemoteCacheWarningsBehavior::Backoff,
@@ -375,6 +382,18 @@ async fn make_request(
   store: &Store,
   args: &Opt,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let (execution_strategy, platform) = if args.server.is_some() {
+    let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
+      args.command.extra_platform_property.iter(),
+    ));
+    (strategy, Platform::Linux_x86_64)
+  } else {
+    (
+      ProcessExecutionStrategy::Local,
+      Platform::current().unwrap(),
+    )
+  };
+
   match (
     args.command.input_digest,
     args.command.input_digest_length,
@@ -383,14 +402,27 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length)).await
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
 
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
-      extract_request_from_action_digest(store, Digest::new(action_fingerprint, action_digest_length), args.remote_instance_name.clone()).await
+      extract_request_from_action_digest(
+        store,
+        Digest::new(action_fingerprint, action_digest_length),
+        execution_strategy,
+        platform,
+        args.remote_instance_name.clone(),
+        args.command.cache_key_gen_version.clone(),
+      ).await
     }
     (None, None, None, None, Some(buildbarn_url)) => {
-      extract_request_from_buildbarn_url(store, buildbarn_url).await
+      extract_request_from_buildbarn_url(
+        store,
+        buildbarn_url,
+        execution_strategy,
+        platform,
+        args.command.cache_key_gen_version.clone()
+      ).await
     }
     (None, None, None, None, None) => {
       Err("Must specify either action input digest or action digest or buildbarn URL".to_owned())
@@ -405,6 +437,8 @@ async fn make_request_from_flat_args(
   store: &Store,
   args: &Opt,
   input_files: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -448,19 +482,19 @@ async fn make_request_from_flat_args(
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
-    level: log::Level::Info,
+    level: Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
-    platform_constraint: None,
+    platform,
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
+    execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
-
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
     cache_key_gen_version: args.command.cache_key_gen_version.clone(),
-    platform_properties: collection_from_keyvalues(args.command.extra_platform_property.iter()),
   };
   Ok((process, metadata))
 }
@@ -469,7 +503,10 @@ async fn make_request_from_flat_args(
 async fn extract_request_from_action_digest(
   store: &Store,
   action_digest: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
   instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let action = store
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
@@ -523,6 +560,11 @@ async fn extract_request_from_action_digest(
     env: command
       .environment_variables
       .iter()
+      .filter(|env| {
+        // Filter out environment variables which will be (re-)set by ExecutionRequest
+        // construction.
+        env.name != process_execution::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      })
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
     working_directory,
@@ -538,31 +580,23 @@ async fn extract_request_from_action_digest(
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?,
     timeout: action.timeout.map(|timeout| {
-      std::time::Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
+      Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
     }),
     execution_slot_variable: None,
     concurrency_available: 0,
     description: "".to_string(),
-    level: log::Level::Error,
+    level: Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform_constraint: None,
+    platform,
     cache_scope: ProcessCacheScope::Always,
+    execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
   let metadata = ProcessMetadata {
     instance_name,
-    cache_key_gen_version: None,
-    platform_properties: command
-      .platform
-      .iter()
-      .flat_map(|platform| {
-        platform
-          .properties
-          .iter()
-          .map(|property| (property.name.clone(), property.value.clone()))
-      })
-      .collect(),
+    cache_key_gen_version,
   };
 
   Ok((process, metadata))
@@ -571,6 +605,9 @@ async fn extract_request_from_action_digest(
 async fn extract_request_from_buildbarn_url(
   store: &Store,
   buildbarn_url: &str,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
   if url_parts.len() < 4 {
@@ -617,7 +654,15 @@ async fn extract_request_from_buildbarn_url(
     }
   };
 
-  extract_request_from_action_digest(store, action_digest, Some(instance.to_owned())).await
+  extract_request_from_action_digest(
+    store,
+    action_digest,
+    execution_strategy,
+    platform,
+    Some(instance.to_owned()),
+    cache_key_gen_version,
+  )
+  .await
 }
 
 fn collection_from_keyvalues<Str, It, Col>(keyvalues: It) -> Col

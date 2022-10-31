@@ -12,6 +12,7 @@ from typing import Any, Callable, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules.environments import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
@@ -33,7 +34,13 @@ _RESERVED_NAMES = {"api-types", "global", "goals", "subsystems", "targets", "too
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions, FilterSubsystem}
+_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {
+    GlobalOptions,
+    Changed,
+    CliOptions,
+    FilterSubsystem,
+    EnvironmentsSubsystem,
+}
 
 
 @dataclass(frozen=True)
@@ -206,7 +213,7 @@ class BuildConfiguration:
 
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
-            rules_and_queries = (*rule_index.rules, *rule_index.queries)
+            rules_and_queries: tuple[Rule, ...] = (*rule_index.rules, *rule_index.queries)
             for rule in rules_and_queries:
                 self._rule_to_providers[rule].append(plugin_or_backend)
             for union_rule in rule_index.union_rules:
@@ -245,10 +252,10 @@ class BuildConfiguration:
                 )
             for target_type in target_types:
                 self._target_type_to_providers[target_type].append(plugin_or_backend)
-                # Access the Target._plugin_field_cls here to ensure the PluginField class is
+                # Access the Target.PluginField here to ensure the PluginField class is
                 # created before the UnionMembership is instantiated, as the class hierarchy is
                 # walked during union membership setup.
-                _ = target_type._plugin_field_cls
+                _ = target_type.PluginField
 
         def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
             self._remote_auth_plugin = remote_auth_plugin

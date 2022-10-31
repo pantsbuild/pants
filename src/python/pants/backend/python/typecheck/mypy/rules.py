@@ -13,15 +13,17 @@ from typing import Iterable, Optional, Tuple
 import packaging
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonSourceField
-from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
     MyPyConfigFile,
+    MyPyFieldSet,
     MyPyFirstPartyPlugins,
 )
-from pants.backend.python.util_rules import partition, pex_from_targets
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.partition import (
+    _partition_by_interpreter_constraints_and_resolve,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexRequest,
@@ -42,28 +44,18 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
-from pants.engine.target import CoarsenedTargets, FieldSet, Target
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, shell_quote
 
 
 @dataclass(frozen=True)
-class MyPyFieldSet(FieldSet):
-    required_fields = (PythonSourceField,)
-
-    sources: PythonSourceField
-
-    @classmethod
-    def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipMyPyField).value
-
-
-@dataclass(frozen=True)
 class MyPyPartition:
-    root_field_sets: FrozenOrderedSet[MyPyFieldSet]
-    closure: FrozenOrderedSet[Target]
+    field_sets: FrozenOrderedSet[MyPyFieldSet]
+    root_targets: CoarsenedTargets
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
@@ -78,7 +70,7 @@ class MyPyPartitions(Collection[MyPyPartition]):
 
 class MyPyRequest(CheckRequest):
     field_set_type = MyPyFieldSet
-    name = MyPy.options_scope
+    tool_name = MyPy.options_scope
 
 
 @rule_helper
@@ -144,7 +136,9 @@ async def mypy_typecheck_partition(
     mkdir: MkdirBinary,
     cp: CpBinary,
     mv: MvBinary,
+    global_options: GlobalOptions,
 ) -> CheckResult:
+
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -161,17 +155,16 @@ async def mypy_typecheck_partition(
         else mypy.interpreter_constraints
     )
 
-    closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     roots_sources_get = Get(
         SourceFiles,
-        SourceFilesRequest(fs.sources for fs in partition.root_field_sets),
+        SourceFilesRequest(fs.sources for fs in partition.field_sets),
     )
 
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (fs.address for fs in partition.root_field_sets),
+            (fs.address for fs in partition.field_sets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
         ),
     )
@@ -188,14 +181,7 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (
-        closure_sources,
-        roots_sources,
-        mypy_pex,
-        extra_type_stubs_pex,
-        requirements_pex,
-    ) = await MultiGet(
-        closure_sources_get,
+    (roots_sources, mypy_pex, extra_type_stubs_pex, requirements_pex,) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
         extra_type_stubs_pex_get,
@@ -225,9 +211,12 @@ async def mypy_typecheck_partition(
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
+    closure_sources_get = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
+    )
 
-    requirements_venv_pex, file_list_digest = await MultiGet(
-        requirements_venv_pex_request, file_list_digest_request
+    closure_sources, requirements_venv_pex, file_list_digest = await MultiGet(
+        closure_sources_get, requirements_venv_pex_request, file_list_digest_request
     )
 
     py_version = config_file.python_version_to_autoset(
@@ -319,6 +308,18 @@ async def mypy_typecheck_partition(
     env = {
         "PEX_EXTRA_SYS_PATH": ":".join(all_used_source_roots),
         "MYPYPATH": ":".join(all_used_source_roots),
+        # Always emit colors to improve cache hit rates, the results are post-processed to match the
+        # global setting
+        "MYPY_FORCE_COLOR": "1",
+        # Mypy needs to know the terminal so it can use appropriate escape sequences. ansi is a
+        # reasonable lowest common denominator for the sort of escapes mypy uses (NB. TERM=xterm
+        # uses some additional codes that colors.strip_color doesn't remove).
+        "TERM": "ansi",
+        # Force a fixed terminal width. This is effectively infinite, disabling mypy's
+        # builtin truncation and line wrapping. Terminals do an acceptable job of soft-wrapping
+        # diagnostic text and source code is typically already hard-wrapped to a limited width.
+        # (Unique random number to make it easier to search for the source of this setting.)
+        "MYPY_FORCE_TERMINAL_WIDTH": "642092230765939",
     }
 
     process = await Get(
@@ -338,8 +339,9 @@ async def mypy_typecheck_partition(
     report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
         result,
-        partition_description=str(sorted(str(c) for c in partition.interpreter_constraints)),
+        partition_description=partition.description(),
         report=report,
+        strip_formatting=not global_options.colors,
     )
 
 
@@ -347,20 +349,28 @@ async def mypy_typecheck_partition(
 async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
 ) -> MyPyPartitions:
-
-    resolve_and_interpreter_constraints_to_coarsened_targets = (
-        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    resolve_and_interpreter_constraints_to_field_sets = (
+        _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+    )
+    coarsened_targets_by_address = coarsened_targets.by_address()
 
     return MyPyPartitions(
         MyPyPartition(
-            FrozenOrderedSet(roots),
-            FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
+            FrozenOrderedSet(field_sets),
+            CoarsenedTargets(
+                OrderedSet(
+                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+                )
+            ),
             resolve if len(python_setup.resolves) > 1 else None,
             interpreter_constraints or mypy.interpreter_constraints,
         )
-        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
-            resolve_and_interpreter_constraints_to_coarsened_targets.items()
+        for (resolve, interpreter_constraints), field_sets in sorted(
+            resolve_and_interpreter_constraints_to_field_sets.items()
         )
     )
 
@@ -369,13 +379,13 @@ async def mypy_determine_partitions(
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> CheckResults:
     if mypy.skip:
-        return CheckResults([], checker_name=request.name)
+        return CheckResults([], checker_name=request.tool_name)
 
     partitions = await Get(MyPyPartitions, MyPyRequest, request)
     partitioned_results = await MultiGet(
         Get(CheckResult, MyPyPartition, partition) for partition in partitions
     )
-    return CheckResults(partitioned_results, checker_name=request.name)
+    return CheckResults(partitioned_results, checker_name=request.tool_name)
 
 
 def rules():

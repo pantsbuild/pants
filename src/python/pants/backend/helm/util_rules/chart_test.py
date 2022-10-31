@@ -117,14 +117,11 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
-    assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
-    assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+    assert "charts/chart1" in helm_chart.snapshot.dirs
+    assert "charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
     assert len(helm_chart.info.dependencies) == 1
     assert helm_chart.info.dependencies[0].name == "chart1"
     assert helm_chart.info.dependencies[0].alias == "foo"
@@ -170,13 +167,6 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
     expected_metadata = HelmChartMetadata(
         name="chart2",
         api_version="v2",
@@ -197,10 +187,10 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
     assert helm_chart.info == expected_metadata
-    assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
-    assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
-    assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
-    assert "chart2/charts/cert-manager/Chart.yaml" in helm_chart.snapshot.files
+    assert "charts/chart1" in helm_chart.snapshot.dirs
+    assert "charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+    assert "charts/cert-manager" in helm_chart.snapshot.dirs
+    assert "charts/cert-manager/Chart.yaml" in helm_chart.snapshot.files
 
 
 def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleRunner) -> None:
@@ -239,13 +229,6 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options(
-        [
-            f"--source-root-patterns={repr(source_root_patterns)}",
-        ]
-    )
-
     expected_metadata = HelmChartMetadata(
         name="chart2",
         api_version="v2",
@@ -269,7 +252,6 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
             ParseHelmChartMetadataDigest(
                 helm_chart.snapshot.digest,
                 description_of_origin="test_chart_metadata_is_updated_with_explicit_dependencies",
-                prefix=helm_chart.path,
             )
         ],
     )
@@ -281,26 +263,44 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
 def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
+            "3rdparty/helm/BUILD": dedent(
+                """\
+                helm_artifact(
+                  name="cert-manager",
+                  repository="https://charts.jetstack.io/",
+                  artifact="cert-manager",
+                  version="v1.7.1"
+                )
+                """
+            ),
             "src/foo/BUILD": "helm_chart()",
             "src/foo/Chart.yaml": gen_chart_file("foo", version="1.0.0"),
-            "src/bar/BUILD": dedent(
+            "src/deploy/BUILD": dedent(
                 """\
-                helm_deployment(dependencies=["//src/foo"])
+                helm_deployment(name="first_party", dependencies=["//src/foo"])
+
+                helm_deployment(name="3rd_party", dependencies=["//3rdparty/helm:cert-manager"])
                 """
             ),
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
+    first_party_target = rule_runner.get_target(Address("src/deploy", target_name="first_party"))
+    third_party_target = rule_runner.get_target(Address("src/deploy", target_name="3rd_party"))
 
-    target = rule_runner.get_target(Address("src/bar"))
-    field_set = HelmDeploymentFieldSet.create(target)
+    first_party_chart = rule_runner.request(
+        HelmChart, [FindHelmDeploymentChart(HelmDeploymentFieldSet.create(first_party_target))]
+    )
+    assert first_party_chart.info.name == "foo"
+    assert first_party_chart.info.version == "1.0.0"
+    assert not first_party_chart.artifact
 
-    chart = rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
-
-    assert chart.info.name == "foo"
-    assert chart.info.version == "1.0.0"
+    third_party_chart = rule_runner.request(
+        HelmChart, [FindHelmDeploymentChart(HelmDeploymentFieldSet.create(third_party_target))]
+    )
+    assert third_party_chart.info.name == "cert-manager"
+    assert third_party_chart.info.version == "v1.7.1"
+    assert third_party_chart.artifact
 
 
 def test_fail_when_no_chart_dependency_is_found_for_a_deployment(rule_runner: RuleRunner) -> None:
@@ -309,7 +309,7 @@ def test_fail_when_no_chart_dependency_is_found_for_a_deployment(rule_runner: Ru
     target = rule_runner.get_target(Address("", target_name="foo"))
     field_set = HelmDeploymentFieldSet.create(target)
 
-    msg = f"The target '{field_set.address}' is missing a dependency on a `helm_chart` target."
+    msg = f"The target '{field_set.address}' is missing a dependency on a `helm_chart` or a `helm_artifact` target."
     with pytest.raises(ExecutionError, match=msg):
         rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
 
@@ -329,15 +329,12 @@ def test_fail_when_more_than_one_chart_is_found_for_a_deployment(rule_runner: Ru
         }
     )
 
-    source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
-
     target = rule_runner.get_target(Address("src/quxx"))
     field_set = HelmDeploymentFieldSet.create(target)
 
     msg = (
-        f"The target '{field_set.address}' has too many `{HelmChartTarget.alias}` "
-        "addresses in its dependencies, it should have only one."
+        f"The target '{field_set.address}' has more than one `helm_chart` "
+        "or `helm_artifact` addresses in its dependencies, it should have only one."
     )
     with pytest.raises(ExecutionError, match=msg):
         rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])

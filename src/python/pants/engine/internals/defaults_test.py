@@ -8,7 +8,12 @@ from collections import namedtuple
 import pytest
 
 from pants.core.target_types import GenericTarget, GenericTargetDependenciesField
-from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.defaults import (
+    BuildFileDefaults,
+    BuildFileDefaultsParserState,
+    ParametrizeDefault,
+)
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -223,6 +228,17 @@ Scenario = namedtuple(
                 expected_defaults={"test_gen_targets": {"dependencies": ("some/dep",)}},
             ),
             id="default value for moved field",
+        ),
+        pytest.param(
+            Scenario(
+                args=({Test1Target.alias: {"tags": Parametrize(["foo"], ["bar"], baz=["baz"])}},),
+                expected_defaults={
+                    "test_type_1": {
+                        "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
+                    }
+                },
+            ),
+            id="parametrize default field value",
         ),
     ],
 )

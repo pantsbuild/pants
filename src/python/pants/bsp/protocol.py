@@ -16,6 +16,8 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.notification import BSPNotification
+from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -41,7 +43,7 @@ class BSPResponseTypeProtocol(Protocol):
         ...
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 class BSPHandlerMapping:
     """Union type for rules to register handlers for BSP methods."""
 
@@ -82,6 +84,8 @@ class BSPConnection:
         max_workers: int = 5,
     ) -> None:
         self._scheduler_session = scheduler_session
+        # TODO: We might eventually want to make this configurable.
+        self._env_name = determine_bootstrap_environment(self._scheduler_session)
         self._inbound = JsonRpcStreamReader(inbound)
         self._outbound = JsonRpcStreamWriter(outbound)
         self._context: BSPContext = context
@@ -153,7 +157,7 @@ class BSPConnection:
         self._scheduler_session.new_run_id()
 
         workspace = Workspace(self._scheduler_session)
-        params = Params(request, workspace)
+        params = Params(request, workspace, self._env_name)
         execution_request = self._scheduler_session.execution_request(
             requests=[(method_mapping.response_type, params)],
         )

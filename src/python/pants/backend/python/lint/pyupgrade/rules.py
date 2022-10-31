@@ -9,13 +9,11 @@ from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.goals.fix import FixResult, FixTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -31,36 +29,33 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(FmtRequest):
+class PyUpgradeRequest(FixTargetsRequest):
     field_set_type = PyUpgradeFieldSet
-    name = PyUpgrade.options_scope
+    tool_subsystem = PyUpgrade
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
-    if pyupgrade.skip:
-        return FmtResult.skip(formatter_name=request.name)
-
+@rule(desc="Fix with pyupgrade", level=LogLevel.DEBUG)
+async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -> FixResult:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
             pyupgrade_pex,
-            argv=(*pyupgrade.args, *request.snapshot.files),
+            argv=(*pyupgrade.args, *request.files),
             input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=f"Run pyupgrade on {pluralize(len(request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FixResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, PyUpgradeRequest),
+        *PyUpgradeRequest.rules(),
         *pex.rules(),
     ]

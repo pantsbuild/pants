@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import functools
 import itertools
+import json
 import logging
 import os.path
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import AddressParseException
@@ -91,7 +93,6 @@ from pants.option.global_options import (
     OwnersNotFoundBehavior,
     UnmatchedBuildFileGlobs,
 )
-from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -106,7 +107,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
     wrapped_targets = await MultiGet(
         Get(
@@ -170,19 +171,13 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@rule
-async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
-    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
-) -> _TargetParametrizations:
-    address = request.address
-
+@rule_helper
+async def _determine_target_adaptor_and_type(
+    address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
+) -> tuple[TargetAdaptor, type[Target]]:
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(address, description_of_origin=request.description_of_origin),
+        TargetAdaptorRequest(address, description_of_origin=description_of_origin),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -195,6 +190,21 @@ async def resolve_target_parametrizations(
         and not address.is_generated_target
     ):
         warn_deprecated_target_type(target_type)
+    return target_adaptor, target_type
+
+
+@rule
+async def resolve_target_parametrizations(
+    request: _TargetParametrizationsRequest,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
+) -> _TargetParametrizations:
+    address = request.address
+    target_adaptor, target_type = await _determine_target_adaptor_and_type(
+        address, registered_target_types, description_of_origin=request.description_of_origin
+    )
 
     target = None
     parametrizations: list[_TargetParametrization] = []
@@ -219,15 +229,23 @@ async def resolve_target_parametrizations(
                 if field_value is not None:
                     template_fields[field_type.alias] = field_value
 
+        field_type_aliases = target_type._get_field_aliases_to_field_types(
+            target_type.class_field_types(union_membership)
+        ).keys()
         generator_fields_parametrized = {
-            name for name, field in generator_fields.items() if isinstance(field, Parametrize)
+            name
+            for name, field in generator_fields.items()
+            if isinstance(field, Parametrize) and name in field_type_aliases
         }
         if generator_fields_parametrized:
             noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+            generator_fields_parametrized_text = ", ".join(
+                repr(f) for f in generator_fields_parametrized
+            )
             raise InvalidFieldException(
                 f"Only fields which will be moved to generated targets may be parametrized, "
                 f"so target generator {address} (with type {target_type.alias}) cannot "
-                f"parametrize the {generator_fields_parametrized} {noun}."
+                f"parametrize the {generator_fields_parametrized_text} {noun}."
             )
 
         base_generator = target_type(
@@ -325,18 +343,22 @@ async def resolve_target_parametrizations(
     return _TargetParametrizations(parametrizations)
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def resolve_target(
     request: WrappedTargetRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> WrappedTarget:
     address = request.address
     base_address = address.maybe_convert_to_target_generator()
     parametrizations = await Get(
         _TargetParametrizations,
-        _TargetParametrizationsRequest(
-            base_address, description_of_origin=request.description_of_origin
-        ),
+        {
+            _TargetParametrizationsRequest(
+                base_address, description_of_origin=request.description_of_origin
+            ): _TargetParametrizationsRequest,
+            local_environment_name.val: EnvironmentName,
+        },
     )
     target = parametrizations.get(address, target_types_to_generate_requests)
     if target is None:
@@ -353,10 +375,46 @@ async def resolve_target(
     return WrappedTarget(target)
 
 
+@dataclass(frozen=True)
+class WrappedTargetForBootstrap:
+    """Used to avoid a rule graph cycle when evaluating bootstrap targets.
+
+    This does not work with target generation and parametrization. It also ignores any unrecognized
+    fields in the target, to accommodate plugin fields which are not yet registered during
+    bootstrapping.
+
+    This should only be used by bootstrapping code.
+    """
+
+    val: Target
+
+
 @rule
+async def resolve_target_for_bootstrapping(
+    request: WrappedTargetRequest,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> WrappedTargetForBootstrap:
+    target_adaptor, target_type = await _determine_target_adaptor_and_type(
+        request.address,
+        registered_target_types,
+        description_of_origin=request.description_of_origin,
+    )
+    target = target_type(
+        target_adaptor.kwargs,
+        request.address,
+        name_explicitly_set=target_adaptor.name_explicitly_set,
+        union_membership=union_membership,
+        ignore_unrecognized_fields=True,
+    )
+    return WrappedTargetForBootstrap(target)
+
+
+@rule(_masked_types=[EnvironmentName])
 async def resolve_targets(
     targets: UnexpandedTargets,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Targets:
     # Replace all generating targets with what they generate. Otherwise, keep them. If a target
     # generator does not generate any targets, keep the target generator.
@@ -373,13 +431,16 @@ async def resolve_targets(
             parametrizations_gets.append(
                 Get(
                     _TargetParametrizations,
-                    _TargetParametrizationsRequest(
-                        tgt.address.maybe_convert_to_target_generator(),
-                        # Idiomatic rules should not be manually creating `UnexpandedTargets`, so
-                        # we can be confident that the targets actually exist and the addresses
-                        # are already legitimate.
-                        description_of_origin="<infallible>",
-                    ),
+                    {
+                        _TargetParametrizationsRequest(
+                            tgt.address.maybe_convert_to_target_generator(),
+                            # Idiomatic rules should not be manually creating `UnexpandedTargets`, so
+                            # we can be confident that the targets actually exist and the addresses
+                            # are already legitimate.
+                            description_of_origin="<infallible>",
+                        ): _TargetParametrizationsRequest,
+                        local_environment_name.val: EnvironmentName,
+                    },
                 )
             )
         else:
@@ -394,7 +455,7 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
-@rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
+@rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     tgts = await Get(
         Targets,
@@ -405,7 +466,7 @@ async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     return AllTargets(tgts)
 
 
-@rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
+@rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
     tgts = await Get(
         UnexpandedTargets,
@@ -416,12 +477,12 @@ async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTarg
     return AllUnexpandedTargets(tgts)
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def find_all_targets_singleton() -> AllTargets:
     return await Get(AllTargets, AllTargetsRequest())
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def find_all_unexpanded_targets_singleton() -> AllUnexpandedTargets:
     return await Get(AllUnexpandedTargets, AllTargetsRequest())
 
@@ -569,8 +630,10 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     )
 
 
-@rule(desc="Resolve transitive targets", level=LogLevel.DEBUG)
-async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
+@rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
+async def transitive_targets(
+    request: TransitiveTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
+) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
 
     dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
@@ -602,13 +665,16 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
     return CoarsenedTargetsRequest(addresses)
 
 
-@rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG)
-async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTargets:
+@rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
+async def coarsened_targets(
+    request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
+) -> CoarsenedTargets:
+
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
@@ -633,29 +699,39 @@ async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTarget
     coarsened_targets: dict[Address, CoarsenedTarget] = {}
     root_coarsened_targets = []
     root_addresses_set = set(request.roots)
-    for component in components:
-        component = sorted(component)
-        component_set = set(component)
+    try:
+        for component in components:
+            component = sorted(component)
+            component_set = set(component)
 
-        # For each member of the component, include the CoarsenedTarget for each of its external
-        # dependencies.
-        coarsened_target = CoarsenedTarget(
-            (addresses_to_targets[a] for a in component),
-            (
-                coarsened_targets[d]
-                for a in component
-                for d in dependency_mapping.mapping[a]
-                if d not in component_set
-            ),
+            # For each member of the component, include the CoarsenedTarget for each of its external
+            # dependencies.
+            coarsened_target = CoarsenedTarget(
+                (addresses_to_targets[a] for a in component),
+                (
+                    coarsened_targets[d]
+                    for a in component
+                    for d in dependency_mapping.mapping[a]
+                    if d not in component_set
+                ),
+            )
+
+            # Add to the coarsened_targets mapping under each of the component's Addresses.
+            for address in component:
+                coarsened_targets[address] = coarsened_target
+
+            # If any of the input Addresses was a member of this component, it is a root.
+            if component_set & root_addresses_set:
+                root_coarsened_targets.append(coarsened_target)
+    except KeyError:
+        # TODO: This output is intended to help uncover a non-deterministic error reported in
+        # https://github.com/pantsbuild/pants/issues/17047.
+        mapping_str = json.dumps(
+            {str(a): [str(d) for d in deps] for a, deps in dependency_mapping.mapping.items()}
         )
-
-        # Add to the coarsened_targets mapping under each of the component's Addresses.
-        for address in component:
-            coarsened_targets[address] = coarsened_target
-
-        # If any of the input Addresses was a member of this component, it is a root.
-        if component_set & root_addresses_set:
-            root_coarsened_targets.append(coarsened_target)
+        components_str = json.dumps([[str(a) for a in component] for component in components])
+        logger.warning(f"For {request}:\nMapping:\n{mapping_str}\nComponents:\n{components_str}")
+        raise
     return CoarsenedTargets(tuple(root_coarsened_targets))
 
 
@@ -700,19 +776,27 @@ def _log_or_raise_unmatched_owners(
 
 @dataclass(frozen=True)
 class OwnersRequest:
-    """A request for the owners of a set of file paths."""
+    """A request for the owners of a set of file paths.
+
+    TODO: This is widely used as an effectively-public API. It should probably move to
+    `pants.engine.target`.
+    """
 
     sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
     filter_by_global_options: bool = False
+    match_if_owning_build_file_included_in_sources: bool = False
 
 
 class Owners(Collection[Address]):
     pass
 
 
-@rule(desc="Find which targets own certain files")
-async def find_owners(owners_request: OwnersRequest) -> Owners:
+@rule(desc="Find which targets own certain files", _masked_types=[EnvironmentName])
+async def find_owners(
+    owners_request: OwnersRequest,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> Owners:
     # Determine which of the sources are live and which are deleted.
     sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
 
@@ -723,10 +807,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     def create_live_and_deleted_gets(
         *, filter_by_global_options: bool
-    ) -> tuple[
-        Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners],
-        Get[UnexpandedTargets, RawSpecsWithoutFileOwners],
-    ]:
+    ) -> tuple[Get[FilteredTargets | Targets], Get[UnexpandedTargets],]:
         """Walk up the buildroot looking for targets that would conceivably claim changed sources.
 
         For live files, we use Targets, which causes generated targets to be used rather than their
@@ -741,7 +822,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             description_of_origin="<owners rule - unused>",
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
         )
-        live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners] = (
+        live_get: Get[FilteredTargets | Targets] = (
             Get(FilteredTargets, RawSpecsWithoutFileOwners, live_raw_specs)
             if filter_by_global_options
             else Get(Targets, RawSpecsWithoutFileOwners, live_raw_specs)
@@ -785,7 +866,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
         for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):
             matching_files = set(
-                matches_filespec(candidate_tgt.get(SourcesField).filespec, paths=sources_set)
+                candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
             # Also consider secondary ownership, meaning it's not a `SourcesField` field with
             # primary ownership, but the target still should match the file. We can't use
@@ -797,9 +878,12 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             )
             for secondary_owner_field in secondary_owner_fields:
                 matching_files.update(
-                    matches_filespec(secondary_owner_field.filespec, paths=sources_set)
+                    *secondary_owner_field.filespec_matcher.matches(list(sources_set))
                 )
-            if not matching_files and bfa.rel_path not in sources_set:
+            if not matching_files and not (
+                owners_request.match_if_owning_build_file_included_in_sources
+                and bfa.rel_path in sources_set
+            ):
                 continue
 
             unmatched_sources -= matching_files
@@ -1056,16 +1140,20 @@ async def _fill_parameters(
     addresses: Iterable[Address],
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     field_defaults: FieldDefaults,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> tuple[Address, ...]:
     assert not isinstance(addresses, Iterator)
 
     parametrizations = await MultiGet(
         Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                address.maybe_convert_to_target_generator(),
-                description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    address.maybe_convert_to_target_generator(),
+                    description_of_origin=f"the `{field_alias}` field of the target {consumer_tgt.address}",
+                ): _TargetParametrizationsRequest,
+                local_environment_name.val: EnvironmentName,
+            },
         )
         for address in addresses
     )
@@ -1078,14 +1166,16 @@ async def _fill_parameters(
     )
 
 
-@rule(desc="Resolve direct dependencies")
+@rule(desc="Resolve direct dependencies of target", _masked_types=[EnvironmentName])
 async def resolve_dependencies(
     request: DependenciesRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
     field_defaults: FieldDefaults,
+    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
+    environment_name = local_environment_name.val
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(
             WrappedTarget,
@@ -1110,8 +1200,12 @@ async def resolve_dependencies(
         inferred = await MultiGet(
             Get(
                 InferredDependencies,
-                InferDependenciesRequest,
-                inference_request_type(inference_request_type.infer_from.create(tgt)),
+                {
+                    inference_request_type(
+                        inference_request_type.infer_from.create(tgt)
+                    ): InferDependenciesRequest,
+                    environment_name: EnvironmentName,
+                },
             )
             for inference_request_type in relevant_inference_request_types
         )
@@ -1121,12 +1215,15 @@ async def resolve_dependencies(
     if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
         parametrizations = await Get(
             _TargetParametrizations,
-            _TargetParametrizationsRequest(
-                tgt.address.maybe_convert_to_target_generator(),
-                description_of_origin=(
-                    f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
-                ),
-            ),
+            {
+                _TargetParametrizationsRequest(
+                    tgt.address.maybe_convert_to_target_generator(),
+                    description_of_origin=(
+                        f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
+                    ),
+                ): _TargetParametrizationsRequest,
+                environment_name: EnvironmentName,
+            },
         )
         generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
 
@@ -1140,6 +1237,7 @@ async def resolve_dependencies(
             explicitly_provided_includes,
             target_types_to_generate_requests,
             field_defaults,
+            local_environment_name,
         )
     explicitly_provided_ignores: FrozenOrderedSet[Address] = explicitly_provided.ignores
     if explicitly_provided_ignores:
@@ -1150,6 +1248,7 @@ async def resolve_dependencies(
                 tuple(explicitly_provided_ignores),
                 target_types_to_generate_requests,
                 field_defaults,
+                local_environment_name,
             )
         )
 
@@ -1206,8 +1305,10 @@ async def resolve_dependencies(
     _ = await MultiGet(
         Get(
             ValidatedDependencies,
-            ValidateDependenciesRequest,
-            vd_request_type(vd_request_type.field_set_type.create(tgt), result),  # type: ignore[misc]
+            {
+                vd_request_type(vd_request_type.field_set_type.create(tgt), result): ValidateDependenciesRequest,  # type: ignore[misc]
+                environment_name: EnvironmentName,
+            },
         )
         for vd_request_type in union_membership.get(ValidateDependenciesRequest)
         if vd_request_type.field_set_type.is_applicable(tgt)  # type: ignore[misc]

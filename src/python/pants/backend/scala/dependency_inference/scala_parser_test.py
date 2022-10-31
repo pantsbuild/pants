@@ -593,3 +593,87 @@ def test_package_object_extends_trait(rule_runner: RuleRunner) -> None:
     )
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Trait", "foo.bar.Trait"]
+
+
+def test_types_at_toplevel_package(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            trait Foo
+
+            class Bar
+
+            object Quxx
+            """
+        ),
+    )
+
+    expected_symbols = [
+        ScalaProvidedSymbol("Foo", False),
+        ScalaProvidedSymbol("Bar", False),
+        ScalaProvidedSymbol("Quxx", False),
+    ]
+
+    expected_symbols_encoded = expected_symbols.copy()
+    expected_symbols_encoded.extend(
+        [ScalaProvidedSymbol("Quxx$", False), ScalaProvidedSymbol("Quxx$.MODULE$", False)]
+    )
+
+    def by_name(symbol: ScalaProvidedSymbol) -> str:
+        return symbol.name
+
+    assert analysis.provided_symbols == FrozenOrderedSet(sorted(expected_symbols, key=by_name))
+    assert analysis.provided_symbols_encoded == FrozenOrderedSet(
+        sorted(expected_symbols_encoded, key=by_name)
+    )
+
+
+def test_type_constaint(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+
+            trait Foo[T >: A <: B]
+
+            class Bar[T >: C <: D]
+
+            class Quxx {
+                def doSomething[T >: E <: F]() = ()
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.A",
+        "foo.B",
+        "foo.C",
+        "foo.D",
+        "foo.E",
+        "foo.F",
+    ]
+
+
+def test_type_context_bounds(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """\
+            package foo
+
+            class Foo[F[_] : Functor]
+
+            class Bar {
+                def doSomething[F[_] : Applicative]() = ()
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.Applicative",
+        "foo.Functor",
+    ]

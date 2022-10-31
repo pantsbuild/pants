@@ -33,6 +33,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
+from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
@@ -57,7 +58,7 @@ from pants.engine.process import (
     ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.unions import UnionMembership, is_union
+from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
 from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
@@ -165,6 +166,8 @@ class Scheduler:
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
+            docker_resolve_image_request=DockerResolveImageRequest,
+            docker_resolve_image_result=DockerResolveImageResult,
         )
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,
@@ -183,10 +186,6 @@ class Scheduler:
             cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
             cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
-            execution_extra_platform_properties=tuple(
-                tuple(pair.split("=", 1))
-                for pair in execution_options.remote_execution_extra_platform_properties
-            ),
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
@@ -440,6 +439,7 @@ class SchedulerSession:
             # TODO: This increment-and-get is racey.
             name = f"graph.{self._scheduler._visualize_run_count:03d}.dot"
             self._scheduler._visualize_run_count += 1
+            logger.info(f"Visualizing graph as {name}")
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
     def teardown_dynamic_ui(self) -> None:
@@ -485,29 +485,13 @@ class SchedulerSession:
 
     def _raise_on_error(self, throws: list[Throw]) -> NoReturn:
         exception_noun = pluralize(len(throws), "Exception")
-
-        if self._scheduler.include_trace_on_error:
-            throw = throws[0]
-            etb = throw.engine_traceback
-            python_traceback_str = throw.python_traceback or ""
-            engine_traceback_str = ""
-            others_msg = f"\n(and {len(throws) - 1} more)" if len(throws) > 1 else ""
-            if etb:
-                sep = "\n  in "
-                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n"
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n"
-                f"{engine_traceback_str}"
-                f"{python_traceback_str}"
-                f"{others_msg}",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
-        else:
-            exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
-            raise ExecutionError(
-                f"{exception_noun} encountered:\n\n  {exception_strs}\n",
-                wrapped_exceptions=tuple(t.exc for t in throws),
-            )
+        others_msg = f"\n(and {len(throws) - 1} more)\n" if len(throws) > 1 else ""
+        raise ExecutionError(
+            f"{exception_noun} encountered:\n\n"
+            f"{throws[0].render(self._scheduler.include_trace_on_error)}\n"
+            f"{others_msg}",
+            wrapped_exceptions=tuple(t.exc for t in throws),
+        )
 
     def execute(self, execution_request: ExecutionRequest) -> list[Any]:
         """Invoke the engine for the given ExecutionRequest, returning successful values or raising.
@@ -641,6 +625,9 @@ class SchedulerSession:
     def cancel(self) -> None:
         self.py_session.cancel()
 
+    def wait_for_tail_tasks(self, timeout: float) -> None:
+        native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
+
 
 def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> PyTasks:
     """Create a native Tasks object loaded with given RuleIndex."""
@@ -651,6 +638,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             tasks,
             rule.func,
             rule.output_type,
+            rule.input_selectors,
+            rule.masked_types,
             side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
             engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
             cacheable=rule.cacheable,
@@ -659,18 +648,27 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             level=rule.level.level,
         )
 
-        for selector in rule.input_selectors:
-            native_engine.tasks_add_select(tasks, selector)
-
         for the_get in rule.input_gets:
-            if is_union(the_get.input_type):
-                # Register a union. TODO: See #12934: this should involve an explicit interface
-                # soon, rather than one being implicitly created with only the provided Param.
-                for union_member in union_membership.get(the_get.input_type):
-                    native_engine.tasks_add_union(tasks, the_get.output_type, (union_member,))
+            unions = [t for t in the_get.input_types if is_union(t)]
+            if len(unions) == 1:
+                # Register the union by recording a copy of the Get for each union member.
+                union = unions[0]
+                in_scope_types = union_in_scope_types(union)
+                assert in_scope_types is not None
+                for union_member in union_membership.get(union):
+                    native_engine.tasks_add_get_union(
+                        tasks,
+                        the_get.output_type,
+                        tuple(union_member if t == union else t for t in the_get.input_types),
+                        in_scope_types,
+                    )
+            elif len(unions) > 1:
+                raise TypeError(
+                    "Only one @union may be used in a Get, but {the_get} used: {unions}."
+                )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_type)
+                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
 
         native_engine.tasks_task_end(tasks)
 

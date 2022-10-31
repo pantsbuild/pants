@@ -12,7 +12,7 @@ fn new_store(shard_count: u8) -> (ShardedLmdb, TempDir) {
   let tempdir = TempDir::new().unwrap();
   let s = ShardedLmdb::new(
     tempdir.path().to_owned(),
-    10_000_000,
+    15_000_000,
     Executor::new(),
     DEFAULT_LEASE_TIME,
     shard_count,

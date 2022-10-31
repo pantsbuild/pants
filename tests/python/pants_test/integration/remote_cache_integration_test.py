@@ -42,11 +42,12 @@ def test_warns_on_remote_cache_errors() -> None:
     def run(behavior: RemoteCacheWarningsBehavior) -> str:
         pants_run = run_pants(
             [
-                "--backend-packages=['pants.backend.python']",
+                "--backend-packages=['pants.backend.experimental.java']",
                 "--no-dynamic-ui",
+                "--no-local-cache",
                 *remote_cache_args(cas.address, behavior),
-                "package",
-                "testprojects/src/python/hello/main:main",
+                "check",
+                "testprojects/src/jvm/org/pantsbuild/example/lib/ExampleLib.java",
             ],
             use_pantsd=False,
         )
@@ -69,6 +70,18 @@ def test_warns_on_remote_cache_errors() -> None:
     fourth_read_err = read_err(4)
     fourth_write_err = write_err(4)
 
+    # Generate lock files first, as the test is java test.
+    pants_run = run_pants(
+        [
+            "--backend-packages=['pants.backend.experimental.java']",
+            "--no-dynamic-ui",
+            "--no-local-cache",
+            "generate-lockfiles",
+        ],
+        use_pantsd=False,
+    )
+    pants_run.assert_success()
+
     ignore_result = run(RemoteCacheWarningsBehavior.ignore)
     for err in [
         first_read_err,
@@ -88,7 +101,7 @@ def test_warns_on_remote_cache_errors() -> None:
 
     backoff_result = run(RemoteCacheWarningsBehavior.backoff)
     for err in [first_read_err, first_write_err, fourth_read_err, fourth_write_err]:
-        assert err in backoff_result
+        assert err in backoff_result, f"Not found in:\n{backoff_result}"
     for err in [third_read_err, third_write_err]:
         assert err not in backoff_result
 
@@ -170,6 +183,7 @@ class MockRunSubsystem(GoalSubsystem):
 
 class MockRun(Goal):
     subsystem_cls = MockRunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

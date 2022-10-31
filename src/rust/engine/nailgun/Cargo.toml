@@ -13,7 +13,8 @@ log = "0.4"
 nails = "0.13"
 os_pipe = "1.0"
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.16", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
+tokio = { version = "1.21", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
+tokio-stream = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1.16", features = ["io-std", "macros", "net", "rt-multi-thread"] }
+tokio = { version = "1.21", features = ["io-std", "macros", "net", "rt-multi-thread"] }

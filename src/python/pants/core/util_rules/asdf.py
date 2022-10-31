@@ -10,20 +10,22 @@ from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class AsdfToolPathsRequest:
+    env_tgt: EnvironmentTarget
     tool_name: str
     tool_description: str
     resolve_standard: bool
     resolve_local: bool
-    extra_env_var_names: tuple[str, ...]
     paths_option_name: str
     bin_relpath: str = "bin"
 
@@ -31,21 +33,25 @@ class AsdfToolPathsRequest:
 @dataclass(frozen=True)
 class AsdfToolPathsResult:
     tool_name: str
-    env: Environment
     standard_tool_paths: tuple[str, ...] = ()
     local_tool_paths: tuple[str, ...] = ()
 
 
 @rule_helper
 async def _resolve_asdf_tool_paths(
+    env_tgt: EnvironmentTarget,
     tool_name: str,
     paths_option_name: str,
     tool_description: str,
     tool_env_name: str,
     bin_relpath: str,
-    env: Environment,
+    env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
+
+    if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
+        return ()
+
     asdf_dir = get_asdf_data_dir(env)
     if not asdf_dir:
         return ()
@@ -92,8 +98,12 @@ async def _resolve_asdf_tool_paths(
         tool_versions_file = Path(get_buildroot(), ".tool-versions")
         if not tool_versions_file.exists():
             logger.warning(
-                "No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in"
-                f" `{paths_option_name}`."
+                softwrap(
+                    f"""
+                    No `.tool-versions` file found in the build root, but <ASDF_LOCAL> was set in
+                    `{paths_option_name}`.
+                    """
+                )
             )
             tool_versions_file = None
     # Target the home directory tool-versions file.
@@ -128,17 +138,25 @@ async def _resolve_asdf_tool_paths(
                         asdf_versions[value] = str(tool_versions_file)
                     else:
                         logger.warning(
-                            f"Unknown version format `{v}` from ASDF configured by "
-                            f"`{paths_option_name}`, ignoring. This "
-                            f"version will not be considered when determining which {tool_description} "
-                            f"to use. Please check that `{tool_versions_file}` "
-                            "is accurate."
+                            softwrap(
+                                f"""
+                                Unknown version format `{v}` from ASDF configured by
+                                `{paths_option_name}`, ignoring. This
+                                version will not be considered when determining which {tool_description}
+                                to use. Please check that `{tool_versions_file}`
+                                is accurate.
+                            """
+                            )
                         )
                 elif v == "system":
                     logger.warning(
-                        f"System path set by ASDF configured by `{paths_option_name}` is unsupported, ignoring. "
-                        f"This version will not be considered when determining which {tool_description} to use. "
-                        f"Please remove 'system' from `{tool_versions_file}` to disable this warning."
+                        softwrap(
+                            f"""
+                            System path set by ASDF configured by `{paths_option_name}` is unsupported, ignoring.
+                            This version will not be considered when determining which {tool_description} to use.
+                            Please remove 'system' from `{tool_versions_file}` to disable this warning.
+                            """
+                        )
                     )
                 else:
                     asdf_versions[v] = str(tool_versions_file)
@@ -149,10 +167,14 @@ async def _resolve_asdf_tool_paths(
             asdf_paths.append(str(install_dir))
         else:
             logger.warning(
-                f"Trying to use ASDF version `{version}` configured by "
-                f"`{paths_option_name}` but `{install_dir}` does not "
-                f"exist. This version will not be considered when determining which {tool_description} "
-                f"to use. Please check that `{source}` is accurate."
+                softwrap(
+                    f"""
+                    Trying to use ASDF version `{version}` configured by
+                    `{paths_option_name}` but `{install_dir}` does not
+                    exist. This version will not be considered when determining which {tool_description}
+                    to use. Please check that `{source}` is accurate.
+                    """
+                )
             )
 
     # For non-local, if no paths have been defined, fallback to every version installed
@@ -176,13 +198,13 @@ async def resolve_asdf_tool_paths(
         "ASDF_DATA_DIR",
         tool_env_name,
         "HOME",
-        *request.extra_env_var_names,
     ]
-    env = await Get(Environment, EnvironmentRequest(env_vars_to_request))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(env_vars_to_request))
 
     standard_tool_paths: tuple[str, ...] = ()
     if request.resolve_standard:
         standard_tool_paths = await _resolve_asdf_tool_paths(
+            env_tgt=request.env_tgt,
             tool_name=request.tool_name,
             paths_option_name=request.paths_option_name,
             tool_description=request.tool_description,
@@ -195,6 +217,7 @@ async def resolve_asdf_tool_paths(
     local_tool_paths: tuple[str, ...] = ()
     if request.resolve_local:
         local_tool_paths = await _resolve_asdf_tool_paths(
+            env_tgt=request.env_tgt,
             tool_name=request.tool_name,
             paths_option_name=request.paths_option_name,
             tool_description=request.tool_description,
@@ -206,13 +229,12 @@ async def resolve_asdf_tool_paths(
 
     return AsdfToolPathsResult(
         tool_name=request.tool_name,
-        env=env,
         standard_tool_paths=standard_tool_paths,
         local_tool_paths=local_tool_paths,
     )
 
 
-def get_asdf_data_dir(env: Environment) -> PurePath | None:
+def get_asdf_data_dir(env: EnvironmentVars) -> PurePath | None:
     """Returns the location of asdf's installed tool versions.
 
     See https://asdf-vm.com/manage/configuration.html#environment-variables.

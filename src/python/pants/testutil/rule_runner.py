@@ -14,7 +14,19 @@ from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Generic,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
@@ -22,17 +34,18 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.internals.native_engine import ProcessConfigFromEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
+from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
-from pants.engine.rules import Rule
 from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
@@ -56,7 +69,7 @@ from pants.util.dirutil import (
     safe_open,
 )
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import OrderedSet
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -183,6 +196,7 @@ class RuleRunner:
     max_workunit_verbosity: LogLevel
     build_config: BuildConfiguration
     scheduler: SchedulerSession
+    rules: tuple[Any, ...]
 
     def __init__(
         self,
@@ -197,6 +211,7 @@ class RuleRunner:
         bootstrap_args: Iterable[str] = (),
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
+        inherent_environment: EnvironmentName | None = EnvironmentName(None),
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -217,10 +232,16 @@ class RuleRunner:
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
 
+        def rewrite_rule_for_inherent_environment(rule):
+            if not inherent_environment or not isinstance(rule, QueryRule):
+                return rule
+            return QueryRule(rule.output_type, OrderedSet((*rule.input_types, EnvironmentName)))
+
         # TODO: Redesign rule registration for tests to be more ergonomic and to make this less
         #  special-cased.
+        self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
-            *(rules or ()),
+            *self.rules,
             *source_root.rules(),
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
@@ -236,11 +257,17 @@ class RuleRunner:
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
-        self.environment = CompleteEnvironment({})
+        self.environment = CompleteEnvironmentVars({})
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
         self.extra_session_values = extra_session_values or {}
+        self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
-        options = self.options_bootstrapper.full_options(self.build_config)
+        options = self.options_bootstrapper.full_options(
+            self.build_config,
+            union_membership=UnionMembership.from_rules(
+                rule for rule in self.rules if isinstance(rule, UnionRule)
+            ),
+        )
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
         dynamic_remote_options, _ = DynamicRemoteOptions.from_options(options, self.environment)
@@ -286,7 +313,7 @@ class RuleRunner:
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
-                    CompleteEnvironment: self.environment,
+                    CompleteEnvironmentVars: self.environment,
                     **self.extra_session_values,
                 }
             ),
@@ -296,10 +323,6 @@ class RuleRunner:
     @property
     def pants_workdir(self) -> str:
         return os.path.join(self.build_root, ".pants.d")
-
-    @property
-    def rules(self) -> FrozenOrderedSet[Rule | UnionRule]:
-        return FrozenOrderedSet([*self.build_config.rules, *self.build_config.union_rules])
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:
@@ -315,9 +338,12 @@ class RuleRunner:
         self.scheduler = self.scheduler.scheduler.new_session(build_id)
 
     def request(self, output_type: type[_O], inputs: Iterable[Any]) -> _O:
-        result = assert_single_element(
-            self.scheduler.product_request(output_type, [Params(*inputs)])
+        params = (
+            Params(*inputs, self.inherent_environment)
+            if self.inherent_environment
+            else Params(*inputs)
         )
+        result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -333,12 +359,11 @@ class RuleRunner:
         self.set_options(merged_args, env=env, env_inherit=env_inherit)
 
         raw_specs = self.options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
+            [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
+            self.union_membership,
         ).specs
         specs = SpecsParser(self.build_root).parse_specs(
-            raw_specs,
-            convert_dir_literal_to_address_literal=True,
-            description_of_origin="RuleRunner.run_goal_rule()",
+            raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
 
         stdout, stderr = StringIO(), StringIO()
@@ -350,6 +375,7 @@ class RuleRunner:
                 specs,
                 console,
                 Workspace(self.scheduler),
+                *([self.inherent_environment] if self.inherent_environment else []),
             ),
         )
 
@@ -365,7 +391,7 @@ class RuleRunner:
     ) -> None:
         """Update the engine session with new options and/or environment variables.
 
-        The environment variables will be used to set the `CompleteEnvironment`, which is the
+        The environment variables will be used to set the `CompleteEnvironmentVars`, which is the
         environment variables captured by the parent Pants process. Some rules use this to be able
         to read arbitrary env vars. Any options that start with `PANTS_` will also be used to set
         options.
@@ -380,7 +406,7 @@ class RuleRunner:
             **(env or {}),
         }
         self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
-        self.environment = CompleteEnvironment(env)
+        self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 
     def set_session_values(
@@ -496,7 +522,24 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        return native_engine.session_run_interactive_process(self.scheduler.py_session, request)
+        return native_engine.session_run_interactive_process(
+            self.scheduler.py_session,
+            request,
+            ProcessConfigFromEnvironment(
+                platform=Platform.create_for_localhost().value,
+                docker_image=None,
+                remote_execution=False,
+                remote_execution_extra_platform_properties=[],
+            ),
+        )
+
+    def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
+        """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
+        return MockGet(
+            output_type=output_type,
+            input_types=tuple(input_types),
+            mock=lambda *input_values: self.request(output_type, input_values),
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -505,29 +548,26 @@ class RuleRunner:
 
 
 @dataclass(frozen=True)
-class MockEffect(Generic[_O, _I]):
+class MockEffect(Generic[_O]):
     output_type: type[_O]
-    input_type: type[_I]
-    mock: Callable[[_I], _O]
+    input_types: tuple[type, ...]
+    mock: Callable[..., _O]
 
 
-# TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
-#  `Callable[[InputType], OutputType]`.
 @dataclass(frozen=True)
-class MockGet:
-    output_type: type
-    input_type: type
-    mock: Callable[[Any], Any]
+class MockGet(Generic[_O]):
+    output_type: type[_O]
+    input_types: tuple[type, ...]
+    mock: Callable[..., _O]
 
 
-# TODO: Improve the type hints so that the return type can be inferred.
 def run_rule_with_mocks(
-    rule: Callable,
+    rule: Callable[..., Coroutine[Any, Any, _O]],
     *,
     rule_args: Sequence[Any] = (),
     mock_gets: Sequence[MockGet | MockEffect] = (),
     union_membership: UnionMembership | None = None,
-):
+) -> _O:
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
     An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
@@ -589,7 +629,7 @@ def run_rule_with_mocks(
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res
+        return res  # type: ignore[return-value]
 
     def get(res: Get | Effect):
         provider = next(
@@ -597,20 +637,24 @@ def run_rule_with_mocks(
                 mock_get.mock
                 for mock_get in mock_gets
                 if mock_get.output_type == res.output_type
-                and (
-                    mock_get.input_type == type(res.input)  # noqa: E721
+                and all(
+                    type(val) in mock_get.input_types
                     or (
                         union_membership
-                        and mock_get.input_type in union_membership
-                        and union_membership.is_member(mock_get.input_type, res.input)
+                        and any(
+                            input_type in union_membership
+                            and union_membership.is_member(input_type, val)
+                            for input_type in mock_get.input_types
+                        )
                     )
+                    for val in res.inputs
                 )
             ),
             None,
         )
         if provider is None:
             raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
-        return provider(res.input)
+        return provider(*res.inputs)
 
     rule_coroutine = res
     rule_input = None
@@ -620,12 +664,12 @@ def run_rule_with_mocks(
             if isinstance(res, (Get, Effect)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]
+                rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
             else:
-                return res
+                return res  # type: ignore[return-value]
         except StopIteration as e:
             if e.args:
-                return e.value
+                return e.value  # type: ignore[no-any-return]
 
 
 @contextmanager
@@ -648,7 +692,7 @@ def mock_console(
     global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     colors = (
         options_bootstrapper.full_options_for_scopes(
-            [GlobalOptions.get_scope_info()], allow_unknown_options=True
+            [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
         )
         .for_global_scope()
         .colors

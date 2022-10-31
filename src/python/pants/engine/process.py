@@ -12,6 +12,9 @@ from typing import Iterable, Mapping
 from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
+from pants.engine.internals.native_engine import (  # noqa: F401
+    ProcessConfigFromEnvironment as ProcessConfigFromEnvironment,
+)
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -19,6 +22,7 @@ from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +67,7 @@ class Process:
     execution_slot_variable: str | None
     concurrency_available: int
     cache_scope: ProcessCacheScope
-    platform: str | None
+    remote_cache_speculation_delay_millis: int
 
     def __init__(
         self,
@@ -85,6 +89,7 @@ class Process:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         platform: Platform | None = None,
+        remote_cache_speculation_delay_millis: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -131,7 +136,19 @@ class Process:
         self.execution_slot_variable = execution_slot_variable
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
-        self.platform = platform.value if platform is not None else None
+        self.remote_cache_speculation_delay_millis = remote_cache_speculation_delay_millis
+
+        if platform is not None:
+            warn_or_error(
+                "2.16.0.dev0",
+                "the `platform` kwarg for `Process`",
+                softwrap(
+                    """
+                    The `platform` kwarg no longer does anything because the `platform` is always
+                    automatically set. To fix this deprecation, delete the kwarg.
+                    """
+                ),
+            )
 
 
 @dataclass(frozen=True)
@@ -303,10 +320,9 @@ class InteractiveProcess(SideEffecting):
         run_in_workspace: bool = False,
         forward_signals_to_process: bool = True,
         restartable: bool = False,
-        cleanup: bool | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
-        keep_sandboxes: KeepSandboxes | None = None,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
@@ -330,19 +346,7 @@ class InteractiveProcess(SideEffecting):
         self.run_in_workspace = run_in_workspace
         self.forward_signals_to_process = forward_signals_to_process
         self.restartable = restartable
-        if cleanup is not None:
-            warn_or_error(
-                removal_version="2.15.0.dev1",
-                entity="InteractiveProcess.cleanup",
-                hint="Use `InteractiveProcess.keep_sandboxes` instead.",
-            )
-            if keep_sandboxes is not None:
-                raise ValueError("Only one of `cleanup` and `keep_sandboxes` may be specified.")
-            self.keep_sandboxes = KeepSandboxes.never if cleanup else KeepSandboxes.always
-        elif keep_sandboxes is not None:
-            self.keep_sandboxes = keep_sandboxes
-        else:
-            self.keep_sandboxes = KeepSandboxes.never
+        self.keep_sandboxes = keep_sandboxes
 
     @classmethod
     def from_process(
@@ -361,27 +365,6 @@ class InteractiveProcess(SideEffecting):
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
         )
-
-
-@dataclass(frozen=True)
-class InteractiveProcessRequest:
-    process: Process
-    forward_signals_to_process: bool = True
-    restartable: bool = False
-
-
-@rule
-async def interactive_process_from_process(req: InteractiveProcessRequest) -> InteractiveProcess:
-    warn_or_error(
-        removal_version="2.15.0.dev1",
-        entity="InteractiveProcessRequest",
-        hint="Instead, use `InteractiveProcess.from_process`.",
-    )
-    return InteractiveProcess.from_process(
-        req.process,
-        forward_signals_to_process=req.forward_signals_to_process,
-        restartable=req.restartable,
-    )
 
 
 def rules():

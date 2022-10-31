@@ -75,7 +75,7 @@ class HelpPrinter(MaybeColor):
             return 1
 
     def _print_alternatives(self, match: str, all_things: Iterable[str]) -> None:
-        did_you_mean = list(difflib.get_close_matches(match, all_things))
+        did_you_mean = difflib.get_close_matches(match, all_things)
 
         if did_you_mean:
             formatted_matches = self._format_did_you_mean_matches(did_you_mean)
@@ -85,7 +85,7 @@ class HelpPrinter(MaybeColor):
         title = self.maybe_green(f"{title_text}\n{'-' * len(title_text)}")
         print(f"\n{title}\n")
 
-    def _print_table(self, table: Dict[str, Optional[str]], indent: int = 0) -> None:
+    def _print_table(self, table: Dict[str, Optional[str]]) -> None:
         longest_key = max(len(key) for key, value in table.items() if value is not None)
         for key, value in table.items():
             if value is None:
@@ -118,8 +118,9 @@ class HelpPrinter(MaybeColor):
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
         }
 
+    @staticmethod
     def _disambiguate_things(
-        self, things: Iterable[str], all_things: Iterable[str]
+        things: Iterable[str], all_things: Iterable[str]
     ) -> Tuple[Set[str], Set[str]]:
         """Returns two sets of strings, one with disambiguated things and the second with
         unresolvable things."""
@@ -268,6 +269,8 @@ class HelpPrinter(MaybeColor):
         for alias, target_type_info in sorted(
             self._all_help_info.name_to_target_type_info.items(), key=lambda x: x[0]
         ):
+            if alias.startswith("_"):
+                continue
             alias_str = self.maybe_cyan(f"{alias}".ljust(chars_before_description))
             summary = self._format_summary_description(
                 target_type_info.summary, chars_before_description
@@ -327,14 +330,14 @@ class HelpPrinter(MaybeColor):
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
-            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(50))
+            cmd = self.maybe_green(f"{bin_name()} {args}".ljust(41))
             print(f"  {cmd}  {desc}")
 
         print(f"\nPants {pants_version()}")
         print("\nUsage:\n")
         print_cmd(
-            "[option ...] [goal ...] [file/target ...]",
-            "Attempt the specified goals on the specified files/targets.",
+            "[options] [goals] [inputs]",
+            "Attempt the specified goals on the specified inputs.",
         )
         print_cmd("help", "Display this usage message.")
         print_cmd("help goals", "List all installed goals.")
@@ -345,7 +348,7 @@ class HelpPrinter(MaybeColor):
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
         print_cmd(
-            "help [target_type/goal/subsystem/api_type/rule]",
+            "help [name]",
             "Help for a target type, goal, subsystem, plugin API type or rule.",
         )
         print_cmd(
@@ -354,24 +357,20 @@ class HelpPrinter(MaybeColor):
         print_cmd("help-all", "Print a JSON object containing all help info.")
 
         print("")
-        print("  [file] can be:")
-        print(f"     {self.maybe_cyan('path/to/file.ext')}")
+        print("  [inputs] can be:")
+        print(f"     A file, e.g. {self.maybe_cyan('path/to/file.ext')}")
         glob_str = self.maybe_cyan("'**/*.ext'")
+        print(f"     A path glob, e.g. {glob_str} (in quotes to prevent premature shell expansion)")
+        print(f"     A directory, e.g. {self.maybe_cyan('path/to/dir')}")
         print(
-            f"     A path glob, such as {glob_str}, in quotes to prevent premature shell expansion."
+            f"     A directory ending in `::` to include all subdirectories, e.g. {self.maybe_cyan('path/to/dir::')}"
         )
-        print("\n  [target] can be:")
-        print(f"    {self.maybe_cyan('path/to/dir:target_name')}.")
+        print(f"     A target address, e.g. {self.maybe_cyan('path/to/dir:target_name')}.")
         print(
-            f"    {self.maybe_cyan('path/to/dir')} for a target whose name is the same as the directory name."
+            f"     Any of the above with a `-` prefix to ignore the value, e.g. {self.maybe_cyan('-path/to/ignore_me::')}"
         )
-        print(
-            f"    {self.maybe_cyan('path/to/dir:')}  to include all targets in the specified directory."
-        )
-        print(
-            f"    {self.maybe_cyan('path/to/dir::')} to include all targets found recursively under the directory.\n"
-        )
-        print(f"Documentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
+
+        print(f"\nDocumentation at {self.maybe_magenta('https://www.pantsbuild.org')}")
         pypi_url = f"https://pypi.org/pypi/pantsbuild.pants/{pants_version()}"
         print(f"Download at {self.maybe_magenta(pypi_url)}")
 
@@ -399,7 +398,7 @@ class HelpPrinter(MaybeColor):
         for line in formatted_lines:
             print(line)
 
-    def _print_target_help(self, target_alias: str, show_advanced: bool) -> None:
+    def _print_target_help(self, target_alias: str, _: bool) -> None:
         self._print_title(f"`{target_alias}` target")
         tinfo = self._all_help_info.name_to_target_type_info[target_alias]
         if tinfo.description:
@@ -434,7 +433,7 @@ class HelpPrinter(MaybeColor):
                 "union type": type_info.union_type,
                 "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
                 "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
-                "dependees": "\n".join(type_info.dependees) if show_advanced else None,
+                "dependents": "\n".join(type_info.dependents) if show_advanced else None,
                 f"returned by {pluralize(len(type_info.returned_by_rules), 'rule')}": "\n".join(
                     type_info.returned_by_rules
                 )

@@ -6,10 +6,265 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-07-25T20:02:17.695Z"
 ---
+2.15
+----
+
+### `lint` and `fmt` schema changes
+
+In order to accomplish several goals (namely targetless formatters and unifying the implementation of `lint`)
+`lint` and `fmt` have undergone a drastic change of their plugin API.
+
+#### 1. `Lint<Targets|Files>Request` and `FmtTargetsRequest` now require a `tool_subsystem` class attribute.
+
+Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTargetsRequest` require
+subclasses to provide a `tool_subsystem` class attribute with a value of your tool's `Subsystem` subclass.
+
+#### 2. Your tool subsystem should have a `skip` option.
+
+Although not explictly not required by the engine to function correctly, `mypy` will complain if the
+subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
+
+Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declaration.
+
+#### 3. The core goals now use a 2-rule approach
+
+Fmt:
+
+In order to support targetless formatters, `fmt` needs to know which _files_ you'll be operating on.
+Therefore the plugin API for `fmt` has forked into 2 rules:
+
+1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
+2. A rule taking `<RequestType>.Batch` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
+
+This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
+that don't overlap.
+
+(Why are targetless formatters something we want to support? This allows us to have `BUILD` file formatters,
+formatters like `Prettier` running on your codebase *without* boilerplate targets, as well as Pants
+doing interesting deprecation fixers on its own files)
+
+The partitioner rule gives you all the matching files (or `FieldSet`s depending on which class you
+subclassed) and you'll return a mapping from `<key>` to files (called a Partition).
+The `<key>` can be anything passable at the rule boundary and is given back to you in your runner rule.
+The partitioner rule gives you an opportunity to perform expensive `Get`s once for the entire run,
+to partition the inputs based on metadata to simplify your runner, and to have a place for easily
+skipping your tool if requested.
+
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`),
+which now has a `.files` property.
+
+If you don't require any `Get`s or metadata for your tool in your partitioner rule,
+Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass,
+set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only
+provide a runner rule.
+
+-----
+
+Lint:
+
+Lint plugins are almost identical to format plugins, except in 2 ways:
+
+1. Your partitioner rule still returns a `Partitions` object, but the element type can be anything.
+2. `<RequestType>.Batch` has a `.elements` field instead of `.files`.
+
+-----
+
+As always, taking a look at Pants' own plugins can also be very enlightening.
+
+### `test` schema changes
+
+To enable running tests in batches, the plugin API for `test` has significantly changed. The new API largely resembles the `lint`/`fmt` API described above.
+
+#### 1. Test plugins must now define a `skip`-able `Subsystem`.
+
+To hook into the new API, a test runner must declare a subclass of `Subsystem` with a `skip: SkipOption` option.
+Add `skip = SkipOption("test")` to your existing (or new) subsystems.
+
+#### 2. Test plugins must define a subclass of `TestRequest`.
+
+To define the rules expected by the new `test` API, you will need to define a `TestRequest` subclass. This new type will point at your plugin-specific `TestFieldSet` and `Subsystem` subclasses:
+
+```python
+class CustomTestRequest(TestRequest):
+    field_set_type = CustomTestFieldSet
+    tool_subsystem = CustomSubsystem
+```
+
+After declaring your new type, register its rules:
+
+```python
+def rules():
+    return [
+        # Add to what you already have:
+        *CustomTestRequest.rules(),
+    ]
+```
+
+#### 3. Test execution now uses a 2-rule approach
+
+The plugin API for `test` has forked into 2 rules:
+
+1. A rule taking `<TestRequestSubclass>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
+2. A rule taking `<TestRequestSubclass>.Batch` and returning a `TestResult`. This is sometimes referred to as the "runner" rule.
+
+The "partitioner" rule was introduced to allow plugins to group tests into "compatible" batches, to be executed as a batch within the "runner" rule. The "runner" rule is a replacement for the previous API which took `TestFieldSet` instances as input.
+
+By default, registering `<TestRequestSubclass>.rules()` will register a "partitioner" rule that creates a single-element partition per input `TestFieldSet`, replicating the behavior from before Pants 2.15. You can then upgrade your existing "runner" rule to take the new input type.
+
+Before:
+
+```python
+@rule
+async def run_test(field_set: CustomTestFieldSet) -> TestResult:
+    ...
+```
+
+After:
+
+```python
+@rule
+async def run_tests(batch: CustomTestRequest.Batch) -> TestResult:
+    field_set = batch.single_element
+    ...
+```
+
+If you would like to make use of the new support for batched testing, override the `partitioner_type` field in your `TestRequest` subclass:
+
+```python
+class CustomTestRequest(TestRequest):
+    field_set_type = CustomTestFieldSet
+    tool_subsystem = CustomSubsystem
+    partitioner_type = PartitionerType.CUSTOM
+```
+
+This will prevent registration of the default "partitioner" rule, allowing you to implement any partitioning logic you'd like. You'll then need to update your "runner" rule to handle a multi-element `batch`.
+
+### `EnvironmentName` is now required to run processes, get environment variables, etc
+
+Pants 2.15 introduces the concept of ["Target Environments"](doc:environments), which allow Pants to execute processes in remote or local containerized environments (using Docker), and to specify configuration values for those environments. 
+
+In order to support the new environments feature, an `EnvironmentName` parameter is now required in order to:
+* Run a `Process`
+* Get environment variables
+* Inspect the current `Platform`
+
+This parameter is often provided automatically from a transitive value provided earlier in the call graph. The choice of whether to use a local or alternative environment must be made at a `@goal_rule` level.
+
+In many cases, the local execution environment is sufficient. If so, your rules will not require significant work to migrate, and execution will behave similarly to pre-2.15 versions of Pants.
+
+In cases where the environment needs to be factored into to rule execution, you'll need to do some work. 
+
+2.15 adds a deprecation warning for all goals that have not considered whether they need to use the execution environment.
+
+#### `Goal.environment_behavior`
+
+2.15 adds the `environment_behavior` property to the `Goal` class, which controls whether an `EnvironmentName` is automatically injected when a `@goal_rule` runs. 
+
+When `environment_behavior=Goal.EnvironmentBehavior.UNMIGRATED` (the default), the `QueryRule` that is installed for a `@goal_rule` will include an `EnvironmentName` and will raise a deprecation warning.
+
+If your Goal only ever needs to use the local target environment, use `environment_behavior=Goal.EnvironmentBehavior.LOCAL_ONLY`. The `QueryRule` installed for the `@goal_rule` will include an `EnvironmentName` that refers to a local environment, and will silence the deprecation warning. No further migration work needs to be done for your Goal.
+
+##### For goals that need to respect `EnvironmentField`s
+
+If your goal needs to select the target's specified environment when running underlying rules, set `environment_behavior=Goal.EnvironmentBehavior.USES_ENVIRONMENTS`, which will silence the deprecation. Unlike for the `LOCAL_ONLY` behavior, any rules that require an `EnvironmentName` will need to specify that name directly.
+
+ In general, `Goal`s should use `EnvironmentNameRequest` to get `EnvironmentName`s for the targets that they will be operating on.
+```python
+Get(
+    EnvironmentName,
+    EnvironmentNameRequest,
+    EnvironmentNameRequest.from_field_set(field_set),
+)
+```
+
+Then, the `EnvironmentName` should be used at `Get` callsites which require an environment:
+```python
+Get(TestResult, {field_set: TestFieldSet, environment_name: EnvironmentName})
+```
+The multi-parameter `Get` syntax provides the value transitively, and so will need to be used in many `Get` callsites in `@goal_rule`s which transitively run processes, consume the platform, etc. One exception is that (most of) the APIs provided by `pants.engine.target` are pinned to running in the `__local__` environment, and so do not require an `EnvironmentName` to use.
+
+
+#### `RuleRunner.inherent_environment`
+
+To reduce the number of changes necessary in tests, the `RuleRunner.inherent_environment` argument defaults to injecting an `EnvironmentName` when running `@rule`s in tests.
+
+### `platform` kwarg for `Process` deprecated
+
+Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
+platforms (OS x CPU architecture). You had to opt into platform awareness by setting the kwarg
+`platform` on the `Process`; otherwise, remote caching could incorrectly use results from a
+different platform.
+
+This was not a safe default, and this behavior also breaks the new Docker support. So, now all
+processes automatically are marked as platform-specific.
+
+https://github.com/pantsbuild/pants/issues/16873 proposes how you will eventually be able to mark
+a `Process` as platform-agnostic.
+
+To fix this deprecation, simply delete the `platform` kwarg.
+
+### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` renamed and moved
+
+The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have
+`Vars` in their names:
+
+Before: `pants.engine.environment.{Environment,EnvironmentRequest,CompleteEnvironment}`
+After: `pants.engine.env_vars.{EnvironmentVars,EnvironmentVarsRequest,CompleteEnvironmentVars}`
+
+The old names still exist until Pants 2.16 as deprecated aliases.
+
+This rename was to avoid ambiguity with the new "environments" mechanism, which lets users specify different options for environments like Linux vs. macOS and running in Docker images.
+
+### `MockGet` expects `input_types` kwarg, not `input_type`
+
+It's now possible in Pants 2.15 to use zero arguments or multiple arguments in a `Get`. To support this change, `MockGet` from `run_run_with_mocks()` now expects the kwarg `input_types: tuple[type, ...]` rather than `input_type: type`.
+
+Before:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_type=LintTargetsRequest,
+    mock=lambda _: LintResult(...),
+)
+```
+
+After:
+
+```python
+MockGet(
+    output_type=LintResult,
+    input_types=(LintTargetsRequest,),
+    mock=lambda _: LintResult(...),
+)
+```
+
+### Deprecated `Platform.current`
+
+The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To
+get the correct `Platform`, a `@rule` should request a `Platform` as a positional argument.
+
+### Deprecated `convert_dir_literal_to_address_literal` kwarg
+
+The `convert_dir_literal_to_address_literal` keyword argument for `RawSpecs.create()` and
+`SpecsParser.parse_specs()` no longer does anything. It should be deleted.
+
 2.14
 ----
 
 See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x.md> for the changelog.
+
+### Removed second type parameter from `Get`
+
+`Get` now takes only a single type parameter for the output type: `Get[_Output]`. The input type
+parameter was unused.
+
+### `FmtRequest` -> `FmtTargetsRequest`
+
+In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt`
+request types. Therefore `FmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
+
+This change also matches `lint`, which uses `LintTargetsRequest`.
 
 ### Optional Option flag name
 
@@ -50,13 +305,22 @@ on `FieldSet`'s mechanisms for matching targets and getting field values.
 Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
 `GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
 distinguish what language a tool belongs to, which is used for options like
-`[python].resolves_to_constraints_file` to validate which resolve names are recognized. 
+`[python].resolves_to_constraints_file` to validate which resolve names are recognized.
 
 Things will still work if you do not make this change, other than the new options not recognizing
 your tool.
 
 However, keep the `UnionRule` the same, i.e. with the first argument still
 `GenerateToolLockfileSentinel`.
+
+### `matches_filespec()` replaced by `FilespecMatcher`
+
+Instead, use `FilespecMatcher(includes=[], excludes=[]).matches(paths: Sequence[str])` from
+`pants.source.filespec`.
+
+The functionality is the same, but can have better performance because we don't need to parse the
+same globs each time `.matches()` is called. When possible, reuse the same `FilespecMatcher` object
+to get these performance benefits.
 
 2.13
 ----
@@ -138,7 +402,7 @@ You can also now specify multiple globs, e.g. `req.path_globs("*.py", "*.pyi")`.
 
 ### Banned short option names like `-x`
 
-You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option. 
+You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option.
 
 (These changes allowed us to introduce ignore specs, like `./pants list :: -ignore_me::`.)
 
@@ -447,7 +711,7 @@ This is tracked by <https://github.com/pantsbuild/pants/issues/10917>.
 
 If you have any custom fields that act like the dependencies field, but do not subclass `Dependencies`, there are two new mechanisms for better support.
 
-1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependees`.
+1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependents`.
 2. You can use `UnparsedAddressInputs` from `pants.engine.addresses` to resolve the addresses:
 
 ```python

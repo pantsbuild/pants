@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.lint.vet.skip_field import SkipGoVetField
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
@@ -16,14 +17,14 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -41,21 +42,19 @@ class GoVetFieldSet(FieldSet):
 
 class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
-    name = GoVetSubsystem.options_scope
+    tool_subsystem = GoVetSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(level=LogLevel.DEBUG)
-async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) -> LintResults:
-    if go_vet_subsystem.skip:
-        return LintResults([], linter_name=request.name)
-
+async def run_go_vet(request: GoVetRequest.Batch[GoVetFieldSet, Any]) -> LintResult:
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request.field_sets),
+        SourceFilesRequest(field_set.sources for field_set in request.elements),
     )
 
     owning_go_mods = await MultiGet(
-        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.field_sets
+        Get(OwningGoMod, OwningGoModRequest(field_set.address)) for field_set in request.elements
     )
 
     owning_go_mod_addresses = {x.address for x in owning_go_mods}
@@ -80,12 +79,11 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
         ),
     )
 
-    result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name=request.name)
+    return LintResult.create(request, process_result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintTargetsRequest, GoVetRequest),
+        *GoVetRequest.rules(),
     ]

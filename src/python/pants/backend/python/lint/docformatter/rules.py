@@ -8,13 +8,11 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -30,15 +28,16 @@ class DocformatterFieldSet(FieldSet):
         return tgt.get(SkipDocformatterField).value
 
 
-class DocformatterRequest(FmtRequest):
+class DocformatterRequest(FmtTargetsRequest):
     field_set_type = DocformatterFieldSet
-    name = Docformatter.options_scope
+    tool_subsystem = Docformatter
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
-async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
-    if docformatter.skip:
-        return FmtResult.skip(formatter_name=request.name)
+async def docformatter_fmt(
+    request: DocformatterRequest.Batch, docformatter: Docformatter
+) -> FmtResult:
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
     result = await Get(
         ProcessResult,
@@ -47,21 +46,20 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
             argv=(
                 "--in-place",
                 *docformatter.args,
-                *request.snapshot.files,
+                *request.files,
             ),
             input_digest=request.snapshot.digest,
-            output_files=request.snapshot.files,
-            description=(f"Run Docformatter on {pluralize(len(request.field_sets), 'file')}."),
+            output_files=request.files,
+            description=(f"Run Docformatter on {pluralize(len(request.files), 'file')}."),
             level=LogLevel.DEBUG,
         ),
     )
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, DocformatterRequest),
+        *DocformatterRequest.rules(),
         *pex.rules(),
     ]

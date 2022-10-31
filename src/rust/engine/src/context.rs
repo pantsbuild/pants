@@ -21,13 +21,16 @@ use crate::types::Types;
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
+use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
+use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
+  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
+  ImmutableInputs, NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -96,7 +99,6 @@ pub struct RemotingOptions {
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
   pub cache_read_timeout: Duration,
-  pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
@@ -184,74 +186,112 @@ impl Core {
     local_execution_root_dir: &Path,
     immutable_inputs: &ImmutableInputs,
     named_caches: &NamedCaches,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    let (runner, parallelism): (Box<dyn CommandRunner>, usize) = if remoting_opts.execution_enable {
-      (
-        Box::new(remote::CommandRunner::new(
-          // We unwrap because global_options.py will have already validated these are defined.
-          remoting_opts.execution_address.as_ref().unwrap(),
-          process_execution_metadata.clone(),
-          root_ca_certs.clone(),
-          remoting_opts.execution_headers.clone(),
-          full_store.clone(),
-          // TODO if we ever want to configure the remote platform to be something else we
-          // need to take an option all the way down here and into the remote::CommandRunner struct.
-          Platform::Linux_x86_64,
-          remoting_opts.execution_overall_deadline,
-          Duration::from_millis(100),
-          remoting_opts.execution_rpc_concurrency,
-          capabilities_cell_opt,
-        )?),
-        exec_strategy_opts.remote_parallelism,
-      )
-    } else {
-      let local_command_runner = local::CommandRunner::new(
-        local_runner_store.clone(),
-        executor.clone(),
-        local_execution_root_dir.to_path_buf(),
-        named_caches.clone(),
-        immutable_inputs.clone(),
-        exec_strategy_opts.local_keep_sandboxes,
-      );
+    let local_command_runner = local::CommandRunner::new(
+      local_runner_store.clone(),
+      executor.clone(),
+      local_execution_root_dir.to_path_buf(),
+      named_caches.clone(),
+      immutable_inputs.clone(),
+      exec_strategy_opts.local_keep_sandboxes,
+    );
 
-      let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
-        // We set the nailgun pool size to the number of instances that fit within the memory
-        // parameters configured when a max child process memory has been given.
-        // Otherwise, pool size will be double of the local parallelism so we can always keep
-        // a jvm warmed up.
-        let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
-          max(
-            1,
-            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-          )
-        } else {
-          exec_strategy_opts.local_parallelism * 2
-        };
-
-        Box::new(nailgun::CommandRunner::new(
-          local_command_runner,
-          local_execution_root_dir.to_path_buf(),
-          local_runner_store.clone(),
-          executor.clone(),
-          pool_size,
-        ))
+    let runner: Box<dyn CommandRunner> = if exec_strategy_opts.local_enable_nailgun {
+      // We set the nailgun pool size to the number of instances that fit within the memory
+      // parameters configured when a max child process memory has been given.
+      // Otherwise, pool size will be double of the local parallelism so we can always keep
+      // a jvm warmed up.
+      let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
+        max(
+          1,
+          exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+        )
       } else {
-        Box::new(local_command_runner)
+        exec_strategy_opts.local_parallelism * 2
       };
 
-      (runner, exec_strategy_opts.local_parallelism)
+      let nailgun_runner = nailgun::CommandRunner::new(
+        local_execution_root_dir.to_path_buf(),
+        local_runner_store.clone(),
+        executor.clone(),
+        named_caches.clone(),
+        immutable_inputs.clone(),
+        pool_size,
+      );
+
+      Box::new(SwitchedCommandRunner::new(
+        nailgun_runner,
+        local_command_runner,
+        |req| !req.input_digests.use_nailgun.is_empty(),
+      ))
+    } else {
+      Box::new(local_command_runner)
     };
 
-    Ok(Arc::new(bounded::CommandRunner::new(
+    // Note that the Docker command runner is only used if the Process sets docker_image. So,
+    // it's safe to always create this command runner.
+    let docker_runner = Box::new(docker::CommandRunner::new(
+      local_runner_store.clone(),
+      executor.clone(),
+      &DOCKER,
+      &IMAGE_PULL_CACHE,
+      local_execution_root_dir.to_path_buf(),
+      named_caches.clone(),
+      immutable_inputs.clone(),
+      exec_strategy_opts.local_keep_sandboxes,
+    )?);
+    let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
+      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+    }));
+
+    let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
       executor,
       runner,
-      parallelism,
-    )))
+      exec_strategy_opts.local_parallelism,
+    ));
+
+    if remoting_opts.execution_enable {
+      // We always create the remote execution runner if it is globally enabled, but it may not
+      // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
+      // or remote execution will be used for any particular process.
+      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+        // We unwrap because global_options.py will have already validated this is defined.
+        remoting_opts.execution_address.as_ref().unwrap(),
+        instance_name,
+        process_cache_namespace,
+        root_ca_certs.clone(),
+        remoting_opts.execution_headers.clone(),
+        full_store.clone(),
+        executor.clone(),
+        remoting_opts.execution_overall_deadline,
+        Duration::from_millis(100),
+        remoting_opts.execution_rpc_concurrency,
+        capabilities_cell_opt,
+      )?);
+      let remote_execution_runner = Box::new(bounded::CommandRunner::new(
+        executor,
+        remote_execution_runner,
+        exec_strategy_opts.remote_parallelism,
+      ));
+      runner = Box::new(SwitchedCommandRunner::new(
+        remote_execution_runner,
+        runner,
+        |req| {
+          matches!(
+            req.execution_strategy,
+            ProcessExecutionStrategy::RemoteExecution(_)
+          )
+        },
+      ));
+    }
+
+    Ok(Arc::new(runner))
   }
 
   ///
@@ -265,7 +305,8 @@ impl Core {
     full_store: &Store,
     executor: &Executor,
     local_cache: &PersistentCache,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     remoting_opts: &RemotingOptions,
     remote_cache_read: bool,
@@ -273,27 +314,20 @@ impl Core {
     local_cache_read: bool,
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
-    // TODO: Until we can deprecate letting the flag default, we implicitly default
-    // cache_content_behavior when remote execution is in use. See the TODO in `global_options.py`.
-    let cache_content_behavior = if remoting_opts.execution_enable {
-      CacheContentBehavior::Defer
-    } else {
-      remoting_opts.cache_content_behavior
-    };
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
-        process_execution_metadata.clone(),
+        instance_name,
+        process_cache_namespace.clone(),
         executor.clone(),
         full_store.clone(),
         remoting_opts.store_address.as_ref().unwrap(),
         root_ca_certs.clone(),
         remoting_opts.store_headers.clone(),
-        Platform::current()?,
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,
-        cache_content_behavior,
+        remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
         remoting_opts.cache_read_timeout,
       )?);
@@ -305,8 +339,8 @@ impl Core {
         local_cache.clone(),
         full_store.clone(),
         local_cache_read,
-        cache_content_behavior,
-        process_execution_metadata.clone(),
+        remoting_opts.cache_content_behavior,
+        process_cache_namespace,
       ));
     }
 
@@ -324,7 +358,8 @@ impl Core {
     local_execution_root_dir: &Path,
     immutable_inputs: &ImmutableInputs,
     named_caches: &NamedCaches,
-    process_execution_metadata: &ProcessMetadata,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
@@ -337,18 +372,16 @@ impl Core {
       local_execution_root_dir,
       immutable_inputs,
       named_caches,
-      process_execution_metadata,
+      instance_name.clone(),
+      process_cache_namespace.clone(),
       root_ca_certs,
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
     )?;
 
-    // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
-    // enable them when remote execution is in use. See the TODO in `global_options.py`.
-    let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
-    let remote_cache_write =
-      exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
+    let remote_cache_read = exec_strategy_opts.remote_cache_read;
+    let remote_cache_write = exec_strategy_opts.remote_cache_write;
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
     let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
@@ -357,7 +390,8 @@ impl Core {
         full_store,
         executor,
         local_cache,
-        process_execution_metadata,
+        instance_name.clone(),
+        process_cache_namespace.clone(),
         root_ca_certs,
         remoting_opts,
         remote_cache_read && should_cache_read,
@@ -480,6 +514,7 @@ impl Core {
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
+      && !remoting_opts.execution_enable
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the
@@ -487,17 +522,14 @@ impl Core {
       full_store.clone().into_local_only()
     } else {
       // Otherwise, the remote CAS should be visible everywhere.
+      //
+      // With remote execution, we do not always write remote results into the local cache, so it's
+      // important to always have access to the remote cache or else we will get missing digests.
       full_store.clone()
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
     let named_caches = NamedCaches::new(named_caches_dir);
-    let process_execution_metadata = ProcessMetadata {
-      instance_name: remoting_opts.instance_name.clone(),
-      cache_key_gen_version: remoting_opts.execution_process_cache_namespace.clone(),
-      platform_properties: remoting_opts.execution_extra_platform_properties.clone(),
-    };
-
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,
@@ -506,7 +538,8 @@ impl Core {
       &local_execution_root_dir,
       &immutable_inputs,
       &named_caches,
-      &process_execution_metadata,
+      remoting_opts.instance_name.clone(),
+      remoting_opts.execution_process_cache_namespace.clone(),
       &root_ca_certs,
       &exec_strategy_opts,
       &remoting_opts,
@@ -592,6 +625,19 @@ impl Core {
     }
     // Then clear the Graph to ensure that drop handlers run (particularly for running processes).
     self.graph.clear();
+
+    // Allow command runners to cleanly shutdown in an async context to avoid issues with
+    // waiting for async code to run in a non-async drop context.
+    let shutdown_futures = self
+      .command_runners
+      .iter()
+      .map(|runner| runner.shutdown().boxed());
+    let shutdown_results = futures::future::join_all(shutdown_futures).await;
+    for shutfdown_result in shutdown_results {
+      if let Err(err) = shutfdown_result {
+        log::warn!("Command runner failed to shutdown cleanly: {err}");
+      }
+    }
   }
 }
 

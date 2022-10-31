@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
-    Any,
     ClassVar,
     Iterable,
     Iterator,
@@ -28,7 +27,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -37,6 +35,7 @@ from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestSubsystem,
 )
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -293,7 +292,6 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
@@ -614,6 +612,18 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class PexVenvSitePackagesCopies(BoolField):
+    alias = "venv_site_packages_copies"
+    default = False
+    help = softwrap(
+        """
+        If execution_mode is venv, populate the venv site packages using hard links or copies of resolved PEX dependencies instead of symlinks.
+
+        This can be used to work around problems with tools or libraries that are confused by symlinked source files.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -631,6 +641,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeRequirementsField,
     PexIncludeSourcesField,
     PexIncludeToolsField,
+    PexVenvSitePackagesCopies,
     RestartableField,
 )
 
@@ -827,19 +838,9 @@ class PythonTestsTimeoutField(IntField):
         `TestTimeoutField` once the deprecated options in the `pytest` scope are removed.
         """
 
-        def resolve_opt(*, option: str) -> Any:
-            return resolve_conflicting_options(
-                old_option=option,
-                new_option=option,
-                old_scope="pytest",
-                new_scope="test",
-                old_container=pytest.options,
-                new_container=test.options,
-            )
-
-        enabled = resolve_opt(option="timeouts")
-        timeout_default = resolve_opt(option="timeout_default")
-        timeout_maximum = resolve_opt(option="timeout_maximum")
+        enabled = test.options.timeouts
+        timeout_default = test.options.timeout_default
+        timeout_maximum = test.options.timeout_maximum
 
         if not enabled:
             return None
@@ -858,6 +859,62 @@ class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
     pass
 
 
+class PythonTestsXdistConcurrencyField(IntField):
+    alias = "xdist_concurrency"
+    help = softwrap(
+        """
+        Maximum number of CPUs to allocate to run each test file belonging to this target.
+
+        Tests are spread across multiple CPUs using `pytest-xdist`
+        (https://pytest-xdist.readthedocs.io/en/latest/index.html).
+        Use of `pytest-xdist` must be enabled using the `[pytest].xdist_enabled` option for
+        this field to have an effect.
+
+        If `pytest-xdist` is enabled and this field is unset, Pants will attempt to derive
+        the concurrency for test sources by counting the number of tests in each file.
+
+        Set this field to `0` to explicitly disable use of `pytest-xdist` for a target.
+        """
+    )
+
+
+class PythonTestsBatchCompatibilityTagField(StringField):
+    alias = "batch_compatibility_tag"
+    help = softwrap(
+        """
+        An arbitrary value used to mark the test files belonging to this target as valid for
+        batched execution.
+
+        It's _sometimes_ safe to run multiple `python_test`s within a single `pytest` process,
+        and doing so can give significant wins by allowing reuse of expensive test setup /
+        teardown logic. To opt into this behavior, set this field to an arbitrary non-empty
+        string on all the `python_test` targets that are safe/compatible to run in the same
+        process.
+
+        If this field is left unset on a target, the target is assumed to be incompatible with
+        all others and will run in a dedicated `pytest` process.
+
+        If this field is set on a target, and its value is different from the value on some
+        other `python_test`, then the two targets are explicitly incompatible and are guaranteed
+        to not run in the same `pytest` process.
+
+        If this field is set on a target, and its value is the same as the value on some other
+        `python_test`, then the two targets are explicitly compatible and _may_ run in the same
+        `pytest` process. Compatible tests may not end up in the same `pytest` batch if:
+
+            * There are "too many" compatible tests in a partition, as determined by the \
+                `[test].batch_size` config parameter, or
+            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+                `resolve`s or `extra_env_vars`).
+
+        When tests with the same `batch_compatibility_tag` have incompatibilities in some other
+        Pants metadata, they will be automatically split into separate batches. This way you can
+        set a high-level `batch_compatibility_tag` using `__defaults__` and then have tests
+        continue to work as you tweak BUILD metadata on specific targets.
+        """
+    )
+
+
 class SkipPythonTestsField(BoolField):
     alias = "skip_tests"
     default = False
@@ -869,10 +926,13 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonResolveField,
     PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
+    PythonTestsXdistConcurrencyField,
+    PythonTestsBatchCompatibilityTagField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
     InterpreterConstraintsField,
     SkipPythonTestsField,
+    EnvironmentField,
 )
 
 

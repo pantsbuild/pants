@@ -8,10 +8,9 @@ from typing import Any, Generic, Iterable, Sequence, TextIO, Tuple, TypeVar, ove
 
 from typing_extensions import Protocol
 
-from pants.engine.fs import PathGlobs
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveProcessResult
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -149,15 +148,49 @@ class RemovePrefix:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
 
+class FilespecMatcher:
+    def __init__(self, includes: Sequence[str], excludes: Sequence[str]) -> None: ...
+    def __eq__(self, other: FilespecMatcher | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    def matches(self, paths: Sequence[str]) -> list[str]: ...
+
 EMPTY_DIGEST: Digest
 EMPTY_FILE_DIGEST: FileDigest
 EMPTY_SNAPSHOT: Snapshot
 
 def default_cache_path() -> str: ...
 
-# TODO: Really, `paths` should be `Sequence[str]`. Fix and update call sites so that we don't
-#  cast to `tuple()` when not necessary.
-def match_path_globs(path_globs: PathGlobs, paths: tuple[str, ...]) -> str: ...
+# ------------------------------------------------------------------------------
+# Process
+# ------------------------------------------------------------------------------
+
+class ProcessConfigFromEnvironment:
+    """Settings from the current Environment for how a `Process` should be run.
+
+    Note that most values from the Environment are instead set via changing the arguments `argv` and
+    `env` in the `Process` constructor.
+    """
+
+    def __init__(
+        self,
+        *,
+        platform: str,
+        docker_image: str | None,
+        remote_execution: bool,
+        remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
+    ) -> None: ...
+    def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    @property
+    def remote_execution(self) -> bool: ...
+    @property
+    def docker_image(self) -> str | None: ...
+    @property
+    def platform(self) -> str: ...
+    @property
+    def remote_execution_extra_platform_properties(self) -> list[tuple[str, str]]: ...
 
 # ------------------------------------------------------------------------------
 # Workunits
@@ -253,6 +286,8 @@ def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
     return_type: type,
+    arg_types: Sequence[type],
+    masked_types: Sequence[type],
     side_effecting: bool,
     engine_aware_return_type: bool,
     cacheable: bool,
@@ -261,10 +296,11 @@ def tasks_task_begin(
     level: int,
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
-def tasks_add_get(tasks: PyTasks, output: type, input: type) -> None: ...
-def tasks_add_union(tasks: PyTasks, output_type: type, input_type: tuple[type, ...]) -> None: ...
-def tasks_add_select(tasks: PyTasks, selector: type) -> None: ...
-def tasks_add_query(tasks: PyTasks, output_type: type, input_type: tuple[type, ...]) -> None: ...
+def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
+def tasks_add_get_union(
+    tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
+) -> None: ...
+def tasks_add_query(tasks: PyTasks, output_type: type, input_types: Sequence[type]) -> None: ...
 def execution_add_root_select(
     scheduler: PyScheduler,
     execution_request: PyExecutionRequest,
@@ -303,7 +339,7 @@ def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
 def session_run_interactive_process(
-    session: PySession, InteractiveProcess
+    session: PySession, process: InteractiveProcess, process_config: ProcessConfigFromEnvironment
 ) -> InteractiveProcessResult: ...
 def session_get_metrics(session: PySession) -> dict[str, int]: ...
 def session_get_observation_histograms(
@@ -313,6 +349,9 @@ def session_record_test_observation(
     scheduler: PyScheduler, session: PySession, value: int
 ) -> None: ...
 def session_isolated_shallow_clone(session: PySession, build_id: str) -> PySession: ...
+def session_wait_for_tail_tasks(
+    scheduler: PyScheduler, session: PySession, timeout: float
+) -> None: ...
 def graph_len(scheduler: PyScheduler) -> int: ...
 def graph_visualize(scheduler: PyScheduler, session: PySession, path: str) -> None: ...
 def graph_invalidate_paths(scheduler: PyScheduler, paths: Iterable[str]) -> int: ...
@@ -344,11 +383,17 @@ class PyGeneratorResponseBreak:
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseGet(Generic[_Output, _Input]):
+class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]
-    input_type: type[_Input]
-    input: _Input
+    input_types: Sequence[type]
+    inputs: Sequence[Any]
 
+    @overload
+    def __init__(
+        self,
+        output_type: type[_Output],
+        input_arg0: dict[Any, type],
+    ) -> None: ...
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
     @overload

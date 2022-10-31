@@ -7,24 +7,25 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
-from pants.base.build_root import BuildRoot
+from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
-from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import Digest, Workspace
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.environment import EnvironmentName
+from pants.engine.fs import Digest
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
-@union
+@union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class ReplImplementation(ABC):
     """A REPL implementation for a specific language or runtime.
@@ -64,6 +65,7 @@ class ReplSubsystem(GoalSubsystem):
 
 class Repl(Goal):
     subsystem_cls = ReplSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @frozen_after_init
@@ -97,14 +99,14 @@ class ReplRequest:
 @goal_rule
 async def run_repl(
     console: Console,
-    workspace: Workspace,
     repl_subsystem: ReplSubsystem,
     specified_targets: FilteredTargets,
-    build_root: BuildRoot,
     union_membership: UnionMembership,
-    global_options: GlobalOptions,
-    complete_env: CompleteEnvironment,
+    complete_env: CompleteEnvironmentVars,
 ) -> Repl:
+
+    await _warn_on_non_local_environments(specified_targets, "the `repl` goal")
+
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
@@ -113,8 +115,12 @@ async def run_repl(
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
-            f"{repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may "
-            f"be specified through the option `--repl-shell`): {available}"
+            softwrap(
+                f"""
+                {repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may
+                be specified through the option `--repl-shell`): {available}
+                """
+            )
         )
         return Repl(-1)
 

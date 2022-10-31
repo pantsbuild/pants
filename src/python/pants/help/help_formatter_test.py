@@ -23,6 +23,7 @@ class TestOptionHelpFormatter:
             unscoped_cmd_line_args=("--foo",),
             env_var="PANTS_FOO",
             config_key="foo",
+            target_field_name=None,
             typ=bool,
             default=None,
             help="help for foo",

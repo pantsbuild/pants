@@ -15,13 +15,13 @@ futures = "0.3"
 libc = "0.2"
 log = "0.4"
 nailgun = { path = "../nailgun" }
-nix = "0.24"
+nix = "0.25"
 options = { path = "../options" }
 sha2 = "0.10"
 strum = "0.24"
 strum_macros = "0.24"
 sysinfo = "0.20.0"
-tokio = { version = "1.16", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
+tokio = { version = "1.21", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
 uname = "0.1"
 
 [dev-dependencies]
