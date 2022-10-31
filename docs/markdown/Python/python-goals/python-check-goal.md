@@ -188,7 +188,7 @@ python_source(name="django_settings", source="django_settings.py")
 
 > 🚧 Importing from `extra_type_stubs`
 >
-> Requirements specified in `[mypy].extra_type_stubs` are not visible to the `python-infer` subsystem, and cannot be referenced as explicit `dependencies`. If you `import` from a stubs module in your code you may see a warning/error depending on the value you've configured for `[python-infer].unowned_dependency_behavior` - goals other than `check` will also raise `ImportError`s if the `import` isn't conditional on the value of `typing.TYPE_CHECKING`:
+> Requirements specified in `[mypy].extra_type_stubs` are not visible to the `python-infer` subsystem, and cannot be referenced as explicit `dependencies`. If you `import` from a stubs module in your code, and it does not have a corresponding implementation `python_requirement` target that provides the imported module, you may see a warning/error depending on the value you've configured for `[python-infer].unowned_dependency_behavior`. Goals other than `check` will also raise `ImportError`s if the `import` isn't conditional on the value of `typing.TYPE_CHECKING`:
 >
 > ```toml pants.toml
 > [python-infer]
@@ -208,7 +208,7 @@ python_source(name="django_settings", source="django_settings.py")
 >     from mypy_boto3_ec2 import EC2ServiceResource
 > ```
 >
-> For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](doc:python-third-party-dependencies).
+> For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](doc:python-third-party-dependencies). Alternatively, you can set `# pants: no-infer-dep` on the lines of type-stub imports "guarded" by a check of `if TYPE_CHECKING`.
 
 > 📘 MyPy Protobuf support
 >

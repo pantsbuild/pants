@@ -157,7 +157,7 @@ class MyPy(PythonToolBase):
     extra_type_stubs = StrListOption(
         advanced=True,
         help=softwrap(
-            """
+            f"""
             Extra type stub requirements to install when running MyPy.
 
             Normally, type stubs can be installed as typical requirements, such as putting
@@ -166,10 +166,8 @@ class MyPy(PythonToolBase):
             used when running MyPy and are not runtime dependencies.
 
             NOTE: Dependencies specified in this way are not visible to dependency inference,
-            and cannot be referenced as explicit dependencies. If you `import` from a stubs
-            module specified here, you may see warnings/errors from Pants depending on inference
-            settings. Specifying the dependencies as "typical" requirements via `requirements.txt`
-            or `python_requirement` targets avoids this issue.
+            and cannot be referenced as explicit dependencies. See {doc_url('python-check-goal')}
+            for more information about problems this can cause, and how to work around them.
 
             Expects a list of pip-style requirement strings, like
             `['types-requests==2.25.9']`.
