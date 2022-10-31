@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
+SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin/")
 
 
 @frozen_after_init
