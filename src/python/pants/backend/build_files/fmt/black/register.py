@@ -15,7 +15,7 @@ class BlackRequest(FmtBuildFilesRequest):
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(request: BlackRequest.SubPartition, black: Black) -> FmtResult:
+async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
     black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
     return await _run_black(request, black, black_ics)
 

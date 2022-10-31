@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import sqlite3
 from pathlib import Path
 from textwrap import dedent
@@ -12,12 +14,14 @@ from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 
-SOURCES = {
-    # Only `lib.py` will actually be tested, but we still expect `random.py` t`o show up in
-    # the final report correctly.
-    "src/python/project/__init__.py": "",
-    "src/python/project/lib.py": dedent(
-        """\
+
+def sources(batched: bool) -> dict[str, str]:
+    return {
+        # Only `lib.py` will actually be tested, but we still expect `random.py` t`o show up in
+        # the final report correctly.
+        "src/python/project/__init__.py": "",
+        "src/python/project/lib.py": dedent(
+            """\
         def add(x, y):
             return x + y
 
@@ -27,64 +31,65 @@ SOURCES = {
         def multiply(x, y):
             return x * y
         """
-    ),
-    # Include a type stub to ensure that we can handle it. We expect it to be ignored because the
-    # test run does not use the file.
-    "src/python/project/lib.pyi": dedent(
-        """\
+        ),
+        # Include a type stub to ensure that we can handle it. We expect it to be ignored because the
+        # test run does not use the file.
+        "src/python/project/lib.pyi": dedent(
+            """\
         def add(x: int, y: int) -> None:
             return x + y
         """
-    ),
-    "src/python/project/random.py": dedent(
-        """\
+        ),
+        "src/python/project/random.py": dedent(
+            """\
         def capitalize(s):
             return s.capitalize()
         """
-    ),
-    # Only test half of the library.
-    "src/python/project/lib_test.py": dedent(
-        """\
+        ),
+        # Only test half of the library.
+        "src/python/project/lib_test.py": dedent(
+            """\
         from project.lib import add
 
         def test_add():
             assert add(2, 3) == 5
         """
-    ),
-    "src/python/project/BUILD": dedent(
-        """\
+        ),
+        "src/python/project/BUILD": dedent(
+            f"""\
         python_sources()
         python_tests(
             name="tests",
             dependencies=[":project"],
+            {'batch_compatibility_tag="default",' if batched else ''}
         )
         """
-    ),
-    "src/python/core/BUILD": "python_sources()",
-    "src/python/core/__init__.py": "",
-    "src/python/core/untested.py": "CONSTANT = 42",
-    "foo/bar.py": "BAZ = True",
-    # Test that a `tests/` source root accurately gets coverage data for the `src/`
-    # root.
-    "tests/python/project_test/__init__.py": "",
-    "tests/python/project_test/test_multiply.py": dedent(
-        """\
+        ),
+        "src/python/core/BUILD": "python_sources()",
+        "src/python/core/__init__.py": "",
+        "src/python/core/untested.py": "CONSTANT = 42",
+        "foo/bar.py": "BAZ = True",
+        # Test that a `tests/` source root accurately gets coverage data for the `src/`
+        # root.
+        "tests/python/project_test/__init__.py": "",
+        "tests/python/project_test/test_multiply.py": dedent(
+            """\
         from project.lib import multiply
 
         def test_multiply():
             assert multiply(2, 3) == 6
         """
-    ),
-    "tests/python/project_test/test_arithmetic.py": dedent(
-        """\
+        ),
+        "tests/python/project_test/test_arithmetic.py": dedent(
+            """\
         from project.lib import add, subtract
 
         def test_arithmetic():
             assert add(4, 3) == 7 == subtract(10, 3)
         """
-    ),
-    "tests/python/project_test/BUILD": dedent(
-        """\
+        ),
+        "tests/python/project_test/BUILD": dedent(
+            """\
         python_tests(
             name="multiply",
             sources=["test_multiply.py"],
@@ -97,18 +102,18 @@ SOURCES = {
             dependencies=['{tmpdir}/src/python/project'],
         )
         """
-    ),
-    # Test a file that does not cover any src code. While this is unlikely to happen,
-    # this tests that we can properly handle the edge case.
-    "tests/python/project_test/no_src/__init__.py": "",
-    "tests/python/project_test/no_src/test_no_src.py": dedent(
-        """\
+        ),
+        # Test a file that does not cover any src code. While this is unlikely to happen,
+        # this tests that we can properly handle the edge case.
+        "tests/python/project_test/no_src/__init__.py": "",
+        "tests/python/project_test/no_src/test_no_src.py": dedent(
+            """\
         def test_true():
            assert True is True
         """
-    ),
-    "tests/python/project_test/no_src/BUILD.py": "python_tests()",
-}
+        ),
+        "tests/python/project_test/no_src/BUILD.py": f"""python_tests({'batch_compatibility_tag="default"' if batched else ''})""",
+    }
 
 
 def run_coverage_that_may_fail(tmpdir: str, *extra_args: str) -> PantsResult:
@@ -143,7 +148,7 @@ def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
     all_major_minor_python_versions(CoverageSubsystem.default_interpreter_constraints),
 )
 def test_coverage(major_minor_interpreter: str) -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+    with setup_tmpdir(sources(False)) as tmpdir:
         result = run_coverage(
             tmpdir, f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']"
         )
@@ -169,16 +174,50 @@ def test_coverage(major_minor_interpreter: str) -> None:
     )
 
 
-def test_coverage_fail_under() -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+@pytest.mark.platform_specific_behavior
+@pytest.mark.parametrize(
+    "major_minor_interpreter",
+    all_major_minor_python_versions(CoverageSubsystem.default_interpreter_constraints),
+)
+def test_coverage_batched(major_minor_interpreter: str) -> None:
+    with setup_tmpdir(sources(True)) as tmpdir:
+        result = run_coverage(
+            tmpdir, f"--coverage-py-interpreter-constraints=['=={major_minor_interpreter}.*']"
+        )
+    assert (
+        dedent(
+            f"""\
+            Name                                                          Stmts   Miss  Cover
+            ---------------------------------------------------------------------------------
+            {tmpdir}/src/python/project/__init__.py                        0      0   100%
+            {tmpdir}/src/python/project/lib.py                             6      0   100%
+            {tmpdir}/src/python/project/lib_test.py                        3      0   100%
+            {tmpdir}/src/python/project/random.py                          2      2     0%
+            {tmpdir}/tests/python/project_test/__init__.py                 0      0   100%
+            {tmpdir}/tests/python/project_test/no_src/__init__.py          0      0   100%
+            {tmpdir}/tests/python/project_test/no_src/test_no_src.py       2      0   100%
+            {tmpdir}/tests/python/project_test/test_arithmetic.py          3      0   100%
+            {tmpdir}/tests/python/project_test/test_multiply.py            3      0   100%
+            ---------------------------------------------------------------------------------
+            TOTAL                                                            19      2    89%
+            """
+        )
+        in result.stderr
+    )
+
+
+@pytest.mark.parametrize("batched", (True, False))
+def test_coverage_fail_under(batched: bool) -> None:
+    with setup_tmpdir(sources(batched)) as tmpdir:
         result = run_coverage(tmpdir, "--coverage-py-fail-under=89")
         result.assert_success()
         result = run_coverage_that_may_fail(tmpdir, "--coverage-py-fail-under=90")
         result.assert_failure()
 
 
-def test_coverage_global() -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+@pytest.mark.parametrize("batched", (True, False))
+def test_coverage_global(batched: bool) -> None:
+    with setup_tmpdir(sources(batched)) as tmpdir:
         result = run_coverage(tmpdir, "--coverage-py-global-report")
     assert (
         dedent(
@@ -206,8 +245,9 @@ def test_coverage_global() -> None:
     ), result.stderr
 
 
-def test_coverage_with_filter() -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+@pytest.mark.parametrize("batched", (True, False))
+def test_coverage_with_filter(batched: bool) -> None:
+    with setup_tmpdir(sources(batched)) as tmpdir:
         result = run_coverage(tmpdir, "--coverage-py-filter=['project.lib', 'project_test.no_src']")
     assert (
         dedent(
@@ -225,8 +265,9 @@ def test_coverage_with_filter() -> None:
     )
 
 
-def test_coverage_raw() -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+@pytest.mark.parametrize("batched", (True, False))
+def test_coverage_raw(batched: bool) -> None:
+    with setup_tmpdir(sources(batched)) as tmpdir:
         result = run_coverage(tmpdir, "--coverage-py-report=raw")
     assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr
     coverage_data = Path(get_buildroot(), "dist", "coverage", "python", ".coverage")
@@ -245,8 +286,9 @@ def test_coverage_raw() -> None:
     }
 
 
-def test_coverage_html_xml_json_lcov() -> None:
-    with setup_tmpdir(SOURCES) as tmpdir:
+@pytest.mark.parametrize("batched", (True, False))
+def test_coverage_html_xml_json_lcov(batched: bool) -> None:
+    with setup_tmpdir(sources(batched)) as tmpdir:
         result = run_coverage(tmpdir, "--coverage-py-report=['xml', 'html', 'json', 'lcov']")
     coverage_path = Path(get_buildroot(), "dist", "coverage", "python")
     assert coverage_path.exists() is True

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
+from typing import Any, Iterable
 
 import pytest
 
@@ -28,6 +29,7 @@ from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
     TestTimeoutField,
@@ -37,7 +39,8 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import ChosenLocalEnvironmentName, EnvironmentNameRequest
+from pants.core.util_rules.environments import ChosenLocalEnvironmentName
+from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
@@ -53,12 +56,15 @@ from pants.engine.fs import (
 from pants.engine.internals.session import RunId
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
 from pants.engine.target import (
+    BoolField,
     MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
@@ -79,14 +85,19 @@ class MockTestTimeoutField(TestTimeoutField):
     pass
 
 
+class MockSkipTestsField(BoolField):
+    alias = "skip_test"
+    default = False
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MockMultipleSourcesField,)
+    core_fields = (MockMultipleSourcesField, MockSkipTestsField)
 
 
 @dataclass(frozen=True)
 class MockCoverageData(CoverageData):
-    address: Address
+    addresses: Iterable[Address]
 
 
 class MockCoverageDataCollection(CoverageDataCollection):
@@ -96,51 +107,82 @@ class MockCoverageDataCollection(CoverageDataCollection):
 class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     required_fields = (MultipleSourcesField,)
 
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(MockSkipTestsField).value
+
+
+class MockTestSubsystem(Subsystem):
+    options_scope = "mock-test"
+    help = "Not real"
+    name = "Mock"
+    skip = SkipOption("test")
+
+
+class MockTestRequest(TestRequest):
+    field_set_type = MockTestFieldSet
+    tool_subsystem = MockTestSubsystem
+
     @staticmethod
     @abstractmethod
-    def exit_code(_: Address) -> int:
+    def exit_code(_: Iterable[Address]) -> int:
         pass
 
     @staticmethod
     @abstractmethod
-    def skipped(_: Address) -> bool:
+    def skipped(_: Iterable[Address]) -> bool:
         pass
 
-    @property
-    def test_result(self) -> TestResult:
+    @classmethod
+    def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
+        addresses = [field_set.address for field_set in field_sets]
         return TestResult(
-            exit_code=self.exit_code(self.address),
+            exit_code=cls.exit_code(addresses),
             stdout="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr="",
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=self.address,
-            coverage_data=MockCoverageData(self.address),
+            addresses=tuple(addresses),
+            coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
             result_metadata=None
-            if self.skipped(self.address)
+            if cls.skipped(addresses)
             else ProcessResultMetadata(999, "ran_locally", 0),
         )
 
 
-class SuccessfulFieldSet(MockTestFieldSet):
+class SuccessfulRequest(MockTestRequest):
     @staticmethod
-    def exit_code(_: Address) -> int:
+    def exit_code(_: Iterable[Address]) -> int:
         return 0
 
     @staticmethod
-    def skipped(_: Address) -> bool:
+    def skipped(_: Iterable[Address]) -> bool:
         return False
 
 
-class ConditionallySucceedsFieldSet(MockTestFieldSet):
+class ConditionallySucceedsRequest(MockTestRequest):
     @staticmethod
-    def exit_code(address: Address) -> int:
-        return 27 if address.target_name == "bad" else 0
+    def exit_code(addresses: Iterable[Address]) -> int:
+        if any(address.target_name == "bad" for address in addresses):
+            return 27
+        return 0
 
     @staticmethod
-    def skipped(address: Address) -> bool:
-        return address.target_name == "skipped"
+    def skipped(addresses: Iterable[Address]) -> bool:
+        return any(address.target_name == "skipped" for address in addresses)
+
+
+def mock_partitioner(
+    request: MockTestRequest.PartitionRequest,
+    _: EnvironmentName,
+) -> Partitions[MockTestFieldSet, Any]:
+    return Partitions(Partition((field_set,), None) for field_set in request.field_sets)
+
+
+def mock_test_partition(request: MockTestRequest.Batch, _: EnvironmentName) -> TestResult:
+    request_type = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
+    return request_type.test_result(request.elements)
 
 
 @pytest.fixture
@@ -148,16 +190,16 @@ def rule_runner() -> RuleRunner:
     return RuleRunner()
 
 
-def make_target(address: Address | None = None) -> Target:
+def make_target(address: Address | None = None, *, skip: bool = False) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({}, address)
+    return MockTarget({MockSkipTestsField.alias: skip}, address)
 
 
 def run_test_rule(
     rule_runner: RuleRunner,
     *,
-    field_set: type[TestFieldSet],
+    request_type: type[TestRequest],
     targets: list[Target],
     debug: bool = False,
     use_coverage: bool = False,
@@ -178,6 +220,7 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
+        batch_size=1,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -187,7 +230,10 @@ def run_test_rule(
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
-            TestFieldSet: [field_set],
+            TestFieldSet: [MockTestFieldSet],
+            TestRequest: [request_type],
+            TestRequest.PartitionRequest: [request_type.PartitionRequest],
+            TestRequest.Batch: [request_type.Batch],
             CoverageDataCollection: [MockCoverageDataCollection],
         }
     )
@@ -197,7 +243,13 @@ def run_test_rule(
     ) -> TargetRootsToFieldSets:
         if not valid_targets:
             return TargetRootsToFieldSets({})
-        return TargetRootsToFieldSets({tgt: [field_set.create(tgt)] for tgt in targets})
+        return TargetRootsToFieldSets(
+            {
+                tgt: [request_type.field_set_type.create(tgt)]
+                for tgt in targets
+                if request_type.field_set_type.is_applicable(tgt)
+            }
+        )
 
     def mock_debug_request(
         _field_set: TestFieldSet, _environment_name: EnvironmentName
@@ -214,7 +266,9 @@ def run_test_rule(
         _: EnvironmentName,
     ) -> CoverageReports:
         addresses = ", ".join(
-            coverage_data.address.spec for coverage_data in coverage_data_collection
+            address.spec
+            for coverage_data in coverage_data_collection
+            for address in coverage_data.addresses
         )
         console_report = ConsoleCoverageReport(
             coverage_insufficient=False, report=f"Ran coverage on {addresses}"
@@ -241,18 +295,23 @@ def run_test_rule(
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
+                    output_type=Partitions,
+                    input_types=(TestRequest.PartitionRequest, EnvironmentName),
+                    mock=mock_partitioner,
+                ),
+                MockGet(
                     output_type=EnvironmentName,
-                    input_types=(EnvironmentNameRequest,),
-                    mock=lambda _: EnvironmentName(None),
+                    input_types=(TestRequest.Batch, EnvironmentName),
+                    mock=lambda _b, _e: EnvironmentName(None),
                 ),
                 MockGet(
                     output_type=TestResult,
-                    input_types=(TestFieldSet, EnvironmentName),
-                    mock=lambda fs, _env: fs.test_result,
+                    input_types=(TestRequest.Batch, EnvironmentName),
+                    mock=mock_test_partition,
                 ),
                 MockGet(
                     output_type=TestDebugRequest,
-                    input_types=(TestFieldSet, EnvironmentName),
+                    input_types=(TestRequest.Batch, EnvironmentName),
                     mock=mock_debug_request,
                 ),
                 MockGet(
@@ -291,9 +350,19 @@ def run_test_rule(
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target()],
         valid_targets=False,
+    )
+    assert exit_code == 0
+    assert stderr.strip() == ""
+
+
+def test_skipped_target_noops(rule_runner: RuleRunner) -> None:
+    exit_code, stderr = run_test_rule(
+        rule_runner,
+        request_type=ConditionallySucceedsRequest,
+        targets=[make_target(Address("", target_name="bad"), skip=True)],
     )
     assert exit_code == 0
     assert stderr.strip() == ""
@@ -306,10 +375,10 @@ def test_summary(rule_runner: RuleRunner) -> None:
 
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=ConditionallySucceedsFieldSet,
+        request_type=ConditionallySucceedsRequest,
         targets=[make_target(good_address), make_target(bad_address), make_target(skipped_address)],
     )
-    assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
+    assert exit_code == ConditionallySucceedsRequest.exit_code((bad_address,))
     assert stderr == dedent(
         """\
 
@@ -333,7 +402,7 @@ def _assert_test_summary(
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=Address(spec_path="", target_name="dummy_address"),
+            addresses=(Address(spec_path="", target_name="dummy_address"),),
             output_setting=ShowOutput.FAILED,
             result_metadata=result_metadata,
         ),
@@ -372,7 +441,7 @@ def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
 def test_debug_target(rule_runner: RuleRunner) -> None:
     exit_code, _ = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target()],
         debug=True,
     )
@@ -384,7 +453,7 @@ def test_report(rule_runner: RuleRunner) -> None:
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         report=True,
     )
@@ -398,7 +467,7 @@ def test_report_dir(rule_runner: RuleRunner) -> None:
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         report=True,
         report_dir=report_dir,
@@ -412,7 +481,7 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
-        field_set=SuccessfulFieldSet,
+        request_type=SuccessfulRequest,
         targets=[make_target(addr1), make_target(addr2)],
         use_coverage=True,
     )
@@ -429,12 +498,30 @@ def sort_results() -> None:
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=ShowOutput.ALL,
     )
-    skip1 = create_test_result(exit_code=None, address=Address("t1"))
-    skip2 = create_test_result(exit_code=None, address=Address("t2"))
-    success1 = create_test_result(exit_code=0, address=Address("t1"))
-    success2 = create_test_result(exit_code=0, address=Address("t2"))
-    fail1 = create_test_result(exit_code=1, address=Address("t1"))
-    fail2 = create_test_result(exit_code=1, address=Address("t2"))
+    skip1 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t1"),),
+    )
+    skip2 = create_test_result(
+        exit_code=None,
+        addresses=(Address("t2"),),
+    )
+    success1 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t1"),),
+    )
+    success2 = create_test_result(
+        exit_code=0,
+        addresses=(Address("t2"),),
+    )
+    fail1 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t1"),),
+    )
+    fail2 = create_test_result(
+        exit_code=1,
+        addresses=(Address("t2"),),
+    )
     assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
         skip1,
         skip2,
@@ -462,7 +549,7 @@ def assert_streaming_output(
         stderr=stderr,
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
-        address=Address("demo_test"),
+        addresses=(Address("demo_test"),),
         result_metadata=result_metadata,
     )
     assert result.level() == expected_level

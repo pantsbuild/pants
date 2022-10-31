@@ -100,8 +100,8 @@ class ShellcheckRequest(LintTargetsRequest):
 
 # 3. Create a rule for your linter logic
 
-Your rule should take as a parameter `ShellcheckRequest.SubPartition` and the
-`Subsystem` (or `ExternalTool`) from step 1 (a `SubPartition` is an object containing a subset of all
+Your rule should take as a parameter `ShellcheckRequest.Batch` and the
+`Subsystem` (or `ExternalTool`) from step 1 (a `Batch` is an object containing a subset of all
 the matched field sets for your tool). It should return a `LintResult`:
 
 ```python
@@ -117,7 +117,7 @@ async def run_shellcheck(
     return LintResult.create(...)
 ```
 
-The `ShellcheckRequest.SubPartition` instance has a property called `.elements`, which in this case,
+The `ShellcheckRequest.Batch` instance has a property called `.elements`, which in this case,
 stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target.
 Pants will have already validated that there is at least one valid `FieldSet`.
 
@@ -158,7 +158,7 @@ from pants.util.strutil import pluralize
 
 @rule
 async def run_shellcheck(
-    request: ShellcheckRequest.SubPartition, shellcheck: Shellcheck, platform: Platform
+    request: ShellcheckRequest.Batch, shellcheck: Shellcheck, platform: Platform
 ) -> LintResult:
     download_shellcheck_request = Get(
         DownloadedExternalTool,

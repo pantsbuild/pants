@@ -268,6 +268,7 @@ impl Core {
         root_ca_certs.clone(),
         remoting_opts.execution_headers.clone(),
         full_store.clone(),
+        executor.clone(),
         remoting_opts.execution_overall_deadline,
         Duration::from_millis(100),
         remoting_opts.execution_rpc_concurrency,

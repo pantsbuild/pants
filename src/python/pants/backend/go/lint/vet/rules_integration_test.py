@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *assembly.rules(),
             QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
-            QueryRule(LintResult, [GoVetRequest.SubPartition]),
+            QueryRule(LintResult, [GoVetRequest.Batch]),
             SubsystemRule(GoVetSubsystem),
         ],
     )
@@ -95,15 +95,15 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions,
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.SubPartition("", subpartition, key)],
+            [GoVetRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

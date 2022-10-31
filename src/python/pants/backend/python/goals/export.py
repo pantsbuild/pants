@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, DefaultDict, Iterable, cast
@@ -165,30 +166,24 @@ async def do_export(
             f"(using Python {py_version})"
         )
 
-        # NOTE: We add a unique prefix to the pex_pex path to avoid conflicts when multiple
-        # venvs are concurrently exporting. Without this prefix all the invocations write
-        # the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of the pex_pex
-        # path in one export will delete the binary out from under the others.
-        pex_pex_dir = f".{req.resolve_name}.tmp"
-        pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
-        pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
-
-        merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, requirements_pex.digest]))
+        merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
+        tmpdir_prefix = f".{uuid.uuid4().hex}.tmp"
+        tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
+        merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
 
         return ExportResult(
             description,
             dest,
-            digest=merged_digest,
+            digest=merged_digest_under_tmpdir,
             post_processing_cmds=[
                 PostProcessingCommand(
                     complete_pex_env.create_argv(
-                        os.path.join(pex_pex_dest, pex_pex.exe),
+                        os.path.join(tmpdir_under_digest_root, pex_pex.exe),
                         *[
-                            os.path.join("{digest_root}", requirements_pex.name),
+                            os.path.join(tmpdir_under_digest_root, requirements_pex.name),
                             "venv",
                             "--pip",
                             "--collisions-ok",
-                            "--remove=pex",
                             output_path,
                         ],
                         python=requirements_pex.python,
@@ -198,8 +193,8 @@ async def do_export(
                         "PEX_MODULE": "pex.tools",
                     },
                 ),
-                # Remove the PEX pex, to avoid confusion.
-                PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
+                # Remove the requirements and pex pexes, to avoid confusion.
+                PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
             ],
         )
 

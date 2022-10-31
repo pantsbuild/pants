@@ -132,6 +132,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Joseph Tilahun
 + Josh Reed
 + Josh Soref
 + Josh Suereth
@@ -238,6 +239,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stephan Erb
 + Stu Hood
 + Suresh Joshi
++ Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai

@@ -21,7 +21,7 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import test
-from pants.backend.go.goals.test import GoTestFieldSet
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -74,7 +74,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateGoFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
-            QueryRule(TestResult, (GoTestFieldSet,)),
+            QueryRule(TestResult, (GoTestRequest.Batch,)),
         ],
         target_types=[
             GoModTarget,
@@ -289,7 +289,9 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     tgt = rule_runner.get_target(Address("src/go/people", target_name="pkg"))
-    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
     assert result.exit_code == 0
     assert "PASS: TestProtoGen" in result.stdout
 

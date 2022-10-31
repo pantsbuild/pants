@@ -13,8 +13,11 @@ updatedAt: "2022-07-25T23:50:56.628Z"
 Directories to cache
 --------------------
 
-In your CI's config file, we recommend caching these directories:
+> 📘 The `init-pants` GitHub Action
+>
+> If you're using GitHub Actions to run your CI workflows, then you can use our [standard action](https://github.com/pantsbuild/actions/tree/main/init-pants) to set up and cache the Pants bootstrap state. Otherwise, read on to learn how to configure this manually.
 
+In your CI's config file, we recommend caching these directories:
 
 - `$HOME/.cache/pants/setup`<br>
   This is the Pants bootstrap directory. Cache this against the version, as specified in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
@@ -96,13 +99,13 @@ We recommend running these commands in CI:
   lint
 ❯ ./pants \
   --changed-since=origin/main \
-  --changed-dependees=transitive \
+  --changed-dependents=transitive \
   check test
 ```
 
-Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependees of those changes.
+Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependents of those changes.
 
-Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependees=transitive`. `check` should also run on any transitive changes.
+Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependents=transitive`. `check` should also run on any transitive changes.
 
 See [Advanced target selection](doc:advanced-target-selection) for more information on `--changed-since` and alternative techniques to select targets to run in CI.
 

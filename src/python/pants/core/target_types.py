@@ -591,7 +591,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
         """
         A private helper target type used by some target generators.
 
-        This tracks their `source` / `sources` field so that `--changed-since --changed-dependees`
+        This tracks their `source` / `sources` field so that `--changed-since --changed-dependents`
         works properly for generated targets.
         """
     )
@@ -742,7 +742,7 @@ class LockfileTarget(Target):
         """
         A target for lockfiles in order to include them in the dependency graph of other targets.
 
-        This tracks them so that `--changed-since --changed-dependees` works properly for targets
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
         relying on a particular lockfile.
         """
     )

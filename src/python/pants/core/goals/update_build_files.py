@@ -11,10 +11,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from typing import DefaultDict, Mapping, cast
+from typing import DefaultDict, cast
 
 from colors import green, red
 
+from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
+from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.lint.black.rules import _run_black
@@ -41,11 +43,9 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import RegisteredTargetTypes, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
@@ -313,8 +313,11 @@ async def format_build_file_with_yapf(
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
     yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
     result = await _run_yapf(
-        YapfRequest.SubPartition(
-            Yapf.options_scope, input_snapshot.files, key=None, snapshot=input_snapshot
+        YapfRequest.Batch(
+            Yapf.options_scope,
+            input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
         ),
         yapf,
         yapf_ics,
@@ -344,8 +347,11 @@ async def format_build_file_with_black(
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
     black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
     result = await _run_black(
-        BlackRequest.SubPartition(
-            Black.options_scope, input_snapshot.files, key=None, snapshot=input_snapshot
+        BlackRequest.Batch(
+            Black.options_scope,
+            input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
         ),
         black,
         black_ics,
@@ -368,60 +374,22 @@ class RenameDeprecatedTargetsRequest(DeprecationFixerRequest):
     pass
 
 
-class RenamedTargetTypes(FrozenDict[str, str]):
-    """Deprecated target type names to new names."""
-
-
-@rule
-def determine_renamed_target_types(target_types: RegisteredTargetTypes) -> RenamedTargetTypes:
-    return RenamedTargetTypes(
-        {
-            tgt.deprecated_alias: tgt.alias
-            for tgt in target_types.types
-            if tgt.deprecated_alias is not None
-        }
-    )
-
-
 @rule(desc="Check for deprecated target type names", level=LogLevel.DEBUG)
-def maybe_rename_deprecated_targets(
+async def maybe_rename_deprecated_targets(
     request: RenameDeprecatedTargetsRequest,
-    renamed_target_types: RenamedTargetTypes,
 ) -> RewrittenBuildFile:
-    tokens = request.tokenize()
-    applied_renames: set[tuple[str, str]] = set()
-
-    def should_be_renamed(token: tokenize.TokenInfo) -> bool:
-        no_indentation = token.start[1] == 0
-        if not (
-            token.type is tokenize.NAME and token.string in renamed_target_types and no_indentation
-        ):
-            return False
-        # Ensure that the next token is `(`
-        try:
-            next_token = tokens[tokens.index(token) + 1]
-        except IndexError:
-            return False
-        return next_token.type is tokenize.OP and next_token.string == "("
-
-    updated_text_lines = list(request.lines)
-    for token in tokens:
-        if not should_be_renamed(token):
-            continue
-        line_index = token.start[0] - 1
-        line = request.lines[line_index]
-        suffix = line[token.end[1] :]
-        new_symbol = renamed_target_types[token.string]
-        applied_renames.add((token.string, new_symbol))
-        updated_text_lines[line_index] = f"{new_symbol}{suffix}"
+    old_bytes = "\n".join(request.lines).encode("utf-8")
+    new_content = await Get(
+        FixedBUILDFile,
+        renamed_fields_rules.RenameFieldsInFileRequest(path=request.path, content=old_bytes),
+    )
 
     return RewrittenBuildFile(
         request.path,
-        tuple(updated_text_lines),
-        change_descriptions=tuple(
-            f"Rename `{request.red(deprecated)}` to `{request.green(new)}`"
-            for deprecated, new in sorted(applied_renames)
-        ),
+        tuple(new_content.content.decode("utf-8").splitlines()),
+        change_descriptions=("Renamed deprecated targets",)
+        if old_bytes != new_content.content
+        else (),
     )
 
 
@@ -434,141 +402,30 @@ class RenameDeprecatedFieldsRequest(DeprecationFixerRequest):
     pass
 
 
-@dataclass(frozen=True)
-class RenamedFieldTypes:
-    """Map deprecated field names to their new name, per target."""
-
-    target_field_renames: FrozenDict[str, FrozenDict[str, str]]
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Mapping[str, str]]) -> RenamedFieldTypes:
-        return cls(
-            FrozenDict(
-                {
-                    target_name: FrozenDict(
-                        {
-                            deprecated_field_name: new_field_name
-                            for deprecated_field_name, new_field_name in field_renames.items()
-                        }
-                    )
-                    for target_name, field_renames in data.items()
-                }
-            )
-        )
-
-
-@rule
-def determine_renamed_field_types(
-    target_types: RegisteredTargetTypes, union_membership: UnionMembership
-) -> RenamedFieldTypes:
-    target_field_renames: DefaultDict[str, dict[str, str]] = defaultdict(dict)
-    for tgt in target_types.types:
-        field_types = list(tgt.class_field_types(union_membership))
-        if issubclass(tgt, TargetGenerator):
-            field_types.extend(tgt.moved_fields)
-
-        for field_type in field_types:
-            if field_type.deprecated_alias is not None:
-                target_field_renames[tgt.alias][field_type.deprecated_alias] = field_type.alias
-
-        # Make sure we also update deprecated fields in deprecated targets.
-        if tgt.deprecated_alias is not None:
-            target_field_renames[tgt.deprecated_alias] = target_field_renames[tgt.alias]
-
-    return RenamedFieldTypes.from_dict(target_field_renames)
-
-
 @rule(desc="Check for deprecated field type names", level=LogLevel.DEBUG)
-def maybe_rename_deprecated_fields(
+async def maybe_rename_deprecated_fields(
     request: RenameDeprecatedFieldsRequest,
-    renamed_field_types: RenamedFieldTypes,
 ) -> RewrittenBuildFile:
-    pants_target: str = ""
-    level: int = 0
-    applied_renames: set[tuple[str, str, str]] = set()
-    tokens = iter(request.tokenize())
-
-    def parse_level(token: tokenize.TokenInfo) -> bool:
-        """Returns true if token was consumed."""
-        nonlocal level
-
-        if level == 0 or token.type is not tokenize.OP or token.string not in ["(", ")"]:
-            return False
-
-        if token.string == "(":
-            level += 1
-        elif token.string == ")":
-            level -= 1
-
-        return True
-
-    def parse_target(token: tokenize.TokenInfo) -> bool:
-        """Returns true if we're parsing a field name for a top level target."""
-        nonlocal pants_target
-        nonlocal level
-
-        if parse_level(token):
-            # Consumed parenthesis operator.
-            return False
-
-        if token.type is not tokenize.NAME:
-            return False
-
-        if level == 0 and next_token_is("("):
-            level = 1
-            pants_target = token.string
-            # Current token consumed.
-            return False
-
-        return level == 1
-
-    def next_token_is(string: str, token_type=tokenize.OP) -> bool:
-        for next_token in tokens:
-            if next_token.type is tokenize.NL:
-                continue
-            parse_level(next_token)
-            return next_token.type is token_type and next_token.string == string
-        return False
-
-    def should_be_renamed(token: tokenize.TokenInfo) -> bool:
-        nonlocal pants_target
-
-        if not parse_target(token):
-            return False
-
-        if pants_target not in renamed_field_types.target_field_renames:
-            return False
-
-        return (
-            next_token_is("=")
-            and token.string in renamed_field_types.target_field_renames[pants_target]
-        )
-
-    updated_text_lines = list(request.lines)
-    for token in tokens:
-        if not should_be_renamed(token):
-            continue
-        line_index = token.start[0] - 1
-        line = request.lines[line_index]
-        prefix = line[: token.start[1]]
-        suffix = line[token.end[1] :]
-        new_symbol = renamed_field_types.target_field_renames[pants_target][token.string]
-        applied_renames.add((pants_target, token.string, new_symbol))
-        updated_text_lines[line_index] = f"{prefix}{new_symbol}{suffix}"
+    old_bytes = "\n".join(request.lines).encode("utf-8")
+    new_content = await Get(
+        FixedBUILDFile,
+        renamed_fields_rules.RenameFieldsInFileRequest(path=request.path, content=old_bytes),
+    )
 
     return RewrittenBuildFile(
         request.path,
-        tuple(updated_text_lines),
-        change_descriptions=tuple(
-            f"Rename the field `{request.red(deprecated)}` to `{request.green(new)}` for target type `{target}`"
-            for target, deprecated, new in sorted(applied_renames)
-        ),
+        tuple(new_content.content.decode("utf-8").splitlines()),
+        change_descriptions=("Renamed deprecated fields",)
+        if old_bytes != new_content.content
+        else (),
     )
 
 
 def rules():
     return (
         *collect_rules(),
+        *collect_rules(renamed_fields_rules),
+        *collect_rules(renamed_targets_rules),
         *pex.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),

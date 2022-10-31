@@ -395,7 +395,7 @@ async fn non_restartable_node_only_runs_once() {
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
   // TNode(0) is cleared before completing, and so will run twice. But the non_restartable node and its
-  // dependee each run once.
+  // dependent each run once.
   assert_eq!(
     context.runs(),
     vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0),]

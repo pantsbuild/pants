@@ -34,7 +34,7 @@ In order to support targetless formatters, `fmt` needs to know which _files_ you
 Therefore the plugin API for `fmt` has forked into 2 rules:
 
 1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
-2. A rule taking `<RequestType>.SubPartition` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
+2. A rule taking `<RequestType>.Batch` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
 
 This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
 that don't overlap.
@@ -50,7 +50,7 @@ The partitioner rule gives you an opportunity to perform expensive `Get`s once f
 to partition the inputs based on metadata to simplify your runner, and to have a place for easily
 skipping your tool if requested.
 
-The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.SubPartition`),
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`),
 which now has a `.files` property.
 
 If you don't require any `Get`s or metadata for your tool in your partitioner rule,
@@ -65,11 +65,79 @@ Lint:
 Lint plugins are almost identical to format plugins, except in 2 ways:
 
 1. Your partitioner rule still returns a `Partitions` object, but the element type can be anything.
-2. `<RequestType>.SubPartition` has a `.elements` field instead of `.files`.
+2. `<RequestType>.Batch` has a `.elements` field instead of `.files`.
 
 -----
 
 As always, taking a look at Pants' own plugins can also be very enlightening.
+
+### `test` schema changes
+
+To enable running tests in batches, the plugin API for `test` has significantly changed. The new API largely resembles the `lint`/`fmt` API described above.
+
+#### 1. Test plugins must now define a `skip`-able `Subsystem`.
+
+To hook into the new API, a test runner must declare a subclass of `Subsystem` with a `skip: SkipOption` option.
+Add `skip = SkipOption("test")` to your existing (or new) subsystems.
+
+#### 2. Test plugins must define a subclass of `TestRequest`.
+
+To define the rules expected by the new `test` API, you will need to define a `TestRequest` subclass. This new type will point at your plugin-specific `TestFieldSet` and `Subsystem` subclasses:
+
+```python
+class CustomTestRequest(TestRequest):
+    field_set_type = CustomTestFieldSet
+    tool_subsystem = CustomSubsystem
+```
+
+After declaring your new type, register its rules:
+
+```python
+def rules():
+    return [
+        # Add to what you already have:
+        *CustomTestRequest.rules(),
+    ]
+```
+
+#### 3. Test execution now uses a 2-rule approach
+
+The plugin API for `test` has forked into 2 rules:
+
+1. A rule taking `<TestRequestSubclass>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
+2. A rule taking `<TestRequestSubclass>.Batch` and returning a `TestResult`. This is sometimes referred to as the "runner" rule.
+
+The "partitioner" rule was introduced to allow plugins to group tests into "compatible" batches, to be executed as a batch within the "runner" rule. The "runner" rule is a replacement for the previous API which took `TestFieldSet` instances as input.
+
+By default, registering `<TestRequestSubclass>.rules()` will register a "partitioner" rule that creates a single-element partition per input `TestFieldSet`, replicating the behavior from before Pants 2.15. You can then upgrade your existing "runner" rule to take the new input type.
+
+Before:
+
+```python
+@rule
+async def run_test(field_set: CustomTestFieldSet) -> TestResult:
+    ...
+```
+
+After:
+
+```python
+@rule
+async def run_tests(batch: CustomTestRequest.Batch) -> TestResult:
+    field_set = batch.single_element
+    ...
+```
+
+If you would like to make use of the new support for batched testing, override the `partitioner_type` field in your `TestRequest` subclass:
+
+```python
+class CustomTestRequest(TestRequest):
+    field_set_type = CustomTestFieldSet
+    tool_subsystem = CustomSubsystem
+    partitioner_type = PartitionerType.CUSTOM
+```
+
+This will prevent registration of the default "partitioner" rule, allowing you to implement any partitioning logic you'd like. You'll then need to update your "runner" rule to handle a multi-element `batch`.
 
 ### `EnvironmentName` is now required to run processes, get environment variables, etc
 
@@ -643,7 +711,7 @@ This is tracked by <https://github.com/pantsbuild/pants/issues/10917>.
 
 If you have any custom fields that act like the dependencies field, but do not subclass `Dependencies`, there are two new mechanisms for better support.
 
-1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependees`.
+1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependents`.
 2. You can use `UnparsedAddressInputs` from `pants.engine.addresses` to resolve the addresses:
 
 ```python

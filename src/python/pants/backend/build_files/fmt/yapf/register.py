@@ -15,7 +15,7 @@ class YapfRequest(FmtBuildFilesRequest):
 
 
 @rule(desc="Format with Yapf", level=LogLevel.DEBUG)
-async def yapf_fmt(request: YapfRequest.SubPartition, yapf: Yapf) -> FmtResult:
+async def yapf_fmt(request: YapfRequest.Batch, yapf: Yapf) -> FmtResult:
     yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
     return await _run_yapf(request, yapf, yapf_ics)
 

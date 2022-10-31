@@ -289,13 +289,13 @@ If you're using a version of MyPy older than `0.700`, consider upgrading to unlo
 Additionally consider not providing `python_version` in your config or args.
 
 
-Tip: only run over changed files and their dependees
-----------------------------------------------------
+Tip: only run over changed files and their dependents
+-----------------------------------------------------
 
 When changing type hints code, you not only need to run over the changed files, but also any code that depends on the changed files:
 
 ```bash
-$ ./pants --changed-since=HEAD --changed-dependees=transitive check
+$ ./pants --changed-since=HEAD --changed-dependents=transitive check
 ```
 
 See [Advanced target selection](doc:advanced-target-selection) for more information.

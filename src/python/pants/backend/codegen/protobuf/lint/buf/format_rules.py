@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
@@ -62,7 +63,7 @@ async def partition_buf(
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(
-    request: BufFormatRequest.SubPartition, buf: BufSubsystem, platform: Platform
+    request: BufFormatRequest.Batch, buf: BufSubsystem, platform: Platform
 ) -> FmtResult:
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
@@ -98,7 +99,7 @@ async def run_buf_format(
             output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
-            env={"PATH": binary_shims.bin_directory},
+            env={"PATH": os.path.join("{chroot}", binary_shims.bin_directory)},
         ),
     )
     return await FmtResult.create(request, result)
