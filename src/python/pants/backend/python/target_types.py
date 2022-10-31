@@ -1027,6 +1027,7 @@ class PythonSourceTarget(Target):
         PythonResolveField,
         PythonRunGoalUseSandboxField,
         PythonSourceField,
+        RestartableField,
     )
     help = "A single Python source file."
 
@@ -1108,6 +1109,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
         PythonRunGoalUseSandboxField,
         PythonDependenciesField,
         InterpreterConstraintsField,
+        RestartableField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
