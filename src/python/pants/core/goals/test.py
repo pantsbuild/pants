@@ -18,7 +18,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
-    EnvironmentNameRequest,
+    SingleEnvironmentNameRequest,
 )
 from pants.core.util_rules.partitions import (
     PartitionerType,
@@ -333,6 +333,12 @@ class TestRequest:
                 )
 
             return self.elements[0]
+
+        @property
+        def description(self) -> str:
+            if self.partition_metadata and self.partition_metadata.description:
+                return f"test batch from partition '{self.partition_metadata.description}'"
+            return "test batch"
 
         def debug_hint(self) -> str:
             if len(self.elements) == 1:
@@ -753,29 +759,6 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
-@rule(desc="Determine environment for partition", level=LogLevel.DEBUG)
-async def get_batch_environment(batch: TestRequest.Batch) -> EnvironmentName:
-    environment_names_per_element = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
-        for field_set in batch.elements
-    )
-    unique_environments = len({name.val for name in environment_names_per_element})
-    if unique_environments != 1:
-        batch_description = "Test batch"
-        if batch.partition_metadata.description:
-            batch_description = f"{batch_description} '{batch.partition_metadata.description}'"
-
-        raise AssertionError(
-            # TODO: Print conflicting field sets in env.
-            f"{batch_description} contains elements from {unique_environments} environments; exactly 1 environment is expected"
-        )
-    return environment_names_per_element[0]
-
-
 @goal_rule
 async def run_tests(
     console: Console,
@@ -824,7 +807,9 @@ async def run_tests(
 
     environment_names = await MultiGet(
         Get(
-            EnvironmentName, {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName}
+            EnvironmentName,
+            SingleEnvironmentNameRequest,
+            SingleEnvironmentNameRequest.from_field_sets(batch.elements, batch.description),
         )
         for batch in test_batches
     )
