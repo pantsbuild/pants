@@ -4,3 +4,7 @@
 python_sources(dependencies=[":lockfiles"])
 
 resources(name="lockfiles", sources=["*.default.lockfile.txt"])
+
+python_tests(
+    name="tests",
+)

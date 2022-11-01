@@ -31,7 +31,7 @@ from pants.jvm.jar_tool.jar_tool import JarToolRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
-    DeployJarDuplicateRulesField,
+    DeployJarDuplicatePolicyField,
     JvmDependenciesField,
     JvmJdkField,
     JvmMainClassNameField,
@@ -52,7 +52,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     output_path: OutputPathField
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
-    duplicate_rules: DeployJarDuplicateRulesField
+    duplicate_policy: DeployJarDuplicatePolicyField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -125,7 +125,8 @@ async def package_deploy_jar(
             main_class=field_set.main_class.value,
             jars=classpath.args(),
             policies=[
-                (rule.pattern, rule.action) for rule in field_set.duplicate_rules.value_or_default()
+                (rule.pattern, rule.action)
+                for rule in field_set.duplicate_policy.value_or_default()
             ],
             compress=True,
         ),

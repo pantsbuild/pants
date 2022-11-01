@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix
@@ -16,7 +16,9 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.option.option_types import EnumOption
 from pants.util.docutil import git_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
@@ -32,13 +34,19 @@ class JarDuplicateAction(Enum):
 
 class JarTool(JvmToolBase):
     options_scope = "jar-tool"
-    help = ""
+    help = "Pants' implementation of a JAR builder tool."
 
     default_version = "0.0.17"
     default_artifacts = ("org.pantsbuild:jar-tool:{version}",)
     default_lockfile_resource = ("pants.jvm.jar_tool", "jar_tool.default.lockfile.txt")
     default_lockfile_path = "src/python/pants/jvm/jar_tool/jar_tool.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+
+    default_duplicate_action = EnumOption(
+        default=None,
+        enum_type=JarDuplicateAction,
+        help="Default action to take when finding duplicate entries.",
+    )
 
 
 class JarToolGenerateLockfileSentinel(GenerateToolLockfileSentinel):
@@ -61,8 +69,10 @@ class JarToolRequest:
     classpath_entries: tuple[str, ...]
     manifest: str | None
     jars: tuple[str, ...]
-    files: tuple[str, ...]
+    file_mappings: FrozenDict[str, str]
+    default_action: JarDuplicateAction | None
     policies: tuple[tuple[str, JarDuplicateAction], ...]
+    skip: tuple[str, ...]
     compress: bool
     update: bool
 
@@ -75,8 +85,10 @@ class JarToolRequest:
         classpath_entries: Iterable[str] | None = None,
         manifest: str | None = None,
         jars: Iterable[str] | None = None,
-        files: Iterable[str] | None = None,
+        file_mappings: Mapping[str, str] | None = None,
+        default_action: JarDuplicateAction | None = None,
         policies: Iterable[tuple[str, str | JarDuplicateAction]] | None = None,
+        skip: Iterable[str] | None = None,
         compress: bool = False,
         update: bool = False,
     ) -> None:
@@ -86,8 +98,10 @@ class JarToolRequest:
         self.manifest = manifest
         self.classpath_entries = tuple(classpath_entries or ())
         self.jars = tuple(jars or ())
-        self.files = tuple(files or ())
+        self.file_mappings = FrozenDict(file_mappings or {})
+        self.default_action = default_action
         self.policies = tuple(JarToolRequest.__parse_policies(policies or ()))
+        self.skip = tuple(skip or ())
         self.compress = compress
         self.update = update
 
@@ -128,7 +142,12 @@ async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarT
     policies = ",".join(
         f"{pattern}={action.value.upper()}" for (pattern, action) in request.policies
     )
+    file_mappings = ",".join(
+        f"{os.path.join(input_prefix, fs_path)}={jar_path}"
+        for fs_path, jar_path in request.file_mappings.items()
+    )
 
+    default_action = request.default_action or jar_tool.default_duplicate_action
     tool_process = JvmProcess(
         jdk=jdk,
         argv=[
@@ -150,14 +169,10 @@ async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarT
                 if request.jars
                 else ()
             ),
-            *(
-                (
-                    f"-files={','.join([os.path.join(input_prefix, file) for file in request.files])}",
-                )
-                if request.files
-                else ()
-            ),
+            *((f"-files={file_mappings}",) if file_mappings else ()),
+            *((f"-default_action={default_action.value.upper()}",) if default_action else ()),
             *((f"-policies={policies}",) if policies else ()),
+            *((f"-skip={','.join(request.skip)}",) if request.skip else ()),
             *(("-compress",) if request.compress else ()),
             *(("-update",) if request.update else ()),
         ],
