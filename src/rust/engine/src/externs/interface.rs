@@ -307,6 +307,7 @@ impl PyRemotingOptions {
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
+    append_only_caches_base_path: Option<String>,
   ) -> Self {
     Self(RemotingOptions {
       execution_enable,
@@ -329,6 +330,7 @@ impl PyRemotingOptions {
       execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
+      append_only_caches_base_path,
     })
   }
 }

@@ -428,7 +428,7 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
   pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
-    let nailgun_req_digest = crate::digest(nailgun_req, None, None, store).await;
+    let nailgun_req_digest = crate::digest(nailgun_req, None, None, store, None).await;
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,
