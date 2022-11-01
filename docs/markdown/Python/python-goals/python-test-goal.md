@@ -500,8 +500,8 @@ report = true
 
 This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
 
-PYTEST_ADDOPTS environment variable
------------------------------------
+Customizing Pytest command line options per target
+--------------------------------------------------
 
 You can set `PYTEST_ADDOPTS` environment variable to add your own command line options, like this:
 
@@ -516,4 +516,4 @@ python_tests(
 )
 ```
 
-Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). In order to preserve the communication channel with Pytest, `PYTEST_ADDOPTS` is not allowed to override these hardwired CLI args.
+Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). If these options are overridden, Pants Pytest handling may not work correctly. Set these at your own peril!

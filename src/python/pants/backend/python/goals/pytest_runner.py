@@ -322,6 +322,9 @@ async def setup_pytest_for_target(
         ),
     )
 
+    # Don't forget to keep "Customize Pytest command line options per target" section in
+    # docs/markdown/Python/python-goals/python-test-goal.md up to date when changing
+    # which flags are added to `pytest_args`.
     pytest_args = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
@@ -402,6 +405,8 @@ async def setup_pytest_for_target(
                 *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
+                # N.B.: Now that we're using command-line options instead of the PYTEST_ADDOPTS
+                # environment variable, it's critical that `pytest_args` comes after `pytest.args`.
                 *pytest_args,
                 *field_set_source_files.files,
             ),
