@@ -34,29 +34,25 @@ See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/e
 Python third-party dependencies and tools
 -----------------------------------------
 
-To get your editor to understand the repo's third-party dependencies, you will probably want to point it at a virtualenv containing those dependencies.
+To get your editor to understand the repo's third-party Python dependencies, you will probably want to point it at a virtualenv containing those dependencies.
 
-You can use the `export` goal to create a suitable virtualenv. 
+Assuming you are using the ["resolves" feature for Python lockfiles](doc:python-third-party-dependencies)—which we strongly recommend—Pants can export a virtualenv for each of your resolves. You can then point your IDE to whichever resolve you want to load at the time.
+
+To use the `export` goal to create a virtualenv:
 
 ```
-❯ ./pants export ::
-Wrote virtualenv for the resolve 'python-default' (using CPython==3.9.*) to dist/export/python/virtualenvs/python-default
+❯ ./pants export --symlink-python-virtualenv --py-resolve=python-default
+Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
 ```
 
-If you are using the ["resolves" feature for Python lockfiles](doc:python-third-party-dependencies)—which we strongly recommend—Pants will write the virtualenv to `dist/export/python/virtualenvs/<resolve-name>`. If you have multiple resolves, this means that Pants will create one virtualenv per resolve. You can then point your IDE to whichever resolve you want to load at the time.
+You can specify the `--py-resolve` flag [multiple times](doc:options#list-values) to export multiple virtualenvs at once.
+
+The `--symlink-python-virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
 
 ### Tool virtualenvs
 
-`./pants export` will also create a virtualenv for certain Python tools you use via Pants, like
-formatters like Black and Isort. This allows you to configure your editor to use the same version
-of the tool that Pants uses for workflows like formatting on save.
+`./pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on (you can run `/pants help tools` to get a list of the tools Pants uses). Use the tool name as the resolve name argument to the `--py-resolve` flag. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save.
 
-To disable a certain tool, set its `export` option to `false`, e.g.:
-
-```toml pants.toml
-[black]
-export = false
-```
 
 Generated code
 --------------

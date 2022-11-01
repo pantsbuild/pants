@@ -263,7 +263,9 @@ async def export_virtualenv_for_resolve(
         if not export_tool_request.pex_request:
             raise ExportError(
                 f"Requested an export of `{resolve}` but that tool's exports were disabled with "
-                f"the `export=false` option."
+                f"the `export=false` option. The per-tool `export=false` options will soon be "
+                f"deprecated anyway, so we recommend removing `export=false` from your config file "
+                f"and switching to using `--py-resolve`."
             )
         pex_request = export_tool_request.pex_request
 
