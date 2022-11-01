@@ -21,6 +21,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -295,7 +296,11 @@ class GunzipBinary:
         return (self.python.path, "-c", script)
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class TarBinary(BinaryPath):
+    platform: Platform
+
     def create_archive_argv(
         self,
         output_filename: str,
@@ -321,7 +326,9 @@ class TarBinary(BinaryPath):
     ) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" else ()
+        prog_args = (
+            ("-Ilz4",) if archive_suffix == ".tar.lz4" and not self.platform.is_macos else ()
+        )
         return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
@@ -686,7 +693,7 @@ def find_gunzip(python: PythonBinary) -> GunzipBinary:
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
-async def find_tar() -> TarBinary:
+async def find_tar(platform: Platform) -> TarBinary:
     request = BinaryPathRequest(
         binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
     )
@@ -694,7 +701,7 @@ async def find_tar() -> TarBinary:
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"
     )
-    return TarBinary(first_path.path, first_path.fingerprint)
+    return TarBinary(first_path.path, first_path.fingerprint, platform)
 
 
 @rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
