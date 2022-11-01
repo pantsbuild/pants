@@ -51,6 +51,7 @@ pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -79,6 +80,7 @@ impl CommandRunner {
     cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
     read_timeout: Duration,
+    append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -103,6 +105,7 @@ impl CommandRunner {
       inner,
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       executor,
       store,
       action_cache_client,
@@ -475,6 +478,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let failures_cached = request.cache_scope == ProcessCacheScope::Always;

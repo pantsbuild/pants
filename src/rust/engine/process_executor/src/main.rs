@@ -301,6 +301,7 @@ async fn main() {
         &address,
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
+        None,
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
@@ -329,6 +330,9 @@ async fn main() {
             CacheContentBehavior::Defer,
             args.cache_rpc_concurrency,
             Duration::from_secs(2),
+            args
+              .named_cache_path
+              .map(|p| p.to_string_lossy().to_string()),
           )
           .expect("Failed to make remote cache command runner"),
         )

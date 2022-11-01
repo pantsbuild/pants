@@ -24,10 +24,10 @@ use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{CommandRunner, EntireExecuteRequest, ExecutionError, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
+  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  InputDigests, Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
 };
-use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -151,7 +151,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -253,7 +253,8 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store).await,
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store, None)
+      .await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -353,7 +354,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store).await,
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -428,7 +429,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -527,7 +528,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -621,7 +622,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -629,6 +630,144 @@ async fn make_execute_request_with_timeout() {
       input_root_digest: input_directory.directory_digest(),
     })
   );
+}
+
+#[tokio::test]
+async fn make_execute_request_with_append_only_caches() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let input_directory = TestDirectory::containing_roland();
+  store
+    .record_directory(&input_directory.directory(), false)
+    .await
+    .unwrap();
+
+  let req = Process {
+    argv: owned_string_vec(&["/bin/cat", "../.cache/xyzzy/foo.txt"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: Some(RelativePath::new(Path::new("animals")).unwrap()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+    output_files: BTreeSet::new(),
+    output_directories: BTreeSet::new(),
+    timeout: one_second(),
+    description: "some description".to_owned(),
+    level: log::Level::Info,
+    append_only_caches: btreemap! {
+      CacheName::new(String::from("xyzzy")).unwrap() => RelativePath::new(Path::new(".cache/xyzzy")).unwrap(),
+    },
+    jdk_home: None,
+    platform: Platform::Linux_x86_64,
+    execution_slot_variable: None,
+    concurrency_available: 0,
+    cache_scope: ProcessCacheScope::Always,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+  };
+
+  let want_command = remexec::Command {
+    arguments: vec![
+      "./__pants_wrapper__".to_owned(),
+      "/bin/cat".to_owned(),
+      "../.cache/xyzzy/foo.txt".to_owned(),
+    ],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: "SOME".to_owned(),
+        value: "value".to_owned(),
+      },
+    ],
+    platform: Some(remexec::Platform::default()),
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "1deb19eddcefd5074263064a7df2a19caeb4e6d86a849bc07e23a5d856f886ec",
+        )
+        .unwrap(),
+        178,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some(
+      (Digest::new(
+        Fingerprint::from_hex_string(
+          "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+        )
+        .unwrap(),
+        178,
+      ))
+      .into(),
+    ),
+    timeout: Some(prost_types::Duration::from(Duration::from_secs(1))),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "e4196db365556cbeed4941845f448cfafc1fabb76b3c476c3f378f358235d3c4",
+        )
+        .unwrap(),
+        146,
+      ))
+        .into(),
+    ),
+    skip_cache_lookup: true,
+    ..Default::default()
+  };
+
+  let want_input_root_digest = DirectoryDigest::from_persisted_digest(Digest::new(
+    Fingerprint::from_hex_string(
+      "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+    )
+    .unwrap(),
+    178,
+  ));
+
+  let got_execute_request =
+    crate::remote::make_execute_request(&req, None, None, &store, Some("/append-only-caches"))
+      .await
+      .unwrap();
+  assert_eq!(
+    got_execute_request,
+    EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: want_input_root_digest,
+    }
+  );
+
+  // Ensure that the wrapper script was added to the input root.
+  let mut files = store
+    .load_digest_trie(got_execute_request.input_root_digest)
+    .await
+    .unwrap()
+    .files();
+  files.sort();
+  assert_eq!(
+    files,
+    vec![
+      Path::new("__pants_wrapper__").to_path_buf(),
+      Path::new("roland.ext").to_path_buf()
+    ]
+  )
 }
 
 #[tokio::test]
@@ -737,7 +876,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store).await,
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -765,6 +904,7 @@ async fn successful_with_only_call_to_execute() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -815,6 +955,7 @@ async fn successful_after_reconnect_with_wait_execution() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -869,6 +1010,7 @@ async fn successful_after_reconnect_from_retryable_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -929,7 +1071,7 @@ async fn dropped_request_cancels() {
   let mock_server = {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(&request, None, None, &store)
+        execute_request: crate::remote::make_execute_request(&request, None, None, &store, None)
           .await
           .unwrap()
           .execute_request,
@@ -988,6 +1130,7 @@ async fn server_rejecting_execute_request_gives_error() {
         None,
         None,
         &store,
+        None,
       )
       .await
       .unwrap()
@@ -1021,6 +1164,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1074,6 +1218,7 @@ async fn sends_headers() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1097,6 +1242,7 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1274,6 +1420,7 @@ async fn ensure_inline_stdio_is_stored() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1297,6 +1444,7 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1358,6 +1506,7 @@ async fn bad_result_bytes() {
           None,
           None,
           &store,
+          None,
         )
         .await
         .unwrap()
@@ -1406,6 +1555,7 @@ async fn initial_response_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1460,6 +1610,7 @@ async fn initial_response_missing_response_and_error() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1505,6 +1656,7 @@ async fn fails_after_retry_limit_exceeded() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1568,6 +1720,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1650,6 +1803,7 @@ async fn execute_missing_file_uploads_if_known() {
       None,
       None,
       &store,
+      None,
     )
     .await
     .unwrap();
@@ -1671,6 +1825,7 @@ async fn execute_missing_file_uploads_if_known() {
             None,
             None,
             &store,
+            None,
           )
           .await
           .unwrap()
@@ -1700,6 +1855,7 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -1761,6 +1917,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -2440,6 +2597,7 @@ fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (Com
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &execution_address,
+    None,
     None,
     None,
     None,
