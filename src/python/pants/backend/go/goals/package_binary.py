@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import cast
 
 from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
@@ -58,19 +59,21 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
 
     if main_pkg.is_third_party:
-        import_path = main_pkg.import_path
+        import_path = cast(str, main_pkg.import_path)
+
         go_mod_address = main_pkg.address.maybe_convert_to_target_generator()
         go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
 
         analysis = await Get(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
-                import_path.value,
+                import_path,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
             ),
         )
 
+        package_name = analysis.name
     else:
         main_pkg, build_opts = await MultiGet(
             Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
@@ -80,13 +83,14 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             FallibleFirstPartyPkgAnalysis,
             FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
         )
-        analysis = main_pkg_analysis.analysis
+        if not main_pkg_analysis.analysis:
+            raise ValueError(
+                f"Unable to analyze main package `{main_pkg.address}` for go_binary target {field_set.address}: {main_pkg_analysis.stderr}"
+            )
 
-    if not analysis:
-        raise ValueError(
-            f"Unable to analyze main package `{main_pkg.address}` for go_binary target {field_set.address}: {main_pkg_analysis.stderr}"
-        )
-    if analysis.name != "main":
+        package_name = main_pkg_analysis.analysis.name
+
+    if package_name != "main":
         raise ValueError(
             f"{GoThirdPartyPackageTarget.alias if main_pkg.is_third_party else GoPackageTarget.alias} "
             f"target `{main_pkg.address}` is used as the main package for {GoBinaryTarget.alias} target "
