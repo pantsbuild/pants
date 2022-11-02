@@ -167,7 +167,7 @@ class Options:
     ) -> None:
         """The low-level constructor for an Options instance.
 
-        Dependees should use `Options.create` instead.
+        Dependents should use `Options.create` instead.
         """
         self._builtin_goal = builtin_goal
         self._goals = goals

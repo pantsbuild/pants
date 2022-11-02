@@ -19,7 +19,9 @@ from pants.core.goals.check import (
     check,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
@@ -144,8 +146,16 @@ def run_typecheck_rule(
             mock_gets=[
                 MockGet(
                     output_type=CheckResults,
-                    input_types=(CheckRequest,),
-                    mock=lambda field_set_collection: field_set_collection.check_results,
+                    input_types=(
+                        CheckRequest,
+                        EnvironmentName,
+                    ),
+                    mock=lambda field_set_collection, _: field_set_collection.check_results,
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda a: EnvironmentName(a.raw_value),
                 ),
             ],
             union_membership=union_membership,

@@ -7,7 +7,9 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type
+from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
+
+from typing_extensions import Protocol
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
@@ -16,6 +18,7 @@ from pants.core.goals.lint import (
     LintResult,
     LintTargetsRequest,
     _get_partitions_by_request_type,
+    _MultiToolGoalSubsystem,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
 from pants.core.util_rules.partitions import PartitionerType, PartitionMetadataT
@@ -29,10 +32,12 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
+from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
@@ -188,12 +193,24 @@ class FixSubsystem(GoalSubsystem):
         return FixRequest in union_membership
 
     only = OnlyOption("fixer", "autoflake", "pyupgrade")
+    skip_formatters = BoolOption(
+        default=False,
+        help=softwrap(
+            f"""
+            If true, skip running all formatters.
+
+            FYI: when running `{bin_name()} fix fmt ::`, there should be diminishing performance
+            benefit to using this flag. Pants attempts to reuse the results from `fmt` when running
+            `fix` where possible.
+            """
+        ),
+    )
     batch_size = BatchSizeOption(uppercase="Fixer", lowercase="fixer")
 
 
 class Fix(Goal):
     subsystem_cls = FixSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @rule_helper
@@ -235,37 +252,48 @@ def _print_results(
         console.print_stderr(f"{sigil} {tool} {status}.")
 
 
-@goal_rule
-async def fix(
-    console: Console,
-    specs: Specs,
-    fix_subsystem: FixSubsystem,
-    workspace: Workspace,
-    union_membership: UnionMembership,
-) -> Fix:
-    core_request_types = list(union_membership.get(FixRequest))
-    target_partitioners = list(union_membership.get(FixTargetsRequest.PartitionRequest))
-    file_partitioners = list(union_membership.get(FixFilesRequest.PartitionRequest))
+_CoreRequestType = TypeVar("_CoreRequestType", bound=FixRequest)
+_TargetPartitioner = TypeVar("_TargetPartitioner", bound=FixTargetsRequest.PartitionRequest)
+_FilePartitioner = TypeVar("_FilePartitioner", bound=FixFilesRequest.PartitionRequest)
+_GoalT = TypeVar("_GoalT", bound=Goal)
 
+
+class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
+    batch_size: BatchSizeOption
+
+
+@rule_helper
+async def _do_fix(
+    core_request_types: Iterable[type[_CoreRequestType]],
+    target_partitioners: Iterable[type[_TargetPartitioner]],
+    file_partitioners: Iterable[type[_FilePartitioner]],
+    goal_cls: type[_GoalT],
+    subsystem: _BatchableMultiToolGoalSubsystem,
+    specs: Specs,
+    workspace: Workspace,
+    console: Console,
+    make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
+    make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
+) -> _GoalT:
     partitions_by_request_type = await _get_partitions_by_request_type(
         core_request_types,
         target_partitioners,
         file_partitioners,
-        fix_subsystem,
+        subsystem,
         specs,
-        lambda request_type: Get(Partitions, FixTargetsRequest.PartitionRequest, request_type),
-        lambda request_type: Get(Partitions, FixFilesRequest.PartitionRequest, request_type),
+        make_targets_partition_request_get,
+        make_files_partition_request_get,
     )
 
     if not partitions_by_request_type:
-        return Fix(exit_code=0)
+        return goal_cls(exit_code=0)
 
     def batch_by_size(files: Iterable[str]) -> Iterator[tuple[str, ...]]:
         batches = partition_sequentially(
             files,
             key=lambda x: str(x),
-            size_target=fix_subsystem.batch_size,
-            size_max=4 * fix_subsystem.batch_size,
+            size_target=subsystem.batch_size,
+            size_max=4 * subsystem.batch_size,
         )
         for batch in batches:
             yield tuple(batch)
@@ -311,7 +339,42 @@ async def fix(
 
     # Since the rules to produce FixResult should use ProcessResult, rather than
     # FallibleProcessResult, we assume that there were no failures.
-    return Fix(exit_code=0)
+    return goal_cls(exit_code=0)
+
+
+@goal_rule
+async def fix(
+    console: Console,
+    specs: Specs,
+    fix_subsystem: FixSubsystem,
+    workspace: Workspace,
+    union_membership: UnionMembership,
+) -> Fix:
+    return await _do_fix(
+        sorted(
+            (
+                request_type
+                for request_type in union_membership.get(FixRequest)
+                if not (request_type.is_formatter and fix_subsystem.skip_formatters)
+            ),
+            # NB: We sort the core request types so that fixers are first. This is to ensure that, between
+            # fixers and formatters, re-running isn't necessary due to tool conflicts (re-running may
+            # still be necessary within formatters). This is because fixers are expected to modify
+            # code irrespective of formattint, and formatters aren't expected to be modifying the code
+            # in a way that needs to be fixed.
+            key=lambda request_type: request_type.is_fixer,
+            reverse=True,
+        ),
+        union_membership.get(FixTargetsRequest.PartitionRequest),
+        union_membership.get(FixFilesRequest.PartitionRequest),
+        Fix,
+        fix_subsystem,
+        specs,
+        workspace,
+        console,
+        lambda request_type: Get(Partitions, FixTargetsRequest.PartitionRequest, request_type),
+        lambda request_type: Get(Partitions, FixFilesRequest.PartitionRequest, request_type),
+    )
 
 
 @rule

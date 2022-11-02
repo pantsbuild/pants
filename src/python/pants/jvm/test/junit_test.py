@@ -33,7 +33,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.test.junit import JunitTestFieldSet
+from pants.jvm.test.junit import JunitTestFieldSet, JunitTestRequest
 from pants.jvm.test.junit import rules as junit_rules
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -64,7 +64,7 @@ def rule_runner() -> RuleRunner:
             *non_jvm_dependencies_rules(),
             get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (JunitTestFieldSet,)),
+            QueryRule(TestResult, (JunitTestRequest.Batch,)),
         ],
         target_types=[
             FileTarget,
@@ -640,4 +640,6 @@ def run_junit_test(
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
     )
-    return rule_runner.request(TestResult, [JunitTestFieldSet.create(tgt)])
+    return rule_runner.request(
+        TestResult, [JunitTestRequest.Batch("", (JunitTestFieldSet.create(tgt),), None)]
+    )

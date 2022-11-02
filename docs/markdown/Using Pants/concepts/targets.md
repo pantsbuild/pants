@@ -157,28 +157,19 @@ You only need to declare direct dependencies. Pants will pull in _transitive dep
 Field default values
 ====================
 
-As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And
-for specific cases it is easy to provide some other value to a specific target. The issue is if you
-want to apply a specific non-default value for a field on many targets. This can get unwieldy, error
-prone and hard to maintain. Enter `__defaults__`.
+As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And for specific cases it is easy to provide some other value to a specific target. The issue is if you  want to apply a specific non-default value for a field on many targets. This can get unwieldy, error  prone and hard to maintain. Enter `__defaults__`.
 
-Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the
-current subtree.
+Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the current subtree.
 
-The defaults are provided as a dictionary mapping targets to the default field values. Multiple
-targets may share the same set of default field values, when grouped together in parenthesis (as a
-Python tuple).
+The defaults are provided as a dictionary mapping targets to the default field values. Multiple targets may share the same set of default field values, when grouped together in parenthesis (as a Python tuple).
 
 Use the `all` keyword argument to provide default field values that should apply to all targets.
 
-The `extend=True` keyword argument allows to add to any existing default field values set by a
-previous `__defaults__` call rather than replacing them.
+The `extend=True` keyword argument allows to add to any existing default field values set by a previous `__defaults__` call rather than replacing them.
 
-Default fields and values are validated against their target types, except when provided using the
-`all` keyword, in which case only values for fields applicable to each target are validated.
+Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated.
 
-This means, that it is legal to provide a default value for `all` targets, even if it is only a
-subset of targets that actually supports that particular field.
+This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
 
 Examples:
 

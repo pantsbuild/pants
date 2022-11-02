@@ -3,6 +3,7 @@
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.shunit2 import Shunit2
@@ -23,6 +24,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -65,6 +67,11 @@ class Shunit2FieldSet(TestFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipShunit2TestsField).value
+
+
+class Shunit2TestRequest(TestRequest):
+    tool_subsystem = Shunit2
+    field_set_type = Shunit2FieldSet
 
 
 @dataclass(frozen=True)
@@ -235,8 +242,10 @@ async def setup_shunit2_for_target(
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
 async def run_tests_with_shunit2(
-    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any], test_subsystem: TestSubsystem
 ) -> TestResult:
+    field_set = batch.single_element
+
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
@@ -247,8 +256,10 @@ async def run_tests_with_shunit2(
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
-async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set))
+async def setup_shunit2_debug_test(
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element))
     return TestDebugRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
@@ -257,9 +268,15 @@ async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugReque
 
 
 @rule
-async def setup_shunit2_debug_adapter_test(field_set: Shunit2FieldSet) -> TestDebugAdapterRequest:
+async def setup_shunit2_debug_adapter_test(
+    _: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
 
 
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, Shunit2FieldSet)]
+    return [
+        *collect_rules(),
+        UnionRule(TestFieldSet, Shunit2FieldSet),
+        *Shunit2TestRequest.rules(),
+    ]
