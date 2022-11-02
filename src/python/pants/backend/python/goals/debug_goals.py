@@ -25,6 +25,7 @@ from pants.backend.python.dependency_inference.rules import (
     _collect_imports_info,
     _exec_parse_deps,
     _find_other_owners_for_unowned_imports,
+    import_rules,
 )
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -192,5 +193,6 @@ async def dump_python_source_analysis(
 
 def rules():
     return [
+        *import_rules(),
         *collect_rules(),
     ]
