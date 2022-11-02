@@ -83,7 +83,7 @@ async def determine_main_pkg_for_go_binary(
                 True,
                 wrapped_specified_tgt.target.get(GoImportPathField),
             )
-        return GoBinaryMainPackage(wrapped_specified_tgt.target.address, True)
+        return GoBinaryMainPackage(wrapped_specified_tgt.target.address, False)
 
     candidate_targets = await Get(
         Targets,
