@@ -15,7 +15,13 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
 )
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
+from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.backend.go.util_rules.third_party_pkg import (
+    ThirdPartyPkgAnalysis,
+    ThirdPartyPkgAnalysisRequest,
+)
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -44,15 +50,31 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
-    main_pkg, build_opts = await MultiGet(
-        Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
-    )
-    main_pkg_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis,
-        FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
-    )
-    analysis = main_pkg_analysis.analysis
+    main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+    if main_pkg.is_third_party:
+        import_path = main_pkg.import_path
+        go_mod_address = main_pkg.address.maybe_convert_to_target_generator()
+        go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+        analysis = await Get(
+            ThirdPartyPkgAnalysis,
+            ThirdPartyPkgAnalysisRequest(
+                import_path.value,
+                go_mod_info.digest,
+                go_mod_info.mod_path,
+            ),
+        )
+
+    else:
+        main_pkg, build_opts = await MultiGet(
+            Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
+            Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
+        )
+        main_pkg_analysis = await Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
+        )
+        analysis = main_pkg_analysis.analysis
+
     if not analysis:
         raise ValueError(
             f"Unable to analyze main package `{main_pkg.address}` for go_binary target {field_set.address}: {main_pkg_analysis.stderr}"
