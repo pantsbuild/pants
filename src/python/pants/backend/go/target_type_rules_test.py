@@ -272,6 +272,8 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
                 """\
                 module example.com/foo
                 go 1.17
+
+                require github.com/tgolsson/example-pants-third-party v0.0.0-20221101220057-1a7167a87ec5 // indirect
                 """
             ),
             "BUILD": "go_mod(name='mod')",
@@ -281,6 +283,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
             "inferred/BUILD": "go_binary()\ngo_package(name='pkg')",
             "ambiguous/f.go": "",
             "ambiguous/BUILD": "go_binary()\ngo_package(name='pkg1')\ngo_package(name='pkg2')",
+            "external/BUILD": "go_binary(main='//:mod#github.com/tgolsson/example-pants-third-party/cmd/hello')",
             # Note there are no `.go` files in this dir.
             "missing/BUILD": "go_binary()",
             "explicit_wrong_type/BUILD": dedent(
@@ -310,10 +313,17 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
 
     assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")
     assert get_main(Address("inferred")) == Address("inferred", target_name="pkg")
+    assert get_main(Address("external")) == Address(
+        "",
+        target_name="mod",
+        generated_name="github.com/tgolsson/example-pants-third-party/cmd/hello",
+    )
 
     with engine_error(ResolveError, contains="none were found"):
         get_main(Address("missing"))
     with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
         get_main(Address("ambiguous"))
-    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
+    with engine_error(
+        InvalidFieldException, contains="a `go_package` or `go_third_party_package` target"
+    ):
         get_main(Address("explicit_wrong_type"))

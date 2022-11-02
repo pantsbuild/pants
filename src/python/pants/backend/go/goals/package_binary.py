@@ -6,7 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.target_types import GoBinaryMainPackageField, GoBinaryTarget, GoPackageTarget
+from pants.backend.go.target_types import (
+    GoBinaryMainPackageField,
+    GoBinaryTarget,
+    GoPackageTarget,
+    GoThirdPartyPackageTarget,
+)
 from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
@@ -51,10 +56,12 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+
     if main_pkg.is_third_party:
         import_path = main_pkg.import_path
         go_mod_address = main_pkg.address.maybe_convert_to_target_generator()
         go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+
         analysis = await Get(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
@@ -81,15 +88,17 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         )
     if analysis.name != "main":
         raise ValueError(
-            f"{GoPackageTarget.alias} target `{main_pkg.address}` is used as the main package for "
-            f"{GoBinaryTarget.address} target `{field_set.address}` but uses package name `{analysis.name}` "
-            "instead of `main`. Go requires that main packages actually use `main` as the package name."
+            f"{GoThirdPartyPackageTarget.alias if main_pkg.is_third_party else GoPackageTarget.alias} "
+            f"target `{main_pkg.address}` is used as the main package for {GoBinaryTarget.alias} target "
+            f"`{field_set.address}` but uses package name `{analysis.name}` instead of `main`. Go "
+            "requires that main packages actually use `main` as the package name."
         )
 
     built_package = await Get(
         BuiltGoPackage,
         BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts),
     )
+
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))

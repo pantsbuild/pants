@@ -28,7 +28,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture()
@@ -104,6 +104,30 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
     assert result.returncode == 0
     assert result.stdout == b"Hello world!\n"
+
+
+def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                go 1.17
+
+                require github.com/tgolsson/example-pants-third-party v0.0.0-20221101220057-1a7167a87ec5 // indirect
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(name="bin", main='//:mod#github.com/tgolsson/example-pants-third-party/pkg/hello')
+                """
+            ),
+        }
+    )
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    with engine_error(ValueError, contains="but uses package name `hello` instead of `main`"):
+        build_package(rule_runner, binary_tgt)
 
 
 def test_package_with_dependencies(rule_runner: RuleRunner) -> None:

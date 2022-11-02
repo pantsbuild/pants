@@ -71,10 +71,10 @@ async def determine_main_pkg_for_go_binary(
         ) and not wrapped_specified_tgt.target.has_field(GoImportPathField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_package` target, but was the address for a "
+                "a `go_package` or `go_third_party_package` target, but was the address for a "
                 f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
-                "Hint: you should normally not specify this field so that Pants will find the "
-                "`go_package` target for you."
+                "Hint: you should normally not specify this field for local packages so that Pants "
+                "will find the `go_package` target for you."
             )
 
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
