@@ -26,6 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 
 pub mod directory;
+#[cfg(test)]
+mod directory_tests;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;

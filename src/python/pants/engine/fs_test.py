@@ -539,32 +539,13 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
         pytest.param(
             CreateDigest(
                 [
-                    FileContent("file.txt", b"four\n"),
-                    SymlinkEntry("a/dirlink", "../b/c/d"),
-                    SymlinkEntry("b/c/d/link", "../../file.txt"),
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("a/self", "."),
                 ]
             ),
-            # NOTE: No "b/c/d/link", because that'd result in "a/file.txt"
-            ("a/dirlink/link", "file.txt"),
-            ("a", "a/dirlink", "b", "b/c", "b/c/d"),
-            id="symlink-makes-updir-valid",
-        ),
-        pytest.param(
-            CreateDigest(
-                [
-                    FileContent("dir/file.txt", b"four\n"),
-                    SymlinkEntry("dir/parent", ".."),
-                    SymlinkEntry("dir/self", "."),
-                    SymlinkEntry("dir/self_obtusely", "../dir"),
-                    SymlinkEntry(
-                        "dir/file_but_oh_so_obtusely",
-                        "self/self/self/self/self_obtusely/parent/dir/parent/dir/parent/dir/self/file.txt",
-                    ),
-                ]
-            ),
-            ("dir/file.txt", "dir/self_obtusely/file.txt", "dir/file_but_oh_so_obtusely"),
-            ("dir"),
-            id="evil",
+            tuple(f"a/{'self/' * count}file.txt" for count in range(65)),
+            ("a",),
+            id="self-dir",
         ),
     ],
 )
