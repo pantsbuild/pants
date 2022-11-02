@@ -36,7 +36,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import BoolOption, StrListOption
+from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe, softwrap
 
@@ -89,8 +89,6 @@ class ExportPythonTool(EngineAwareParameter):
 
 
 class ExportPluginOptions:
-    py_resolve = StrListOption(default=[], help="Export virtualenvs for this resolve.")
-
     symlink_python_virtualenv = BoolOption(
         default=False,
         help="Export a symlink into a cached Python virtualenv.  This virtualenv will have no pip binary, "
@@ -159,6 +157,7 @@ async def do_export(
             description,
             dest,
             post_processing_cmds=[PostProcessingCommand(["ln", "-s", venv_abspath, output_path])],
+            resolve=req.resolve_name or None,
         )
     else:
         # Note that an internal-only pex will always have the `python` field set.
@@ -204,7 +203,13 @@ async def do_export(
                 # Remove the requirements and pex pexes, to avoid confusion.
                 PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
             ],
+            resolve=req.resolve_name or None,
         )
+
+
+@dataclass(frozen=True)
+class MaybeExportResult:
+    result: ExportResult | None
 
 
 @rule
@@ -212,7 +217,7 @@ async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
-) -> ExportResult:
+) -> MaybeExportResult:
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
     if lockfile_path:
@@ -259,13 +264,15 @@ async def export_virtualenv_for_resolve(
             (etr for etr in all_export_tool_requests if etr.resolve_name == resolve), None
         )
         if not export_tool_request:
-            raise ExportError(f"No such resolve: {resolve}")
+            # No such Python resolve or tool, but it may be a resolve for a different language/backend,
+            # so we let the core export goal sort out whether it's an error or not.
+            return MaybeExportResult(None)
         if not export_tool_request.pex_request:
             raise ExportError(
                 f"Requested an export of `{resolve}` but that tool's exports were disabled with "
                 f"the `export=false` option. The per-tool `export=false` options will soon be "
                 f"deprecated anyway, so we recommend removing `export=false` from your config file "
-                f"and switching to using `--py-resolve`."
+                f"and switching to using `--resolve`."
             )
         pex_request = export_tool_request.pex_request
 
@@ -279,7 +286,7 @@ async def export_virtualenv_for_resolve(
             qualify_path_with_python_version=True,
         ),
     )
-    return export_result
+    return MaybeExportResult(export_result)
 
 
 @rule
@@ -354,16 +361,16 @@ async def export_virtualenvs(
     union_membership: UnionMembership,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    if export_subsys.options.py_resolve:
+    if export_subsys.options.resolve:
         if request.targets:
             raise ExportError(
-                "If using export's --py-resolve option, do not also provide target specs."
+                "If using the `--resolve` option, do not also provide target specs."
             )
-        venvs = await MultiGet(
-            Get(ExportResult, _ExportVenvForResolveRequest(resolve))
-            for resolve in export_subsys.options.py_resolve
+        maybe_venvs = await MultiGet(
+            Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
+            for resolve in export_subsys.options.resolve
         )
-        return ExportResults(venvs)
+        return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
 
     # TODO: Deprecate this entire codepath.
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)

@@ -153,9 +153,9 @@ def test_export_venv_new_codepath(
         [
             f"--python-interpreter-constraints=['=={current_interpreter}']",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
-            "--export-py-resolve=a",
-            "--export-py-resolve=b",
-            "--export-py-resolve=flake8",
+            "--export-resolve=a",
+            "--export-resolve=b",
+            "--export-resolve=flake8",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
             symlink_flag,

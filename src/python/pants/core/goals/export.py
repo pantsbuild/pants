@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import itertools
 import os
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError, KnownUserResolveNames, \
+    KnownUserResolveNamesRequest, GenerateToolLockfileSentinel
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
@@ -21,6 +24,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import StrListOption
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -37,7 +41,6 @@ class ExportRequest:
 
     Subclass and install a member of this type to export data.
     """
-
     targets: Sequence[Target]
 
 
@@ -73,6 +76,9 @@ class ExportResult:
     digest: Digest
     # Run these commands as local processes after the digest is materialized.
     post_processing_cmds: tuple[PostProcessingCommand, ...]
+    # Set for the common special case of exporting a resolve, and names that resolve.
+    # Set to None for other export results.
+    resolve: str | None
 
     def __init__(
         self,
@@ -81,11 +87,13 @@ class ExportResult:
         *,
         digest: Digest = EMPTY_DIGEST,
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
+        resolve: str = None
     ):
         self.description = description
         self.reldir = reldir
         self.digest = digest
         self.post_processing_cmds = tuple(post_processing_cmds)
+        self.resolve = resolve
 
 
 class ExportResults(Collection[ExportResult]):
@@ -95,6 +103,18 @@ class ExportResults(Collection[ExportResult]):
 class ExportSubsystem(GoalSubsystem):
     name = "export"
     help = "Export Pants data for use in other tools, such as IDEs."
+
+    # NB: Only options that are relevant across many/most backends and languages
+    #  should be defined here.  Backend-specific options should be defined in that backend
+    #  as plugin options on this subsystem.
+
+    # Exporting resolves is a common use-case for `export`, often the primary one, so we
+    # add affordances for it at the core goal level.
+    resolve = StrListOption(
+        default=[],
+        help="Export the specified resolve(s). The export format is backend-specific, "
+             "e.g., Python resolves are exported as virtualenvs."
+    )
 
 
 class Export(Goal):
@@ -110,6 +130,7 @@ async def export(
     union_membership: UnionMembership,
     build_root: BuildRoot,
     dist_dir: DistDir,
+    export_subsys: ExportSubsystem,
 ) -> Export:
     request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
     requests = tuple(request_type(targets) for request_type in request_types)
@@ -127,6 +148,7 @@ async def export(
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)
     environment = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
+    resolves_exported = set()
     for result in flattened_results:
         result_dir = os.path.join(output_dir, result.reldir)
         digest_root = os.path.join(build_root.path, result_dir)
@@ -140,8 +162,23 @@ async def export(
             ipr = await Effect(InteractiveProcessResult, InteractiveProcess, ip)
             if ipr.exit_code:
                 raise ExportError(f"Failed to write {result.description} to {result_dir}")
-
+        if result.resolve:
+            resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
+
+    unexported_resolves = sorted((set(export_subsys.resolve) - resolves_exported))
+    if unexported_resolves:
+        all_known_user_resolve_names = await MultiGet(
+            Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+            for request in union_membership.get(KnownUserResolveNamesRequest)
+        )
+        all_valid_resolve_names=sorted([
+            *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
+            *(sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)),
+        ])
+        raise UnrecognizedResolveNamesError(unexported_resolves, all_valid_resolve_names,
+                                            description_of_origin="the option --export-resolve")
+
     return Export(exit_code=0)
 
 
