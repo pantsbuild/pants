@@ -99,7 +99,7 @@ async def package_deploy_jar(
     Constructs a deploy ("fat") JAR file by
     1. Resolving/compiling a Classpath for the `root_address` target,
     2. Creating a deploy jar with a valid ZIP index and deduplicated entries
-    3. Strip the jar from all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
+    3. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
     """
 
     if field_set.main_class.value is None:
