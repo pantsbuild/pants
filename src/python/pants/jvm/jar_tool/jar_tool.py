@@ -16,7 +16,6 @@ from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
-from pants.option.option_types import EnumOption
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -32,8 +31,8 @@ class JarDuplicateAction(Enum):
     THROW = "throw"
 
 
-class JarTool(JvmToolBase):
-    options_scope = "jar-tool"
+class _JarTool(JvmToolBase):
+    options_scope = "__jar-tool"
     help = "Pants' implementation of a JAR builder tool."
 
     default_version = "0.0.17"
@@ -42,20 +41,14 @@ class JarTool(JvmToolBase):
     default_lockfile_path = "src/python/pants/jvm/jar_tool/jar_tool.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    default_duplicate_action = EnumOption(
-        default=None,
-        enum_type=JarDuplicateAction,
-        help="Default action to take when finding duplicate entries.",
-    )
-
 
 class JarToolGenerateLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = JarTool.options_scope
+    resolve_name = _JarTool.options_scope
 
 
 @rule
 async def generate_jartool_lockfile_request(
-    _: JarToolGenerateLockfileSentinel, jar_tool: JarTool
+    _: JarToolGenerateLockfileSentinel, jar_tool: _JarTool
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(jar_tool)
 
@@ -124,7 +117,7 @@ _JAR_TOOL_MAIN_CLASS = "org.pantsbuild.tools.jar.Main"
 
 
 @rule
-async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarTool) -> Digest:
+async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: _JarTool) -> Digest:
     output_prefix = "__out"
     output_jarname = os.path.join(output_prefix, request.jar_name)
 
@@ -147,7 +140,6 @@ async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarT
         for fs_path, jar_path in request.file_mappings.items()
     )
 
-    default_action = request.default_action or jar_tool.default_duplicate_action
     tool_process = JvmProcess(
         jdk=jdk,
         argv=[
@@ -170,7 +162,11 @@ async def run_jar_tool(request: JarToolRequest, jdk: InternalJdk, jar_tool: JarT
                 else ()
             ),
             *((f"-files={file_mappings}",) if file_mappings else ()),
-            *((f"-default_action={default_action.value.upper()}",) if default_action else ()),
+            *(
+                (f"-default_action={request.default_action.value.upper()}",)
+                if request.default_action
+                else ()
+            ),
             *((f"-policies={policies}",) if policies else ()),
             *((f"-skip={','.join(request.skip)}",) if request.skip else ()),
             *(("-compress",) if request.compress else ()),
