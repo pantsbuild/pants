@@ -322,7 +322,10 @@ async def setup_pytest_for_target(
         ),
     )
 
-    add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
+    # Don't forget to keep "Customize Pytest command line options per target" section in
+    # docs/markdown/Python/python-goals/python-test-goal.md up to date when changing
+    # which flags are added to `pytest_args`.
+    pytest_args = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
     results_file_name = None
@@ -333,12 +336,11 @@ async def setup_pytest_for_target(
                 f"batch-of-{results_file_prefix}+{len(request.field_sets)-1}-files"
             )
         results_file_name = f"{results_file_prefix}.xml"
-        add_opts.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
+        pytest_args.extend(
+            (f"--junit-xml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
         output_files.append(results_file_name)
 
-    coverage_args = []
     if test_subsystem.use_coverage and not request.is_debug:
         pytest.validate_pytest_cov_included()
         output_files.append(".coverage")
@@ -353,14 +355,15 @@ async def setup_pytest_for_target(
             # materialized to the Process chroot.
             cov_args = [f"--cov={source_root}" for source_root in prepared_sources.source_roots]
 
-        coverage_args = [
-            "--cov-report=",  # Turn off output.
-            f"--cov-config={coverage_config.path}",
-            *cov_args,
-        ]
+        pytest_args.extend(
+            (
+                "--cov-report=",  # Turn off output.
+                f"--cov-config={coverage_config.path}",
+                *cov_args,
+            )
+        )
 
     extra_env = {
-        "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
@@ -402,7 +405,9 @@ async def setup_pytest_for_target(
                 *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
-                *coverage_args,
+                # N.B.: Now that we're using command-line options instead of the PYTEST_ADDOPTS
+                # environment variable, it's critical that `pytest_args` comes after `pytest.args`.
+                *pytest_args,
                 *field_set_source_files.files,
             ),
             extra_env=extra_env,
