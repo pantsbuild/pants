@@ -884,7 +884,7 @@ impl DigestTrie {
   ///
   /// Cannot follow a symlink above `self` (returns None).
   ///
-  /// An error will be returned if the given path attempts to traverse below a file entry or symlink.
+  /// An error will be returned if the given path attempts to traverse below a file entry.
   pub fn entry<'a>(&'a self, path: &Path) -> Result<Option<&'a Entry>, String> {
     self.entry_helper(self, path, 0)
   }
