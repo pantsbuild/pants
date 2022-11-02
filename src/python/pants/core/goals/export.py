@@ -92,7 +92,7 @@ class ExportResult:
         *,
         digest: Digest = EMPTY_DIGEST,
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
-        resolve: str = None,
+        resolve: str | None = None,
     ):
         self.description = description
         self.reldir = reldir
