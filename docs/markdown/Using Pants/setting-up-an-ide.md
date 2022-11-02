@@ -41,17 +41,17 @@ Assuming you are using the ["resolves" feature for Python lockfiles](doc:python-
 To use the `export` goal to create a virtualenv:
 
 ```
-❯ ./pants export --symlink-python-virtualenv --py-resolve=python-default
+❯ ./pants export --symlink-python-virtualenv --resolve=python-default
 Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
 ```
 
-You can specify the `--py-resolve` flag [multiple times](doc:options#list-values) to export multiple virtualenvs at once.
+You can specify the `--resolve` flag [multiple times](doc:options#list-values) to export multiple virtualenvs at once.
 
 The `--symlink-python-virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
 
 ### Tool virtualenvs
 
-`./pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on (you can run `/pants help tools` to get a list of the tools Pants uses). Use the tool name as the resolve name argument to the `--py-resolve` flag. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save.
+`./pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on (you can run `/pants help tools` to get a list of the tools Pants uses). Use the tool name as the resolve name argument to the `--resolve` flag. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save.
 
 
 Generated code
