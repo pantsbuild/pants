@@ -49,7 +49,7 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 >   fi
 > }
 >
-> nuke_if_too_big ~/.cache/pants/setup 256
+> nuke_if_too_big ~/.cache/pants/setup 512
 > nuke_if_too_big ~/.cache/pants/named_caches 1024
 > ```
 
