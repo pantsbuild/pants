@@ -363,9 +363,7 @@ async def export_virtualenvs(
 ) -> ExportResults:
     if export_subsys.options.resolve:
         if request.targets:
-            raise ExportError(
-                "If using the `--resolve` option, do not also provide target specs."
-            )
+            raise ExportError("If using the `--resolve` option, do not also provide target specs.")
         maybe_venvs = await MultiGet(
             Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
             for resolve in export_subsys.options.resolve

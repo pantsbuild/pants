@@ -9,8 +9,12 @@ from dataclasses import dataclass
 from typing import Iterable, Mapping, Sequence, cast
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError, KnownUserResolveNames, \
-    KnownUserResolveNamesRequest, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import (
+    GenerateToolLockfileSentinel,
+    KnownUserResolveNames,
+    KnownUserResolveNamesRequest,
+    UnrecognizedResolveNamesError,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
@@ -41,6 +45,7 @@ class ExportRequest:
 
     Subclass and install a member of this type to export data.
     """
+
     targets: Sequence[Target]
 
 
@@ -87,7 +92,7 @@ class ExportResult:
         *,
         digest: Digest = EMPTY_DIGEST,
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
-        resolve: str = None
+        resolve: str = None,
     ):
         self.description = description
         self.reldir = reldir
@@ -113,7 +118,7 @@ class ExportSubsystem(GoalSubsystem):
     resolve = StrListOption(
         default=[],
         help="Export the specified resolve(s). The export format is backend-specific, "
-             "e.g., Python resolves are exported as virtualenvs."
+        "e.g., Python resolves are exported as virtualenvs.",
     )
 
 
@@ -172,12 +177,20 @@ async def export(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
-        all_valid_resolve_names=sorted([
-            *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
-            *(sentinel.resolve_name for sentinel in union_membership.get(GenerateToolLockfileSentinel)),
-        ])
-        raise UnrecognizedResolveNamesError(unexported_resolves, all_valid_resolve_names,
-                                            description_of_origin="the option --export-resolve")
+        all_valid_resolve_names = sorted(
+            [
+                *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
+                *(
+                    sentinel.resolve_name
+                    for sentinel in union_membership.get(GenerateToolLockfileSentinel)
+                ),
+            ]
+        )
+        raise UnrecognizedResolveNamesError(
+            unexported_resolves,
+            all_valid_resolve_names,
+            description_of_origin="the option --export-resolve",
+        )
 
     return Export(exit_code=0)
 

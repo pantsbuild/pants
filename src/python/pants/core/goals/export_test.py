@@ -16,10 +16,11 @@ from pants.core.goals.export import (
     ExportRequest,
     ExportResult,
     ExportResults,
+    ExportSubsystem,
     PostProcessingCommand,
-    export, ExportSubsystem,
+    export,
 )
-from pants.core.goals.generate_lockfiles import KnownUserResolveNamesRequest, KnownUserResolveNames
+from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     EnvironmentField,
