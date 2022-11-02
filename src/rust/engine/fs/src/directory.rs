@@ -633,13 +633,12 @@ impl DigestTrie {
       let mut entry = entry;
       if let SymlinkBehavior::Oblivious = symlink_behavior {
         if let Entry::Symlink(s) = entry {
-          if link_depth >= MAX_LINK_DEPTH {
-            warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
-            return;
-          }
-
           link_depth += 1;
           if s.target == Component::CurDir.as_os_str() {
+            if link_depth >= MAX_LINK_DEPTH {
+              warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+              return;
+            }
             self.walk_helper(root, path.clone(), symlink_behavior, link_depth, f);
             return;
           }
