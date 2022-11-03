@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -26,15 +27,12 @@ from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
-from pants.jvm.target_types import DeployJarTarget, JarDuplicateRule, JvmArtifactTarget
 from pants.jvm.target_types import (
+    JVM_JAR_SHADING_RULE_TYPES,
     DeployJarTarget,
-    JarShadingKeepRule,
-    JarShadingRemoveRule,
-    JarShadingRenameRule,
+    JarDuplicateRule,
     JvmArtifactTarget,
 )
-from pants.jvm.target_types import JVM_JAR_SHADING_RULE_TYPES, DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -70,7 +68,7 @@ def rule_runner() -> RuleRunner:
         ],
         objects={
             JarDuplicateRule.alias: JarDuplicateRule,
-            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES}
+            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES},
         },
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -375,7 +373,8 @@ def test_deploy_jar_coursier_deps_duplicate_policy(rule_runner: RuleRunner) -> N
 
     _deploy_jar_test(rule_runner, "example_app_deploy_jar")
 
-@maybe_skip_jdk_test    
+
+@maybe_skip_jdk_test
 def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -391,7 +390,7 @@ def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
                         shading_rules=[
                             shading_rename(
                                 pattern="com.fasterxml.jackson.core.**",
-                                replacement="jackson.@1",
+                                replacement="jackson.core.@1",
                             )
                         ]
                     )
@@ -418,7 +417,9 @@ def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
         }
     )
 
-    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
+    _deploy_jar_test(
+        rule_runner, "example_app_deploy_jar", args=["--jarjar-misplaced-class-strategy=move"]
+    )
 
 
 @maybe_skip_jdk_test
@@ -475,7 +476,11 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
     assert process_result.stdout.decode() == "2000-01-01\n2000-01-01\n"
 
 
-def _deploy_jar_test(rule_runner: RuleRunner, target_name: str) -> None:
+def _deploy_jar_test(
+    rule_runner: RuleRunner, target_name: str, args: Iterable[str] | None = None
+) -> None:
+    rule_runner.set_options(args=(args or ()), env_inherit=PYTHON_BOOTSTRAP_ENV)
+
     tgt = rule_runner.get_target(Address("", target_name=target_name))
     jdk = rule_runner.request(InternalJdk, [])
     fat_jar = rule_runner.request(

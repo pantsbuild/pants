@@ -88,7 +88,7 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
     output_prefix = "__out"
     output_filename = os.path.join(output_prefix, request.path.name)
 
-    rule_config_content = "\n".join([rule.encode() for rule in request.rules])
+    rule_config_content = "\n".join([rule.encode() for rule in request.rules]) + "\n"
     logger.debug(f"Using JarJar rule file with following contents:\n{rule_config_content}")
 
     lockfile_request, conf_digest, output_digest = await MultiGet(

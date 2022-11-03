@@ -356,6 +356,9 @@ class JarShadingRule(ABC):
                 errors.append(f"`{name}` can not contain the character `{ch}`.")
         return set(errors)
 
+    def __repr__(self) -> str:
+        return super().__repr__()
+
 
 @dataclass(frozen=True)
 class JarShadingRenameRule(JarShadingRule):
@@ -384,7 +387,7 @@ class JarShadingRelocateRule(JarShadingRule):
     alias = "shading_relocate"
     help = softwrap(
         """
-        Relocates the classes under the given `package` under the new package name.
+        Relocates the classes under the given `package` into the new package name.
         The default target package is `__shaded_by_pants__` if none provided in
         the `into` parameter.
         """
@@ -569,7 +572,10 @@ class DeployJarDuplicatePolicyField(SequenceField[JarDuplicateRule]):
     expected_element_type = JarDuplicateRule
     expected_type_description = "a list of JAR duplicate rules"
 
-    default = (JarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),)
+    default = (
+        JarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),
+        JarDuplicateRule(pattern="^META-INF/LICENSE", action="skip"),
+    )
 
     @classmethod
     def compute_value(
@@ -718,6 +724,6 @@ def build_file_aliases():
     return BuildFileAliases(
         objects={
             JarDuplicateRule.alias: JarDuplicateRule,
-            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES}
+            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES},
         }
     )
