@@ -145,7 +145,7 @@ def pex_executable(rule_runner: RuleRunner) -> str:
         {
             "pex_exe/BUILD": dedent(
                 """\
-                python_requirement(name="req", requirements=["pex==2.1.66"])
+                python_requirement(name="req", requirements=["pex==2.1.112"])
                 pex_binary(dependencies=[":req"], script="pex")
                 """
             ),
