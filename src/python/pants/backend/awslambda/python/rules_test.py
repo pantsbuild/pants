@@ -95,7 +95,7 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
         {
             "pex_exe/BUILD": dedent(
                 """\
-                python_requirement(name="req", requirements=["pex==2.1.66"])
+                python_requirement(name="req", requirements=["pex==2.1.112"])
                 pex_binary(dependencies=[":req"], script="pex")
                 """
             ),
