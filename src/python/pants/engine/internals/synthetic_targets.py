@@ -56,13 +56,14 @@ import os.path
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence
 
+from pants.base.specs import AdditionalSpecPaths, AdditionalSpecPathsRequest
 from pants.engine.collection import Collection
 from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.mapper import AddressMap
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InvalidTargetException
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -242,5 +243,24 @@ async def all_synthetic_targets(union_membership: UnionMembership) -> AllSynthet
     )
 
 
+class AdditionalSyntheticTargetsSpecPathsRequest(AdditionalSpecPathsRequest):
+    pass
+
+
+@rule
+def get_additional_synthetic_targets_spec_paths(
+    request: AdditionalSyntheticTargetsSpecPathsRequest, all_synthetic: AllSyntheticAddressMaps
+) -> AdditionalSpecPaths:
+    """Return all known paths for synthetic targets loaded with SINGLE_REQUEST_FOR_ALL_TARGETS.
+
+    Plugins using REQUEST_TARGETS_PER_DIRECTORY are responsible for providing known paths as
+    required them selves.
+    """
+    return AdditionalSpecPaths.from_request(request, all_synthetic.address_maps)
+
+
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(AdditionalSpecPathsRequest, AdditionalSyntheticTargetsSpecPathsRequest),
+    )

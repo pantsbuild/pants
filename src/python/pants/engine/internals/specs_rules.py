@@ -12,6 +12,7 @@ from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.specs import (
+    AdditionalSpecPathsRequest,
     AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
@@ -129,6 +130,7 @@ async def addresses_from_raw_specs_without_file_owners(
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
     local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
@@ -155,8 +157,12 @@ async def addresses_from_raw_specs_without_file_owners(
         Get(Paths, PathGlobs, build_file_globs),
         Get(Paths, PathGlobs, validation_globs),
     )
-
-    dirnames = {os.path.dirname(f) for f in build_file_paths.files}
+    dirnames = set(
+        await AdditionalSpecPathsRequest._get_additional_spec_paths(
+            union_membership, specs.glob_specs()
+        )
+    )
+    dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     base_addresses = Addresses(
         itertools.chain.from_iterable(

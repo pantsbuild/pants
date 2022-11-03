@@ -3,14 +3,19 @@
 
 from __future__ import annotations
 
+import itertools
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, cast
+from typing import ClassVar, Iterable, Iterator, Protocol, TypeVar, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.engine.collection import Collection
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.rules import rule_helper
+from pants.engine.unions import UnionMembership, union
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.frozendict import FrozenDict
 
@@ -21,6 +26,11 @@ class Spec(ABC):
     @abstractmethod
     def __str__(self) -> str:
         """The normalized string representation of this spec."""
+
+
+class GlobSpecsProtocol(Protocol):
+    def matches_target_residence_dir(self, residence_dir: str) -> bool:
+        pass
 
 
 @dataclass(frozen=True)
@@ -528,3 +538,68 @@ class Specs:
         if len(specs_descriptions) == 2:
             return " and ".join(specs_descriptions) + " arguments"
         return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
+
+
+# -----------------------------------------------------------------------------------------------
+# Plugin API for injecting additional paths in addition to those found using BUILD file globs for
+# the current specs.
+# -----------------------------------------------------------------------------------------------
+
+T = TypeVar("T", bound="AdditionalSpecPathsRequest")
+
+
+@union
+@dataclass(frozen=True)
+class AdditionalSpecPathsRequest:
+    specs: tuple[GlobSpecsProtocol, ...]
+
+    @classmethod
+    def from_glob_specs(cls: type[T], glob_specs: Iterable[GlobSpecsProtocol]) -> T:
+        return cls(tuple(glob_specs))
+
+    @staticmethod
+    @rule_helper
+    async def _get_additional_spec_paths(
+        union_membership: UnionMembership, glob_specs: Iterable[GlobSpecsProtocol]
+    ) -> AdditionalSpecPaths:
+        specs = tuple(glob_specs)
+        return AdditionalSpecPaths.from_paths(
+            itertools.chain.from_iterable(
+                await MultiGet(
+                    Get(
+                        AdditionalSpecPaths,
+                        AdditionalSpecPathsRequest,
+                        request_type.from_glob_specs(specs),
+                    )
+                    for request_type in union_membership.get(AdditionalSpecPathsRequest)
+                )
+            )
+        )
+
+
+class AdditionalSpecPaths(Collection[str]):
+    """Request AddressFamily information for these paths in addition to those found using the BUILD
+    file glob patterns for current specs.
+
+    Synthetic Targets plugins using REQUEST_TARGETS_PER_DIRECTORY with targets in directories
+    without BUILD files must provide this information in order for their targets to be discoverable
+    and included in `AllTargets`.
+
+    Provide a rule that takes a union member of `AdditionalSpecPathsRequest` as input and returns a
+    `AdditionalSpecPaths`.
+    """
+
+    @staticmethod
+    def from_paths(paths: Iterable[str]) -> AdditionalSpecPaths:
+        return AdditionalSpecPaths(sorted(set(paths)))
+
+    @staticmethod
+    def from_request(
+        request: AdditionalSpecPathsRequest, paths: Iterable[str]
+    ) -> AdditionalSpecPaths:
+        return AdditionalSpecPaths.from_paths(
+            filter(
+                lambda path: any(spec.matches_target_residence_dir(path) for spec in request.specs),
+                paths,
+            )
+        )
