@@ -47,7 +47,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.target_types import (
-    JarShadingRule,
+    JvmShadingRule,
     JvmWarContentField,
     JvmWarDependenciesField,
     JvmWarDescriptorAddressField,
@@ -94,7 +94,7 @@ class RenderedWarContent:
 
 @rule_helper
 async def _apply_shading_rules_to_classpath(
-    classpath: Classpath, shading_rules: Iterable[JarShadingRule] | None
+    classpath: Classpath, shading_rules: Iterable[JvmShadingRule] | None
 ) -> Digest:
     input_digest = await Get(Digest, MergeDigests(classpath.digests()))
     if not shading_rules:

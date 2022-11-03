@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple, Type
+from typing import ClassVar, Iterable, Optional, Tuple, Type, final
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -326,7 +327,18 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
-class JarShadingRule(ABC):
+class JvmMainClassNameField(StringField):
+    alias = "main"
+    required = True
+    help = softwrap(
+        """
+        `.`-separated name of the JVM class containing the `main()` method to be called when
+        executing this JAR.
+        """
+    )
+
+
+class JvmShadingRule(ABC):
     """Base class for defining JAR shading rules as valid aliases in BUILD files.
 
     Subclasses need to provide with an `alias` and a `help` message. The `alias` represents
@@ -356,12 +368,15 @@ class JarShadingRule(ABC):
                 errors.append(f"`{name}` can not contain the character `{ch}`.")
         return set(errors)
 
+    @final
     def __repr__(self) -> str:
-        return super().__repr__()
+        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]
+        return f"{self.alias}({', '.join(fields)})"
 
 
-@dataclass(frozen=True)
-class JarShadingRenameRule(JarShadingRule):
+@final
+@dataclass(frozen=True, repr=False)
+class JvmShadingRenameRule(JvmShadingRule):
     alias = "shading_rename"
     help = "Renames all occurrences of the given `pattern` by the `replacement`."
 
@@ -374,16 +389,17 @@ class JarShadingRenameRule(JarShadingRule):
     def validate(self) -> set[str]:
         errors: list[str] = []
         errors.extend(
-            JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+            JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
         )
         errors.extend(
-            JarShadingRule._validate_field(self.replacement, name="replacement", invalid_chars="/")
+            JvmShadingRule._validate_field(self.replacement, name="replacement", invalid_chars="/")
         )
         return set(errors)
 
 
-@dataclass(frozen=True)
-class JarShadingRelocateRule(JarShadingRule):
+@final
+@dataclass(frozen=True, repr=False)
+class JvmShadingRelocateRule(JvmShadingRule):
     alias = "shading_relocate"
     help = softwrap(
         """
@@ -394,7 +410,7 @@ class JarShadingRelocateRule(JarShadingRule):
     )
 
     package: str
-    into: str | None
+    into: str | None = None
 
     def encode(self) -> str:
         if not self.into:
@@ -406,17 +422,18 @@ class JarShadingRelocateRule(JarShadingRule):
     def validate(self) -> set[str]:
         errors: list[str] = []
         errors.extend(
-            JarShadingRule._validate_field(self.package, name="package", invalid_chars="/*")
+            JvmShadingRule._validate_field(self.package, name="package", invalid_chars="/*")
         )
         if self.into:
             errors.extend(
-                JarShadingRule._validate_field(self.into, name="into", invalid_chars="/*")
+                JvmShadingRule._validate_field(self.into, name="into", invalid_chars="/*")
             )
         return set(errors)
 
 
-@dataclass(frozen=True)
-class JarShadingZapRule(JarShadingRule):
+@final
+@dataclass(frozen=True, repr=False)
+class JvmShadingZapRule(JvmShadingRule):
     alias = "shading_zap"
     help = "Removes from the final artifact the occurrences of the `pattern`."
 
@@ -426,11 +443,12 @@ class JarShadingZapRule(JarShadingRule):
         return f"zap {self.pattern}"
 
     def validate(self) -> set[str]:
-        return JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+        return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
-@dataclass(frozen=True)
-class JarShadingKeepRule(JarShadingRule):
+@final
+@dataclass(frozen=True, repr=False)
+class JvmShadingKeepRule(JvmShadingRule):
     alias = "shading_keep"
     help = softwrap(
         """
@@ -445,14 +463,14 @@ class JarShadingKeepRule(JarShadingRule):
         return f"keep {self.pattern}"
 
     def validate(self) -> set[str]:
-        return JarShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+        return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
-JVM_JAR_SHADING_RULE_TYPES: list[Type[JarShadingRule]] = [
-    JarShadingRelocateRule,
-    JarShadingRenameRule,
-    JarShadingZapRule,
-    JarShadingKeepRule,
+JVM_SHADING_RULE_TYPES: list[Type[JvmShadingRule]] = [
+    JvmShadingRelocateRule,
+    JvmShadingRenameRule,
+    JvmShadingZapRule,
+    JvmShadingKeepRule,
 ]
 
 
@@ -461,9 +479,9 @@ def _shading_rules_field_help(intro: str) -> str:
         f"""
         {intro}
 
-        There are {pluralize(len(JVM_JAR_SHADING_RULE_TYPES), "possible shading rule")} available,
+        There are {pluralize(len(JVM_SHADING_RULE_TYPES), "possible shading rule")} available,
         which are as follows:
-        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_JAR_SHADING_RULE_TYPES])}
+        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_SHADING_RULE_TYPES])}
 
         When defining shading rules, just add them in this field using the previously listed rule
         alias and passing along the required parameters.
@@ -471,7 +489,7 @@ def _shading_rules_field_help(intro: str) -> str:
     )
 
 
-def _shading_validate_rules(shading_rules: Iterable[JarShadingRule]) -> set[str]:
+def _shading_validate_rules(shading_rules: Iterable[JvmShadingRule]) -> set[str]:
     validation_errors = []
     for shading_rule in shading_rules:
         found_errors = shading_rule.validate()
@@ -488,16 +506,16 @@ def _shading_validate_rules(shading_rules: Iterable[JarShadingRule]) -> set[str]
     return set(validation_errors)
 
 
-class JvmShadingRulesField(SequenceField[JarShadingRule], metaclass=ABCMeta):
+class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
     alias = "shading_rules"
     required = False
-    expected_element_type = JarShadingRule
+    expected_element_type = JvmShadingRule
     expected_type_description = "an iterable of ShadingRule"
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[JarShadingRule]], address: Address
-    ) -> Optional[Tuple[JarShadingRule, ...]]:
+        cls, raw_value: Optional[Iterable[JvmShadingRule]], address: Address
+    ) -> Optional[Tuple[JvmShadingRule, ...]]:
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
@@ -515,8 +533,13 @@ class JvmShadingRulesField(SequenceField[JarShadingRule], metaclass=ABCMeta):
         return computed_value
 
 
+# -----------------------------------------------------------------------------------------------
+# `deploy_jar` target
+# -----------------------------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
-class JarDuplicateRule:
+class DeployJarDuplicateRule:
     alias: ClassVar[str] = "duplicate_rule"
     valid_actions: ClassVar[tuple[str, ...]] = ("skip", "replace", "concat", "concat_text", "throw")
 
@@ -524,13 +547,13 @@ class JarDuplicateRule:
     action: str
 
     def validate(self) -> str | None:
-        if self.action not in JarDuplicateRule.valid_actions:
+        if self.action not in DeployJarDuplicateRule.valid_actions:
             return softwrap(
                 f"""
                 Value '{self.action}' for `action` associated with pattern
                 '{self.pattern}' is not valid.
 
-                It must be one of {list(JarDuplicateRule.valid_actions)}.
+                It must be one of {list(DeployJarDuplicateRule.valid_actions)}.
                 """
             )
         return None
@@ -539,7 +562,7 @@ class JarDuplicateRule:
         return f"{self.alias}(pattern='{self.pattern}', action='{self.action}')"
 
 
-class DeployJarDuplicatePolicyField(SequenceField[JarDuplicateRule]):
+class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
     alias = "duplicate_policy"
     help = softwrap(
         f"""
@@ -562,25 +585,25 @@ class DeployJarDuplicatePolicyField(SequenceField[JarDuplicateRule]):
         Where:
 
         * The `pattern` field is treated as a regular expression
-        * The `action` field must be one of {list(JarDuplicateRule.valid_actions)}.
+        * The `action` field must be one of {list(DeployJarDuplicateRule.valid_actions)}.
 
         Note that the order in which the rules are listed is relevant.
         """
     )
     required = False
 
-    expected_element_type = JarDuplicateRule
+    expected_element_type = DeployJarDuplicateRule
     expected_type_description = "a list of JAR duplicate rules"
 
     default = (
-        JarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),
-        JarDuplicateRule(pattern="^META-INF/LICENSE", action="skip"),
+        DeployJarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),
+        DeployJarDuplicateRule(pattern="^META-INF/LICENSE", action="skip"),
     )
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[JarDuplicateRule]], address: Address
-    ) -> Optional[Tuple[JarDuplicateRule, ...]]:
+        cls, raw_value: Optional[Iterable[DeployJarDuplicateRule]], address: Address
+    ) -> Optional[Tuple[DeployJarDuplicateRule, ...]]:
         value = super().compute_value(raw_value, address)
         if value:
             errors = []
@@ -602,21 +625,10 @@ class DeployJarDuplicatePolicyField(SequenceField[JarDuplicateRule]):
                 )
         return value
 
-    def value_or_default(self) -> tuple[JarDuplicateRule, ...]:
+    def value_or_default(self) -> tuple[DeployJarDuplicateRule, ...]:
         if self.value is not None:
             return self.value
         return self.default
-
-
-class JvmMainClassNameField(StringField):
-    alias = "main"
-    required = True
-    help = softwrap(
-        """
-        `.`-separated name of the JVM class containing the `main()` method to be called when
-        executing this JAR.
-        """
-    )
 
 
 class DeployJarShadingRulesField(JvmShadingRulesField):
@@ -627,13 +639,13 @@ class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JvmDependenciesField,
+        RestartableField,
         OutputPathField,
+        JvmDependenciesField,
         JvmMainClassNameField,
         JvmJdkField,
         JvmResolveField,
         DeployJarDuplicatePolicyField,
-        RestartableField,
         DeployJarShadingRulesField,
     )
     help = softwrap(
@@ -723,7 +735,7 @@ def rules():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
-            JarDuplicateRule.alias: JarDuplicateRule,
-            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES},
+            DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
+            **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
         }
     )

@@ -26,7 +26,7 @@ from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.shading import jarjar
 from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
-from pants.jvm.target_types import JarShadingRule, _shading_validate_rules
+from pants.jvm.target_types import JvmShadingRule, _shading_validate_rules
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class ShadeJarRequest(EngineAwareParameter):
     path: PurePath
     digest: Digest
-    rules: tuple[JarShadingRule, ...]
+    rules: tuple[JvmShadingRule, ...]
 
     # JarJar configuration options
     skip_manifest: bool
@@ -50,7 +50,7 @@ class ShadeJarRequest(EngineAwareParameter):
         *,
         path: str | PurePath,
         digest: Digest,
-        rules: Iterable[JarShadingRule] | None = None,
+        rules: Iterable[JvmShadingRule] | None = None,
         skip_manifest: bool = False,
         misplaced_class_strategy: MisplacedClassStrategy | None = None,
         verbose: bool = False,

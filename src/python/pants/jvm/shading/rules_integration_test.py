@@ -30,10 +30,10 @@ from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import (
-    JarShadingRelocateRule,
-    JarShadingRenameRule,
     JvmArtifactFieldSet,
     JvmArtifactTarget,
+    JvmShadingRelocateRule,
+    JvmShadingRenameRule,
 )
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as jvm_util_rules
@@ -150,7 +150,7 @@ def test_shade_commons_lang(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
                 path=commons_lang_classpath.filenames[0],
                 digest=commons_lang_classpath.digest,
                 rules=[
-                    JarShadingRelocateRule(
+                    JvmShadingRelocateRule(
                         package="org.apache.commons.lang", into="legacy.commons_lang"
                     )
                 ],
@@ -201,7 +201,7 @@ def test_restore_input_path(rule_runner: RuleRunner, jarjar_lockfile: JVMLockfil
                 path=input_path,
                 digest=input_digest,
                 rules=[
-                    JarShadingRenameRule(
+                    JvmShadingRenameRule(
                         pattern="org.apache.commons.lang.**", replacement="legacy.commons_lang.@1"
                     )
                 ],

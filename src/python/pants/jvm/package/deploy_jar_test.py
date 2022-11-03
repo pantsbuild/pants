@@ -28,9 +28,9 @@ from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import (
-    JVM_JAR_SHADING_RULE_TYPES,
+    JVM_SHADING_RULE_TYPES,
+    DeployJarDuplicateRule,
     DeployJarTarget,
-    JarDuplicateRule,
     JvmArtifactTarget,
 )
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -67,8 +67,8 @@ def rule_runner() -> RuleRunner:
             DeployJarTarget,
         ],
         objects={
-            JarDuplicateRule.alias: JarDuplicateRule,
-            **{rule.alias: rule for rule in JVM_JAR_SHADING_RULE_TYPES},
+            DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
+            **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
         },
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
