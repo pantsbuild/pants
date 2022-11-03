@@ -68,7 +68,9 @@ async def generate_from_pipenv_requirements(
     return GeneratedTargets(request.generator, result)
 
 
-def parse_pipenv_requirements(file_contents: bytes, file_path: str) -> tuple[PipRequirement, ...]:
+def parse_pipenv_requirements(
+    file_contents: bytes, file_path: str = ""
+) -> tuple[PipRequirement, ...]:
     lock_info = json.loads(file_contents)
 
     def _parse_pipenv_requirement(raw_req: str, info: dict) -> PipRequirement:
