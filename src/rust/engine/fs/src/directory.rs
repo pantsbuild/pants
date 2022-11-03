@@ -906,13 +906,17 @@ impl DigestTrie {
       if component == Component::CurDir {
         // NB: This only happens if "." is the first component in a path.
         continue;
-      } else if let Some(Entry::File(_)) = current_entry {
+      }
+
+      if let Some(Entry::File(_)) = current_entry {
         return Err(format!(
           "{tree_digest:?} cannot contain a path at {requested_path:?}, \
           because a file was encountered at {path_so_far:?}.",
           tree_digest = self.compute_root_digest()
         ));
-      } else if let Some(Entry::Directory(d)) = current_entry {
+      }
+
+      if let Some(Entry::Directory(d)) = current_entry {
         tree = &d.tree;
       }
 
@@ -920,7 +924,7 @@ impl DigestTrie {
       logical_path.push(component);
       if component == Component::ParentDir {
         if let Some(grandparent) = logical_path.parent().unwrap().parent() {
-          let full_path = grandparent.join(components.as_path()).to_path_buf();
+          let full_path = grandparent.join(components.as_path());
           return root.entry_helper(root, &full_path, link_depth);
         }
         return Ok(None);
@@ -952,8 +956,7 @@ impl DigestTrie {
           .parent()
           .unwrap()
           .join(&s.target)
-          .join(components.as_path())
-          .to_path_buf();
+          .join(components.as_path());
         return root.entry_helper(root, &full_path, link_depth + 1);
       }
 
