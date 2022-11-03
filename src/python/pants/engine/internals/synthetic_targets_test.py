@@ -9,15 +9,17 @@ from typing import DefaultDict
 
 import pytest
 
+from pants.base.specs import RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.core.target_types import FileTarget, GenericTarget
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.specs_rules_test import resolve_raw_specs_without_file_owners
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticTargetsRequest,
     rules,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import rule
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     DescriptionField,
     InvalidTargetException,
@@ -61,6 +63,10 @@ async def example_synthetic_targets(
                     tags=["synthetic", "tags"],
                 ),
             ),
+        ),
+        (
+            "src/synthetic/BUILD.synthetic",
+            (TargetAdaptor("target", "generic-synth", description="Additional target"),),
         ),
     ]
     return SyntheticAddressMaps.for_targets_request(request, targets)
@@ -112,6 +118,7 @@ def rule_runner() -> RuleRunner:
             example_synthetic_targets_per_directory,
             UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
             UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsPerDirectoryRequest),
+            QueryRule(Addresses, [RawSpecsWithoutFileOwners]),
         ],
         target_types=[GenericTarget, FileTarget],
     )
@@ -215,3 +222,14 @@ def test_extend_missing_synthetic_target(rule_runner: RuleRunner) -> None:
             WrappedTarget,
             [WrappedTargetRequest(Address("src/test", target_name="another"), "synth test")],
         )
+
+
+def test_additional_spec_path(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "",
+        }
+    )
+    assert Address(
+        "src/synthetic", target_name="generic-synth"
+    ) in resolve_raw_specs_without_file_owners(rule_runner, [RecursiveGlobSpec("src")])
