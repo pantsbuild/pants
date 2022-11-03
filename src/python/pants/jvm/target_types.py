@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple, Type, final
+from typing import ClassVar, Iterable, Optional, Tuple, Type
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -368,13 +368,11 @@ class JvmShadingRule(ABC):
                 errors.append(f"`{name}` can not contain the character `{ch}`.")
         return set(errors)
 
-    @final
     def __repr__(self) -> str:
         fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]
         return f"{self.alias}({', '.join(fields)})"
 
 
-@final
 @dataclass(frozen=True, repr=False)
 class JvmShadingRenameRule(JvmShadingRule):
     alias = "shading_rename"
@@ -397,7 +395,6 @@ class JvmShadingRenameRule(JvmShadingRule):
         return set(errors)
 
 
-@final
 @dataclass(frozen=True, repr=False)
 class JvmShadingRelocateRule(JvmShadingRule):
     alias = "shading_relocate"
@@ -431,7 +428,6 @@ class JvmShadingRelocateRule(JvmShadingRule):
         return set(errors)
 
 
-@final
 @dataclass(frozen=True, repr=False)
 class JvmShadingZapRule(JvmShadingRule):
     alias = "shading_zap"
@@ -446,7 +442,6 @@ class JvmShadingZapRule(JvmShadingRule):
         return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
-@final
 @dataclass(frozen=True, repr=False)
 class JvmShadingKeepRule(JvmShadingRule):
     alias = "shading_keep"
