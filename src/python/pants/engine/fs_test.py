@@ -47,7 +47,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -543,13 +543,12 @@ def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
                     SymlinkEntry("a/self", "."),
                 ]
             ),
-            tuple(f"a/{'self/' * count}file.txt" for count in range(65)),
+            tuple(f"a/{'self/' * count}file.txt" for count in range(64)),
             ("a",),
             id="self-dir",
         ),
     ],
 )
-@logging
 def test_snapshot_and_contents_are_symlink_oblivious(
     rule_runner: RuleRunner,
     create_digest: CreateDigest,
