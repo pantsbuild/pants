@@ -63,8 +63,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 
 
 class ScalatestTestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = Scalatest  # type: ignore[assignment]
+    tool_subsystem = Scalatest
     field_set_type = ScalatestTestFieldSet
 
 

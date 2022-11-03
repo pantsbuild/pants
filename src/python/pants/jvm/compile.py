@@ -123,7 +123,7 @@ class ClasspathEntryRequestFactory:
         if len(compatible) == 1:
             if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
-                    "The following targets had dependees, but can only be used as roots in a "
+                    "The following targets had dependents, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
                 )
             return compatible[0](component, resolve, None)

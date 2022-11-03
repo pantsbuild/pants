@@ -242,11 +242,11 @@ def setup_coverage_lockfile(
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
-    address: Address
+    addresses: tuple[Address, ...]
     digest: Digest
 
 
-class PytestCoverageDataCollection(CoverageDataCollection):
+class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
@@ -381,18 +381,20 @@ async def merge_coverage_data(
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
         coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
+        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
-    addresses = []
+    addresses: list[Address] = []
     for data in data_collection:
+        path_prefix = data.addresses[0].path_safe_spec
+        if len(data.addresses) > 1:
+            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(
-            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        )
-        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
-        addresses.append(data.address)
+        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_data_file_paths.append(f"{path_prefix}/.coverage")
+        addresses.extend(data.addresses)
 
     if coverage.global_report:
         # It's important to set the `branch` value in the empty base report to the value it will

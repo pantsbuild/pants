@@ -50,6 +50,7 @@ class RunTracker:
             "check",
             "count-loc",
             "dependees",
+            "dependents",
             "dependencies",
             "export-codegen",
             "filedeps",

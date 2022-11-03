@@ -106,8 +106,7 @@ class GoTestFieldSet(TestFieldSet):
 
 
 class GoTestRequest(TestRequest):
-    # TODO: Remove the type-ignore after adding a `skip` option to the subsystem.
-    tool_subsystem = GoTestSubsystem  # type: ignore[assignment]
+    tool_subsystem = GoTestSubsystem
     field_set_type = GoTestFieldSet
 
 

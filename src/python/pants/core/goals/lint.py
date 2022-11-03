@@ -19,6 +19,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
@@ -76,9 +77,7 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.partition_metadata.description
-            if request.partition_metadata
-            else None,
+            partition_description=request.partition_metadata.description,
             report=report,
         )
 
@@ -267,7 +266,7 @@ class LintSubsystem(GoalSubsystem):
 
 class Lint(Goal):
     subsystem_cls = LintSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 def _print_results(
@@ -364,6 +363,8 @@ async def _get_partitions_by_request_type(
     _get_specs_paths = Get(SpecsPaths, Specs, specs if file_partitioners else Specs.empty())
 
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+
+    await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
     def partition_request_get(request_type: type[LintRequest]) -> Get[Partitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")

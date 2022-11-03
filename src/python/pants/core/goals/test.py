@@ -18,10 +18,9 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
-    EnvironmentNameRequest,
+    SingleEnvironmentNameRequest,
 )
 from pants.core.util_rules.partitions import (
-    PartitionElementT,
     PartitionerType,
     PartitionMetadataT,
     Partitions,
@@ -118,9 +117,7 @@ class TestResult(EngineAwareReturnType):
             addresses=tuple(field_set.address for field_set in batch.elements),
             output_setting=output_setting,
             result_metadata=None,
-            partition_description=(
-                batch.partition_metadata.description if batch.partition_metadata else None
-            ),
+            partition_description=batch.partition_metadata.description,
         )
 
     @staticmethod
@@ -169,9 +166,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
-            partition_description=(
-                batch.partition_metadata.description if batch.partition_metadata else None
-            ),
+            partition_description=batch.partition_metadata.description,
         )
 
     @property
@@ -315,12 +310,13 @@ class TestRequest:
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class PartitionRequest(_PartitionFieldSetsRequestBase[_TestFieldSetT]):
-        pass
+        def metadata(self) -> dict[str, Any]:
+            return {"addresses": [field_set.address.spec for field_set in self.field_sets]}
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
+    class Batch(_BatchBase[_TestFieldSetT, PartitionMetadataT]):
         @property
-        def single_element(self) -> PartitionElementT:
+        def single_element(self) -> _TestFieldSetT:
             """Return the single element of this batch.
 
             NOTE: Accessing this property will raise a `TypeError` if this `Batch` contains
@@ -330,13 +326,31 @@ class TestRequest:
 
             if len(self.elements) != 1:
                 description = ""
-                if self.partition_metadata:
+                if self.partition_metadata.description:
                     description = f" from partition '{self.partition_metadata.description}'"
                 raise TypeError(
                     f"Expected a single element in batch{description}, but found {len(self.elements)}"
                 )
 
             return self.elements[0]
+
+        @property
+        def description(self) -> str:
+            if self.partition_metadata and self.partition_metadata.description:
+                return f"test batch from partition '{self.partition_metadata.description}'"
+            return "test batch"
+
+        def debug_hint(self) -> str:
+            if len(self.elements) == 1:
+                return self.elements[0].address.spec
+
+            return f"{self.elements[0].address.spec} and {len(self.elements)-1} other files"
+
+        def metadata(self) -> dict[str, Any]:
+            return {
+                "addresses": [field_set.address.spec for field_set in self.elements],
+                "partition_description": self.partition_metadata.description,
+            }
 
     @classmethod
     def rules(cls) -> Iterable:
@@ -565,6 +579,36 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    batch_size = IntOption(
+        "--batch-size",
+        default=128,
+        advanced=True,
+        help=softwrap(
+            """
+            The target maximum number of files to be included in each run of batch-enabled
+            test runners.
+
+            Some test runners can execute tests from multiple files in a single run. Test
+            implementations will return all tests that _can_ run together as a single group -
+            and then this may be further divided into smaller batches, based on this option.
+            This is done:
+
+                1. to avoid OS argument length limits (in processes which don't support argument files)
+                2. to support more stable cache keys than would be possible if all files were operated \
+                    on in a single batch
+                3. to allow for parallelism in test runners which don't have internal \
+                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                    behavior when multiple processes are competing for cores and so internal parallelism \
+                    cannot be used perfectly
+
+            In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
+            and so this value is only a "target" max batch size (rather than an exact value).
+
+            NOTE: This parameter has no effect on test runners/plugins that do not implement support
+            for batched testing.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -630,6 +674,7 @@ async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
     local_environment_name: ChosenLocalEnvironmentName,
+    test_subsystem: TestSubsystem,
 ) -> list[TestRequest.Batch]:
     def partitions_get(request_type: type[TestRequest]) -> Get[Partitions]:
         partition_type = cast(TestRequest, request_type)
@@ -659,11 +704,10 @@ async def _get_test_batches(
         for request_type, partitions in zip(core_request_types, all_partitions)
         for partition in partitions
         for batch in partition_sequentially(
-            # TODO: Expose max batch size as a subsystem parameter.
             partition.elements,
             key=lambda x: str(x),
-            size_target=128,
-            size_max=128,
+            size_target=test_subsystem.batch_size,
+            size_max=2 * test_subsystem.batch_size,
         )
     ]
 
@@ -715,29 +759,6 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
-@rule(desc="Determine environment for partition", level=LogLevel.DEBUG)
-async def get_batch_environment(batch: TestRequest.Batch) -> EnvironmentName:
-    environment_names_per_element = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
-        for field_set in batch.elements
-    )
-    unique_environments = len({name.val for name in environment_names_per_element})
-    if unique_environments != 1:
-        batch_description = "Test batch"
-        if batch.partition_metadata:
-            batch_description = f"{batch_description} '{batch.partition_metadata.description}'"
-
-        raise AssertionError(
-            # TODO: Print conflicting field sets in env.
-            f"{batch_description} contains elements from {unique_environments} environments; exactly 1 environment is expected"
-        )
-    return environment_names_per_element[0]
-
-
 @goal_rule
 async def run_tests(
     console: Console,
@@ -776,6 +797,7 @@ async def run_tests(
         request_types,
         targets_to_valid_field_sets,
         local_environment_name,
+        test_subsystem,
     )
 
     if test_subsystem.debug or test_subsystem.debug_adapter:
@@ -785,7 +807,9 @@ async def run_tests(
 
     environment_names = await MultiGet(
         Get(
-            EnvironmentName, {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName}
+            EnvironmentName,
+            SingleEnvironmentNameRequest,
+            SingleEnvironmentNameRequest.from_field_sets(batch.elements, batch.description),
         )
         for batch in test_batches
     )

@@ -85,7 +85,7 @@ The `RunRequest` will get converted into an `InteractiveProcess` that will run i
 
 The process will run in a temporary directory in the build root, which means that the script/program can access files that would normally need to be declared by adding a `files` or `resources` target to the `dependencies` field.
 
-The process's environment will not be hermetic, meaning that it will inherit the environment used by the `./pants process`. Any values you set in `extra_env` will add or update the specified environment variables.
+The process will not be hermetic, meaning that it will inherit the environment variables used by the `./pants` process. Any values you set in `extra_env` will add or update the specified environment variables.
 
 ```python
 from dataclasses import dataclass

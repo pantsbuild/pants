@@ -962,12 +962,19 @@ pub async fn digest(
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
   store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Digest {
   let EntireExecuteRequest {
     execute_request, ..
-  } = remote::make_execute_request(process, instance_name, process_cache_namespace, store)
-    .await
-    .unwrap();
+  } = remote::make_execute_request(
+    process,
+    instance_name,
+    process_cache_namespace,
+    store,
+    append_only_caches_base_path,
+  )
+  .await
+  .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

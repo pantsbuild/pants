@@ -43,7 +43,7 @@ Use the option `--keep-sandboxes=always` for Pants to log the paths to these san
 
 You can also pass `--keep-sandboxes=on_failure`, to preserve only the sandboxes of failing processes.
 
-There is even a `__run.sh` script in the directory that will run the process using the same argv and environment that Pants would use.
+There is even a `__run.sh` script in the directory that will run the process using the same argv and environment variables that Pants would use.
 
 Cache or pantsd invalidation issues
 -----------------------------------

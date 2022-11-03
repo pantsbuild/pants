@@ -433,7 +433,7 @@ class HelpPrinter(MaybeColor):
                 "union type": type_info.union_type,
                 "union members": "\n".join(type_info.union_members) if type_info.is_union else None,
                 "dependencies": "\n".join(type_info.dependencies) if show_advanced else None,
-                "dependees": "\n".join(type_info.dependees) if show_advanced else None,
+                "dependents": "\n".join(type_info.dependents) if show_advanced else None,
                 f"returned by {pluralize(len(type_info.returned_by_rules), 'rule')}": "\n".join(
                     type_info.returned_by_rules
                 )

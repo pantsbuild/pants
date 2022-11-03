@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Write};
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -40,13 +40,13 @@ use hashing::{Digest, Fingerprint};
 use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
 use task_executor::Executor;
 use workunit_store::{
-  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, WorkunitMetadata,
-  WorkunitStore,
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+  CacheName, Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -106,6 +106,7 @@ pub enum ExecutionError {
 pub struct CommandRunner {
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   store: Store,
   executor: Executor,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -167,6 +168,7 @@ impl CommandRunner {
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
+    append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
@@ -203,6 +205,7 @@ impl CommandRunner {
     let command_runner = CommandRunner {
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       execution_client,
       operations_client,
       store,
@@ -491,8 +494,10 @@ impl CommandRunner {
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
-            warn!("protocol violation: REv2 prohibits setting Operation::error");
-            return Err(ExecutionError::Fatal(format_error(&rpc_status).into()));
+            // Infrastructure error. Retry it.
+            let msg = format_error(&rpc_status);
+            debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+            return Err(ExecutionError::Retryable(msg));
           }
           None => {
             return Err(ExecutionError::Fatal(
@@ -816,6 +821,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let build_id = context.build_id.clone();
@@ -851,42 +860,43 @@ impl crate::CommandRunner for CommandRunner {
       // renders at the Process's level.
       request.level,
       desc = Some(request.description.clone()),
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
-        let result = tokio::time::timeout(deadline_duration, result_fut).await;
-        if result.is_err() {
-          workunit.update_metadata(|initial| {
-            let initial = initial.map(|(m, _)| m).unwrap_or_default();
-            Some((
-              WorkunitMetadata {
-                desc: Some(format!(
-                  "remote execution timed out after {:?}",
-                  deadline_duration
-                )),
-                ..initial
-              },
-              Level::Error,
-            ))
-          })
-        }
 
         // Detect whether the operation ran or hit the deadline timeout.
-        match result {
-          Ok(result) => {
-            if result.is_ok() {
-              workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
-            } else {
-              workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
-            }
-            result
+        match tokio::time::timeout(deadline_duration, result_fut).await {
+          Ok(Ok(result)) => {
+            workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            Ok(result)
           }
-          Err(_) => {
+          Ok(Err(err)) => {
+            workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            Err(err.enrich(&format!("For action {action_digest:?}")))
+          }
+          Err(tokio::time::error::Elapsed { .. }) => {
             // The Err in this match arm originates from the timeout future.
             debug!(
               "remote execution for build_id={} timed out after {:?}",
               &build_id, deadline_duration
             );
+            workunit.update_metadata(|initial| {
+              let initial = initial.map(|(m, _)| m).unwrap_or_default();
+              Some((
+                WorkunitMetadata {
+                  desc: Some(format!(
+                    "remote execution timed out after {:?}",
+                    deadline_duration
+                  )),
+                  ..initial
+                },
+                Level::Error,
+              ))
+            });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
             Err(format!("remote execution timed out after {:?}", deadline_duration).into())
           }
@@ -917,6 +927,62 @@ fn maybe_add_workunit(
   }
 }
 
+fn make_wrapper_for_append_only_caches(
+  caches: &BTreeMap<CacheName, RelativePath>,
+  base_path: &str,
+  working_directory: Option<&str>,
+) -> Result<String, String> {
+  let mut script = String::new();
+  writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+  // Setup the append-only caches.
+  for (cache_name, path) in caches {
+    writeln!(
+      &mut script,
+      "/bin/mkdir -p '{}/{}'",
+      base_path,
+      cache_name.name()
+    )
+    .map_err(|err| format!("write! failed: {err:?}"))?;
+    if let Some(parent) = path.parent() {
+      writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+        .map_err(|err| format!("write! failed: {err}"))?;
+    }
+    writeln!(
+      &mut script,
+      "/bin/ln -s '{}/{}' '{}'",
+      base_path,
+      cache_name.name(),
+      path.as_path().to_string_lossy()
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Change into any working directory.
+  //
+  // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
+  // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
+  // first.
+  if let Some(path) = working_directory {
+    writeln!(
+      &mut script,
+      concat!(
+        "cd '{0}'\n",
+        "if [ \"$?\" != 0 ]; then\n",
+        "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+        "  exit 1\n",
+        "fi\n",
+      ),
+      path
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Finally, execute the process.
+  writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+  Ok(script)
+}
+
 /// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
 /// a particular `Process`.
 #[derive(Clone, Debug, PartialEq)]
@@ -931,12 +997,47 @@ pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
-  _store: &Store,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
+  const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
+
+  // Implement append-only caches by running a wrapper script before the actual program
+  // to be invoked in the remote environment.
+  let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
+    (Some(base_path), caches) if !caches.is_empty() => {
+      let script = make_wrapper_for_append_only_caches(
+        caches,
+        base_path,
+        req.working_directory.as_ref().and_then(|p| p.to_str()),
+      )?;
+      let digest = store
+        .store_file_bytes(Bytes::from(script), false)
+        .await
+        .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+      let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
+      let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+      let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+      Some(directory_digest)
+    }
+    _ => None,
+  };
+
+  let arguments = match &wrapper_script_digest_opt {
+    Some(_) => {
+      let mut args = Vec::with_capacity(req.argv.len() + 1);
+      args.push(WRAPPER_SCRIPT.to_string());
+      args.extend(req.argv.iter().cloned());
+      args
+    }
+    None => req.argv.clone(),
+  };
+
   let mut command = remexec::Command {
-    arguments: req.argv.clone(),
+    arguments,
     ..remexec::Command::default()
   };
+
   for (name, value) in &req.env {
     if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
       || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
@@ -960,15 +1061,6 @@ pub async fn make_execute_request(
     ProcessExecutionStrategy::RemoteExecution(properties) => properties,
     _ => vec![],
   };
-
-  // TODO: Disabling append-only caches in remoting until server support exists due to
-  //       interaction with how servers match platform properties.
-  // if !req.append_only_caches.is_empty() {
-  //   platform_properties.extend(NamedCaches::platform_properties(
-  //     &req.append_only_caches,
-  //     &cache_key_gen_version,
-  //   ));
-  // }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     command
@@ -1034,10 +1126,14 @@ pub async fn make_execute_request(
   command.output_directories = output_directories;
 
   if let Some(working_directory) = &req.working_directory {
-    command.working_directory = working_directory
-      .to_str()
-      .map(str::to_owned)
-      .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    // Do not set `working_directory` if a wrapper script is in use because the wrapper script
+    // will change to the working directory itself.
+    if wrapper_script_digest_opt.is_none() {
+      command.working_directory = working_directory
+        .to_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    }
   }
 
   if req.jdk_home.is_some() {
@@ -1088,7 +1184,19 @@ pub async fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
-  let input_root_digest = req.input_digests.complete.clone();
+  let input_root_digest: DirectoryDigest = match &wrapper_script_digest_opt {
+    Some(wrapper_digest) => {
+      let digests = vec![
+        req.input_digests.complete.clone(),
+        wrapper_digest.to_owned(),
+      ];
+      store
+        .merge(digests)
+        .await
+        .map_err(|err| format!("store error: {err}"))?
+    }
+    None => req.input_digests.complete.clone(),
+  };
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
