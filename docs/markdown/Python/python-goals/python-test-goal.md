@@ -256,7 +256,7 @@ If you use multiple files with `test --debug`, they will run sequentially rather
 >
 > 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
 > 2. Run your test with `./pants test --debug-adapter`.
-> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
+> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adapter`. (They can also be configured using the `[debug-adapter]` subsystem).
 
 > Run your test with `./pants test --debug` as usual.
 
