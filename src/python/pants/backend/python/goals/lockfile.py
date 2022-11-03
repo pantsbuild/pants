@@ -287,7 +287,7 @@ async def python_lockfile_synthetic_targets(
     request: PythonSyntheticLockfileTargetsRequest,
     python_setup: PythonSetup,
 ) -> SyntheticAddressMaps:
-    if not (python_setup.enable_resolves and python_setup.enable_lockfile_targets):
+    if not python_setup.enable_synthetic_lockfiles:
         return SyntheticAddressMaps()
 
     resolves = [

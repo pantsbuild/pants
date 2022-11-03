@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os
 from typing import Callable, Iterable, cast
 
@@ -39,6 +40,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
 ParseRequirementsCallback = Callable[[bytes, str], Iterable[PipRequirement]]
 
 
@@ -76,20 +78,37 @@ async def _generate_requirements(
     resolve = request.template.get(
         PythonRequirementResolveField.alias, python_setup.default_resolve
     )
-    lockfile = python_setup.resolves.get(resolve) if python_setup.enable_resolves else None
+    lockfile = (
+        python_setup.resolves.get(resolve) if python_setup.enable_synthetic_lockfiles else None
+    )
     if lockfile:
+        lockfile_address = Address(
+            os.path.dirname(lockfile),
+            target_name=resolve,
+        )
         target_adaptor = await Get(
             TargetAdaptor,
             TargetAdaptorRequest(
                 description_of_origin=f"{generator.alias} lockfile dep for the {resolve} resolve",
-                address=Address(
-                    os.path.dirname(lockfile),
-                    target_name=resolve,
-                ),
+                address=lockfile_address,
             ),
         )
         if target_adaptor.type_alias == "_lockfiles":
             req_deps.append(f"{lockfile}:{resolve}")
+        else:
+            logger.warning(
+                softwrap(
+                    f"""
+                    The synthetic lockfile target for {lockfile} is being shadowed by the
+                    {target_adaptor.type_alias} target {lockfile_address}.
+
+                    There will not be any dependency to the lockfile.
+
+                    Resolve by either renaming the shadowing target, the resolve {resolve!r} or
+                    moving the target or the lockfile to another directory.
+                    """
+                )
+            )
 
     digest_contents = await Get(
         DigestContents,
