@@ -7,7 +7,9 @@ import itertools
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, Protocol, TypeVar, cast
+from typing import ClassVar, Iterable, Iterator, TypeVar, cast
+
+from typing_extensions import Protocol
 
 from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
