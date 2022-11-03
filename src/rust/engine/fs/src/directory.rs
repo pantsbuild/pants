@@ -915,11 +915,6 @@ impl DigestTrie {
         ));
       }
 
-      if link_depth >= MAX_LINK_DEPTH {
-        warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
-        return Ok(None);
-      }
-
       if let Some(Entry::Directory(d)) = current_entry {
         tree = &d.tree;
       }
@@ -947,6 +942,11 @@ impl DigestTrie {
       }
 
       if let Some(Entry::Symlink(s)) = maybe_matching_entry {
+        if link_depth >= MAX_LINK_DEPTH {
+          warn!("Exceeded the maximum link depth while traversing links. Stopping traversal.");
+          return Ok(None);
+        }
+
         if s.target.as_os_str() == Component::CurDir.as_os_str() {
           logical_path = logical_path.parent().unwrap().to_path_buf();
           continue;
