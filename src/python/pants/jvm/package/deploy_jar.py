@@ -102,8 +102,8 @@ async def package_deploy_jar(
     Constructs a deploy ("fat") JAR file by
     1. Resolving/compiling a Classpath for the `root_address` target,
     2. Creating a deploy jar with a valid ZIP index and deduplicated entries
-    3. (optionally) Apply shading rules to the bytecode inside the jar file
-    4. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
+    3. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
+    4. (optionally) Apply shading rules to the bytecode inside the jar file
     """
 
     if field_set.main_class.value is None:
@@ -137,7 +137,19 @@ async def package_deploy_jar(
     )
 
     #
-    # 3. Apply shading rules
+    # 3. Strip the JAR from  all non-reproducible metadata if requested so
+    #
+    if jvm.reproducible_jars:
+        jar_digest = await Get(
+            Digest,
+            StripJarRequest(
+                digest=jar_digest,
+                filenames=(output_filename.name,),
+            ),
+        )
+
+    #
+    # 4. Apply shading rules
     #
     if field_set.shading_rules.value:
         shaded_jar = await Get(
@@ -150,18 +162,6 @@ async def package_deploy_jar(
             ),
         )
         jar_digest = shaded_jar.digest
-
-    #
-    # 4. Strip the JAR from  all non-reproducible metadata if requested so
-    #
-    if jvm.reproducible_jars:
-        jar_digest = await Get(
-            Digest,
-            StripJarRequest(
-                digest=jar_digest,
-                filenames=(output_filename.name,),
-            ),
-        )
 
     prefixed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))

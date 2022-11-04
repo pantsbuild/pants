@@ -417,9 +417,7 @@ def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
         }
     )
 
-    _deploy_jar_test(
-        rule_runner, "example_app_deploy_jar", args=["--jarjar-misplaced-class-strategy=move"]
-    )
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar")
 
 
 @maybe_skip_jdk_test

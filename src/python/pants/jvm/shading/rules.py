@@ -41,9 +41,8 @@ class ShadeJarRequest(EngineAwareParameter):
     rules: tuple[JvmShadingRule, ...]
 
     # JarJar configuration options
-    skip_manifest: bool
+    skip_manifest: bool | None
     misplaced_class_strategy: MisplacedClassStrategy | None
-    verbose: bool
 
     def __init__(
         self,
@@ -51,16 +50,14 @@ class ShadeJarRequest(EngineAwareParameter):
         path: str | PurePath,
         digest: Digest,
         rules: Iterable[JvmShadingRule] | None = None,
-        skip_manifest: bool = False,
+        skip_manifest: bool | None = None,
         misplaced_class_strategy: MisplacedClassStrategy | None = None,
-        verbose: bool = False,
     ) -> None:
         self.path = path if isinstance(path, PurePath) else PurePath(path)
         self.digest = digest
         self.rules = tuple(rules or ())
         self.skip_manifest = skip_manifest
         self.misplaced_class_strategy = misplaced_class_strategy
-        self.verbose = verbose
 
         validation_errors = _shading_validate_rules(self.rules)
         if validation_errors:
@@ -119,9 +116,14 @@ async def shade_jar(request: ShadeJarRequest, jdk: InternalJdk, jarjar: JarJar) 
         conf_prefix: conf_digest,
     }
 
+    def should_skip_manifest() -> bool:
+        if request.skip_manifest is not None:
+            return request.skip_manifest
+        return jarjar.skip_manifest
+
     system_properties: dict[str, str] = {
-        "verbose": str(request.verbose or jarjar.verbose),
-        "skipManifest": str(request.skip_manifest or jarjar.skip_manifest),
+        "verbose": str(logger.isEnabledFor(LogLevel.DEBUG.level)).lower(),
+        "skipManifest": str(should_skip_manifest()).lower(),
     }
     misplaced_class_strategy = request.misplaced_class_strategy or jarjar.misplaced_class_strategy
     if misplaced_class_strategy:

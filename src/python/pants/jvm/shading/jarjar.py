@@ -32,7 +32,6 @@ class JarJar(JvmToolBase):
     default_lockfile_path = "src/python/pants/jvm/shading/jarjar.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    verbose = BoolOption(default=False, help="Run JarJar in verbose mode.")
     skip_manifest = BoolOption(default=False, help="Skip the processing of the JAR manifest.")
     misplaced_class_strategy = EnumOption(
         default=None,
