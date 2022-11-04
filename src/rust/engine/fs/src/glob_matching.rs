@@ -23,6 +23,9 @@ use crate::{
 
 static DOUBLE_STAR: &str = "**";
 
+static PARENT_DIR: &str = "..";
+static DOUBLE_STAR: &str = "**";
+
 lazy_static! {
   pub static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
   pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(DOUBLE_STAR).unwrap();
