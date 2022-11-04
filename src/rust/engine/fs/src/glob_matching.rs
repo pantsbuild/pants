@@ -20,11 +20,12 @@ use crate::{
   StrictGlobMatching, Vfs, MAX_LINK_DEPTH,
 };
 
+
+static DOUBLE_STAR: &str = "**";
+
 lazy_static! {
-  static ref PARENT_DIR: &'static str = "..";
   pub static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-  static ref DOUBLE_STAR: &'static str = "**";
-  pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
+  pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(DOUBLE_STAR).unwrap();
   static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
   static ref PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
     case_sensitive: true,
@@ -134,7 +135,7 @@ impl PathGlob {
       };
 
       // Ignore repeated doublestar instances.
-      let cur_is_doublestar = *DOUBLE_STAR == part;
+      let cur_is_doublestar = DOUBLE_STAR == part;
       if prev_was_doublestar && cur_is_doublestar {
         continue;
       }
@@ -178,7 +179,7 @@ impl PathGlob {
   ) -> Result<Vec<PathGlob>, String> {
     if parts.is_empty() {
       Ok(vec![])
-    } else if *DOUBLE_STAR == parts[0].as_str() {
+    } else if DOUBLE_STAR == parts[0].as_str() {
       if parts.len() == 1 {
         // Per https://git-scm.com/docs/gitignore:
         //  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files
@@ -223,7 +224,7 @@ impl PathGlob {
         )
       };
       Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
-    } else if *PARENT_DIR == parts[0].as_str() {
+    } else if parts[0].as_str() == Component::ParentDir.as_os_str().to_str().unwrap() {
       // A request for the parent of `canonical_dir`: since we've already expanded the directory
       // to make it canonical, we can safely drop it directly and recurse without this component.
       // The resulting symbolic path will continue to contain a literal `..`.
@@ -237,7 +238,7 @@ impl PathGlob {
           symbolic_path,
         ));
       }
-      symbolic_path_parent.push(Path::new(*PARENT_DIR));
+      symbolic_path_parent.push(Path::new(&Component::ParentDir));
       PathGlob::parse_globs(
         canonical_dir_parent,
         symbolic_path_parent,

@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from typing import Optional
+from dataclasses import dataclass
+from typing import ClassVar, Iterable, Optional, Tuple
 
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -22,6 +24,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
+    SequenceField,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -31,7 +34,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -322,6 +325,96 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class JarDuplicateRule:
+    alias: ClassVar[str] = "duplicate_rule"
+    valid_actions: ClassVar[tuple[str, ...]] = ("skip", "replace", "concat", "concat_text", "throw")
+
+    pattern: str
+    action: str
+
+    def validate(self) -> str | None:
+        if self.action not in JarDuplicateRule.valid_actions:
+            return softwrap(
+                f"""
+                Value '{self.action}' for `action` associated with pattern
+                '{self.pattern}' is not valid.
+
+                It must be one of {list(JarDuplicateRule.valid_actions)}.
+                """
+            )
+        return None
+
+    def __repr__(self) -> str:
+        return f"{self.alias}(pattern='{self.pattern}', action='{self.action}')"
+
+
+class DeployJarDuplicatePolicyField(SequenceField[JarDuplicateRule]):
+    alias = "duplicate_policy"
+    help = softwrap(
+        f"""
+        A list of the rules to apply when duplicate file entries are found in the final
+        assembled JAR file.
+
+        When defining a duplicate policy, just add `duplicate_rule` directives to this
+        field as follows:
+
+        Example:
+
+        ```
+        duplicate_policy=[
+            duplicate_rule(pattern="^META-INF/services", action="concat_text"),
+            duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
+            duplicate_rule(pattern="^org/apache/commons", action="throw"),
+        ]
+        ```
+
+        Where:
+
+        * The `pattern` field is treated as a regular expression
+        * The `action` field must be one of {list(JarDuplicateRule.valid_actions)}.
+
+        Note that the order in which the rules are listed is relevant.
+        """
+    )
+    required = False
+
+    expected_element_type = JarDuplicateRule
+    expected_type_description = "a list of JAR duplicate rules"
+
+    default = (JarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),)
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JarDuplicateRule]], address: Address
+    ) -> Optional[Tuple[JarDuplicateRule, ...]]:
+        value = super().compute_value(raw_value, address)
+        if value:
+            errors = []
+            for duplicate_rule in value:
+                err = duplicate_rule.validate()
+                if err:
+                    errors.append(err)
+
+            if errors:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field.
+                        Found following errors:
+
+                        {bullet_list(errors)}
+                        """
+                    )
+                )
+        return value
+
+    def value_or_default(self) -> tuple[JarDuplicateRule, ...]:
+        if self.value is not None:
+            return self.value
+        return self.default
+
+
 class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
@@ -342,6 +435,7 @@ class DeployJarTarget(Target):
         JvmMainClassNameField,
         JvmJdkField,
         JvmResolveField,
+        DeployJarDuplicatePolicyField,
         RestartableField,
     )
     help = softwrap(
@@ -419,3 +513,7 @@ def rules():
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
     ]
+
+
+def build_file_aliases():
+    return BuildFileAliases(objects={JarDuplicateRule.alias: JarDuplicateRule})

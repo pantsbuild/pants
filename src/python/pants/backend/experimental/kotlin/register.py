@@ -16,10 +16,12 @@ from pants.core.util_rules import source_files, system_binaries
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import lockfile
+from pants.jvm.jar_tool import jar_tool
 from pants.jvm.package import deploy_jar, war
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
 from pants.jvm.test.junit import rules as jvm_junit_rules
 
 
@@ -56,8 +58,13 @@ def rules():
         *source_files.rules(),
         *strip_jar.rules(),
         *deploy_jar.rules(),
+        *jar_tool.rules(),
         *run_deploy_jar.rules(),
         *war.rules(),
         *jvm_junit_rules(),
         *kotlin_junit_rules(),
     ]
+
+
+def build_file_aliases():
+    return jvm_build_file_aliases()
