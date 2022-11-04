@@ -20,10 +20,6 @@ use crate::{
   StrictGlobMatching, Vfs, MAX_LINK_DEPTH,
 };
 
-
-static DOUBLE_STAR: &str = "**";
-
-static PARENT_DIR: &str = "..";
 static DOUBLE_STAR: &str = "**";
 
 lazy_static! {
