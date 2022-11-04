@@ -26,6 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 
 pub mod directory;
+#[cfg(test)]
+mod directory_tests;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -33,7 +35,8 @@ mod glob_matching_tests;
 mod posixfs_tests;
 
 pub use crate::directory::{
-  DigestTrie, DirectoryDigest, TypedPath, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
+  DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
+  EMPTY_DIRECTORY_DIGEST,
 };
 pub use crate::glob_matching::{
   FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
@@ -66,6 +69,15 @@ lazy_static! {
 const TARGET_NOFILE_LIMIT: u64 = 10000;
 
 const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
+
+/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
+///
+/// We use a slightly different limit because this is not exactly the same operation: we're
+/// walking recursively while matching globs, and so our link traversals might involve steps
+/// through non-link destinations.
+const MAX_LINK_DEPTH: u8 = 64;
+
+type LinkDepth = u8;
 
 /// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
 pub fn default_cache_path() -> PathBuf {
@@ -173,6 +185,10 @@ impl Stat {
       path,
       is_executable,
     })
+  }
+
+  pub fn link(path: PathBuf) -> Stat {
+    Stat::Link(Link(path))
   }
 }
 
@@ -349,12 +365,6 @@ impl GlobExpansionConjunction {
       _ => Err(format!("Unrecognized conjunction: {}.", spec)),
     }
   }
-}
-
-#[derive(Clone)]
-pub enum SymlinkBehavior {
-  Aware,
-  Oblivious,
 }
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, PartialEq, Hash)]
@@ -637,8 +647,25 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 #[async_trait]
 impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
-    // DigestTrie does not currently support Links.
-    Err(format!("{:?} does not exist within this Snapshot.", link))
+    let entry = self
+      .entry(&link.0)?
+      .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?;
+    let target = match entry {
+      directory::Entry::File(_) => {
+        return Err(format!(
+          "Path `{}` was a file rather than a symlink.",
+          link.0.display()
+        ))
+      }
+      directory::Entry::Symlink(s) => s.target(),
+      directory::Entry::Directory(_) => {
+        return Err(format!(
+          "Path `{}` was a directory rather than a symlink.",
+          link.0.display()
+        ))
+      }
+    };
+    Ok(target.to_path_buf())
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
@@ -658,6 +685,12 @@ impl Vfs<String> for DigestTrie {
             dir.0.display()
           ))
         }
+        directory::Entry::Symlink(_) => {
+          return Err(format!(
+            "Path `{}` was a symlink rather than a directory.",
+            dir.0.display()
+          ))
+        }
         directory::Entry::Directory(d) => d.clone(),
       }
     };
@@ -672,6 +705,7 @@ impl Vfs<String> for DigestTrie {
             path: dir.0.join(f.name().as_ref()),
             is_executable: f.is_executable(),
           }),
+          directory::Entry::Symlink(s) => Stat::Link(Link(dir.0.join(s.name().as_ref()))),
           directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
         })
         .collect(),
@@ -767,8 +801,15 @@ pub struct FileEntry {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub struct SymlinkEntry {
+  pub path: PathBuf,
+  pub target: PathBuf,
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum DigestEntry {
   File(FileEntry),
+  Symlink(SymlinkEntry),
   EmptyDirectory(PathBuf),
 }
 
@@ -776,6 +817,7 @@ impl DigestEntry {
   pub fn path(&self) -> &Path {
     match self {
       DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::Symlink(symlink_entry) => &symlink_entry.path,
       DigestEntry::EmptyDirectory(path) => path,
     }
   }

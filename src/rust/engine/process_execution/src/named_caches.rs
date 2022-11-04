@@ -24,6 +24,10 @@ impl CacheName {
       ))
     }
   }
+
+  pub fn name(&self) -> &str {
+    &self.0
+  }
 }
 
 #[derive(Clone)]

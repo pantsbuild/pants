@@ -41,6 +41,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
+    SymlinkEntry,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -402,7 +403,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -441,6 +442,125 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
             ),
         ]
     )
+
+
+def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    SymlinkEntry("a.ln", "a.txt"),
+                    SymlinkEntry("b.ln", "b.txt"),
+                    FileContent("a.txt", b"four\n"),
+                ]
+            )
+        ],
+    )
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            SymlinkEntry("a.ln", "a.txt"),
+            FileEntry(
+                "a.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+            SymlinkEntry("b.ln", "b.txt"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "create_digest, files, dirs",
+    [
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("symlink", "file.txt"),
+                    SymlinkEntry("relsymlink", "./file.txt"),
+                    SymlinkEntry("a/symlink", "../file.txt"),
+                    SymlinkEntry("a/b/symlink", "../../file.txt"),
+                ]
+            ),
+            ("a/b/symlink", "a/symlink", "file.txt", "relsymlink", "symlink"),
+            ("a", "a/b"),
+            id="simple",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry(
+                        "circular1", "./circular1"
+                    ),  # After so many traversals, we give up
+                    SymlinkEntry("circular2", "circular2"),  # After so many traversals, we give up
+                    SymlinkEntry("chain1", "chain2"),
+                    SymlinkEntry("chain2", "chain3"),
+                    SymlinkEntry("chain3", "chain1"),
+                    SymlinkEntry(
+                        "a/symlink", "file.txt"
+                    ),  # looks for a/file.txt, which doesn't exist
+                    SymlinkEntry("a/too-far.ln", "../../file.txt"),  # went too far up
+                    SymlinkEntry("a/parent", ".."),
+                    SymlinkEntry("too-far.ln", "../file.txt"),  # went too far up
+                    SymlinkEntry("absolute1.ln", str(Path(__file__).resolve())),  # absolute path
+                    SymlinkEntry("absolute2.ln", "/file.txt"),
+                ]
+            ),
+            ("file.txt",),
+            ("a",),
+            id="ignored",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("a/b/parent-file.ln", "../../file.txt"),
+                    SymlinkEntry("dirlink", "a"),
+                ]
+            ),
+            ("a/b/parent-file.ln", "dirlink/b/parent-file.ln", "file.txt"),
+            ("a", "a/b", "dirlink", "dirlink/b"),
+            id="parentdir-in-symlink-target",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("dirlink", "a"),
+                    SymlinkEntry("double-dirlink", "dirlink"),
+                ]
+            ),
+            ("a/file.txt", "dirlink/file.txt", "double-dirlink/file.txt"),
+            ("a", "dirlink", "double-dirlink"),
+            id="double-dirlink",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("a/self", "."),
+                ]
+            ),
+            tuple(f"a/{'self/' * count}file.txt" for count in range(64)),
+            ("a",),
+            id="self-dir",
+        ),
+    ],
+)
+def test_snapshot_and_contents_are_symlink_oblivious(
+    rule_runner: RuleRunner,
+    create_digest: CreateDigest,
+    files: tuple[str, ...],
+    dirs: tuple[str, ...],
+) -> None:
+    digest = rule_runner.request(Digest, [create_digest])
+    snapshot = rule_runner.request(Snapshot, [digest])
+    assert snapshot.files == files
+    assert snapshot.dirs == dirs
+    contents = rule_runner.request(DigestContents, [digest])
+    assert tuple(content.path for content in contents) == files
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:

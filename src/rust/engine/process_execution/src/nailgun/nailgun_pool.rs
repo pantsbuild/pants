@@ -112,14 +112,14 @@ impl NailgunPool {
       let mut processes = self.processes.lock().await;
 
       // Start by seeing whether there are any idle processes with a matching fingerprint.
-      if let Some((_idx, process)) = Self::find_usable(&mut *processes, &requested_fingerprint)? {
+      if let Some((_idx, process)) = Self::find_usable(&mut processes, &requested_fingerprint)? {
         return Ok(BorrowedNailgunProcess::new(process, permit));
       }
 
       // There wasn't a matching, valid, available process. We need to start one.
       if processes.len() >= self.size {
         // Find the oldest idle non-matching process and remove it.
-        let idx = Self::find_lru_idle(&mut *processes)?.ok_or_else(|| {
+        let idx = Self::find_lru_idle(&mut processes)?.ok_or_else(|| {
           // NB: We've acquired a semaphore permit, so this should be impossible.
           "No idle slots in nailgun pool.".to_owned()
         })?;
@@ -428,7 +428,7 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
   pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
-    let nailgun_req_digest = crate::digest(nailgun_req, None, None, store).await;
+    let nailgun_req_digest = crate::digest(nailgun_req, None, None, store, None).await;
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,

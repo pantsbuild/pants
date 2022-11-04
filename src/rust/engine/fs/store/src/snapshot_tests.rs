@@ -61,8 +61,8 @@ async fn snapshot_one_file() {
       80,
     )
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("roland")]);
-  assert_eq!(snapshot.tree.directories(), Vec::<PathBuf>::new());
+  assert_eq!(snapshot.files(), vec![PathBuf::from("roland")]);
+  assert_eq!(snapshot.directories(), Vec::<PathBuf>::new());
 }
 
 #[tokio::test]
@@ -88,8 +88,8 @@ async fn snapshot_recursive_directories() {
       78,
     )
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("cats/roland")]);
-  assert_eq!(snapshot.tree.directories(), vec![PathBuf::from("cats")]);
+  assert_eq!(snapshot.files(), vec![PathBuf::from("cats/roland")]);
+  assert_eq!(snapshot.directories(), vec![PathBuf::from("cats")]);
 }
 
 #[tokio::test]
@@ -162,9 +162,9 @@ async fn snapshot_recursive_directories_including_empty() {
       232,
     ),
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("cats/roland")]);
+  assert_eq!(snapshot.files(), vec![PathBuf::from("cats/roland")]);
   assert_eq!(
-    snapshot.tree.directories(),
+    snapshot.directories(),
     vec![
       PathBuf::from("cats"),
       PathBuf::from("dogs"),

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use fs::{directory, DigestTrie, RelativePath};
+use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -51,6 +51,7 @@ pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -79,6 +80,7 @@ impl CommandRunner {
     cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
     read_timeout: Duration,
+    append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -103,6 +105,7 @@ impl CommandRunner {
       inner,
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       executor,
       store,
       action_cache_client,
@@ -131,8 +134,15 @@ impl CommandRunner {
     directory_path: RelativePath,
   ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
     let sub_trie = match root_trie.entry(&directory_path)? {
-      Some(directory::Entry::Directory(d)) => d.tree(),
       None => return Ok(None),
+      Some(directory::Entry::Directory(d)) => d.tree(),
+      Some(directory::Entry::Symlink(_)) => {
+        return Err(format!(
+          "Declared output directory path {directory_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+          trie_digest = root_trie.compute_root_digest(),
+        ))
+      }
       Some(directory::Entry::File(_)) => {
         return Err(format!(
           "Declared output directory path {directory_path:?} in output \
@@ -144,8 +154,9 @@ impl CommandRunner {
 
     let tree = sub_trie.into();
     let mut file_digests = Vec::new();
-    sub_trie.walk(&mut |_, entry| match entry {
+    sub_trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
       directory::Entry::File(f) => file_digests.push(f.digest()),
+      directory::Entry::Symlink(_) => (),
       directory::Entry::Directory(_) => {}
     });
 
@@ -157,6 +168,7 @@ impl CommandRunner {
     file_path: &str,
   ) -> Result<Option<remexec::OutputFile>, String> {
     match root_trie.entry(&RelativePath::new(file_path)?)? {
+      None => Ok(None),
       Some(directory::Entry::File(f)) => {
         let output_file = remexec::OutputFile {
           digest: Some(f.digest().into()),
@@ -166,7 +178,11 @@ impl CommandRunner {
         };
         Ok(Some(output_file))
       }
-      None => Ok(None),
+      Some(directory::Entry::Symlink(_)) => Err(format!(
+        "Declared output file path {file_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+        trie_digest = root_trie.compute_root_digest(),
+      )),
       Some(directory::Entry::Directory(_)) => Err(format!(
         "Declared output file path {file_path:?} in output \
            digest {trie_digest:?} contained a directory instead.",
@@ -475,6 +491,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let failures_cached = request.cache_scope == ProcessCacheScope::Always;

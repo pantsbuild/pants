@@ -109,7 +109,7 @@ async fn main() {
 Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
               .arg(Arg::new("path").required(true).takes_value(true))
-              .arg(Arg::new("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
+              .arg(Arg::new("output-mode").long("output-mode").possible_values(["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
                 "Set to manipulate the way a report is displayed."
               )),
           ),
@@ -153,7 +153,7 @@ directory, relative to the root.",
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
             ))
-                .arg(Arg::new("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
+                .arg(Arg::new("output-mode").long("output-mode").possible_values(["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
                   "Set to manipulate the way a report is displayed."
                 )),
           )
@@ -167,7 +167,7 @@ to this directory.",
                   .long("output-format")
                   .takes_value(true)
                   .default_value("binary")
-                  .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
+                  .possible_values(["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
               )
               .arg(
                 Arg::new("child-dir")
