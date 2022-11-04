@@ -21,6 +21,11 @@ from pants.build_graph.address import (
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    BuildFileDependencyRulesParserState,
+    MaybeBuildFileDependencyRulesImplementation,
+)
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.synthetic_targets import (
@@ -28,11 +33,6 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.internals.visibility import (
-    BuildFileVisibility,
-    BuildFileVisibilityParserState,
-    MaybeBuildFileVisibilityImplementation,
-)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -164,7 +164,7 @@ async def parse_address_family(
     directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-    maybe_build_file_visibility_implementation: MaybeBuildFileVisibilityImplementation,
+    maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -187,8 +187,8 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
-    dependents_visibility: BuildFileVisibility | None = None
-    dependencies_visibility: BuildFileVisibility | None = None
+    dependents_rules: BuildFileDependencyRules | None = None
+    dependencies_rules: BuildFileDependencyRules | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await MultiGet(
@@ -199,25 +199,25 @@ async def parse_address_family(
             if maybe_parent.address_family is not None:
                 family = maybe_parent.address_family
                 defaults = family.defaults
-                dependents_visibility = family.dependents_visibility
-                dependencies_visibility = family.dependencies_visibility
+                dependents_rules = family.dependents_rules
+                dependencies_rules = family.dependencies_rules
                 break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
-    # Without a backend registering a BUILD file visibility implementation, the visibility checks
+    # Without a backend registering a BUILD file dependency implementation, the dependency checks
     # becomes no-ops.
-    build_file_visibility_class = (
-        maybe_build_file_visibility_implementation.build_file_visibility_class
+    build_file_dependency_rules_class = (
+        maybe_build_file_dependency_rules_implementation.build_file_dependency_rules_class
     )
-    dependents_visibility_parser_state = BuildFileVisibilityParserState(
-        dependents_visibility,
-        build_file_visibility_class=build_file_visibility_class,
+    dependents_rules_parser_state = BuildFileDependencyRulesParserState(
+        dependents_rules,
+        build_file_dependency_rules_class=build_file_dependency_rules_class,
     )
-    dependencies_visibility_parser_state = BuildFileVisibilityParserState(
-        dependencies_visibility,
-        build_file_visibility_class=build_file_visibility_class,
+    dependencies_rules_parser_state = BuildFileDependencyRulesParserState(
+        dependencies_rules,
+        build_file_dependency_rules_class=build_file_dependency_rules_class,
     )
     address_maps = [
         AddressMap.parse(
@@ -226,8 +226,8 @@ async def parse_address_family(
             parser,
             prelude_symbols,
             defaults_parser_state,
-            dependents_visibility_parser_state,
-            dependencies_visibility_parser_state,
+            dependents_rules_parser_state,
+            dependencies_rules_parser_state,
         )
         for fc in digest_contents
     ]
@@ -247,8 +247,8 @@ async def parse_address_family(
             directory.path,
             (*address_maps, *synthetic_address_maps),
             frozen_defaults,
-            dependents_visibility_parser_state.get_frozen_visibility(),
-            dependencies_visibility_parser_state.get_frozen_visibility(),
+            dependents_rules_parser_state.get_frozen_dependency_rules(),
+            dependencies_rules_parser_state.get_frozen_dependency_rules(),
         ),
     )
 
@@ -276,7 +276,7 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
 @rule
 async def find_target_adaptor(
     request: TargetAdaptorRequest,
-    maybe_build_file_visibility_implementation: MaybeBuildFileVisibilityImplementation,
+    maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
 ) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address = request.address
@@ -299,32 +299,29 @@ async def find_target_adaptor(
             namespace=address_family.namespace,
         )
 
-    # Visibility checks will only be applied on requests with an `address_of_origin`.
+    # DependencyRules checks will only be applied on requests with an `address_of_origin`.
     if not maybe_origin_family:
         return target_adaptor
 
-    build_file_visibility_class = (
-        maybe_build_file_visibility_implementation.build_file_visibility_class
+    build_file_dependency_rules_class = (
+        maybe_build_file_rules_implementation.build_file_dependency_rules_class
     )
-    if build_file_visibility_class is None:
+    if build_file_dependency_rules_class is None:
         return target_adaptor
 
     for origin_family in maybe_origin_family:
-        if (
-            address_family.dependents_visibility is None
-            or origin_family.dependencies_visibility is None
-        ):
+        if address_family.dependents_rules is None or origin_family.dependencies_rules is None:
             break
         origin_target = origin_family.get_target_adaptor(cast(Address, request.address_of_origin))
         if origin_target is None:
             break
-        action = build_file_visibility_class.check_visibility(
+        action = build_file_dependency_rules_class.check_dependency_rules(
             source_type=origin_target.type_alias,
             source_path=origin_family.namespace,
-            dependencies_visibility=origin_family.dependencies_visibility,
+            dependencies_rules=origin_family.dependencies_rules,
             target_type=target_adaptor.type_alias,
             target_path=address_family.namespace,
-            dependents_visibility=address_family.dependents_visibility,
+            dependents_rules=address_family.dependents_rules,
         )
         action.execute(description_of_origin=request.description_of_origin)
     return target_adaptor

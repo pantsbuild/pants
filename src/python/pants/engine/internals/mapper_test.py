@@ -12,6 +12,7 @@ from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
@@ -21,7 +22,6 @@ from pants.engine.internals.mapper import (
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _unrecognized_symbol_func
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.internals.visibility import BuildFileVisibilityParserState
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -44,8 +44,8 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         BuildFileDefaultsParserState.create(
             "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
         ),
-        dependents_visibility=BuildFileVisibilityParserState(None),
-        dependencies_visibility=BuildFileVisibilityParserState(None),
+        dependents_rules=BuildFileDependencyRulesParserState(None),
+        dependencies_rules=BuildFileDependencyRulesParserState(None),
     )
     assert path == address_map.path
     return address_map

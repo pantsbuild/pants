@@ -16,8 +16,11 @@ from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRulesParserState,
+    SetDependencyRulesT,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.internals.visibility import BuildFileVisibilityParserState, SetVisibilityT
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -39,8 +42,8 @@ class UnaddressableObjectError(MappingError):
 class ParseState(threading.local):
     def __init__(self):
         self._defaults: BuildFileDefaultsParserState | None = None
-        self._dependents_visibility: BuildFileVisibilityParserState | None = None
-        self._dependencies_visibility: BuildFileVisibilityParserState | None = None
+        self._dependents_rules: BuildFileDependencyRulesParserState | None = None
+        self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
         self._filepath: str | None = None
         self._target_adapters: list[TargetAdaptor] = []
 
@@ -48,12 +51,12 @@ class ParseState(threading.local):
         self,
         filepath: str,
         defaults: BuildFileDefaultsParserState,
-        dependents_visibility: BuildFileVisibilityParserState,
-        dependencies_visibility: BuildFileVisibilityParserState,
+        dependents_rules: BuildFileDependencyRulesParserState,
+        dependencies_rules: BuildFileDependencyRulesParserState,
     ) -> None:
         self._defaults = defaults
-        self._dependents_visibility = dependents_visibility
-        self._dependencies_visibility = dependencies_visibility
+        self._dependents_rules = dependents_rules
+        self._dependencies_rules = dependencies_rules
         self._filepath = filepath
         self._target_adapters.clear()
 
@@ -86,30 +89,30 @@ class ParseState(threading.local):
         self.defaults.set_defaults(*args, **kwargs)
 
     @property
-    def dependents_visibility(self) -> BuildFileVisibilityParserState:
-        if self._dependents_visibility is None:
+    def dependents_rules(self) -> BuildFileDependencyRulesParserState:
+        if self._dependents_rules is None:
             raise AssertionError(
-                "The BUILD file __dependents_visibility__ was accessed before being set. This indicates a "
+                "The BUILD file __dependents_rules__ was accessed before being set. This indicates a "
                 "programming error in Pants. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
-        return self._dependents_visibility
+        return self._dependents_rules
 
-    def set_dependents_visibility(self, *args: SetVisibilityT, **kwargs) -> None:
-        self.dependents_visibility.set_visibility(self.filepath(), *args, **kwargs)
+    def set_dependents_rules(self, *args: SetDependencyRulesT, **kwargs) -> None:
+        self.dependents_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
     @property
-    def dependencies_visibility(self) -> BuildFileVisibilityParserState:
-        if self._dependencies_visibility is None:
+    def dependencies_rules(self) -> BuildFileDependencyRulesParserState:
+        if self._dependencies_rules is None:
             raise AssertionError(
-                "The BUILD file __dependencies_visibility__ was accessed before being set. This indicates a "
+                "The BUILD file __dependencies_rules__ was accessed before being set. This indicates a "
                 "programming error in Pants. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
-        return self._dependencies_visibility
+        return self._dependencies_rules
 
-    def set_dependencies_visibility(self, *args: SetVisibilityT, **kwargs) -> None:
-        self.dependencies_visibility.set_visibility(self.filepath(), *args, **kwargs)
+    def set_dependencies_rules(self, *args: SetDependencyRulesT, **kwargs) -> None:
+        self.dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
 
 class Parser:
@@ -169,8 +172,8 @@ class Parser:
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.filepath()).parent,
             "__defaults__": parse_state.set_defaults,
-            "__dependents_visibility__": parse_state.set_dependents_visibility,
-            "__dependencies_visibility__": parse_state.set_dependencies_visibility,
+            "__dependents_rules__": parse_state.set_dependents_rules,
+            "__dependencies_rules__": parse_state.set_dependencies_rules,
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
@@ -192,14 +195,14 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
-        dependents_visibility: BuildFileVisibilityParserState,
-        dependencies_visibility: BuildFileVisibilityParserState,
+        dependents_rules: BuildFileDependencyRulesParserState,
+        dependencies_rules: BuildFileDependencyRulesParserState,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(
             filepath=filepath,
             defaults=defaults,
-            dependents_visibility=dependents_visibility,
-            dependencies_visibility=dependencies_visibility,
+            dependents_rules=dependents_rules,
+            dependencies_rules=dependencies_rules,
         )
 
         global_symbols = {**self._symbols, **extra_symbols.symbols}
@@ -214,8 +217,8 @@ class Parser:
                     self._parse_state.reset(
                         filepath=filepath,
                         defaults=defaults,
-                        dependents_visibility=dependents_visibility,
-                        dependencies_visibility=dependencies_visibility,
+                        dependents_rules=dependents_rules,
+                        dependencies_rules=dependencies_rules,
                     )
                     continue
                 break

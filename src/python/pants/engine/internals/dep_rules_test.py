@@ -12,14 +12,14 @@ import pytest
 from pants.backend.experimental.visibility.register import rules
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.internals.visibility import (
-    BuildFileVisibility,
-    BuildFileVisibilityParserState,
-    VisibilityAction,
-    VisibilityActionDeniedError,
-    VisibilityRule,
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    BuildFileDependencyRulesParserState,
+    DependencyRule,
+    DependencyRuleAction,
+    DependencyRuleActionDeniedError,
 )
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -32,16 +32,16 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_create_default_visibility() -> None:
-    visibility = BuildFileVisibility.create()
-    assert visibility.default.value == "allow"
-    assert visibility.all == ()
-    assert len(visibility.targets) == 0
+def test_create_default_dependency_rules() -> None:
+    dependency_rules = BuildFileDependencyRules.create()
+    assert dependency_rules.default.value == "allow"
+    assert dependency_rules.all == ()
+    assert len(dependency_rules.targets) == 0
 
 
 Scenario = namedtuple(
     "Scenario",
-    "args, kwargs, expected_visibility, expected_error, parent_visibility",
+    "args, kwargs, expected_dependency_rules, expected_error, parent_dependency_rules",
     defaults=((), {}, {}, None, {}),
 )
 
@@ -51,24 +51,24 @@ Scenario = namedtuple(
     [
         pytest.param(
             Scenario(
-                expected_visibility=BuildFileVisibility.create(),
+                expected_dependency_rules=BuildFileDependencyRules.create(),
             ),
-            id="default visibility",
+            id="default dependency rules",
         ),
         pytest.param(
             Scenario(
                 kwargs=dict(all=("src/a", "!src/b")),
-                expected_visibility=BuildFileVisibility.create(
+                expected_dependency_rules=BuildFileDependencyRules.create(
                     all=("src/a", "!src/b"),
                 ),
             ),
-            id="simple visibility rules for all",
+            id="simple dependency rules for all",
         ),
         pytest.param(
             Scenario(
                 args=({"foo": ["."], "bar": ["!."]},),
                 kwargs=dict(all=("src/a", "!src/b"), default="deny"),
-                expected_visibility=BuildFileVisibility.create(
+                expected_dependency_rules=BuildFileDependencyRules.create(
                     default="deny",
                     all=("src/a", "!src/b"),
                     targets={"foo": (".",), "bar": ("!.",)},
@@ -80,12 +80,12 @@ Scenario = namedtuple(
             Scenario(
                 args=({"foo": []},),
                 kwargs=dict(extend=True),
-                parent_visibility=BuildFileVisibility.create(
+                parent_dependency_rules=BuildFileDependencyRules.create(
                     default="warn",
                     all=("src/a", "!src/b"),
                     targets={"foo": (".",), "bar": ("!.",)},
                 ),
-                expected_visibility=BuildFileVisibility.create(
+                expected_dependency_rules=BuildFileDependencyRules.create(
                     default="warn",
                     all=("src/a", "!src/b"),
                     targets={"bar": ("!.",)},
@@ -95,13 +95,13 @@ Scenario = namedtuple(
         ),
     ],
 )
-def test_set_visibility(scenario: Scenario) -> None:
+def test_set_dependency_rules(scenario: Scenario) -> None:
     with (scenario.expected_error or no_exception()):
-        visibility = BuildFileVisibilityParserState(
-            scenario.parent_visibility or BuildFileVisibility.create(),
+        dependency_rules = BuildFileDependencyRulesParserState(
+            scenario.parent_dependency_rules or BuildFileDependencyRules.create(),
         )
-        visibility.set_visibility("src/BUILD", *scenario.args, **scenario.kwargs)
-        assert scenario.expected_visibility == visibility.get_frozen_visibility()
+        dependency_rules.set_dependency_rules("src/BUILD", *scenario.args, **scenario.kwargs)
+        assert scenario.expected_dependency_rules == dependency_rules.get_frozen_dependency_rules()
 
 
 @pytest.mark.parametrize(
@@ -124,8 +124,8 @@ def test_set_visibility(scenario: Scenario) -> None:
         (False, "./*", "src/a/b", "src/a/b/c"),
     ],
 )
-def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert VisibilityRule.parse(rule).match(path, relpath) == expected
+def test_dependency_rule_match(expected: bool, rule: str, path: str, relpath: str) -> None:
+    assert DependencyRule.parse(rule).match(path, relpath) == expected
 
 
 @pytest.mark.parametrize(
@@ -142,45 +142,47 @@ def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: st
         ("src/blocked/a", "tgt/blocked/b", "deny"),
     ],
 )
-def test_check_visibility(source_path: str, target_path: str, expected_action: str) -> None:
+def test_check_dependency_ruless(source_path: str, target_path: str, expected_action: str) -> None:
     # Source rules.
-    dependencies_visibility = BuildFileVisibility.create(
-        # Rules for outgoing visibility.
+    dependencies_rules = BuildFileDependencyRules.create(
+        # Rules for outgoing dependency.
         all=("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*"),
     )
     # Target rules.
-    dependents_visibility = BuildFileVisibility.create(
-        # Rules for incoming visibility.
+    dependents_rules = BuildFileDependencyRules.create(
+        # Rules for incoming dependency.
         all=("src/ok/*", "?src/dubious/*", "!src/blocked/*"),
     )
-    assert BuildFileVisibility.check_visibility(
+    assert BuildFileDependencyRules.check_dependency_rules(
         source_type="dependent_target",
         source_path=source_path,
-        dependencies_visibility=dependencies_visibility,
+        dependencies_rules=dependencies_rules,
         target_type="dependency_target",
         target_path=target_path,
-        dependents_visibility=dependents_visibility,
-    ) == VisibilityAction(expected_action)
+        dependents_rules=dependents_rules,
+    ) == DependencyRuleAction(expected_action)
 
 
-def test_visibility_action(caplog) -> None:
-    violation_msg = "Visibility violation for test"
+def test_dependency_rule_action(caplog) -> None:
+    violation_msg = "Dependency rule violation for test"
 
-    VisibilityAction("allow").execute(description_of_origin="test")
+    DependencyRuleAction("allow").execute(description_of_origin="test")
     assert_logged(caplog, expect_logged=None)
     caplog.clear()
 
-    VisibilityAction("warn").execute(description_of_origin="test")
+    DependencyRuleAction("warn").execute(description_of_origin="test")
     assert_logged(caplog, expect_logged=[(logging.WARNING, violation_msg)])
     caplog.clear()
 
-    with pytest.raises(VisibilityActionDeniedError, match=violation_msg):
-        VisibilityAction("deny").execute(description_of_origin="test")
+    with pytest.raises(DependencyRuleActionDeniedError, match=violation_msg):
+        DependencyRuleAction("deny").execute(description_of_origin="test")
     assert_logged(caplog, expect_logged=None)
 
 
 def denied():
-    return engine_error(VisibilityActionDeniedError, contains="Visibility violation for test")
+    return engine_error(
+        DependencyRuleActionDeniedError, contains="Dependency rule violation for test"
+    )
 
 
 @pytest.mark.parametrize(
@@ -198,14 +200,12 @@ def denied():
         (["src/a", "src/b", "src/c"], dict(default="deny"), denied()),
     ],
 )
-def test_dependents_visibility(
-    rule_runner: RuleRunner, rules: list[str], kwargs, expect_error
-) -> None:
+def test_dependents_rules(rule_runner: RuleRunner, rules: list[str], kwargs, expect_error) -> None:
     rule_runner.write_files(
         {
             "src/dependency/BUILD": dedent(
                 f"""\
-                __dependents_visibility__({{target:{rules}}}, **{kwargs})
+                __dependents_rules__({{target:{rules}}}, **{kwargs})
                 target()
                 """
             ),
@@ -240,7 +240,7 @@ def test_dependents_visibility(
         (["!src/*"], dict(default="allow"), denied()),
     ],
 )
-def test_dependencies_visibility(
+def test_dependencies_rules(
     rule_runner: RuleRunner, rules: list[str], kwargs, expect_error
 ) -> None:
     rule_runner.write_files(
@@ -248,7 +248,7 @@ def test_dependencies_visibility(
             "src/dependency/BUILD": "target()",
             "src/origin/BUILD": dedent(
                 f"""\
-                __dependencies_visibility__({{target:{rules}}}, **{kwargs})
+                __dependencies_rules__({{target:{rules}}}, **{kwargs})
                 target(dependencies=["src/dependency:tgt"])
                 """
             ),

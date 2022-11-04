@@ -1,12 +1,12 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.internals.visibility import (
-    BuildFileVisibility,
-    BuildFileVisibilityImplementation,
-    BuildFileVisibilityImplementationRequest,
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    BuildFileDependencyRulesImplementation,
+    BuildFileDependencyRulesImplementationRequest,
 )
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -17,7 +17,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 
 
-class DefaultBuildFileVisibilityImplementationRequest(BuildFileVisibilityImplementationRequest):
+class BuildFileVisibilityImplementationRequest(BuildFileDependencyRulesImplementationRequest):
     pass
 
 
@@ -30,10 +30,10 @@ class VisibilityValidateDependenciesRequest(ValidateDependenciesRequest):
 
 
 @rule
-def default_build_file_visibility_implementation(
-    _: DefaultBuildFileVisibilityImplementationRequest,
-) -> BuildFileVisibilityImplementation:
-    return BuildFileVisibilityImplementation(BuildFileVisibility)
+def build_file_visibility_implementation(
+    _: BuildFileVisibilityImplementationRequest,
+) -> BuildFileDependencyRulesImplementation:
+    return BuildFileDependencyRulesImplementation(BuildFileDependencyRules)
 
 
 @rule
@@ -61,8 +61,8 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(
+            BuildFileDependencyRulesImplementationRequest,
             BuildFileVisibilityImplementationRequest,
-            DefaultBuildFileVisibilityImplementationRequest,
         ),
         UnionRule(ValidateDependenciesRequest, VisibilityValidateDependenciesRequest),
     )

@@ -23,12 +23,12 @@ from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import (
     build_files,
+    dep_rules,
     graph,
     options_parsing,
     platform_rules,
     specs_rules,
     synthetic_targets,
-    visibility,
 )
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
@@ -269,6 +269,7 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
+                *dep_rules.rules(),
                 *desktop.rules(),
                 *git_rules(),
                 *graph.rules(),
@@ -282,7 +283,6 @@ class EngineInitializer:
                 *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
                 *synthetic_targets.rules(),
-                *visibility.rules(),
                 *rules,
             )
         )
