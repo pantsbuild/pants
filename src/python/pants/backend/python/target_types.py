@@ -625,6 +625,7 @@ class PexVenvSitePackagesCopies(BoolField):
 
 
 _PEX_BINARY_COMMON_FIELDS = (
+    EnvironmentField,
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
