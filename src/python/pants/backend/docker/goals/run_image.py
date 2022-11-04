@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import cast
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSourceField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
@@ -34,7 +34,7 @@ async def docker_image_run_request(
         WrappedTarget,
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
     )
-    build_request = DockerFieldSet.create(wrapped_target.target)
+    build_request = DockerPackageFieldSet.create(wrapped_target.target)
     registries = options.registries()
     for registry in registries.get(*(build_request.registries.value or [])):
         if registry.run_as_alias:

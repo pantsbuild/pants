@@ -64,7 +64,7 @@ class DockerImageOptionValueError(ValueError):
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet):
+class DockerPackageFieldSet(PackageFieldSet):
     required_fields = (DockerImageSourceField,)
 
     context_root: DockerImageContextRootField
@@ -206,7 +206,7 @@ class DockerFieldSet(PackageFieldSet):
 
 def get_build_options(
     context: DockerBuildContext,
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
     target: Target,
 ) -> Iterator[str]:
@@ -251,7 +251,7 @@ def get_build_options(
 
 @rule
 async def build_docker_image(
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
@@ -465,5 +465,5 @@ def format_docker_build_context_help_message(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, DockerFieldSet),
+        UnionRule(PackageFieldSet, DockerPackageFieldSet),
     ]
