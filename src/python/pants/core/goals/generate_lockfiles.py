@@ -14,7 +14,8 @@ from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Effect, Get, MultiGet
+from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
@@ -122,6 +123,19 @@ class RequestedUserResolveNames(Collection[str]):
     Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
     rule that goes from the subclass -> UserGenerateLockfiles.
     """
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class LockfileGenerated:
+    """Hook for post-processing after lockfile generation."""
+
+    result: GenerateLockfileResult
+
+
+@dataclass(frozen=True)
+class LockfileGeneratedPostProcessing:
+    process: InteractiveProcess | None = None
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
@@ -429,6 +443,20 @@ async def generate_lockfiles_goal(
     workspace.write_digest(merged_digest)
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+
+        post_processing = await MultiGet(
+            Get(LockfileGeneratedPostProcessing, LockfileGenerated, request(result))
+            for request in union_membership.get(LockfileGenerated)
+        )
+        for post in post_processing:
+            if post.process is not None:
+                _ = await Effect(
+                    InteractiveProcessResult,
+                    {
+                        post.process: InteractiveProcess,
+                        local_environment.val: EnvironmentName,
+                    },
+                )
 
     return GenerateLockfilesGoal(exit_code=0)
 
