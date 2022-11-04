@@ -240,7 +240,7 @@ class AssetSourceField(SingleSourceField):
             if len(filenames) > 1:
                 raise ValueError(
                     "Every `http_source` in the `per_platform` must have the same `filename`,"
-                    + f"but found: {', '.join(sorted(filenames))}"
+                    + f" but found: {', '.join(sorted(filenames))}"
                 )
 
         elif not isinstance(raw_value, http_source):
