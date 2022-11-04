@@ -239,7 +239,7 @@ class AssetSourceField(SingleSourceField):
             }
             if len(filenames) > 1:
                 raise ValueError(
-                    "Every `http_spurce` in the `per_platform` must have the same `filename`."
+                    "Every `http_source` in the `per_platform` must have the same `filename`."
                     + f"But found: {', '.join(sorted(filenames))}"
                 )
 
