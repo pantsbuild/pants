@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import textwrap
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.export import (
     Export,
     ExportError,
@@ -370,7 +372,19 @@ async def export_virtualenvs(
         )
         return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
 
-    # TODO: Deprecate this entire codepath.
+    # TODO: After the deprecation exipres, everything in this function below this comment
+    #  can be deleted.
+    warn_or_error(
+        "2.23.0.dev0",
+        "exporting resolves without using the --resolve option",
+        textwrap.dedent(
+            f"""
+        Use the --resolve flag one or more times to name the resolves you want to export,
+        and don't provide any target specs. E.g.,\n
+        `{bin_name()} export --resolve=python-default --resolve=pytest`
+        """
+        ),
+    )
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)
     for tgt in request.targets:
         if not tgt.has_field(PythonResolveField):
