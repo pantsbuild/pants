@@ -8,7 +8,7 @@ import os
 import re
 import shlex
 from dataclasses import dataclass
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
 from pants.backend.shell.shell_setup import ShellSetup
