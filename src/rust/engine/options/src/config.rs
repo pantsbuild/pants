@@ -103,7 +103,7 @@ impl Config {
   fn get_value(&self, id: &OptionId) -> Option<&Value> {
     self
       .config
-      .get(&id.scope())
+      .get(id.scope())
       .and_then(|table| table.get(Self::option_name(id)))
   }
 
@@ -175,7 +175,7 @@ impl OptionsSource for Config {
   }
 
   fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-    if let Some(table) = self.config.get(&id.scope()) {
+    if let Some(table) = self.config.get(id.scope()) {
       let option_name = Self::option_name(id);
       let mut list_edits = vec![];
       if let Some(value) = table.get(&option_name) {
@@ -195,19 +195,19 @@ impl OptionsSource for Config {
           if let Some(add) = sub_table.get("add") {
             list_edits.push(ListEdit {
               action: ListEditAction::Add,
-              items: Self::extract_string_list(&*format!("{}.add", option_name), add)?,
+              items: Self::extract_string_list(&format!("{}.add", option_name), add)?,
             })
           }
           if let Some(remove) = sub_table.get("remove") {
             list_edits.push(ListEdit {
               action: ListEditAction::Remove,
-              items: Self::extract_string_list(&*format!("{}.remove", option_name), remove)?,
+              items: Self::extract_string_list(&format!("{}.remove", option_name), remove)?,
             })
           }
         } else {
           list_edits.push(ListEdit {
             action: ListEditAction::Replace,
-            items: Self::extract_string_list(&*option_name, value)?,
+            items: Self::extract_string_list(&option_name, value)?,
           });
         }
       }

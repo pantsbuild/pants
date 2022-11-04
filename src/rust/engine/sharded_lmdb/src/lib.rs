@@ -687,7 +687,7 @@ impl ShardedLmdb {
         })?;
       std::fs::remove_dir_all(&old_dir)
         .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
-      std::fs::rename(&new_dir.path(), &old_dir).map_err(|e| {
+      std::fs::rename(new_dir.path(), &old_dir).map_err(|e| {
         format!(
           "Error replacing {:?} with {:?}: {}",
           old_dir,

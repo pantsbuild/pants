@@ -481,7 +481,7 @@ impl DigestTrie {
   }
 
   pub fn entries(&self) -> &[Entry] {
-    &*self.0
+    &self.0
   }
 
   /// Returns the digests reachable from this DigestTrie.
