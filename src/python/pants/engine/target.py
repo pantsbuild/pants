@@ -2890,7 +2890,7 @@ def generate_multiple_sources_field_help_message(files_example: str) -> str:
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:
-    example = textwrap.dedent(example.lstrip("\n"))
+    example = textwrap.dedent(example.lstrip("\n"))  # noqa: PNT20
     example = textwrap.indent(example, " " * 4)
     return "\n".join(
         [

@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
