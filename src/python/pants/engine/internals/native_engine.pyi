@@ -77,6 +77,10 @@ class Snapshot:
     names/content.
 
     You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+
+    The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
+    you can use the `digest` property to request the `DigestEntries`:
+    `await Get(DigestEntries, Digest, snapshot.digest)`.
     """
 
     @classmethod

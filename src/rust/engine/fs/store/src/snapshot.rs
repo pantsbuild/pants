@@ -13,8 +13,8 @@ use futures::future;
 use futures::FutureExt;
 
 use fs::{
-  DigestTrie, Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS,
-  PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
+  DigestTrie, Dir, DirectoryDigest, Entry, File, GitignoreStyleExcludes, GlobMatching, PathStat,
+  PosixFS, PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 
@@ -50,6 +50,34 @@ impl Snapshot {
       digest: EMPTY_DIGEST,
       tree: EMPTY_DIGEST_TREE.clone(),
     }
+  }
+
+  pub fn files(&self) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    self
+      .tree
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| {
+        if let Entry::File(_) = entry {
+          files.push(path.to_owned())
+        }
+      });
+    files
+  }
+
+  pub fn directories(&self) -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    self
+      .tree
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| {
+        match entry {
+          Entry::Directory(d) if d.name().is_empty() => {
+            // Is the root directory, which is not emitted here.
+          }
+          Entry::Directory(_) => directories.push(path.to_owned()),
+          _ => (),
+        }
+      });
+    directories
   }
 
   pub async fn from_path_stats<

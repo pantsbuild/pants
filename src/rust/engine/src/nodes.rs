@@ -29,7 +29,7 @@ use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
   GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching, Vfs,
+  RelativePath, StrictGlobMatching, SymlinkEntry, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
@@ -844,6 +844,21 @@ impl Snapshot {
     ))
   }
 
+  fn store_symlink_entry(
+    py: Python,
+    types: &crate::types::Types,
+    item: &SymlinkEntry,
+  ) -> Result<Value, String> {
+    Ok(externs::unsafe_call(
+      py,
+      types.symlink_entry,
+      &[
+        Self::store_path(py, &item.path)?,
+        externs::store_utf8(py, item.target.to_str().unwrap()),
+      ],
+    ))
+  }
+
   fn store_empty_directory(
     py: Python,
     types: &crate::types::Types,
@@ -882,6 +897,9 @@ impl Snapshot {
       .map(|digest_entry| match digest_entry {
         DigestEntry::File(file_entry) => {
           Self::store_file_entry(py, &context.core.types, file_entry)
+        }
+        DigestEntry::Symlink(symlink_entry) => {
+          Self::store_symlink_entry(py, &context.core.types, symlink_entry)
         }
         DigestEntry::EmptyDirectory(path) => {
           Self::store_empty_directory(py, &context.core.types, path)

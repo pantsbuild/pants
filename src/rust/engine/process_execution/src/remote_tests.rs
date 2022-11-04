@@ -27,7 +27,7 @@ use crate::{
   CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   InputDigests, Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
 };
-use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -759,7 +759,7 @@ async fn make_execute_request_with_append_only_caches() {
     .load_digest_trie(got_execute_request.input_root_digest)
     .await
     .unwrap()
-    .files();
+    .files(SymlinkBehavior::Oblivious);
   files.sort();
   assert_eq!(
     files,
