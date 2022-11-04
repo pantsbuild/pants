@@ -31,7 +31,7 @@ To utilize this functionality, you first create a `vcs_version` target in some B
 vcs_version(
     name="version",
     generate_to="src/foo/version.py",
-    template='version = {version}',
+    template='version = "{version}"',
 )
 ```
 

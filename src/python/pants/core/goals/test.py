@@ -18,10 +18,9 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     ChosenLocalEnvironmentName,
     EnvironmentName,
-    EnvironmentNameRequest,
+    SingleEnvironmentNameRequest,
 )
 from pants.core.util_rules.partitions import (
-    PartitionElementT,
     PartitionerType,
     PartitionMetadataT,
     Partitions,
@@ -311,12 +310,13 @@ class TestRequest:
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class PartitionRequest(_PartitionFieldSetsRequestBase[_TestFieldSetT]):
-        pass
+        def metadata(self) -> dict[str, Any]:
+            return {"addresses": [field_set.address.spec for field_set in self.field_sets]}
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
+    class Batch(_BatchBase[_TestFieldSetT, PartitionMetadataT]):
         @property
-        def single_element(self) -> PartitionElementT:
+        def single_element(self) -> _TestFieldSetT:
             """Return the single element of this batch.
 
             NOTE: Accessing this property will raise a `TypeError` if this `Batch` contains
@@ -333,6 +333,24 @@ class TestRequest:
                 )
 
             return self.elements[0]
+
+        @property
+        def description(self) -> str:
+            if self.partition_metadata and self.partition_metadata.description:
+                return f"test batch from partition '{self.partition_metadata.description}'"
+            return "test batch"
+
+        def debug_hint(self) -> str:
+            if len(self.elements) == 1:
+                return self.elements[0].address.spec
+
+            return f"{self.elements[0].address.spec} and {len(self.elements)-1} other files"
+
+        def metadata(self) -> dict[str, Any]:
+            return {
+                "addresses": [field_set.address.spec for field_set in self.elements],
+                "partition_description": self.partition_metadata.description,
+            }
 
     @classmethod
     def rules(cls) -> Iterable:
@@ -741,29 +759,6 @@ async def _run_debug_tests(
     return Test(exit_code)
 
 
-@rule(desc="Determine environment for partition", level=LogLevel.DEBUG)
-async def get_batch_environment(batch: TestRequest.Batch) -> EnvironmentName:
-    environment_names_per_element = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
-        for field_set in batch.elements
-    )
-    unique_environments = len({name.val for name in environment_names_per_element})
-    if unique_environments != 1:
-        batch_description = "Test batch"
-        if batch.partition_metadata.description:
-            batch_description = f"{batch_description} '{batch.partition_metadata.description}'"
-
-        raise AssertionError(
-            # TODO: Print conflicting field sets in env.
-            f"{batch_description} contains elements from {unique_environments} environments; exactly 1 environment is expected"
-        )
-    return environment_names_per_element[0]
-
-
 @goal_rule
 async def run_tests(
     console: Console,
@@ -812,7 +807,9 @@ async def run_tests(
 
     environment_names = await MultiGet(
         Get(
-            EnvironmentName, {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName}
+            EnvironmentName,
+            SingleEnvironmentNameRequest,
+            SingleEnvironmentNameRequest.from_field_sets(batch.elements, batch.description),
         )
         for batch in test_batches
     )

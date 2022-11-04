@@ -450,7 +450,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "env1:1.2.3",
             "--file",
@@ -473,13 +473,13 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_build_pull(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=False)'})
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=True)'})
 
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=False",
+            "--pull=True",
             "--tag",
             "args1:latest",
             "--file",
@@ -510,7 +510,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--squash",
             "--tag",
             "args1:latest",
@@ -523,7 +523,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "args2:latest",
             "--file",
@@ -559,7 +559,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "args1:1.2.3",
             "--build-arg",
@@ -654,7 +654,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -712,7 +712,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             f"id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
             "--secret",
             f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--file",
@@ -747,7 +747,7 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             "build",
             "--ssh",
             "default",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--file",
@@ -791,7 +791,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             "build.host=tbs06",
             "--label",
             "build.job=13934",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -932,7 +932,7 @@ def test_build_target_stage(
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--target",
             expected_target,
             "--tag",
@@ -1151,7 +1151,7 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "plugin:latest",
             "--tag",

@@ -108,7 +108,7 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestDependenciesField(Dependencies):
+class Shunit2TestDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
 
 
@@ -269,8 +269,8 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandDependenciesField(Dependencies):
-    pass
+class ShellCommandDependenciesField(ShellDependenciesField):
+    supports_transitive_excludes = True
 
 
 class ShellCommandSourcesField(MultipleSourcesField):

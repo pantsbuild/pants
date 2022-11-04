@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
   directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
-  EMPTY_DIRECTORY_DIGEST,
+  SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, FutureExt};
 use hashing::Digest;
@@ -71,6 +71,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
     parent_path,
     files,
     directories,
+    symlinks,
   } = err;
   let file_details_by_name = files
     .iter()
@@ -105,6 +106,15 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
       res
     })
     .map(|f| f.boxed());
+  let symlink_details_by_name = symlinks
+    .iter()
+    .map(|symlink| async move {
+      let target = symlink.target();
+      let detail = format!("symlink target={}:\n\n", target.to_str().unwrap());
+      let res: Result<_, String> = Ok((symlink.name(), detail));
+      res
+    })
+    .map(|f| f.boxed());
   let dir_details_by_name = directories
     .iter()
     .map(|dir| async move {
@@ -118,6 +128,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
   let duplicate_details = async move {
     let details_by_name = future::try_join_all(
       file_details_by_name
+        .chain(symlink_details_by_name)
         .chain(dir_details_by_name)
         .collect::<Vec<_>>(),
     )
@@ -223,10 +234,11 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
     let mut files = HashMap::new();
-    input_tree.walk(&mut |path, entry| match entry {
+    input_tree.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
+      directory::Entry::Symlink(_) => todo!(),
       directory::Entry::Directory(_) => (),
     });
 

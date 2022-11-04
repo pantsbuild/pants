@@ -30,6 +30,7 @@ from pants.engine.fs import (
     PathGlobsAndRoot,
     Paths,
     Snapshot,
+    SymlinkEntry,
 )
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
@@ -149,6 +150,7 @@ class Scheduler:
             paths=Paths,
             file_content=FileContent,
             file_entry=FileEntry,
+            symlink_entry=SymlinkEntry,
             directory=Directory,
             digest_contents=DigestContents,
             digest_entries=DigestEntries,

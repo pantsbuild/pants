@@ -348,12 +348,13 @@ class DockerBuildOptionFieldValueMixin(Field):
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
-    default = True
+    default = False
     help = softwrap(
         """
         If true, then docker will always attempt to pull a newer version of the image.
 
-        Useful to disable it when building images from other intermediate goals.
+        NOTE: This option cannot be used on images that build off of "transient" base images
+        referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
         """
     )
     docker_build_option = "--pull"

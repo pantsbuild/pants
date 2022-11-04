@@ -82,6 +82,7 @@ impl crate::CommandRunner for CommandRunner {
           None,
           self.process_cache_namespace.clone(),
           &self.file_store,
+          None,
         )
         .await
         .into(),

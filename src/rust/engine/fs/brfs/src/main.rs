@@ -764,7 +764,7 @@ async fn main() {
   let runtime = task_executor::Executor::new();
 
   let local_only_store =
-    Store::local_only(runtime.clone(), &store_path).expect("Error making local store.");
+    Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
     Some(address) => local_only_store
       .into_with_remote(
