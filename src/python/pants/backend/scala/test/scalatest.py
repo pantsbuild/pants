@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import (
@@ -17,6 +18,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -58,6 +60,11 @@ class ScalatestTestFieldSet(TestFieldSet):
     jdk_version: JvmJdkField
     dependencies: JvmDependenciesField
     extra_env_vars: ScalatestTestExtraEnvVarsField
+
+
+class ScalatestTestRequest(TestRequest):
+    tool_subsystem = Scalatest
+    field_set_type = ScalatestTestFieldSet
 
 
 class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -165,8 +172,10 @@ async def setup_scalatest_for_target(
 @rule(desc="Run Scalatest", level=LogLevel.DEBUG)
 async def run_scalatest_test(
     test_subsystem: TestSubsystem,
-    field_set: ScalatestTestFieldSet,
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any],
 ) -> TestResult:
+    field_set = batch.single_element
+
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
@@ -185,8 +194,10 @@ async def run_scalatest_test(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> TestDebugRequest:
-    setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+async def setup_scalatest_debug_request(
+    batch: ScalatestTestRequest.Batch[ScalatestTestFieldSet, Any]
+) -> TestDebugRequest:
+    setup = await Get(TestSetup, TestSetupRequest(batch.single_element, is_debug=True))
     process = await Get(Process, JvmProcess, setup.process)
     return TestDebugRequest(
         InteractiveProcess.from_process(process, forward_signals_to_process=False, restartable=True)
@@ -195,7 +206,7 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 
 @rule
 async def setup_scalatest_debug_adapter_request(
-    field_set: ScalatestTestFieldSet,
+    _: ScalatestTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
 
@@ -213,4 +224,5 @@ def rules():
         *lockfile.rules(),
         UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
+        *ScalatestTestRequest.rules(),
     ]

@@ -32,7 +32,7 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.test.junit import JunitTestFieldSet
+from pants.jvm.test.junit import JunitTestRequest
 from pants.jvm.test.junit import rules as jvm_junit_rules
 from pants.jvm.test.junit_test import run_junit_test
 from pants.jvm.testutil import maybe_skip_jdk_test
@@ -81,7 +81,7 @@ def rule_runner() -> RuleRunner:
             *kotlin_dep_inf_rules(),
             get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
-            QueryRule(TestResult, (JunitTestFieldSet,)),
+            QueryRule(TestResult, (JunitTestRequest.Batch,)),
         ],
         target_types=[
             FileTarget,

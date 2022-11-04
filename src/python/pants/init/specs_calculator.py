@@ -71,7 +71,7 @@ def calculate_specs(
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    changed_request = ChangedRequest(changed_files, changed_options.dependees)
+    changed_request = ChangedRequest(changed_files, changed_options.dependents)
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
         [Params(changed_request, options_bootstrapper, bootstrap_environment)],

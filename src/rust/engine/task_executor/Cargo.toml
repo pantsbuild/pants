@@ -13,5 +13,5 @@ lazy_static = "1"
 log = "0.4"
 parking_lot = "0.12"
 stdio = { path = "../stdio" }
-tokio = { version = "1.16", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "time"] }
 workunit_store = { path = "../workunit_store" }

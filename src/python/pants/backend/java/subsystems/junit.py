@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import ArgsListOption
+from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.docutil import git_url
 
 
@@ -22,3 +22,5 @@ class JUnit(JvmToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
+
+    skip = SkipOption("test")

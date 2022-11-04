@@ -21,6 +21,8 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
+    PythonResolveField,
+    PythonTestsBatchCompatibilityTagField,
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
@@ -35,7 +37,7 @@ from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
@@ -52,6 +54,8 @@ class PythonTestFieldSet(TestFieldSet):
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
     xdist_concurrency: PythonTestsXdistConcurrencyField
+    batch_compatibility_tag: PythonTestsBatchCompatibilityTagField
+    resolve: PythonResolveField
     environment: EnvironmentField
 
     @classmethod
@@ -145,6 +149,8 @@ class PyTest(PythonToolBase):
     )
 
     export = ExportToolOption()
+
+    skip = SkipOption("test")
 
     @property
     def all_requirements(self) -> tuple[str, ...]:
