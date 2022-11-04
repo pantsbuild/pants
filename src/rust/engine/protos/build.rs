@@ -5,7 +5,7 @@ use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut config = Config::new();
-  config.bytes(&["."]);
+  config.bytes(["."]);
 
   tonic_build::configure()
     .build_client(true)

@@ -975,7 +975,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                     softwrap(
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
-                        ancestor dependees of {target.address} and are therefore candidates to
+                        ancestor dependents of {target.address} and are therefore candidates to
                         own it: {', '.join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """

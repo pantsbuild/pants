@@ -25,8 +25,10 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import QueryRule
@@ -151,7 +153,7 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
 
 def mock_target_partitioner(
     request: MockLintTargetsRequest.PartitionRequest,
-) -> Partitions[Any, MockLinterFieldSet]:
+) -> Partitions[MockLinterFieldSet, Any]:
     if type(request) is SkippedRequest.PartitionRequest:
         return Partitions()
 
@@ -174,7 +176,7 @@ class MockFilesRequest(MockLintRequest, LintFilesRequest):
         return LintResult(0, "", "", cls.tool_name)
 
 
-def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[Any, str]:
+def mock_file_partitioner(request: MockFilesRequest.PartitionRequest) -> Partitions[str, Any]:
     return Partitions.single_partition(request.files)
 
 
@@ -307,6 +309,11 @@ def run_lint_rule(
                     output_type=Partitions,
                     input_types=(LintTargetsRequest.PartitionRequest,),
                     mock=mock_target_partitioner,
+                ),
+                MockGet(
+                    output_type=EnvironmentName,
+                    input_types=(EnvironmentNameRequest,),
+                    mock=lambda _: EnvironmentName(None),
                 ),
                 MockGet(
                     output_type=Partitions,
@@ -508,7 +515,8 @@ def test_default_single_partition_partitioner() -> None:
         MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions([(None, field_sets)])  # type: ignore[type-var]
+    assert len(partitions) == 1
+    assert partitions[0].elements == field_sets
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])

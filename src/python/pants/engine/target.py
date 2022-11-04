@@ -2697,7 +2697,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,

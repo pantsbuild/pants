@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
-from typing_extensions import final
+from typing_extensions import Protocol, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (
@@ -19,13 +19,13 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionKeyT
+from pants.core.util_rules.environments import _warn_on_non_local_environments
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as Partitions  # re-export
 from pants.core.util_rules.partitions import (
     _BatchBase,
     _PartitionFieldSetsRequestBase,
     _PartitionFilesRequestBase,
-    _single_partition_field_sets_partitioner_rules,
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -77,9 +77,7 @@ class LintResult(EngineAwareReturnType):
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=request.tool_name,
-            partition_description=request.partition_key.description
-            if request.partition_key
-            else None,
+            partition_description=request.partition_metadata.description,
             report=report,
         )
 
@@ -134,7 +132,7 @@ class LintRequest:
                     request: DryCleaningRequest.PartitionRequest[DryCleaningFieldSet]
                     # or `request: DryCleaningRequest.PartitionRequest` if file linter
                     subsystem: DryCleaningSubsystem,
-                ) -> Partitions[DryCleaningFieldSet]:
+                ) -> Partitions[DryCleaningFieldSet, Any]:
                     if subsystem.skip:
                         return Partitions()
 
@@ -175,7 +173,7 @@ class LintRequest:
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    class Batch(_BatchBase[PartitionKeyT, PartitionElementT]):
+    class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
         pass
 
     @final
@@ -200,9 +198,7 @@ class LintTargetsRequest(LintRequest):
 
     @classmethod
     def _get_rules(cls) -> Iterable:
-        if cls.partitioner_type is PartitionerType.DEFAULT_SINGLE_PARTITION:
-            yield from _single_partition_field_sets_partitioner_rules(cls)
-
+        yield from cls.partitioner_type.default_rules(cls, by_file=False)
         yield from super()._get_rules()
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
@@ -270,7 +266,7 @@ class LintSubsystem(GoalSubsystem):
 
 class Lint(Goal):
     subsystem_cls = LintSubsystem
-    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 def _print_results(
@@ -314,12 +310,17 @@ _TargetPartitioner = TypeVar("_TargetPartitioner", bound=LintTargetsRequest.Part
 _FilePartitioner = TypeVar("_FilePartitioner", bound=LintFilesRequest.PartitionRequest)
 
 
+class _MultiToolGoalSubsystem(Protocol):
+    name: str
+    only: OnlyOption
+
+
 @rule_helper
 async def _get_partitions_by_request_type(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
     file_partitioners: Iterable[type[_FilePartitioner]],
-    subsystem: GoalSubsystem,
+    subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
     # NB: Because the rule parser code will collect `Get`s from caller's scope, these allows the
     # caller to customize the specific `Get`.
@@ -328,7 +329,7 @@ async def _get_partitions_by_request_type(
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
     specified_names = determine_specified_tool_names(
         subsystem.name,
-        subsystem.only,  # type: ignore[attr-defined]
+        subsystem.only,
         core_request_types,
     )
 
@@ -362,6 +363,8 @@ async def _get_partitions_by_request_type(
     _get_specs_paths = Get(SpecsPaths, Specs, specs if file_partitioners else Specs.empty())
 
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
+
+    await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
     def partition_request_get(request_type: type[LintRequest]) -> Get[Partitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")
@@ -438,10 +441,10 @@ async def lint(
 
     lint_batches_by_request_type = {
         request_type: [
-            (batch, key)
+            (batch, partition.metadata)
             for partitions in partitions_list
-            for key, partition in partitions.items()
-            for batch in batch_by_size(partition)
+            for partition in partitions
+            for batch in batch_by_size(partition.elements)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
     }
@@ -454,7 +457,7 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    batches = [
+    batches: Iterable[LintRequest.Batch] = [
         request_type.Batch(
             request_type.tool_name,
             elements,

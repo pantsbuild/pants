@@ -176,6 +176,7 @@ impl PyTypes {
     paths: &PyType,
     file_content: &PyType,
     file_entry: &PyType,
+    symlink_entry: &PyType,
     directory: &PyType,
     digest_contents: &PyType,
     digest_entries: &PyType,
@@ -204,6 +205,7 @@ impl PyTypes {
       paths: TypeId::new(paths),
       file_content: TypeId::new(file_content),
       file_entry: TypeId::new(file_entry),
+      symlink_entry: TypeId::new(symlink_entry),
       directory: TypeId::new(directory),
       digest_contents: TypeId::new(digest_contents),
       digest_entries: TypeId::new(digest_entries),
@@ -307,6 +309,7 @@ impl PyRemotingOptions {
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
+    append_only_caches_base_path: Option<String>,
   ) -> Self {
     Self(RemotingOptions {
       execution_enable,
@@ -329,6 +332,7 @@ impl PyRemotingOptions {
       execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
+      append_only_caches_base_path,
     })
   }
 }
@@ -844,8 +848,8 @@ async fn workunit_to_py_value(
   let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
   for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
     let value = match user_metadata_item {
-      UserMetadataItem::ImmediateString(v) => v.into_py(py),
-      UserMetadataItem::ImmediateInt(n) => n.into_py(py),
+      UserMetadataItem::String(v) => v.into_py(py),
+      UserMetadataItem::Int(n) => n.into_py(py),
       UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
         .as_any()
         .downcast_ref::<Value>()

@@ -105,13 +105,15 @@ async def partition_black(
 
     return Partitions.single_partition(
         (field_set.source.file_path for field_set in request.field_sets),
-        key=tool_interpreter_constraints,
+        metadata=tool_interpreter_constraints,
     )
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
-    return await _run_black(request, black, cast(InterpreterConstraints, request.partition_key))
+    return await _run_black(
+        request, black, cast(InterpreterConstraints, request.partition_metadata)
+    )
 
 
 def rules():

@@ -85,7 +85,7 @@ impl<R: Rule> Node<R> {
 }
 
 ///
-/// A Node labeled with Param types that are declared (by its transitive dependees) for consumption,
+/// A Node labeled with Param types that are declared (by its transitive dependents) for consumption,
 /// and Param types that are actually (by its transitive dependencies) consumed.
 ///
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -93,7 +93,7 @@ struct ParamsLabeled<R: Rule> {
   node: Node<R>,
   // Params that are actually consumed by transitive dependencies.
   in_set: ParamTypes<R::TypeId>,
-  // Params that the Node's transitive dependees have available for consumption.
+  // Params that the Node's transitive dependents have available for consumption.
   out_set: ParamTypes<R::TypeId>,
 }
 
@@ -169,7 +169,7 @@ impl<T: std::fmt::Display, Reason: std::fmt::Debug> std::fmt::Display for MaybeD
 enum NodePrunedReason {
   Ambiguous,
   Monomorphized,
-  NoDependees,
+  NoDependents,
   NoSourceOfParam,
   NoValidCombinationsOfDependencies,
 }
@@ -261,7 +261,7 @@ impl<R: Rule> Builder<R> {
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
     //    large) set of used Params.
     let polymorphic_live_params_graph = self.live_param_labeled_graph(initial_polymorphic_graph);
-    // 3. monomorphize by partitioning a node (and its dependees) for each valid combination of its
+    // 3. monomorphize by partitioning a node (and its dependents) for each valid combination of its
     //    dependencies while mantaining liveness sets.
     let monomorphic_live_params_graph = Self::monomorphize(polymorphic_live_params_graph);
     // 4. choose the best dependencies via in/out sets. fail if:
@@ -308,7 +308,7 @@ impl<R: Rule> Builder<R> {
       })
       .collect::<HashMap<_, _>>();
 
-    // Rules and Reentries are created on the fly based on the out_set of dependees.
+    // Rules and Reentries are created on the fly based on the out_set of dependents.
     let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
     #[allow(clippy::type_complexity)]
     let mut reentries: HashMap<
@@ -484,14 +484,14 @@ impl<R: Rule> Builder<R> {
   /// consume in each subgraph: as this information propagates down the graph, Param dependencies
   /// might be eliminated, which results in corresponding changes to the in_set which flow back
   /// up the graph. As the in_sets shrink, we shrink the out_sets as well to avoid creating
-  /// redundant nodes: although the params might still technically be declared by the dependees, we
+  /// redundant nodes: although the params might still technically be declared by the dependents, we
   /// can be sure that any not contained in the in_set are not used.
   ///
   /// Any node that has only invalid sources of a dependency (such as those that do not consume a
   /// provided param, or those that consume a Param that is not present in their scope) will be
-  /// removed (which may also cause its dependees to be removed, for the same reason). This is safe
+  /// removed (which may also cause its dependents to be removed, for the same reason). This is safe
   /// to do at any time during the monomorphize run, because the in/out sets are adjusted in tandem
-  /// based on the current dependencies/dependees.
+  /// based on the current dependencies/dependents.
   ///
   /// The exit condition for this phase is that all valid combinations of dependencies have the
   /// same minimal in_set. This occurs when all splits that would result in smaller sets of
@@ -511,7 +511,7 @@ impl<R: Rule> Builder<R> {
 
     // In order to reduce the number of permutations rapidly, we make a best effort attempt to
     // visit a node before any of its dependencies using DFS-post-order. We need to visit all
-    // nodes in the graph, but because monomorphizing a node enqueues its dependees we may
+    // nodes in the graph, but because monomorphizing a node enqueues its dependents we may
     // visit some of them multiple times.
     //
     // DFS converges much more quickly than BFS. We use an IndexSet to preserve the initial walk
@@ -647,9 +647,9 @@ impl<R: Rule> Builder<R> {
         continue;
       }
 
-      // Group dependees by out_set.
+      // Group dependents by out_set.
       #[allow(clippy::type_complexity)]
-      let dependees_by_out_set: HashMap<
+      let dependents_by_out_set: HashMap<
         ParamTypes<R::TypeId>,
         Vec<(DependencyKey<R::TypeId>, _)>,
       > = {
@@ -659,7 +659,7 @@ impl<R: Rule> Builder<R> {
             continue;
           }
 
-          // Compute the out_set of this dependee, plus the provided param, if any.
+          // Compute the out_set of this dependent, plus the provided param, if any.
           let mut out_set = graph[edge_ref.source()].0.out_set.clone();
           out_set.extend(edge_ref.weight().0.provided_params.iter().cloned());
           dbos
@@ -669,12 +669,12 @@ impl<R: Rule> Builder<R> {
         }
         dbos
       };
-      let had_dependees = !dependees_by_out_set.is_empty();
+      let had_dependents = !dependents_by_out_set.is_empty();
 
       let trace_str = if looping {
         format!(
-          "creating monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
-          dependees_by_out_set.len(),
+          "creating monomorphizations (from {} dependent sets and {:?} dependencies) for {:?}: {} with {:#?} and {:#?}",
+          dependents_by_out_set.len(),
           dependencies_by_key
         .iter()
         .map(|edges| edges.len())
@@ -689,7 +689,7 @@ impl<R: Rule> Builder<R> {
                 .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
             })
             .collect::<Vec<_>>(),
-          dependees_by_out_set
+          dependents_by_out_set
         .keys()
         .map(params_str)
         .collect::<Vec<_>>(),
@@ -699,9 +699,9 @@ impl<R: Rule> Builder<R> {
       };
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
-      // create, and the dependees and dependencies to give it (respectively).
+      // create, and the dependents and dependencies to give it (respectively).
       let mut monomorphizations = HashMap::default();
-      for (out_set, dependees) in dependees_by_out_set {
+      for (out_set, dependents) in dependents_by_out_set {
         for (node, dependencies) in Self::monomorphizations(
           &graph,
           node_id,
@@ -712,7 +712,7 @@ impl<R: Rule> Builder<R> {
           let entry = monomorphizations
             .entry(node)
             .or_insert_with(|| (HashSet::default(), HashSet::default()));
-          entry.0.extend(dependees.iter().cloned());
+          entry.0.extend(dependents.iter().cloned());
           entry.1.extend(dependencies);
         }
       }
@@ -797,16 +797,16 @@ impl<R: Rule> Builder<R> {
           NodePrunedReason::Ambiguous
         } else if !monomorphizations.is_empty() {
           NodePrunedReason::Monomorphized
-        } else if had_dependees {
+        } else if had_dependents {
           NodePrunedReason::NoValidCombinationsOfDependencies
         } else {
-          NodePrunedReason::NoDependees
+          NodePrunedReason::NoDependents
         });
-      // And schedule visits for all dependees and dependencies.
+      // And schedule visits for all dependents and dependencies.
       to_visit.extend(graph.neighbors_undirected(node_id));
 
       // Generate a replacement node for each monomorphization of this rule.
-      for (new_node, (dependees, dependencies)) in monomorphizations {
+      for (new_node, (dependents, dependencies)) in monomorphizations {
         let is_suspected_ambiguous_node = if is_suspected_ambiguous {
           let is_identical = new_node == graph[node_id].0;
           if ambiguous && is_identical {
@@ -821,9 +821,9 @@ impl<R: Rule> Builder<R> {
 
         if looping {
           log::trace!(
-            "   generating {:#?}, with {} dependees and {} dependencies ({} minimal) which consumes: {:#?}",
+            "   generating {:#?}, with {} dependents and {} dependencies ({} minimal) which consumes: {:#?}",
             new_node,
-            dependees.len(),
+            dependents.len(),
             dependencies.len(),
             dependencies.iter().filter(|(_, dependency_id)| minimal_in_set.contains(dependency_id)).count(),
             dependencies
@@ -844,8 +844,8 @@ impl<R: Rule> Builder<R> {
           log::trace!("node: creating: {:?}", replacement_id);
         }
 
-        // Give all dependees edges to the new node.
-        for (dependency_key, dependee_id) in &dependees {
+        // Give all dependents edges to the new node.
+        for (dependency_key, dependent_id) in &dependents {
           // Add a new edge.
           let mut edge = MaybeDeleted::new(dependency_key.clone());
           for p in &dependency_key.provided_params {
@@ -856,9 +856,9 @@ impl<R: Rule> Builder<R> {
             }
           }
           if looping {
-            log::trace!("dependee edge: adding: ({:?}, {})", dependee_id, edge);
+            log::trace!("dependent edge: adding: ({:?}, {})", dependent_id, edge);
           }
-          graph.add_edge(*dependee_id, replacement_id, edge);
+          graph.add_edge(*dependent_id, replacement_id, edge);
         }
 
         // And give the replacement node edges to this combination of dependencies.
@@ -1554,7 +1554,7 @@ impl<R: Rule> Builder<R> {
       let entry = ParamsLabeled {
         node: graph[node_id].0.node.clone(),
         in_set: in_set.clone(),
-        // NB: See the method doc. Although our dependees could technically still provide a
+        // NB: See the method doc. Although our dependents could technically still provide a
         // larger set of params, anything not in the in_set is not consumed in this subgraph,
         // and the out_set shrinks correspondingly to avoid creating redundant nodes.
         out_set: out_set.intersection(&in_set).cloned().collect(),

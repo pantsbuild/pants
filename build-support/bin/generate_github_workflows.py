@@ -120,11 +120,11 @@ def classify_changes() -> Jobs:
                         affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
                         echo "Affected:"
                         if [[ "${{affected}}" == "docs" ]]; then
-                          echo "::set-output name=docs_only::true"
+                          echo "docs_only=true" >> $GITHUB_OUTPUT
                           echo "docs_only"
                         fi
                         for i in ${{affected}}; do
-                          echo "::set-output name=${{i}}::true"
+                          echo "${{i}}=true" >> $GITHUB_OUTPUT
                           echo "${{i}}"
                         done
                         """
@@ -258,7 +258,7 @@ def setup_primary_python(install_python: bool = True) -> Sequence[Step]:
         ret.append(
             {
                 "name": f"Set up Python {gha_expr('matrix.python-version')}",
-                "uses": "actions/setup-python@v3",
+                "uses": "actions/setup-python@v4",
                 "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
             }
         )
@@ -389,7 +389,7 @@ class Helper:
             {
                 "name": "Get native engine hash",
                 "id": "get-engine-hash",
-                "run": 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"\n',
+                "run": 'echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT',
                 "shell": "bash",
             },
             {
@@ -397,7 +397,7 @@ class Helper:
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": "\n".join(NATIVE_FILES),
-                    "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1\n",
+                    "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1",
                 },
             },
         ]
@@ -834,7 +834,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             "steps": [
                 {
                     "id": "set_merge_ok",
-                    "run": "echo '::set-output name=merge_ok::true'",
+                    "run": "echo 'merge_ok=true' >> ${GITHUB_OUTPUT}",
                 },
             ],
         },

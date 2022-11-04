@@ -315,7 +315,7 @@ class PluginAPITypeInfo:
     union_type: str | None
     union_members: tuple[str, ...]
     dependencies: tuple[str, ...]
-    dependees: tuple[str, ...]
+    dependents: tuple[str, ...]
     returned_by_rules: tuple[str, ...]
     consumed_by_rules: tuple[str, ...]
     used_in_rules: tuple[str, ...]
@@ -699,7 +699,7 @@ class HelpInfoExtracter:
 
         # Calculate type graph.
         for api_type in all_types:
-            # Collect all providers first, as we need them up-front for the dependencies/dependees.
+            # Collect all providers first, as we need them up-front for the dependencies/dependents.
             type_graph[api_type]["providers"] = tuple(
                 sorted(
                     {
@@ -731,19 +731,19 @@ class HelpInfoExtracter:
                 )
             )
 
-        # Add a dependee on the target type for each dependency.
-        type_dependees: DefaultDict[type, set[str]] = defaultdict(set)
+        # Add a dependent on the target type for each dependency.
+        type_dependents: DefaultDict[type, set[str]] = defaultdict(set)
         for _, provider, dependencies in all_types_with_dependencies:
             if not provider:
                 continue
             for target_type in dependencies:
-                type_dependees[target_type].add(provider)
-        for api_type, dependees in type_dependees.items():
-            type_graph[api_type]["dependees"] = tuple(
+                type_dependents[target_type].add(provider)
+        for api_type, dependents in type_dependents.items():
+            type_graph[api_type]["dependents"] = tuple(
                 sorted(
-                    dependees
+                    dependents
                     - set(
-                        # Exclude providers from list of dependees.
+                        # Exclude providers from list of dependents.
                         type_graph[api_type]["providers"][0]
                     )
                 )
@@ -766,7 +766,7 @@ class HelpInfoExtracter:
                     rules,
                     provider=", ".join(type_graph[api_type]["providers"]),
                     dependencies=type_graph[api_type]["dependencies"],
-                    dependees=type_graph[api_type].get("dependees", ()),
+                    dependents=type_graph[api_type].get("dependents", ()),
                     union_members=tuple(
                         sorted(member.__name__ for member in union_membership.get(api_type))
                     ),

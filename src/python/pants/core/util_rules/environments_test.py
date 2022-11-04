@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import Sequence
 
 import pytest
 
@@ -30,6 +31,7 @@ from pants.core.util_rules.environments import (
     RemoteEnvironmentCacheBinaryDiscovery,
     RemoteEnvironmentTarget,
     RemoteExtraPlatformPropertiesField,
+    SingleEnvironmentNameRequest,
     UnrecognizedEnvironmentError,
     extract_process_config_from_environment,
     resolve_environment_name,
@@ -57,6 +59,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(AllEnvironmentTargets, []),
             QueryRule(EnvironmentTarget, [EnvironmentName]),
             QueryRule(EnvironmentName, [EnvironmentNameRequest]),
+            QueryRule(EnvironmentName, [SingleEnvironmentNameRequest]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget, RemoteEnvironmentTarget],
         inherent_environment=None,
@@ -283,6 +286,37 @@ def test_resolve_environment_name(rule_runner: RuleRunner) -> None:
         get_name("remote-no-fallback")
     with engine_error(UnrecognizedEnvironmentError):
         get_name("remote-bad-fallback")
+
+
+def test_resolve_environment_names(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                local_environment(name='local1')
+                local_environment(name='local2')
+                """
+            )
+        }
+    )
+
+    def get_names(v: Sequence[str]) -> EnvironmentName:
+        return rule_runner.request(
+            EnvironmentName, [SingleEnvironmentNameRequest(tuple(v), description_of_origin="foo")]
+        )
+
+    # If `--names` is not set, and the local matcher is used, do not choose an environment.
+    assert get_names([LOCAL_ENVIRONMENT_MATCHER]).val is None
+
+    env_names_arg = (
+        "--environments-preview-names={" + "'local1': '//:local1', " + "'local2': '//:local2'}"
+    )
+    rule_runner.set_options([env_names_arg])
+
+    assert get_names(["local1", "local1"]).val == "local1"
+
+    with engine_error(contains="Needed 1 unique environment, but foo contained 2:"):
+        _ = get_names(["local1", "local2"])
 
 
 def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> None:

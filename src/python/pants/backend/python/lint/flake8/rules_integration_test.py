@@ -55,15 +55,15 @@ def run_flake8(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    partition = rule_runner.request(
-        Partitions[Any, Flake8FieldSet],
+    partitions = rule_runner.request(
+        Partitions[Flake8FieldSet, Any],
         [Flake8Request.PartitionRequest(tuple(Flake8FieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, batch in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [Flake8Request.Batch("", batch, key)],
+            [Flake8Request.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

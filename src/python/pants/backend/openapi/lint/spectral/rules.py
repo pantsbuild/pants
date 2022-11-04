@@ -43,7 +43,7 @@ class SpectralRequest(LintTargetsRequest):
 
 @rule(desc="Lint with Spectral", level=LogLevel.DEBUG)
 async def run_spectral(
-    request: SpectralRequest.Batch[Any, SpectralFieldSet],
+    request: SpectralRequest.Batch[SpectralFieldSet, Any],
     spectral: SpectralSubsystem,
     platform: Platform,
 ) -> LintResult:

@@ -91,6 +91,26 @@ class OutputPathField(StringField, AsyncFieldMixin):
         return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 
+@dataclass(frozen=True)
+class EnvironmentAwarePackageRequest:
+    """Request class to request a `BuiltPackage` in an environment-aware fashion."""
+
+    field_set: PackageFieldSet
+
+
+@rule
+async def environment_aware_package(request: EnvironmentAwarePackageRequest) -> BuiltPackage:
+    environment_name = await Get(
+        EnvironmentName,
+        EnvironmentNameRequest,
+        EnvironmentNameRequest.from_field_set(request.field_set),
+    )
+    package = await Get(
+        BuiltPackage, {request.field_set: PackageFieldSet, environment_name: EnvironmentName}
+    )
+    return package
+
+
 class PackageSubsystem(GoalSubsystem):
     name = "package"
     help = "Create a distributable package."
@@ -134,19 +154,9 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     if not target_roots_to_field_sets.field_sets:
         return Package(exit_code=0)
 
-    environment_names_per_field_set = await MultiGet(
-        Get(
-            EnvironmentName,
-            EnvironmentNameRequest,
-            EnvironmentNameRequest.from_field_set(field_set),
-        )
-        for field_set in target_roots_to_field_sets.field_sets
-    )
     packages = await MultiGet(
-        Get(BuiltPackage, {field_set: PackageFieldSet, environment_name: EnvironmentName})
-        for field_set, environment_name in zip(
-            target_roots_to_field_sets.field_sets, environment_names_per_field_set
-        )
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in target_roots_to_field_sets.field_sets
     )
 
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))

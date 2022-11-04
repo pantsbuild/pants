@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
@@ -98,7 +99,7 @@ async def run_buf_format(
             output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
-            env={"PATH": binary_shims.bin_directory},
+            env={"PATH": os.path.join("{chroot}", binary_shims.bin_directory)},
         ),
     )
     return await FmtResult.create(request, result)

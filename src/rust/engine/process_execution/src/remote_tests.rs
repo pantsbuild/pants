@@ -19,14 +19,15 @@ use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
+use tokio::time::{sleep, timeout};
 use workunit_store::{RunId, WorkunitStore};
 
-use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
+use crate::remote::{CommandRunner, EntireExecuteRequest, ExecutionError, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
+  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  InputDigests, Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
 };
-use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -38,10 +39,10 @@ const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct RemoteTestResult {
-  pub(crate) original: FallibleProcessResultWithPlatform,
-  pub(crate) stdout_bytes: Vec<u8>,
-  pub(crate) stderr_bytes: Vec<u8>,
+struct RemoteTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
 }
 
 impl RemoteTestResult {
@@ -56,19 +57,23 @@ impl RemoteTestResult {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StdoutType {
+enum StdoutType {
   Raw(String),
   Digest(Digest),
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StderrType {
+enum StderrType {
   Raw(String),
   Digest(Digest),
 }
 
 #[tokio::test]
 async fn make_execute_request() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -97,6 +102,10 @@ async fn make_execute_request() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -115,10 +124,10 @@ async fn make_execute_request() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -130,7 +139,7 @@ async fn make_execute_request() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "5aa25fbe0530761c1e0692c6f4e4bba67ebb29634a3b5b1c4998b95061ac5285",
+          "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
         )
         .unwrap(),
         141,
@@ -142,13 +151,22 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
 }
 
 #[tokio::test]
 async fn make_execute_request_with_instance_name() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -180,6 +198,10 @@ async fn make_execute_request_with_instance_name() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -203,10 +225,10 @@ async fn make_execute_request_with_instance_name() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "0f5513942fe627c46827ee8024406e24aa3f47d2a6582ed33c244b89e420a160",
+          "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
         )
         .unwrap(),
-        160,
+        216,
       ))
         .into(),
     ),
@@ -219,7 +241,7 @@ async fn make_execute_request_with_instance_name() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "62faff0371cc0b08c4a8b0218d37335083674761928576d2090d02b4f10aaf61",
+          "5b017857389d245cd0663105f3b8ee47bb7412940e4859098c8af46bdd21c8b6",
         )
         .unwrap(),
         141,
@@ -231,13 +253,23 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None,),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store, None)
+      .await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
 }
 
 #[tokio::test]
 async fn make_execute_request_with_cache_key_gen_version() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -266,6 +298,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -291,10 +327,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "9ea985902b500695cfc80fb87aab4b110272a863cfd7196a31b6504e483006b6",
+          "04ed10b1ddac69249ad1ca463fd4284c4f9c0115a2f2aaf1fd8a9ce6571ee29c",
         )
         .unwrap(),
-        168,
+        224,
       ))
         .into(),
     ),
@@ -306,7 +342,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "504f18fbe21c7fe17f7e7e038f25780cd8bb3a280333715112d04d7325ba4b98",
+          "e55329e2c0413a6def422752f9e964204e7e40ec81e2867a6222a43727ba29d1",
         )
         .unwrap(),
         141,
@@ -318,13 +354,22 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()),),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
 }
 
 #[tokio::test]
 async fn make_execute_request_with_jdk() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
   req.platform = Platform::Linux_x86_64;
@@ -334,10 +379,16 @@ async fn make_execute_request_with_jdk() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::Local.cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![remexec::platform::Property {
         name: "JDK_SYMLINK".to_owned(),
@@ -351,10 +402,10 @@ async fn make_execute_request_with_jdk() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "fdb14491ad797437907cd8a2f2b7afba9e556b73773b1045383af930e7244a16",
+          "45e72f32f1d935e02732e26a8aaec041877811a9b7fe66816ace7b570173953e",
         )
         .unwrap(),
-        87,
+        142,
       ))
         .into(),
     ),
@@ -366,10 +417,10 @@ async fn make_execute_request_with_jdk() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "44bfe183fa37bab87d919147c48f014b2d964dbd0ff95fca55a7780e00cdeb3e",
+          "2868a54befe3ad9d8fd2ac30c2a170ac890715ec0b196ab8259e8b6beabf7d1c",
         )
         .unwrap(),
-        140,
+        141,
       ))
         .into(),
     ),
@@ -378,13 +429,22 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
 }
 
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]))
     .remote_execution_platform_properties(vec![
@@ -400,10 +460,16 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
-    environment_variables: vec![remexec::command::EnvironmentVariable {
-      name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
-      value: "linux_x86_64".to_owned(),
-    }],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+    ],
     platform: Some(remexec::Platform {
       properties: vec![
         remexec::platform::Property {
@@ -435,10 +501,10 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "cb0dce5f745b343c440d9c1fbd5a368953d44423fa1ff4c51c8a6aba38851e9a",
+          "03b368b6f449438938636f57fbaf6b6e2a1eb776583b5197c1320b646ee8d64a",
         )
         .unwrap(),
-        142,
+        198,
       ))
         .into(),
     ),
@@ -450,7 +516,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "844f05249ca4a71d5e216650dfc26e20d3b52512c015108f30ab29eaa76d549c",
+          "0291bda0da047d715b6da33c1e4c2a74679ab06c95a32424ea754f70be5242ed",
         )
         .unwrap(),
         141,
@@ -462,13 +528,22 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
 }
 
 #[tokio::test]
 async fn make_execute_request_with_timeout() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let input_directory = TestDirectory::containing_roland();
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -497,6 +572,10 @@ async fn make_execute_request_with_timeout() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -515,10 +594,10 @@ async fn make_execute_request_with_timeout() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -531,7 +610,7 @@ async fn make_execute_request_with_timeout() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "25eed790a1cf4a0e7e30361b87cb0315eb28d155a5d02fe9c968bc9560cce5f4",
+          "6e3666265a4ef89ddf26a406516484429b2d8e744fbae6b36a66c6853407626a",
         )
         .unwrap(),
         145,
@@ -543,9 +622,152 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: input_directory.directory_digest(),
+    })
   );
+}
+
+#[tokio::test]
+async fn make_execute_request_with_append_only_caches() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let input_directory = TestDirectory::containing_roland();
+  store
+    .record_directory(&input_directory.directory(), false)
+    .await
+    .unwrap();
+
+  let req = Process {
+    argv: owned_string_vec(&["/bin/cat", "../.cache/xyzzy/foo.txt"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: Some(RelativePath::new(Path::new("animals")).unwrap()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+    output_files: BTreeSet::new(),
+    output_directories: BTreeSet::new(),
+    timeout: one_second(),
+    description: "some description".to_owned(),
+    level: log::Level::Info,
+    append_only_caches: btreemap! {
+      CacheName::new(String::from("xyzzy")).unwrap() => RelativePath::new(Path::new(".cache/xyzzy")).unwrap(),
+    },
+    jdk_home: None,
+    platform: Platform::Linux_x86_64,
+    execution_slot_variable: None,
+    concurrency_available: 0,
+    cache_scope: ProcessCacheScope::Always,
+    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+  };
+
+  let want_command = remexec::Command {
+    arguments: vec![
+      "./__pants_wrapper__".to_owned(),
+      "/bin/cat".to_owned(),
+      "../.cache/xyzzy/foo.txt".to_owned(),
+    ],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "linux_x86_64".to_owned(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: "SOME".to_owned(),
+        value: "value".to_owned(),
+      },
+    ],
+    platform: Some(remexec::Platform::default()),
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "1deb19eddcefd5074263064a7df2a19caeb4e6d86a849bc07e23a5d856f886ec",
+        )
+        .unwrap(),
+        178,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some(
+      (Digest::new(
+        Fingerprint::from_hex_string(
+          "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+        )
+        .unwrap(),
+        178,
+      ))
+      .into(),
+    ),
+    timeout: Some(prost_types::Duration::from(Duration::from_secs(1))),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "e4196db365556cbeed4941845f448cfafc1fabb76b3c476c3f378f358235d3c4",
+        )
+        .unwrap(),
+        146,
+      ))
+        .into(),
+    ),
+    skip_cache_lookup: true,
+    ..Default::default()
+  };
+
+  let want_input_root_digest = DirectoryDigest::from_persisted_digest(Digest::new(
+    Fingerprint::from_hex_string(
+      "92f5d2ff07cb6cdf4a70f2d6392781b482cd587b9dd69d6729ac73eb54110a69",
+    )
+    .unwrap(),
+    178,
+  ));
+
+  let got_execute_request =
+    crate::remote::make_execute_request(&req, None, None, &store, Some("/append-only-caches"))
+      .await
+      .unwrap();
+  assert_eq!(
+    got_execute_request,
+    EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: want_input_root_digest,
+    }
+  );
+
+  // Ensure that the wrapper script was added to the input root.
+  let mut files = store
+    .load_digest_trie(got_execute_request.input_root_digest)
+    .await
+    .unwrap()
+    .files(SymlinkBehavior::Oblivious);
+  files.sort();
+  assert_eq!(
+    files,
+    vec![
+      Path::new("__pants_wrapper__").to_path_buf(),
+      Path::new("roland.ext").to_path_buf()
+    ]
+  )
 }
 
 #[tokio::test]
@@ -605,6 +827,10 @@ async fn make_execute_request_using_immutable_inputs() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
+      },
+      remexec::command::EnvironmentVariable {
         name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
@@ -623,10 +849,10 @@ async fn make_execute_request_using_immutable_inputs() {
     command_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "d57fdd2d8fc69d5f85c6c75eeac6859d7fe9262906d9407eca343c1b9f86d421",
+          "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
         )
         .unwrap(),
-        131,
+        187,
       ))
         .into(),
     ),
@@ -638,7 +864,7 @@ async fn make_execute_request_using_immutable_inputs() {
     action_digest: Some(
       (&Digest::new(
         Fingerprint::from_hex_string(
-          "54dd9dd373e6492b6c22e0cf4d93c3da893ce6a702577cabf44bdd0d5f013fa9",
+          "2c1eae75a54d2464ac63ba51587deb3986f15c3966c61f77fb9b06b195f4127a",
         )
         .unwrap(),
         141,
@@ -650,21 +876,38 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None),
-    Ok((want_action, want_command, want_execute_request))
+    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    Ok(EntireExecuteRequest {
+      action: want_action,
+      command: want_command,
+      execute_request: want_execute_request,
+      input_root_digest: expected_digest,
+    })
   );
 }
 
 #[tokio::test]
 async fn successful_with_only_call_to_execute() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -697,13 +940,25 @@ async fn successful_with_only_call_to_execute() {
 #[tokio::test]
 async fn successful_after_reconnect_with_wait_execution() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -739,14 +994,26 @@ async fn successful_after_reconnect_with_wait_execution() {
 #[tokio::test]
 async fn successful_after_reconnect_from_retryable_error() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
   let op_name_1 = "gimme-foo".to_string();
   let op_name_2 = "gimme-bar".to_string();
 
   let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     let execute_request_2 = execute_request.clone();
 
@@ -788,8 +1055,71 @@ async fn successful_after_reconnect_from_retryable_error() {
 }
 
 #[tokio::test]
+async fn dropped_request_cancels() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let client_timeout = Duration::new(5, 0);
+  let delayed_operation_time = Duration::new(15, 0);
+
+  let request = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
+
+  let op_name = "gimme-foo".to_string();
+
+  let mock_server = {
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(&request, None, None, &store, None)
+          .await
+          .unwrap()
+          .execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  let cas = mock::StubCAS::builder()
+    .file(&TestData::roland())
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let (command_runner, _store) = create_command_runner(mock_server.address(), &cas);
+
+  let context = Context {
+    workunit_store,
+    build_id: String::from("marmosets"),
+    run_id: RunId(0),
+    ..Context::default()
+  };
+
+  // Timeout the run, which should cause the remote operation to be cancelled.
+  if let Ok(res) = timeout(
+    client_timeout,
+    command_runner.run(context, &mut workunit, request),
+  )
+  .await
+  {
+    panic!("Did not expect the client to return successfully. Got: {res:?}");
+  }
+
+  // Wait for the cancellation to have been spawned and sent.
+  sleep(Duration::from_secs(2)).await;
+
+  // Confirm that the cancellation was sent.
+  assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
+}
+
+#[tokio::test]
 async fn server_rejecting_execute_request_gives_error() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
 
   let execute_request = echo_foo_request();
 
@@ -799,9 +1129,12 @@ async fn server_rejecting_execute_request_gives_error() {
         &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
         None,
         None,
+        &store,
+        None,
       )
+      .await
       .unwrap()
-      .2,
+      .execute_request,
       stream_responses: Err(Status::invalid_argument("".to_owned())),
     }]),
     None,
@@ -817,13 +1150,24 @@ async fn server_rejecting_execute_request_gives_error() {
 #[tokio::test]
 async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
 
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -844,30 +1188,6 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
 async fn sends_headers() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  let execute_request = echo_foo_request();
-  let op_name = "gimme-foo".to_string();
-
-  let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
-
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request,
-        stream_responses: Ok(vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ]),
-      }]),
-      None,
-    )
-  };
   let cas = mock::StubCAS::empty();
   let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
@@ -887,8 +1207,42 @@ async fn sends_headers() {
     )
     .unwrap();
 
+  let execute_request = echo_foo_request();
+  let op_name = "gimme-foo".to_string();
+
+  let mock_server = {
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ]),
+      }]),
+      None,
+    )
+  };
+
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
     None,
     None,
     None,
@@ -897,6 +1251,7 @@ async fn sends_headers() {
       String::from("authorization") => String::from("Bearer catnip-will-get-you-anywhere"),
     },
     store,
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1032,34 +1387,6 @@ async fn ensure_inline_stdio_is_stored() {
   WorkunitStore::setup_for_tests();
 
   let runtime = task_executor::Executor::new();
-
-  let test_stdout = TestData::roland();
-  let test_stderr = TestData::catnip();
-
-  let mock_server = {
-    let op_name = "cat".to_owned();
-
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&echo_roland_request().try_into().unwrap(), None, None)
-        .unwrap();
-
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request,
-        stream_responses: Ok(vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name.clone(),
-            StdoutType::Raw(test_stdout.string()),
-            StderrType::Raw(test_stderr.string()),
-            0,
-          ),
-        ]),
-      }]),
-      None,
-    )
-  };
-
   let store_dir = TempDir::new().unwrap();
   let store_dir_path = store_dir.path();
 
@@ -1080,13 +1407,50 @@ async fn ensure_inline_stdio_is_stored() {
     )
     .unwrap();
 
+  let test_stdout = TestData::roland();
+  let test_stderr = TestData::catnip();
+
+  let mock_server = {
+    let op_name = "cat".to_owned();
+
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &echo_roland_request().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        ]),
+      }]),
+      None,
+    )
+  };
+
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
     None,
     None,
     None,
+    None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1126,6 +1490,10 @@ async fn ensure_inline_stdio_is_stored() {
 #[tokio::test]
 async fn bad_result_bytes() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1137,9 +1505,12 @@ async fn bad_result_bytes() {
           &execute_request.clone().try_into().unwrap(),
           None,
           None,
+          &store,
+          None,
         )
+        .await
         .unwrap()
-        .2,
+        .execute_request,
         stream_responses: Ok(vec![
           make_incomplete_operation(&op_name),
           MockOperation::new(Operation {
@@ -1168,14 +1539,26 @@ async fn bad_result_bytes() {
 #[tokio::test]
 async fn initial_response_error() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
 
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1203,19 +1586,34 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result.to_string(), "Internal: Something went wrong");
+  assert!(result.to_string().ends_with(
+    "Error from remote execution: \
+     InvalidArgument: \"Execute endpoint called. Did not expect this call.\""
+  ));
 }
 
 #[tokio::test]
 async fn initial_response_missing_response_and_error() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
 
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1236,21 +1634,32 @@ async fn initial_response_missing_response_and_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(
-    result.to_string(),
-    "Operation finished but no response supplied"
-  );
+  assert!(result
+    .to_string()
+    .ends_with("Operation finished but no response supplied"));
 }
 
 #[tokio::test]
 async fn fails_after_retry_limit_exceeded() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
 
   let mock_server = {
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1287,22 +1696,34 @@ async fn fails_after_retry_limit_exceeded() {
     .await
     .expect_err("Expected error");
 
-  assert_eq!(
-    result.to_string(),
-    "Too many failures from server. The last error was: the bot running the task appears to be lost"
-  );
+  assert!(result.to_string().ends_with(
+    "Too many failures from server. \
+     The last error was: the bot running the task appears to be lost"
+  ));
 }
 
 #[tokio::test]
 async fn fails_after_retry_limit_exceeded_with_stream_close() {
   WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
   let execute_request = echo_foo_request();
 
   let mock_server = {
     let op_name = "foo-bar".to_owned();
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&execute_request.clone().try_into().unwrap(), None, None)
-        .unwrap();
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1339,60 +1760,17 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     .await
     .expect_err("Expected error");
 
-  assert_eq!(
-    result.to_string(),
-    "Too many failures from server. The last event was the server disconnecting with no error given."
-  );
+  assert!(result.to_string().ends_with(
+    "Too many failures from server. \
+     The last event was the server disconnecting with no error given."
+  ));
 }
 
 #[tokio::test]
 async fn execute_missing_file_uploads_if_known() {
   WorkunitStore::setup_for_tests();
+
   let runtime = task_executor::Executor::new();
-
-  let roland = TestData::roland();
-
-  let mock_server = {
-    let op_name = "cat".to_owned();
-
-    let (_, _, execute_request) =
-      crate::remote::make_execute_request(&cat_roland_request().try_into().unwrap(), None, None)
-        .unwrap();
-
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![
-        ExpectedAPICall::Execute {
-          execute_request,
-          stream_responses: Ok(vec![
-            make_incomplete_operation(&op_name),
-            make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-              &roland.digest(),
-            )]),
-          ]),
-        },
-        ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
-            &cat_roland_request().try_into().unwrap(),
-            None,
-            None,
-          )
-          .unwrap()
-          .2,
-          stream_responses: Ok(vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              "cat2",
-              StdoutType::Raw(roland.string()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ]),
-        },
-      ]),
-      None,
-    )
-  };
-
   let store_dir = TempDir::new().unwrap();
   let cas = mock::StubCAS::builder()
     .directory(&TestDirectory::containing_roland())
@@ -1412,6 +1790,61 @@ async fn execute_missing_file_uploads_if_known() {
       STORE_BATCH_API_SIZE_LIMIT,
     )
     .unwrap();
+
+  let roland = TestData::roland();
+
+  let mock_server = {
+    let op_name = "cat".to_owned();
+
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &cat_roland_request().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+              &roland.digest(),
+            )]),
+          ]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            None,
+            None,
+            &store,
+            None,
+          )
+          .await
+          .unwrap()
+          .execute_request,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ]),
+        },
+      ]),
+      None,
+    )
+  };
+
   store
     .store_file_bytes(roland.bytes(), false)
     .await
@@ -1425,8 +1858,10 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     None,
     None,
+    None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1485,8 +1920,10 @@ async fn execute_missing_file_errors_if_unknown() {
     None,
     None,
     None,
+    None,
     BTreeMap::new(),
     store,
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -1954,7 +2391,7 @@ pub fn echo_foo_request() -> Process {
   req
 }
 
-pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
+fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   let op = Operation {
     name: operation_name.to_string(),
     done: false,
@@ -1963,7 +2400,13 @@ pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   MockOperation::new(op)
 }
 
-pub(crate) fn make_retryable_operation_failure() -> MockOperation {
+fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
+  let mut op = make_incomplete_operation(operation_name);
+  op.duration = Some(delay);
+  op
+}
+
+fn make_retryable_operation_failure() -> MockOperation {
   let status = protos::gen::google::rpc::Status {
     code: Code::Aborted as i32,
     message: String::from("the bot running the task appears to be lost"),
@@ -1990,7 +2433,7 @@ pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   }
 }
 
-pub(crate) fn make_action_result(
+fn make_action_result(
   stdout: StdoutType,
   stderr: StderrType,
   exit_code: i32,
@@ -2047,7 +2490,7 @@ fn make_successful_operation_with_maybe_metadata(
   }
 }
 
-pub(crate) fn make_successful_operation(
+fn make_successful_operation(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2058,7 +2501,7 @@ pub(crate) fn make_successful_operation(
   MockOperation::new(op)
 }
 
-pub(crate) fn make_successful_operation_with_metadata(
+fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2093,7 +2536,7 @@ fn timestamp_only_secs(v: i64) -> prost_types::Timestamp {
   }
 }
 
-pub(crate) fn make_precondition_failure_operation(
+fn make_precondition_failure_operation(
   violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
 ) -> MockOperation {
   let operation = Operation {
@@ -2126,7 +2569,7 @@ fn make_precondition_failure_status(
   }
 }
 
-pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
+async fn run_cmd_runner<R: crate::CommandRunner>(
   request: Process,
   command_runner: R,
   store: Store,
@@ -2157,8 +2600,10 @@ fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (Com
     None,
     None,
     None,
+    None,
     BTreeMap::new(),
     store.clone(),
+    task_executor::Executor::new(),
     OVERALL_DEADLINE_SECS,
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
@@ -2196,11 +2641,7 @@ async fn run_command_remote(
   })
 }
 
-pub(crate) fn make_store(
-  store_dir: &Path,
-  cas: &mock::StubCAS,
-  executor: task_executor::Executor,
-) -> Store {
+fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
   Store::local_only(executor, store_dir)
     .unwrap()
     .into_with_remote(
@@ -2275,7 +2716,7 @@ async fn extract_output_files_from_response(
   Ok(directory_digest.as_digest())
 }
 
-pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
+fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
   let rust_type_name = type_name::<T>();
   let proto_type_name = rust_type_name
     .strip_prefix(prefix)
@@ -2288,7 +2729,7 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
   }
 }
 
-pub(crate) fn missing_preconditionfailure_violation(
+fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> protos::gen::google::rpc::precondition_failure::Violation {
   {
@@ -2301,7 +2742,7 @@ pub(crate) fn missing_preconditionfailure_violation(
 }
 
 #[track_caller]
-pub(crate) fn assert_contains(haystack: &str, needle: &str) {
+fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
@@ -2310,7 +2751,7 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-pub(crate) fn cat_roland_request() -> Process {
+fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.platform = Platform::Linux_x86_64;
@@ -2321,7 +2762,7 @@ pub(crate) fn cat_roland_request() -> Process {
   process
 }
 
-pub(crate) fn echo_roland_request() -> Process {
+fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
   req.platform = Platform::Linux_x86_64;
   req.timeout = one_second();
@@ -2329,7 +2770,7 @@ pub(crate) fn echo_roland_request() -> Process {
   req
 }
 
-pub(crate) fn assert_cancellation_requests(
+fn assert_cancellation_requests(
   mock_server: &mock::execution_server::TestServer,
   expected: Vec<String>,
 ) {

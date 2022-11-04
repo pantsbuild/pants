@@ -13,6 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
@@ -157,13 +158,13 @@ async def partition_scalafmt(
     )
 
     return Partitions(
-        (
+        Partition(
+            tuple(files),
             PartitionInfo(
                 classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 config_snapshot=config_snapshot,
                 extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
             ),
-            tuple(files),
         )
         for files, config_snapshot in zip(
             source_files_by_config_file.values(), config_file_snapshots
@@ -175,7 +176,7 @@ async def partition_scalafmt(
 async def scalafmt_fmt(
     request: ScalafmtRequest.Batch, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> FmtResult:
-    partition_info = cast(PartitionInfo, request.partition_key)
+    partition_info = cast(PartitionInfo, request.partition_metadata)
     merged_digest = await Get(
         Digest,
         MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest]),
