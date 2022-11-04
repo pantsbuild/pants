@@ -16,20 +16,10 @@ use log::warn;
 use parking_lot::Mutex;
 
 use crate::{
-  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, PathStat, Stat, StrictGlobMatching,
-  Vfs,
+  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, LinkDepth, PathStat, Stat,
+  StrictGlobMatching, Vfs, MAX_LINK_DEPTH,
 };
 
-/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
-///
-/// We use a slightly different limit because this is not exactly the same operation: we're
-/// walking recursively while matching globs, and so our link traversals might involve steps
-/// through non-link destinations.
-const MAX_LINK_DEPTH: u8 = 64;
-
-type LinkDepth = u8;
-
-static PARENT_DIR: &str = "..";
 static DOUBLE_STAR: &str = "**";
 
 lazy_static! {
@@ -233,7 +223,7 @@ impl PathGlob {
         )
       };
       Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
-    } else if PARENT_DIR == parts[0].as_str() {
+    } else if parts[0].as_str() == Component::ParentDir.as_os_str().to_str().unwrap() {
       // A request for the parent of `canonical_dir`: since we've already expanded the directory
       // to make it canonical, we can safely drop it directly and recurse without this component.
       // The resulting symbolic path will continue to contain a literal `..`.
@@ -247,7 +237,7 @@ impl PathGlob {
           symbolic_path,
         ));
       }
-      symbolic_path_parent.push(Path::new(PARENT_DIR));
+      symbolic_path_parent.push(Path::new(&Component::ParentDir));
       PathGlob::parse_globs(
         canonical_dir_parent,
         symbolic_path_parent,
