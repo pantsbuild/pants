@@ -408,7 +408,14 @@ class Helper:
             *setup_primary_python(install_python=install_python),
             *self.bootstrap_caches(),
             setup_toolchain_auth(),
-            {"name": "Bootstrap Pants", "run": self.wrap_cmd("./pants --version\n")},
+            {
+                "name": "Bootstrap Pants",
+                # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
+                "run": self.wrap_cmd(
+                    f"./pants version > {gha_expr('runner.temp')}/_pants_version.stdout && "
+                    f"[[ -s {gha_expr('runner.temp')}/_pants_version.stdout ]]"
+                ),
+            },
             {
                 "name": "Run smoke tests",
                 "run": dedent(
