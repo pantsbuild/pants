@@ -404,19 +404,21 @@ async def map_module_to_address(
     ):
         return PythonModuleOwners(addresses)
 
-    MODULE_MAPPING = {  # Exists in, and should be taken from `BUILD.__defaults__.python_requirements.module_mapping`
-      "pacifica-cli": ["pacifica.cli"],
-    }
-
-    addresses_for_mapped_modules = tuple(
-        provider.addr
-        for provider in providers
-        if request.module in MODULE_MAPPING.get(provider.addr.generated_name, ())
-    )
-    if len(addresses_for_mapped_modules) == 1:
-        return PythonModuleOwners(addresses_for_mapped_modules)
+    addresses_by_ancestry = defaultdict(list)
+    for provider in providers:
+        ancestry = calc_ancestry(request.module, provider.addr)
+        addresses_by_ancestry[ancestry].append(provider.addr)
+    minimal_ancestry = min(addresses_by_ancestry.keys())
+    minimal_ancestry_addresses = tuple(addresses_by_ancestry[minimal_ancestry])
+    if len(minimal_ancestry_addresses) == 1:
+        return PythonModuleOwners(minimal_ancestry_addresses)
 
     return PythonModuleOwners((), ambiguous=addresses)
+
+
+def calc_ancestry(module: str, address: Address) -> int:
+    distance = 0 if module.replace(".", "-") == address.generated_name else module.count(".")
+    return distance
 
 
 def rules():
