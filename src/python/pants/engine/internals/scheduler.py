@@ -189,6 +189,7 @@ class Scheduler:
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
+            append_only_caches_base_path=execution_options.remote_execution_append_only_caches_base_path,
         )
         py_local_store_options = PyLocalStoreOptions(
             store_dir=local_store_options.store_dir,
