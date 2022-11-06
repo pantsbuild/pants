@@ -200,6 +200,7 @@ async def setup_build_go_package_target_request(
         cxx_files = _first_party_pkg_analysis.cxx_files
         objc_files = _first_party_pkg_analysis.m_files
         fortran_files = _first_party_pkg_analysis.f_files
+        prebuilt_object_files = _first_party_pkg_analysis.syso_files
 
         # If the xtest package was requested, then replace analysis with the xtest values.
         if request.for_xtests:
@@ -253,6 +254,7 @@ async def setup_build_go_package_target_request(
         cxx_files = _third_party_pkg_info.cxx_files
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
+        prebuilt_object_files = _third_party_pkg_info.syso_files
     else:
         raise AssertionError(
             f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
@@ -352,6 +354,7 @@ async def setup_build_go_package_target_request(
         cxx_files=cxx_files,
         objc_files=objc_files,
         fortran_files=fortran_files,
+        prebuilt_object_files=prebuilt_object_files,
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(pkg_direct_dependencies),
         for_tests=request.for_tests,

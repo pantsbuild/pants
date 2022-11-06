@@ -24,8 +24,9 @@ class FallibleAssemblyPreCompilation:
 
 @dataclass(frozen=True)
 class AssemblyPreCompilation:
-    merged_compilation_input_digest: Digest
-    assembly_digests: tuple[Digest, ...]
+    symabis_digest: Digest
+    symabis_path: str
+    assembly_outputs: tuple[tuple[str, Digest], ...]
 
 
 @dataclass(frozen=True)
@@ -39,22 +40,6 @@ class AssemblyPreCompilationRequest:
     s_files: tuple[str, ...]
     dir_path: str
     import_path: str
-
-
-@dataclass(frozen=True)
-class AssemblyPostCompilation:
-    result: FallibleProcessResult
-    merged_output_digest: Digest | None
-
-
-@dataclass(frozen=True)
-class AssemblyPostCompilationRequest:
-    """Link the assembly_digests into the compilation_result."""
-
-    compilation_result: Digest
-    assembly_digests: tuple[Digest, ...]
-    s_files: tuple[str, ...]
-    dir_path: str
 
 
 @rule
@@ -75,6 +60,7 @@ async def setup_assembly_pre_compilation(
     symabis_input_digest = await Get(
         Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
+    symabis_path = "symabis"
     symabis_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
@@ -86,7 +72,7 @@ async def setup_assembly_pre_compilation(
                 os.path.join(goroot.path, "pkg", "include"),
                 "-gensymabis",
                 "-o",
-                "symabis",
+                symabis_path,
                 "--",
                 *(f"./{request.dir_path}/{name}" for name in request.s_files),
             ),
@@ -94,18 +80,13 @@ async def setup_assembly_pre_compilation(
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
-            output_files=("symabis",),
+            output_files=(symabis_path,),
         ),
     )
     if symabis_result.exit_code != 0:
         return FallibleAssemblyPreCompilation(
             None, symabis_result.exit_code, symabis_result.stderr.decode("utf-8")
         )
-
-    merged = await Get(
-        Digest,
-        MergeDigests([request.compilation_input, symabis_result.output_digest]),
-    )
 
     # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
     # See https://go.dev/doc/go1.19#assembler and
@@ -148,47 +129,17 @@ async def setup_assembly_pre_compilation(
         )
         return FallibleAssemblyPreCompilation(None, exit_code, stdout, stderr)
 
+    assembly_outputs = tuple(
+        (f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}", result.output_digest)
+        for s_file, result in zip(request.s_files, assembly_results)
+    )
+
     return FallibleAssemblyPreCompilation(
-        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results))
-    )
-
-
-# TODO(#16831): Refactor this to share logic with similar cgo logic.
-@rule
-async def link_assembly_post_compilation(
-    request: AssemblyPostCompilationRequest,
-) -> AssemblyPostCompilation:
-    merged_digest, asm_tool_id = await MultiGet(
-        Get(
-            Digest,
-            MergeDigests([request.compilation_result, *request.assembly_digests]),
-        ),
-        # Use `go tool asm` tool ID since `go tool pack` does not have a version argument.
-        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-    )
-    pack_result = await Get(
-        FallibleProcessResult,
-        GoSdkProcess(
-            input_digest=merged_digest,
-            command=(
-                "tool",
-                "pack",
-                "r",
-                "__pkg__.a",
-                *(
-                    f"./{request.dir_path}/{PurePath(name).with_suffix('.o')}"
-                    for name in request.s_files
-                ),
-            ),
-            env={
-                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
-            },
-            description=f"Link assembly objects to Go package archive for {request.dir_path}",
-            output_files=("__pkg__.a",),
-        ),
-    )
-    return AssemblyPostCompilation(
-        pack_result, pack_result.output_digest if pack_result.exit_code == 0 else None
+        AssemblyPreCompilation(
+            symabis_digest=symabis_result.output_digest,
+            symabis_path=symabis_path,
+            assembly_outputs=assembly_outputs,
+        )
     )
 
 

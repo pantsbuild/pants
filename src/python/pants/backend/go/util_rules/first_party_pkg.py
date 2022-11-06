@@ -98,6 +98,8 @@ class FirstPartyPkgAnalysis:
     f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    syso_files: tuple[str, ...]
+
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
@@ -184,6 +186,7 @@ class FallibleFirstPartyPkgAnalysis:
             h_files=tuple(metadata.get("HFiles", [])),
             f_files=tuple(metadata.get("FFiles", [])),
             s_files=tuple(metadata.get("SFiles", [])),
+            syso_files=tuple(metadata.get("SysoFiles", ())),
             minimum_go_version=minimum_go_version,
             embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
             test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
