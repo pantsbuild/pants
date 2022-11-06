@@ -33,7 +33,7 @@ from pants.util.strutil import softwrap
 
 
 class GoCgoEnabledField(TriBoolField):
-    """Enables whether Cgo support will be enabled for a binary."""
+    """Enables whether Cgo support will be enabled."""
 
     alias = "cgo_enabled"
     help = softwrap(
@@ -41,8 +41,12 @@ class GoCgoEnabledField(TriBoolField):
         Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
         packages making use of Cgo to actually be compiled with Cgo support.
 
-        If this field is not specified, then the value will be taken from the value of the
-        `[golang].cgo_enabled` option. (That option will be deprecated in a future Pants version.)
+        This field can be specified on several different target types, including `go_binary` and `go_mod` target
+        types. If this field is specified on a `go_binary` target, then that instance takes precedence over other
+        configuration when building the applicable executable. The applicable `go_mod` target will be checked next
+        as a fallback. Finally, if neither target specifies this field, then the value will be taken from
+        the value of the `[golang].cgo_enabled` option. (Note: That option will be deprecated in a future Pants
+        version.)
 
         See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
         """
