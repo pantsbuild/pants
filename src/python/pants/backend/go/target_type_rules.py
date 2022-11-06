@@ -22,7 +22,7 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
-from pants.backend.go.util_rules import first_party_pkg, import_analysis, build_opts
+from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -361,9 +361,10 @@ async def generate_targets_from_go_mod(
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(
-            go_mod_info.digest, go_mod_info.mod_path,
+            go_mod_info.digest,
+            go_mod_info.mod_path,
             # TODO: Figure out how to avoid rule graph cycle and properly extract these options.
-            build_opts=GoBuildOptions()
+            build_opts=GoBuildOptions(),
         ),
     )
 
