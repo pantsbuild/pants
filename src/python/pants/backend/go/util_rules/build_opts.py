@@ -47,25 +47,32 @@ async def go_extract_build_options_from_target(
         ),
     )
     target = wrapped_target.target
+    target_fields: GoBuildOptionsFieldSet | None = None
+    if GoBuildOptionsFieldSet.is_applicable(target):
+        target_fields = GoBuildOptionsFieldSet.create(target)
 
-    # If this target does not have build option fields, then find the owning `go_mod` target and
-    # use its fields.
-    if not GoBuildOptionsFieldSet.is_applicable(target):
-        owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
-        wrapped_target_go_mod = await Get(
-            WrappedTarget,
-            WrappedTargetRequest(
-                owning_go_mod.address,
-                description_of_origin="the `go_extract_build_options_from_target` rule",
-            ),
-        )
-        target = wrapped_target_go_mod.target
+    # Find the owning `go_mod` target so any unspecified fields on a target like `go_binary` will then
+    # fallback to the `go_mod`. If the target does not have build option fields, then only the `go_mod`
+    # will be used.
+    owning_go_mod = await Get(OwningGoMod, OwningGoModRequest(request.address))
+    wrapped_target_go_mod = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            owning_go_mod.address,
+            description_of_origin="the `go_extract_build_options_from_target` rule",
+        ),
+    )
+    go_mod_target = wrapped_target_go_mod.target
+    go_mod_target_fields = GoBuildOptionsFieldSet.create(go_mod_target)
 
-    opts_field_set = GoBuildOptionsFieldSet.create(target)
-
+    # Extract the `cgo_enabled` value for this target.
     cgo_enabled: bool | None = None
-    if opts_field_set.cgo_enabled.value is not None:
-        cgo_enabled = opts_field_set.cgo_enabled.value
+    if target_fields is not None:
+        if target_fields.cgo_enabled.value is not None:
+            cgo_enabled = target_fields.cgo_enabled.value
+    if cgo_enabled is None:
+        if go_mod_target_fields.cgo_enabled.value is not None:
+            cgo_enabled = go_mod_target_fields.cgo_enabled.value
     if cgo_enabled is None:
         cgo_enabled = golang.cgo_enabled
 
