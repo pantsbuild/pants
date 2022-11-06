@@ -103,12 +103,13 @@ class GoCodegenBuildRequest:
     """
 
     target: Target
+    build_opts: GoBuildOptions
 
     generate_from: ClassVar[type[SourcesField]]
 
 
 def maybe_get_codegen_request_type(
-    tgt: Target, union_membership: UnionMembership
+    tgt: Target, build_opts: GoBuildOptions, union_membership: UnionMembership
 ) -> GoCodegenBuildRequest | None:
     if not tgt.has_field(SourcesField):
         return None
@@ -128,7 +129,7 @@ def maybe_get_codegen_request_type(
             f"Possible implementations:\n\n"
             f"{bullet_list(sorted(generator.__name__ for generator in relevant_requests))}"
         )
-    return relevant_requests[0](tgt) if relevant_requests else None
+    return relevant_requests[0](tgt, build_opts) if relevant_requests else None
 
 
 # NB: We must have a description for the streaming of this rule to work properly
@@ -144,7 +145,7 @@ async def setup_build_go_package_target_request(
     )
     target = wrapped_target.target
 
-    codegen_request = maybe_get_codegen_request_type(target, union_membership)
+    codegen_request = maybe_get_codegen_request_type(target, request.build_opts, union_membership)
     if codegen_request:
         codegen_result = await Get(
             FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
@@ -284,7 +285,7 @@ async def setup_build_go_package_target_request(
             first_party_dep_import_path_targets.append(dep)
         elif dep.has_field(GoThirdPartyPackageDependenciesField):
             third_party_dep_import_path_targets.append(dep)
-        elif bool(maybe_get_codegen_request_type(dep, union_membership)):
+        elif bool(maybe_get_codegen_request_type(dep, request.build_opts, union_membership)):
             codegen_dep_import_path_targets.append(dep)
 
     first_party_dep_import_path_results = await MultiGet(
