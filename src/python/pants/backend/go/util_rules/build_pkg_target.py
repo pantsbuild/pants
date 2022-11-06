@@ -159,7 +159,10 @@ async def setup_build_go_package_target_request(
                 FallibleFirstPartyPkgAnalysis,
                 FirstPartyPkgAnalysisRequest(target.address, build_opts=request.build_opts),
             ),
-            Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(target.address)),
+            Get(
+                FallibleFirstPartyPkgDigest,
+                FirstPartyPkgDigestRequest(target.address, build_opts=request.build_opts),
+            ),
         )
         if _maybe_first_party_pkg_analysis.analysis is None:
             return FallibleBuildGoPackageRequest(

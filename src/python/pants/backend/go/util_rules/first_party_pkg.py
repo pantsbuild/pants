@@ -198,8 +198,8 @@ class FallibleFirstPartyPkgAnalysis:
 @dataclass(frozen=True)
 class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
+    build_opts: GoBuildOptions
     extra_build_tags: tuple[str, ...] = ()
-    build_opts: GoBuildOptions | None = None
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -227,6 +227,7 @@ class FallibleFirstPartyPkgDigest:
 @dataclass(frozen=True)
 class FirstPartyPkgDigestRequest(EngineAwareParameter):
     address: Address
+    build_opts: GoBuildOptions
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -277,8 +278,6 @@ async def analyze_first_party_package(
     if request.extra_build_tags:
         extra_build_tags_env = {"EXTRA_BUILD_TAGS": ",".join(request.extra_build_tags)}
 
-    build_opts = request.build_opts if request.build_opts is not None else GoBuildOptions()
-
     input_digest = await Get(Digest, MergeDigests([pkg_sources.snapshot.digest, analyzer.digest]))
     result = await Get(
         FallibleProcessResult,
@@ -288,7 +287,7 @@ async def analyze_first_party_package(
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
             env={
-                "CGO_ENABLED": "1" if build_opts.cgo_enabled else "0",
+                "CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0",
                 **extra_build_tags_env,
             },
         ),
@@ -314,7 +313,10 @@ async def setup_first_party_pkg_digest(
                 request.address, description_of_origin="<first party digest setup>"
             ),
         ),
-        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
+        Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(request.address, build_opts=request.build_opts),
+        ),
     )
     if maybe_analysis.analysis is None:
         return FallibleFirstPartyPkgDigest(

@@ -220,13 +220,14 @@ async def infer_go_dependencies(
     std_lib_imports: GoStdLibImports,
 ) -> InferredDependencies:
     go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
-    package_mapping = await Get(
-        GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)
+    package_mapping, build_opts = await MultiGet(
+        Get(GoModuleImportPathsMapping, GoImportPathMappingRequest(go_mod_addr.address)),
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_addr.address)),
     )
 
     addr = request.field_set.address
     maybe_pkg_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr)
+        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
     )
     if maybe_pkg_analysis.analysis is None:
         logger.error(

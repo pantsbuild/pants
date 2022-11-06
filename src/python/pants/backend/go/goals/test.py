@@ -176,11 +176,18 @@ async def run_go_tests(
 ) -> TestResult:
     field_set = batch.single_element
 
-    maybe_pkg_analysis, maybe_pkg_digest, dependencies, build_opts = await MultiGet(
-        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
-        Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
+    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
+
+    maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
+        Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(field_set.address, build_opts=build_opts),
+        ),
+        Get(
+            FallibleFirstPartyPkgDigest,
+            FirstPartyPkgDigestRequest(field_set.address, build_opts=build_opts),
+        ),
         Get(Targets, DependenciesRequest(field_set.dependencies)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
     )
 
     def compilation_failure(exit_code: int, stdout: str | None, stderr: str | None) -> TestResult:

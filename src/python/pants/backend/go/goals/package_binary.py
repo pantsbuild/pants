@@ -44,7 +44,8 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
     )
     main_pkg_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(main_pkg.address)
+        FallibleFirstPartyPkgAnalysis,
+        FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
     )
     analysis = main_pkg_analysis.analysis
     if not analysis:
