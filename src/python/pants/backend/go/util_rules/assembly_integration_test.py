@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import os.path
+import platform
 import subprocess
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -30,6 +32,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture()
@@ -155,3 +158,86 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
         result.stdout
         == ".//add_amd64.s:1: unexpected EOF\nasm: assembly of .//add_amd64.s failed\n"
     )
+
+
+def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> None:
+    # Compile helper assembly into a prebuilt .syso object file.
+    machine = platform.uname().machine
+    if machine == "x86_64":
+        assembly_text = dedent(
+            """\
+            .align 4
+            .globl _fortytwo
+            _fortytwo:
+              mov x0, #42
+              ret
+            """
+        )
+    elif machine == "arm64":
+        assembly_text = dedent(
+            """\
+            .align 4
+            .globl _fortytwo
+            _fortytwo:
+              mov x0, #42
+              ret
+        """
+        )
+    else:
+        pytest.skip(f"Unsupported architecture for test: {machine}")
+
+    with temporary_dir() as tempdir:
+        source_path = Path(tempdir) / "fortytwo.s"
+        source_path.write_text(assembly_text)
+        output_path = source_path.with_suffix(".o")
+        subprocess.check_call(["gcc", "-c", "-o", str(output_path), str(source_path)])
+        object_bytes = output_path.read_bytes()
+
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/syso_files
+                go 1.17
+                """
+            ),
+            "main.go": dedent(
+                """\
+                package main
+
+                import "fmt"
+
+                func main() {
+                    fmt.Println(value())
+                }
+                """
+            ),
+            "value.go": dedent(
+                """\
+                package main
+                // extern int fortytwo();
+                import "C"
+                func value() int {
+                    return int(C.fortytwo())
+                }
+                """
+            ),
+            "value.syso": object_bytes,
+            "BUILD": dedent(
+                """\
+                go_mod(name="mod")
+                go_package(name="pkg", sources=["*.go", "*.syso"])
+                go_binary(name="bin")
+                """
+            ),
+        }
+    )
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"42\n"
