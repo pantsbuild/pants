@@ -28,12 +28,12 @@ from pants.engine.target import (
 from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
-# Build option fieklds
+# Build option fields
 # -----------------------------------------------------------------------------------------------
 
 
 class GoCgoEnabledField(TriBoolField):
-    """Enables whether Cgo support will be enabled."""
+    """Enables Cgo support."""
 
     alias = "cgo_enabled"
     help = softwrap(
