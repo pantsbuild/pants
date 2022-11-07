@@ -169,7 +169,7 @@ def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> No
             .align 4
             .globl _fortytwo
             _fortytwo:
-              mov x0, #42
+              movl $42, eax
               ret
             """
         )
