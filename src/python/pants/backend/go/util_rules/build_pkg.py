@@ -10,8 +10,8 @@ from typing import Iterable
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
-    AssemblyPreCompilationRequest,
-    FallibleAssemblyPreCompilation,
+    AssemblyCompilationRequest,
+    FallibleAssemblyCompilationResult,
 )
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import (
@@ -468,8 +468,8 @@ async def build_go_package(
     symabis_path: str | None = None
     if s_files:
         assembly_setup = await Get(
-            FallibleAssemblyPreCompilation,
-            AssemblyPreCompilationRequest(
+            FallibleAssemblyCompilationResult,
+            AssemblyCompilationRequest(
                 compilation_input=input_digest,
                 s_files=tuple(s_files),
                 dir_path=request.dir_path,

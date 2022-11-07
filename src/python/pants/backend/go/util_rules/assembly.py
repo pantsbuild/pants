@@ -15,22 +15,22 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 
 @dataclass(frozen=True)
-class FallibleAssemblyPreCompilation:
-    result: AssemblyPreCompilation | None
+class FallibleAssemblyCompilationResult:
+    result: AssemblyCompilationResult | None
     exit_code: int = 0
     stdout: str | None = None
     stderr: str | None = None
 
 
 @dataclass(frozen=True)
-class AssemblyPreCompilation:
+class AssemblyCompilationResult:
     symabis_digest: Digest
     symabis_path: str
     assembly_outputs: tuple[tuple[str, Digest], ...]
 
 
 @dataclass(frozen=True)
-class AssemblyPreCompilationRequest:
+class AssemblyCompilationRequest:
     """Add a `symabis` file for consumption by Go compiler and assemble all `.s` files.
 
     See https://github.com/bazelbuild/rules_go/issues/1893.
@@ -44,9 +44,9 @@ class AssemblyPreCompilationRequest:
 
 @rule
 async def setup_assembly_pre_compilation(
-    request: AssemblyPreCompilationRequest,
+    request: AssemblyCompilationRequest,
     goroot: GoRoot,
-) -> FallibleAssemblyPreCompilation:
+) -> FallibleAssemblyCompilationResult:
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
@@ -84,7 +84,7 @@ async def setup_assembly_pre_compilation(
         ),
     )
     if symabis_result.exit_code != 0:
-        return FallibleAssemblyPreCompilation(
+        return FallibleAssemblyCompilationResult(
             None, symabis_result.exit_code, symabis_result.stderr.decode("utf-8")
         )
 
@@ -127,15 +127,15 @@ async def setup_assembly_pre_compilation(
         stderr = "\n\n".join(
             result.stderr.decode("utf-8") for result in assembly_results if result.stderr
         )
-        return FallibleAssemblyPreCompilation(None, exit_code, stdout, stderr)
+        return FallibleAssemblyCompilationResult(None, exit_code, stdout, stderr)
 
     assembly_outputs = tuple(
         (f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}", result.output_digest)
         for s_file, result in zip(request.s_files, assembly_results)
     )
 
-    return FallibleAssemblyPreCompilation(
-        AssemblyPreCompilation(
+    return FallibleAssemblyCompilationResult(
+        AssemblyCompilationResult(
             symabis_digest=symabis_result.output_digest,
             symabis_path=symabis_path,
             assembly_outputs=assembly_outputs,
