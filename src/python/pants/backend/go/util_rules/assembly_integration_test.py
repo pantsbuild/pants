@@ -166,9 +166,15 @@ def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> No
     if machine == "x86_64":
         assembly_text = dedent(
             """\
+            /* Apple still insists on underscore prefixes for C function names. */
+            #if defined(__APPLE__)
+            #define EXT(s) _##s
+            #else
+            #define EXT(s) s
+            #endif
             .align 4
-            .globl _fortytwo
-            _fortytwo:
+            .globl EXT(fortytwo)
+            EXT(fortytwo):
               movl $42, %eax
               ret
             """
@@ -176,9 +182,15 @@ def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> No
     elif machine == "arm64":
         assembly_text = dedent(
             """\
+            /* Apple still insists on underscore prefixes for C function names. */
+            #if defined(__APPLE__)
+            #define EXT(s) _##s
+            #else
+            #define EXT(s) s
+            #endif
             .align 4
-            .globl _fortytwo
-            _fortytwo:
+            .globl EXT(fortytwo)
+            EXT(fortytwo):
               mov x0, #42
               ret
         """
