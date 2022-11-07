@@ -199,7 +199,7 @@ def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> No
         pytest.skip(f"Unsupported architecture for test: {machine}")
 
     with temporary_dir() as tempdir:
-        source_path = Path(tempdir) / "fortytwo.s"
+        source_path = Path(tempdir) / "fortytwo.S"
         source_path.write_text(assembly_text)
         output_path = source_path.with_suffix(".o")
         subprocess.check_call(["gcc", "-c", "-o", str(output_path), str(source_path)])
