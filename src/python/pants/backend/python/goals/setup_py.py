@@ -292,8 +292,10 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> FrozenDict[str, Any]:
-        return self.target[PythonProvidesField].value.kwargs
+    def explicit_kwargs(self) -> Dict[str, Any]:
+        # We return a dict copy of the underlying FrozenDict, because the caller expects a
+        # dict (and we have documented as much).
+        return dict(self.target[PythonProvidesField].value.kwargs)
 
 
 class FinalizedSetupKwargs(SetupKwargs):
