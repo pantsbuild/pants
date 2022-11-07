@@ -57,6 +57,7 @@ class ModuleProviderType(enum.Enum):
 class ModuleProvider:
     addr: Address
     typ: ModuleProviderType
+    ancestry: int = 0
 
 
 def module_from_stripped_path(path: PurePath) -> str:
@@ -156,7 +157,8 @@ class FirstPartyPythonModuleMapping(
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return mapping.get(parent_module, ())
+        parent_providers = mapping.get(parent_module, ())
+        return tuple(ModuleProvider(mp.addr, mp.typ, 1) for mp in parent_providers)
 
     def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
         """Find all providers for the module.
@@ -248,21 +250,21 @@ class ThirdPartyPythonModuleMapping(
     """A mapping of each resolve to the modules they contain and the addresses providing those
     modules."""
 
-    def _providers_for_resolve(self, module: str, resolve: str) -> tuple[ModuleProvider, ...]:
+    def _providers_for_resolve(self, module: str, resolve: str, ancestry: int = 0) -> tuple[ModuleProvider, ...]:
         mapping = self.get(resolve)
         if not mapping:
             return ()
 
         result = mapping.get(module, ())
         if result:
-            return result
+            return tuple(ModuleProvider(mp.addr, mp.typ, ancestry) for mp in result)
 
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self._providers_for_resolve(parent_module, resolve)
+        return self._providers_for_resolve(parent_module, resolve, ancestry + 1)
 
     def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
         """Find all providers for the module.
@@ -406,19 +408,13 @@ async def map_module_to_address(
 
     addresses_by_ancestry = defaultdict(list)
     for provider in providers:
-        ancestry = calc_ancestry(request.module, provider.addr)
-        addresses_by_ancestry[ancestry].append(provider.addr)
+        addresses_by_ancestry[provider.ancestry].append(provider.addr)
     minimal_ancestry = min(addresses_by_ancestry.keys())
     minimal_ancestry_addresses = tuple(addresses_by_ancestry[minimal_ancestry])
     if len(minimal_ancestry_addresses) == 1:
         return PythonModuleOwners(minimal_ancestry_addresses)
 
     return PythonModuleOwners((), ambiguous=addresses)
-
-
-def calc_ancestry(module: str, address: Address) -> int:
-    distance = 0 if module.replace(".", "-") == address.generated_name else module.count(".")
-    return distance
 
 
 def rules():
