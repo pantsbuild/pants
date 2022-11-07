@@ -6,6 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
+import packaging
+
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
     PylintFieldSet,
@@ -20,6 +22,7 @@ from pants.backend.python.util_rules.partition import (
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexRequest,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
     VenvPexRequest,
@@ -152,6 +155,11 @@ async def run_pylint(
         report_directory_digest_get,
     )
 
+    pylint_pex_info = await Get(PexResolveInfo, Pex, pylint_pex)
+    astroid_info = pylint_pex_info.find("astroid")
+    # Astroid is a transitive dependency of pylint and should always be available in the pex.
+    assert astroid_info
+
     pylint_runner_pex, config_files = await MultiGet(
         Get(
             VenvPex,
@@ -163,10 +171,9 @@ async def run_pylint(
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
                 ),
-                # TODO(John Sirois): Remove this (change to the default of symlinks) when we can
-                #  upgrade to a version of Pylint with https://github.com/PyCQA/pylint/issues/1470
-                #  resolved.
-                site_packages_copies=True,
+                # Astroid < 2.9.1 had a regression that prevented the use of symlinks:
+                # https://github.com/PyCQA/pylint/issues/1470
+                site_packages_copies=(astroid_info.version < packaging.version.Version("2.9.1")),
             ),
         ),
         Get(
