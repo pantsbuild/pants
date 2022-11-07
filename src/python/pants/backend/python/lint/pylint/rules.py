@@ -42,7 +42,6 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class PartitionMetadata:
-    coarsened_targets: CoarsenedTargets
     # NB: These are the same across every element in a partition
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
@@ -86,19 +85,10 @@ async def partition_pylint(
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
 
-    coarsened_targets = await Get(
-        CoarsenedTargets,
-        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
-    )
-    coarsened_targets_by_address = coarsened_targets.by_address()
-
     return Partitions(
         Partition(
             tuple(field_sets),
             PartitionMetadata(
-                CoarsenedTargets(
-                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
-                ),
                 resolve if len(python_setup.resolves) > 1 else None,
                 InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
             ),
@@ -118,10 +108,16 @@ async def run_pylint(
 ) -> LintResult:
     assert request.partition_metadata is not None
 
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        CoarsenedTargetsRequest(field_set.address for field_set in request.elements),
+    )
+    coarsened_closure = tuple(coarsened_targets.closure())
+
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.partition_metadata.coarsened_targets.closure()),
+            (target.address for target in coarsened_closure),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -140,7 +136,7 @@ async def run_pylint(
 
     sources_get = Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(request.partition_metadata.coarsened_targets.closure()),
+        PythonSourceFilesRequest(coarsened_closure),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
