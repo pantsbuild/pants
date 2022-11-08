@@ -73,6 +73,8 @@ class ThirdPartyPkgAnalysis:
     f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    syso_files: tuple[str, ...]
+
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
@@ -416,7 +418,6 @@ async def analyze_go_third_party_package(
         "CompiledGoFiles",
         "SwigFiles",
         "SwigCXXFiles",
-        "SysoFiles",
     ):
         if key in request.pkg_json:
             maybe_error = GoThirdPartyPkgError(
@@ -452,6 +453,7 @@ async def analyze_go_third_party_package(
         h_files=tuple(request.pkg_json.get("HFiles", ())),
         f_files=tuple(request.pkg_json.get("FFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
+        syso_files=tuple(request.pkg_json.get("SysoFiles", ())),
         cgo_files=tuple(request.pkg_json.get("CgoFiles", ())),
         minimum_go_version=request.minimum_go_version,
         embed_patterns=tuple(request.pkg_json.get("EmbedPatterns", [])),
@@ -618,6 +620,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             m_files=(),
             f_files=(),
             s_files=(),
+            syso_files=(),
             minimum_go_version=None,
             embed_patterns=(),
             test_embed_patterns=(),
