@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.goals.package_image import DockerFieldSet
+from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.core.goals import package
@@ -25,7 +25,7 @@ def rule_runner() -> RuleRunner:
             *docker_rules(),
             *source_files_rules(),
             package.find_all_packageable_targets,
-            QueryRule(BuiltPackage, [DockerFieldSet]),
+            QueryRule(BuiltPackage, [DockerPackageFieldSet]),
         ],
         target_types=[DockerImageTarget],
     )
@@ -43,7 +43,7 @@ def run_docker(
     )
     result = rule_runner.request(
         BuiltPackage,
-        [DockerFieldSet.create(target)],
+        [DockerPackageFieldSet.create(target)],
     )
     return result
 

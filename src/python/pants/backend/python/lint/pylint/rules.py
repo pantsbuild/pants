@@ -118,10 +118,20 @@ async def run_pylint(
 ) -> LintResult:
     assert request.partition_metadata is not None
 
+    # The coarsened targets in the incoming request are for all targets in the request's original
+    # partition. Since the core `lint` logic re-batches inputs according to `[lint].batch_size`,
+    # this could be many more targets than are actually needed to lint the specific batch of files
+    # received by this rule. Subset the CTs one more time here to only those that are relevant.
+    all_coarsened_targets_by_address = request.partition_metadata.coarsened_targets.by_address()
+    coarsened_targets = CoarsenedTargets(
+        all_coarsened_targets_by_address[field_set.address] for field_set in request.elements
+    )
+    coarsened_closure = tuple(coarsened_targets.closure())
+
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.partition_metadata.coarsened_targets.closure()),
+            (target.address for target in coarsened_closure),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -140,7 +150,7 @@ async def run_pylint(
 
     sources_get = Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(request.partition_metadata.coarsened_targets.closure()),
+        PythonSourceFilesRequest(coarsened_closure),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))

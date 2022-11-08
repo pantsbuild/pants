@@ -35,7 +35,6 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -65,7 +64,7 @@ class DockerImageOptionValueError(ValueError):
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet, RunFieldSet):
+class DockerPackageFieldSet(PackageFieldSet):
     required_fields = (DockerImageSourceField,)
 
     context_root: DockerImageContextRootField
@@ -149,22 +148,40 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         This method will always return a non-empty tuple.
         """
+        return tuple(
+            self._image_refs_generator(
+                default_repository=default_repository,
+                registries=registries,
+                interpolation_context=interpolation_context,
+                additional_tags=additional_tags,
+            )
+        )
+
+    def _image_refs_generator(
+        self,
+        default_repository: str,
+        registries: DockerRegistries,
+        interpolation_context: InterpolationContext,
+        additional_tags: tuple[str, ...] = (),
+    ) -> Iterator[str]:
         image_tags = (self.tags.value or ()) + additional_tags
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
             repository = self.format_repository(default_repository, interpolation_context)
-            return tuple(self.format_names(repository, image_tags, interpolation_context))
+            yield from self.format_names(repository, image_tags, interpolation_context)
+            return
 
-        return tuple(
-            "/".join([registry.address, image_name])
-            for registry in registries_options
-            for image_name in self.format_names(
+        for registry in registries_options:
+            image_names = self.format_names(
                 self.format_repository(default_repository, interpolation_context, registry),
                 image_tags + registry.extra_image_tags,
                 interpolation_context,
             )
-        )
+            for image_name in image_names:
+                if registry.use_local_alias and registry.alias:
+                    yield "/".join([registry.alias, image_name])
+                yield "/".join([registry.address, image_name])
 
     def get_context_root(self, default_context_root: str) -> str:
         """Examines `default_context_root` and `self.context_root.value` and translates that to a
@@ -189,7 +206,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
 def get_build_options(
     context: DockerBuildContext,
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
     target: Target,
 ) -> Iterator[str]:
@@ -234,7 +251,7 @@ def get_build_options(
 
 @rule
 async def build_docker_image(
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
@@ -448,6 +465,5 @@ def format_docker_build_context_help_message(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, DockerFieldSet),
-        UnionRule(RunFieldSet, DockerFieldSet),
+        UnionRule(PackageFieldSet, DockerPackageFieldSet),
     ]
