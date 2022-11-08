@@ -10,10 +10,8 @@ from typing import Iterable
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
-    AssemblyPostCompilation,
-    AssemblyPostCompilationRequest,
-    AssemblyPreCompilationRequest,
-    FallibleAssemblyPreCompilation,
+    AssemblyCompilationRequest,
+    FallibleAssemblyCompilationResult,
 )
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult, CGoCompilerFlags
 from pants.backend.go.util_rules.coverage import (
@@ -68,6 +66,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         cxx_files: tuple[str, ...] = (),
         objc_files: tuple[str, ...] = (),
         fortran_files: tuple[str, ...] = (),
+        prebuilt_object_files: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -92,6 +91,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.cxx_files = cxx_files
         self.objc_files = objc_files
         self.fortran_files = fortran_files
+        self.prebuilt_object_files = prebuilt_object_files
         self._hashcode = hash(
             (
                 self.import_path,
@@ -111,6 +111,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.cxx_files,
                 self.objc_files,
                 self.fortran_files,
+                self.prebuilt_object_files,
             )
         )
 
@@ -135,7 +136,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"c_files={self.c_files}, "
             f"cxx_files={self.cxx_files}, "
             f"objc_files={self.objc_files}, "
-            f"fortran_files={self.fortran_files}"
+            f"fortran_files={self.fortran_files}, "
+            f"prebuilt_object_files={self.prebuilt_object_files}"
             ")"
         )
 
@@ -163,6 +165,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.cxx_files == other.cxx_files
             and self.objc_files == other.objc_files
             and self.fortran_files == other.fortran_files
+            and self.prebuilt_object_files == other.prebuilt_object_files
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -405,6 +408,18 @@ async def build_go_package(
         cgo_files = coverage_result.cgo_files
         cover_file_metadatas = coverage_result.cover_file_metadatas
 
+    # Track loose object files to link into final package archive. These can come from Cgo outputs, regular
+    # assembly files, or regular C files.
+    objects: list[tuple[str, Digest]] = []
+
+    # Add any prebuilt object files (".syso" extension) to the list of objects to link into the package.
+    if request.prebuilt_object_files:
+        objects.extend(
+            (f"./{request.dir_path}/{prebuilt_object_file}", request.digest)
+            for prebuilt_object_file in request.prebuilt_object_files
+        )
+
+    # Process any Cgo files.
     cgo_compile_result: CGoCompileResult | None = None
     if cgo_files:
         # Check if any assembly files contain gcc assembly, and not Go assembly. Raise an exception if any are
@@ -435,6 +450,12 @@ async def build_go_package(
         )
         assert cgo_compile_result is not None
         unmerged_input_digests.append(cgo_compile_result.digest)
+        objects.extend(
+            [
+                (obj_file, cgo_compile_result.digest)
+                for obj_file in cgo_compile_result.output_obj_files
+            ]
+        )
         s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
     input_digest = await Get(
@@ -442,19 +463,21 @@ async def build_go_package(
         MergeDigests(unmerged_input_digests),
     )
 
-    assembly_digests = None
-    symabis_path = None
+    # Process any assembly files and add the result to `objects` for linking into the package archive.
+    # The `symabis` file generated with API information is added to the input digest for use in compilation.
+    symabis_path: str | None = None
     if s_files:
         assembly_setup = await Get(
-            FallibleAssemblyPreCompilation,
-            AssemblyPreCompilationRequest(
+            FallibleAssemblyCompilationResult,
+            AssemblyCompilationRequest(
                 compilation_input=input_digest,
                 s_files=tuple(s_files),
                 dir_path=request.dir_path,
                 import_path=request.import_path,
             ),
         )
-        if assembly_setup.result is None:
+        assembly_result = assembly_setup.result
+        if assembly_result is None:
             return FallibleBuiltGoPackage(
                 None,
                 request.import_path,
@@ -462,9 +485,11 @@ async def build_go_package(
                 stdout=assembly_setup.stdout,
                 stderr=assembly_setup.stderr,
             )
-        input_digest = assembly_setup.result.merged_compilation_input_digest
-        assembly_digests = assembly_setup.result.assembly_digests
-        symabis_path = "./symabis"
+        input_digest = await Get(
+            Digest, MergeDigests([input_digest, assembly_result.symabis_digest])
+        )
+        symabis_path = assembly_result.symabis_path
+        objects.extend(assembly_result.assembly_outputs)
 
     compile_args = [
         "tool",
@@ -492,9 +517,9 @@ async def build_go_package(
     if embedcfg.digest != EMPTY_DIGEST:
         compile_args.extend(["-embedcfg", RenderedEmbedConfig.PATH])
 
-    if not s_files:
-        # If there are no non-Go sources, then pass -complete flag which tells the compiler that the provided
-        # Go files are the entire package.
+    # If there are no loose object files to add to the package archive later, then pass -complete flag which
+    # tells the compiler that the provided Go files constitute the entire package.
+    if not objects:
         compile_args.append("-complete")
 
     relativized_sources = (
@@ -522,43 +547,22 @@ async def build_go_package(
         )
 
     compilation_digest = compile_result.output_digest
-    if assembly_digests:
-        assembly_result = await Get(
-            AssemblyPostCompilation,
-            AssemblyPostCompilationRequest(
-                compilation_result=compilation_digest,
-                assembly_digests=assembly_digests,
-                s_files=tuple(s_files),
-                dir_path=request.dir_path,
-            ),
-        )
-        if assembly_result.result.exit_code != 0:
-            return FallibleBuiltGoPackage(
-                None,
-                request.import_path,
-                assembly_result.result.exit_code,
-                stdout=assembly_result.result.stdout.decode("utf-8"),
-                stderr=assembly_result.result.stderr.decode("utf-8"),
-            )
-        assert assembly_result.merged_output_digest
-        compilation_digest = assembly_result.merged_output_digest
-
-    if cgo_compile_result:
-        cgo_link_input_digest = await Get(
+    if objects:
+        assembly_link_input_digest = await Get(
             Digest,
             MergeDigests(
                 [
                     compilation_digest,
-                    cgo_compile_result.digest,
+                    *(digest for obj_file, digest in objects),
                 ]
             ),
         )
-        cgo_link_result = await _add_objects_to_archive(
-            input_digest=cgo_link_input_digest,
+        assembly_link_result = await _add_objects_to_archive(
+            input_digest=assembly_link_input_digest,
             pkg_archive_path="__pkg__.a",
-            obj_file_paths=cgo_compile_result.output_obj_files,
+            obj_file_paths=sorted(obj_file for obj_file, digest in objects),
         )
-        compilation_digest = cgo_link_result.output_digest
+        compilation_digest = assembly_link_result.output_digest
 
     path_prefix = os.path.join("__pkgs__", path_safe(request.import_path))
     import_paths_to_pkg_a_files[request.import_path] = os.path.join(path_prefix, "__pkg__.a")

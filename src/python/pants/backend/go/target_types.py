@@ -166,6 +166,7 @@ class GoPackageSourcesField(MultipleSourcesField):
         ".F",
         ".for",
         ".f90",
+        ".syso",
     )
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(

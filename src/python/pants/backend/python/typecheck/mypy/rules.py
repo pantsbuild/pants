@@ -7,7 +7,7 @@ import dataclasses
 import itertools
 from dataclasses import dataclass
 from hashlib import sha256
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Optional, Tuple
 
 import packaging

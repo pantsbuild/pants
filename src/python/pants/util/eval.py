@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
 from typing import Any
+
+from pants.util.strutil import softwrap
 
 
 def parse_expression(
@@ -43,11 +44,11 @@ def parse_expression(
         parsed_value = eval(val)
     except Exception as e:
         raise ValueError(
-            dedent(
-                f"""\
+            softwrap(
+                f"""
                 The {get_name()} cannot be evaluated as a literal expression: {e!r}
                 Given raw value:
-                {format_raw_value()}
+                  {format_raw_value()}
                 """
             )
         )
@@ -67,11 +68,11 @@ def parse_expression(
 
         expected_types = ", ".join(format_type(t) for t in iter_types(acceptable_types))
         raise ValueError(
-            dedent(
-                f"""\
+            softwrap(
+                f"""
                 The {get_name()} is not of the expected type(s): {expected_types}:
                 Given the following raw value that evaluated to type {format_type(type(parsed_value))}:
-                {format_raw_value()}
+                  {format_raw_value()}
                 """
             )
         )

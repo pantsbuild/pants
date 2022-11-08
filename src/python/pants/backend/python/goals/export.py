@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import os
-import textwrap
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -377,12 +376,13 @@ async def export_virtualenvs(
     warn_or_error(
         "2.23.0.dev0",
         "exporting resolves without using the --resolve option",
-        textwrap.dedent(
+        softwrap(
             f"""
-        Use the --resolve flag one or more times to name the resolves you want to export,
-        and don't provide any target specs. E.g.,\n
-        `{bin_name()} export --resolve=python-default --resolve=pytest`
-        """
+            Use the --resolve flag one or more times to name the resolves you want to export,
+            and don't provide any target specs. E.g.,
+
+              {bin_name()} export --resolve=python-default --resolve=pytest
+            """
         ),
     )
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)

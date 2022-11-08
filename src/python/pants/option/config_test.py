@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Dict
@@ -16,8 +17,7 @@ from pants.option.config import Config, TomlSerializer
 class ConfigFile:
     content: str
     unexpanded_default_values: Dict
-    expanded_default_values: Dict
-    expected_options: Dict
+    expected_options: Dict[str, Dict[str, list[str]]]
 
 
 FILE_0 = ConfigFile(
@@ -43,6 +43,7 @@ FILE_0 = ConfigFile(
 
         [b]
         preempt = true
+        embedded = "This is a path: %(embed)s"
 
         [c]
         name = "overridden_from_default"
@@ -77,35 +78,41 @@ FILE_0 = ConfigFile(
         "embed": "%(path)s::%(name)s",
         "disclaimer": "Let it be known\nthat.",
     },
-    expanded_default_values={
-        "name": "foo",
-        "answer": 42,
-        "scale": 1.2,
-        "path": "/a/b/42",
-        "embed": "/a/b/42::foo",
-        "disclaimer": "Let it be known\nthat.",
-    },
     expected_options={
-        "a": {"list": "['1', '2', '3', '42']", "list2": "+[7, 8, 9]", "list3": "-['x', 'y', 'z']"},
-        "b": {"preempt": "True"},
-        "c": {
-            "name": "overridden_from_default",
-            "interpolated_from_section": "overridden_from_default is interpolated",
-            "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
+        "DEFAULT": {
+            "name": ["foo"],
+            "answer": ["42"],
+            "scale": ["1.2"],
+            "path": ["/a/b/42"],
+            "embed": ["/a/b/42::foo"],
+            "disclaimer": ["Let it be known\nthat."],
         },
-        "d": {"dict_val": "{'add': 0, 'remove': 0, 'nested': {'nested_key': '42!'}}"},
+        "a": {
+            "list": ["['1', '2', '3', '42']"],
+            "list2": ["+[7, 8, 9]"],
+            "list3": ["-['x', 'y', 'z']"],
+        },
+        "b": {"preempt": ["True"], "embedded": ["This is a path: /a/b/42::foo"]},
+        "c": {
+            "name": ["overridden_from_default"],
+            "interpolated_from_section": ["overridden_from_default is interpolated"],
+            "recursively_interpolated_from_section": [
+                "overridden_from_default is interpolated (again)"
+            ],
+        },
+        "d": {"dict_val": ["{'add': 0, 'remove': 0, 'nested': {'nested_key': '42!'}}"]},
         "list_merging": {
-            "list1": "[]",
-            "list2": "[1, 2]",
-            "list3": "+[3, 4]",
-            "list4": "-[5]",
-            "list5": "[6, 7]",
+            "list1": ["[]"],
+            "list2": ["[1, 2]"],
+            "list3": ["+[3, 4]"],
+            "list4": ["-[5]"],
+            "list5": ["[6, 7]"],
         },
         "dict_merging": {
-            "dict1": "{}",
-            "dict2": "{'a': '1', 'b': '2'}",
-            "dict3": "+{'c': '3', 'd': '4'}",
-            "dict4": "{'e': '5'}",
+            "dict1": ["{}"],
+            "dict2": ["{'a': '1', 'b': '2'}"],
+            "dict3": ["+{'c': '3', 'd': '4'}"],
+            "dict4": ["{'e': '5'}"],
         },
     },
 )
@@ -142,37 +149,44 @@ FILE_1 = ConfigFile(
         """
     ),
     unexpanded_default_values={},
-    expanded_default_values={},
     expected_options={
-        "a": {"fast": "True"},
-        "b": {"preempt": "False"},
-        "d": {"list": "+[0, 1],-[8, 9]"},
+        "a": {"fast": ["True"]},
+        "b": {"preempt": ["False"]},
+        "d": {"list": ["+[0, 1],-[8, 9]"]},
         "empty_section": {},
         "list_merging": {
-            "list1": "[11, 22]",
-            "list2": "+[33]",
-            "list3": "+[8, 9],-[4, 55]",
-            "list4": "[66]",
-            "list6": "+[77, 88]",
+            "list1": ["[11, 22]"],
+            "list2": ["+[33]"],
+            "list3": ["+[8, 9],-[4, 55]"],
+            "list4": ["[66]"],
+            "list6": ["+[77, 88]"],
         },
         "dict_merging": {
-            "dict1": "+{'zz': '99'}",
-            "dict2": "+{'a': 'xx', 'bb': '22'}",
-            "dict3": "+{'cc': '33', 'dd': '44'}",
-            "dict4": "{'ee': '55'}",
+            "dict1": ["+{'zz': '99'}"],
+            "dict2": ["+{'a': 'xx', 'bb': '22'}"],
+            "dict3": ["+{'cc': '33', 'dd': '44'}"],
+            "dict4": ["{'ee': '55'}"],
         },
     },
 )
 
 
 _expected_combined_values: dict[str, dict[str, list[str]]] = {
+    "DEFAULT": {
+        "name": ["foo"],
+        "answer": ["42"],
+        "scale": ["1.2"],
+        "path": ["/a/b/42"],
+        "embed": ["/a/b/42::foo"],
+        "disclaimer": ["Let it be known\nthat."],
+    },
     "a": {
         "list": ["['1', '2', '3', '42']"],
         "list2": ["+[7, 8, 9]"],
         "list3": ["-['x', 'y', 'z']"],
         "fast": ["True"],
     },
-    "b": {"preempt": ["True", "False"]},
+    "b": {"preempt": ["True", "False"], "embedded": ["This is a path: /a/b/42::foo"]},
     "c": {
         "name": ["overridden_from_default"],
         "interpolated_from_section": ["overridden_from_default is interpolated"],
@@ -212,6 +226,32 @@ def test_empty() -> None:
     assert config.sources() == []
 
 
+def _compare(config: Config, expected: dict[str, dict[str, list[str]]]) -> None:
+    # Values are processed and stringified on get(), so we can't just naively compare dicts.
+    # Therefore we verify that we've covered all the sections, and all entries in each section.
+    sections = sorted(
+        set(itertools.chain(*[list(cv.section_to_values.keys()) for cv in config.values]))
+    )
+    expected_sections = sorted(expected.keys())
+    assert sections == expected_sections
+
+    for section, section_data in expected.items():
+        keys = sorted(
+            set(
+                itertools.chain(
+                    *[list(cv.section_to_values.get(section, {}).keys()) for cv in config.values]
+                )
+            )
+        )
+        expected_keys = sorted(section_data.keys())
+        assert keys == expected_keys
+
+        for key, val in section_data.items():
+            values_list = config.get(section, key)
+            assert values_list, f"for section {section}, key {key}"
+            assert values_list == val
+
+
 @pytest.mark.parametrize("filedata", [FILE_0, FILE_1])
 def test_individual_file_parsing(filedata: ConfigFile) -> None:
     config = Config.load(
@@ -222,16 +262,11 @@ def test_individual_file_parsing(filedata: ConfigFile) -> None:
         env=_env,
     )
     assert ["file.toml"] == config.sources()
-    for section, section_data in filedata.expected_options.items():
-        for key, val in section_data.items():
-            values_list = config.get(section, key)
-            assert values_list, f"for section {section}, key {key}"
-            assert values_list[0] == val
 
-    # The raw unexpanded defaults, as returned by _ConfigValues.defaults, are used in
-    # `options_bootstrapper.py` to ignore default values when validating options, so we
-    # test that those values make sense here.
-    assert config.values[0].defaults == {
+    _compare(config, filedata.expected_options)
+
+    # Verify that the raw, unexpanded seed values are as expected.
+    assert config.values[0].seed_values == {
         **_default_seed_values,
         **filedata.unexpanded_default_values,
     }
@@ -240,28 +275,15 @@ def test_individual_file_parsing(filedata: ConfigFile) -> None:
 def test_merged_config() -> None:
     config = Config.load(
         file_contents=[
-            FileContent("file1.toml", FILE_0.content.encode()),
-            FileContent("file2.toml", FILE_1.content.encode()),
+            FileContent("file0.toml", FILE_0.content.encode()),
+            FileContent("file1.toml", FILE_1.content.encode()),
         ],
         seed_values=_seed_values,
         env=_env,
     )
-    assert ["file1.toml", "file2.toml"] == config.sources()
+    assert ["file0.toml", "file1.toml"] == config.sources()
 
-    # Check the DEFAULT section
-    # N.B.: All values read from config files are read as str and only later converted by the
-    # options parser to the expected destination type; so we ensure we're comparing strings here.
-    for option, value in _default_seed_values.items():
-        # Both config files have the seed values.
-        assert config.get(section="DEFAULT", option=option) == [str(value), str(value)]
-    for option, value in FILE_0.expanded_default_values.items():
-        # Only FILE_1 has explicit DEFAULT values.
-        assert config.get(section="DEFAULT", option=option) == [str(value)]
-
-    # Check the combined values.
-    for section, expected_section_values in _expected_combined_values.items():
-        for option, value_list in expected_section_values.items():
-            assert config.get(section=section, option=option) == value_list, f"in section {section}"
+    _compare(config, _expected_combined_values)
 
 
 def test_toml_serializer() -> None:

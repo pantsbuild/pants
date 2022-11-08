@@ -10,7 +10,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Sequence
 
 from pants.core.subsystems import python_bootstrap
