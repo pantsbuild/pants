@@ -87,6 +87,7 @@ _orgs = (
         "https://www.peopledatalabs.com/",
         "https://files.readme.io/8c4f5cd-peopledatalabs-small.png",
     ),
+    Org("Ponder", "https://ponder.io/", "https://files.readme.io/fd34269-ponder.png"),
     Org(
         "Rippling",
         "https://www.rippling.com/",
