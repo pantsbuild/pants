@@ -951,53 +951,40 @@ impl Store {
     Ok(missing.is_empty())
   }
 
-  ///
-  /// Ensure that a directory is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured).
-  ///
-  pub async fn ensure_local_has_recursive_directory(
+  /// Ensure that the files are locally loadable. This will download them from the remote store as
+  /// a side effect, if one is configured.
+  pub async fn ensure_local_has_files(
     &self,
-    dir_digest: DirectoryDigest,
+    mut file_digests: Vec<Digest>,
+    directory_digests: Vec<DirectoryDigest>,
   ) -> Result<(), StoreError> {
-    let mut file_digests = Vec::new();
-    self
-      .load_digest_trie(dir_digest)
-      .await?
-      .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
-        directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
-      });
-
-    let _ = future::try_join_all(
-      file_digests
-        .into_iter()
-        .map(|file_digest| self.ensure_local_has_file(file_digest))
-        .collect::<Vec<_>>(),
-    )
-    .await?;
-    Ok(())
-  }
-
-  /// Ensure that a file is locally loadable, which will download it from the Remote store as
-  /// a side effect (if one is configured). Called only with the Digest of a File.
-  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), StoreError> {
-    if let Err(e) = self
-      .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-      .await
-    {
-      log::debug!("Missing file digest from remote store: {:?}", file_digest);
-      in_workunit!(
-        "missing_file_counter",
-        Level::Trace,
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-        },
-      )
-      .await;
-      Err(e)
-    } else {
-      Ok(())
+    for dir_digest in directory_digests.into_iter() {
+      self
+        .load_digest_trie(dir_digest)
+        .await?
+        .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+          directory::Entry::File(f) => file_digests.push(f.digest()),
+          directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
+        });
     }
+    for file_digest in file_digests {
+      if let Err(e) = self
+        .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
+        .await
+      {
+        log::debug!("Missing file digest from remote store: {:?}", file_digest);
+        in_workunit!(
+          "missing_file_counter",
+          Level::Trace,
+          |workunit| async move {
+            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+          },
+        )
+        .await;
+        return Err(e);
+      }
+    }
+    Ok(())
   }
 
   /// Load a REv2 Tree from a remote CAS _without_ persisting the embedded Directory protos in
