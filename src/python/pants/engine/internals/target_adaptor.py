@@ -15,15 +15,10 @@ from pants.engine.engine_aware import EngineAwareParameter
 
 @dataclass(frozen=True)
 class TargetAdaptorRequest(EngineAwareParameter):
-    """Lookup the TargetAdaptor for an Address.
-
-    If `address_of_origin` is not None then any visibility checks will apply if there is a
-    visibility backend enabled.
-    """
+    """Lookup the TargetAdaptor for an Address."""
 
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
-    address_of_origin: Address | None = None
 
     def debug_hint(self) -> str:
         return self.address.spec

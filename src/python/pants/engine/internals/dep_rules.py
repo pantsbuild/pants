@@ -123,10 +123,10 @@ class BuildFileDependencyRules:
         *,
         source_type: str,
         source_path: str,
-        dependencies_rules: BuildFileDependencyRules,
+        dependencies_rules: BuildFileDependencyRules | None,
         target_type: str,
         target_path: str,
-        dependents_rules: BuildFileDependencyRules,
+        dependents_rules: BuildFileDependencyRules | None,
     ) -> DependencyRuleAction:
         """The source of the dependency has the dependencies field, the target of the dependency is
         the one listed as a value in the dependencies field.
@@ -138,11 +138,19 @@ class BuildFileDependencyRules:
         but with a logged warning.
         """
         # Check outgoing dependency action
-        outgoing = dependencies_rules.get_action(source_type, target_path, relpath=source_path)
+        outgoing = (
+            dependencies_rules.get_action(source_type, target_path, relpath=source_path)
+            if dependencies_rules is not None
+            else DependencyRuleAction.ALLOW
+        )
         if outgoing == DependencyRuleAction.DENY:
             return outgoing
         # Check incoming dependency action
-        incoming = dependents_rules.get_action(target_type, source_path, relpath=target_path)
+        incoming = (
+            dependents_rules.get_action(target_type, source_path, relpath=target_path)
+            if dependents_rules is not None
+            else DependencyRuleAction.ALLOW
+        )
         return incoming if incoming != DependencyRuleAction.ALLOW else outgoing
 
 

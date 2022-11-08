@@ -8,7 +8,7 @@ import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, cast
+from typing import Any
 
 from pants.build_graph.address import (
     Address,
@@ -24,6 +24,7 @@ from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaults
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
     BuildFileDependencyRulesParserState,
+    DependencyRuleAction,
     MaybeBuildFileDependencyRulesImplementation,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
@@ -34,7 +35,11 @@ from pants.engine.internals.synthetic_targets import (
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.target import (
+    DependenciesRuleAction,
+    DependenciesRuleActionRequest,
+    RegisteredTargetTypes,
+)
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -273,6 +278,20 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     return BuildFileAddress(address, bfa.rel_path) if address.is_generated_target else bfa
 
 
+def _get_target_adaptor(
+    address: Address, address_family: AddressFamily, description_of_origin: str
+) -> TargetAdaptor:
+    target_adaptor = address_family.get_target_adaptor(address)
+    if target_adaptor is None:
+        raise ResolveError.did_you_mean(
+            address,
+            description_of_origin=description_of_origin,
+            known_names=address_family.target_names,
+            namespace=address_family.namespace,
+        )
+    return target_adaptor
+
+
 @rule
 async def find_target_adaptor(
     request: TargetAdaptorRequest,
@@ -285,46 +304,55 @@ async def find_target_adaptor(
             "Generated targets are not defined in BUILD files, and so do not have "
             f"TargetAdaptors: {request}"
         )
-    address_family, *maybe_origin_family = await MultiGet(
-        Get(AddressFamily, AddressFamilyDir(addr.spec_path))
-        for addr in (address, request.address_of_origin)
-        if addr is not None
-    )
-    target_adaptor = address_family.get_target_adaptor(address)
-    if target_adaptor is None:
-        raise ResolveError.did_you_mean(
-            address,
-            description_of_origin=request.description_of_origin,
-            known_names=address_family.target_names,
-            namespace=address_family.namespace,
-        )
+    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    target_adaptor = _get_target_adaptor(address, address_family, request.description_of_origin)
+    return target_adaptor
 
-    # DependencyRules checks will only be applied on requests with an `address_of_origin`.
-    if not maybe_origin_family:
-        return target_adaptor
 
+@rule
+async def get_dependencies_rule_action(
+    request: DependenciesRuleActionRequest,
+    maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+) -> DependenciesRuleAction:
     build_file_dependency_rules_class = (
         maybe_build_file_rules_implementation.build_file_dependency_rules_class
     )
     if build_file_dependency_rules_class is None:
-        return target_adaptor
+        return DependenciesRuleAction(
+            request.address,
+            FrozenDict({dep: DependencyRuleAction.ALLOW for dep in request.dependencies}),
+        )
 
-    for origin_family in maybe_origin_family:
-        if address_family.dependents_rules is None or origin_family.dependencies_rules is None:
-            break
-        origin_target = origin_family.get_target_adaptor(cast(Address, request.address_of_origin))
-        if origin_target is None:
-            break
-        action = build_file_dependency_rules_class.check_dependency_rules(
+    spec_paths = {address.spec_path for address in (request.address, *request.dependencies)}
+    address_families = await MultiGet(
+        Get(AddressFamily, AddressFamilyDir(spec_path)) for spec_path in spec_paths
+    )
+    families = {address_family.namespace: address_family for address_family in address_families}
+    origin_family = families[request.address.spec_path]
+    origin_target = _get_target_adaptor(
+        request.address.maybe_convert_to_target_generator(),
+        origin_family,
+        request.description_of_origin,
+    )
+    dependencies_rule: dict[Address, DependencyRuleAction] = {}
+    for dependency_address in request.dependencies:
+        dependency_family = families[dependency_address.spec_path]
+        dependency_target = _get_target_adaptor(
+            dependency_address.maybe_convert_to_target_generator(),
+            dependency_family,
+            f"{request.description_of_origin} on {dependency_address}",
+        )
+        dependencies_rule[
+            dependency_address
+        ] = build_file_dependency_rules_class.check_dependency_rules(
             source_type=origin_target.type_alias,
             source_path=origin_family.namespace,
             dependencies_rules=origin_family.dependencies_rules,
-            target_type=target_adaptor.type_alias,
-            target_path=address_family.namespace,
-            dependents_rules=address_family.dependents_rules,
+            target_type=dependency_target.type_alias,
+            target_path=dependency_family.namespace,
+            dependents_rules=dependency_family.dependents_rules,
         )
-        action.execute(description_of_origin=request.description_of_origin)
-    return target_adaptor
+    return DependenciesRuleAction(request.address, FrozenDict(dependencies_rule))
 
 
 def rules():

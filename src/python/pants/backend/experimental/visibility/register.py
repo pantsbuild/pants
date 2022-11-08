@@ -6,10 +6,11 @@ from pants.engine.internals.dep_rules import (
     BuildFileDependencyRulesImplementation,
     BuildFileDependencyRulesImplementationRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
+    DependenciesRuleAction,
+    DependenciesRuleActionRequest,
     FieldSet,
     ValidatedDependencies,
     ValidateDependenciesRequest,
@@ -40,20 +41,16 @@ def build_file_visibility_implementation(
 async def visibility_validate_dependencies(
     request: VisibilityValidateDependenciesRequest,
 ) -> ValidatedDependencies:
-    address = request.field_set.address.maybe_convert_to_target_generator()
-    _ = await MultiGet(
-        Get(
-            TargetAdaptor,
-            TargetAdaptorRequest(
-                address=dependency_address.maybe_convert_to_target_generator(),
-                address_of_origin=address,
-                description_of_origin=(
-                    f"dependency validation of {request.field_set.address} on {dependency_address}"
-                ),
-            ),
-        )
-        for dependency_address in request.dependencies
+    address = request.field_set.address
+    dependencies_rule_action = await Get(
+        DependenciesRuleAction,
+        DependenciesRuleActionRequest(
+            address=address,
+            dependencies=request.dependencies,
+            description_of_origin=f"get dependency rules for {address}",
+        ),
     )
+    dependencies_rule_action.execute_actions()
     return ValidatedDependencies()
 
 

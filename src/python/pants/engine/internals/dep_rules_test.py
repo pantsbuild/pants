@@ -11,7 +11,7 @@ import pytest
 
 from pants.backend.experimental.visibility.register import rules
 from pants.core.target_types import GenericTarget
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
     BuildFileDependencyRulesParserState,
@@ -19,15 +19,15 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleAction,
     DependencyRuleActionDeniedError,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.target import DependenciesRuleAction, DependenciesRuleActionRequest
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*rules(), QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
+        rules=[*rules(), QueryRule(DependenciesRuleAction, (DependenciesRuleActionRequest,))],
         target_types=[GenericTarget],
     )
 
@@ -180,8 +180,9 @@ def test_dependency_rule_action(caplog) -> None:
 
 
 def denied():
-    return engine_error(
-        DependencyRuleActionDeniedError, contains="Dependency rule violation for test"
+    return pytest.raises(
+        DependencyRuleActionDeniedError,
+        match="Dependency rule violation for src/origin:origin on src/dependency:dependency",
     )
 
 
@@ -218,16 +219,17 @@ def test_dependents_rules(rule_runner: RuleRunner, rules: list[str], kwargs, exp
     )
 
     with expect_error or no_exception():
-        rule_runner.request(
-            TargetAdaptor,
+        rsp = rule_runner.request(
+            DependenciesRuleAction,
             [
-                TargetAdaptorRequest(
-                    Address("src/dependency"),
-                    address_of_origin=Address("src/origin"),
+                DependenciesRuleActionRequest(
+                    Address("src/origin"),
+                    dependencies=Addresses([Address("src/dependency")]),
                     description_of_origin="test",
                 )
             ],
         )
+        rsp.execute_actions()
 
 
 @pytest.mark.parametrize(
@@ -256,13 +258,15 @@ def test_dependencies_rules(
     )
 
     with expect_error or no_exception():
-        rule_runner.request(
-            TargetAdaptor,
+        rsp = rule_runner.request(
+            DependenciesRuleAction,
             [
-                TargetAdaptorRequest(
-                    Address("src/dependency"),
-                    address_of_origin=Address("src/origin"),
+                DependenciesRuleActionRequest(
+                    Address("src/origin"),
+                    dependencies=Addresses([Address("src/dependency")]),
                     description_of_origin="test",
                 )
             ],
         )
+        print(rsp)
+        rsp.execute_actions()
