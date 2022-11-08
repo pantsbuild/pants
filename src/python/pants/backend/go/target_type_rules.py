@@ -364,7 +364,9 @@ async def generate_targets_from_go_mod(
         AllThirdPartyPackagesRequest(
             go_mod_info.digest,
             go_mod_info.mod_path,
-            # TODO: Figure out how to avoid rule graph cycle and properly extract these options.
+            # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.
+            # For now, just use a default set of options to facilitate analyzing third-party dependencies and
+            # generating targets.
             build_opts=GoBuildOptions(),
         ),
     )
