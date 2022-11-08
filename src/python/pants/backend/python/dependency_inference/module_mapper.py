@@ -421,13 +421,13 @@ async def map_module_to_address(
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     )
 
-    # We attempt to disambiguate conflicting providers by taking only the ones for the
-    # closest ancestors to the requested modules. This prevents issues with namespace
-    # packages that are split between first-party and third-party
+    # We attempt to disambiguate conflicting providers by taking - for each provider type -
+    # the providers for the closest ancestors to the requested modules. This prevents
+    # issues with namespace packages that are split between first-party and third-party
     # (e.g., https://github.com/pantsbuild/pants/discussions/17286).
 
     # Map from provider type to mutable pair of
-    # [closest ancestry found, list of provider of that type at that ancestry level].
+    # [closest ancestry, list of provider of that type at that ancestry level].
     type_to_closest_providers: dict[ModuleProviderType, list] = defaultdict(lambda: [999, []])
     for possible_provider in possible_providers:
         val = type_to_closest_providers[possible_provider.provider.typ]
@@ -444,6 +444,8 @@ async def map_module_to_address(
     )
     addresses = tuple(provider.addr for provider in closest_providers)
 
+    # Check that we have at most one closest provider for each provider type.
+    # If we have more than one, signal ambiguity.
     if any(len(val[1]) > 1 for val in type_to_closest_providers.values()):
         return PythonModuleOwners((), ambiguous=addresses)
 
