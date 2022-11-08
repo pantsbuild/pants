@@ -7,11 +7,11 @@ import itertools
 import logging
 import urllib.parse
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path, PurePath
 from typing import Any, Iterator, Mapping, Sequence, cast
 
 import toml
-from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
 from typing_extensions import TypedDict
 
@@ -20,29 +20,16 @@ from pants.backend.python.macros.common_fields import (
     RequirementsOverrideField,
     TypeStubsModuleMappingField,
 )
+from pants.backend.python.macros.common_requirements_rule import _generate_requirements
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import (
-    PythonRequirementModulesField,
-    PythonRequirementResolveField,
-    PythonRequirementsField,
-    PythonRequirementTarget,
-    PythonRequirementTypeStubModulesField,
-)
+from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.base.build_root import BuildRoot
-from pants.core.target_types import (
-    TargetGeneratorSourcesHelperSourcesField,
-    TargetGeneratorSourcesHelperTarget,
-)
-from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
-    InvalidFieldException,
     SingleSourceField,
     TargetGenerator,
 )
@@ -423,6 +410,18 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     )
 
 
+def parse_poetry_requirements(
+    build_root: BuildRoot, file_contents: bytes, file_path: str
+) -> set[PipRequirement]:
+    return parse_pyproject_toml(
+        PyProjectToml(
+            build_root=PurePath(build_root.path),
+            toml_relpath=PurePath(file_path),
+            toml_contents=file_contents.decode(),
+        )
+    )
+
+
 # ---------------------------------------------------------------------------------
 # Target generator
 # ---------------------------------------------------------------------------------
@@ -460,89 +459,13 @@ async def generate_from_python_requirement(
     union_membership: UnionMembership,
     python_setup: PythonSetup,
 ) -> GeneratedTargets:
-    generator = request.generator
-    pyproject_rel_path = generator[PoetryRequirementsSourceField].value
-    pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
-    overrides = {
-        canonicalize_project_name(k): v
-        for k, v in request.require_unparametrized_overrides().items()
-    }
-
-    file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: pyproject_rel_path},
-        Address(
-            request.template_address.spec_path,
-            target_name=request.template_address.target_name,
-            relative_file_path=pyproject_rel_path,
-        ),
+    result = await _generate_requirements(
+        request,
         union_membership,
+        python_setup,
+        parse_requirements_callback=partial(parse_poetry_requirements, build_root),
     )
-
-    req_deps = [file_tgt.address.spec]
-
-    resolve = request.template.get(
-        PythonRequirementResolveField.alias, python_setup.default_resolve
-    )
-    lockfile = python_setup.resolves.get(resolve) if python_setup.enable_resolves else None
-    if lockfile:
-        req_deps.append(f"{lockfile}:{resolve}")
-
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [pyproject_full_path],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin=f"{generator}'s field `{PoetryRequirementsSourceField.alias}`",
-        ),
-    )
-
-    requirements = parse_pyproject_toml(
-        PyProjectToml(
-            build_root=PurePath(build_root.path),
-            toml_relpath=PurePath(pyproject_full_path),
-            toml_contents=digest_contents[0].content.decode(),
-        )
-    )
-
-    module_mapping = generator[ModuleMappingField].value
-    stubs_mapping = generator[TypeStubsModuleMappingField].value
-
-    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
-        normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
-        tgt_overrides = overrides.pop(normalized_proj_name, {})
-        if Dependencies.alias in tgt_overrides:
-            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + req_deps
-
-        return PythonRequirementTarget(
-            {
-                **request.template,
-                PythonRequirementsField.alias: [parsed_req],
-                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
-                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
-                    normalized_proj_name
-                ),
-                # This may get overridden by `tgt_overrides`, which will have already added in
-                # the file tgt.
-                Dependencies.alias: req_deps,
-                **tgt_overrides,
-            },
-            request.template_address.create_generated(parsed_req.project_name),
-            union_membership,
-        )
-
-    result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
-
-    if overrides:
-        raise InvalidFieldException(
-            softwrap(
-                f"""
-                Unused key in the `overrides` field for {request.template_address}:
-                {sorted(overrides)}
-                """
-            )
-        )
-
-    return GeneratedTargets(generator, result)
+    return GeneratedTargets(request.generator, result)
 
 
 def rules():
