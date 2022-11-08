@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import PythonRequirementTarget
@@ -21,6 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *lockfile.rules(),
             *python_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
