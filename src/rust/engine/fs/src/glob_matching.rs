@@ -677,7 +677,14 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
   ) -> Result<bool, E> {
     // Filter directory listing to append PathStats, with no continuation.
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, symlink_behavior, link_depth)
+      .directory_listing(
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+        &exclude,
+        symlink_behavior,
+        link_depth,
+      )
       .await?;
 
     let mut result = result.lock();
@@ -700,7 +707,14 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     // Filter directory listing and recurse for matched Dirs.
     let context = self.clone();
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, symlink_behavior, link_depth)
+      .directory_listing(
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+        &exclude,
+        symlink_behavior,
+        link_depth,
+      )
       .await?;
 
     let path_globs = path_stats
