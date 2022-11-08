@@ -254,7 +254,7 @@ python_tests(
 > To specify defaults for both generated and manually-written instances of a target, you must list the target generator in your `__defaults__` as well:
 >
 > ```python
-> __defaults({(python_test, python_tests): {"timeout": 30}})
+> __defaults__({(python_test, python_tests): {"timeout": 30}})
 > ```
 
 The address for generated targets depends if the generated target is for first-party code or not:
