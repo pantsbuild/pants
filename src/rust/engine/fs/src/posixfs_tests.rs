@@ -351,7 +351,9 @@ async fn memfs_expand_basic() {
   .unwrap();
 
   assert_eq!(
-    fs.expand_globs(globs, None).await.unwrap(),
+    fs.expand_globs(globs, SymlinkBehavior::Oblivious, None)
+      .await
+      .unwrap(),
     vec![
       PathStat::file(
         p1.clone(),

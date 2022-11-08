@@ -29,7 +29,7 @@ use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
   GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching, SymlinkEntry, Vfs,
+  RelativePath, StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
@@ -664,7 +664,11 @@ impl Paths {
 
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
       .map_err(|e| throw(format!("{}", e)))
       .await
   }
@@ -676,6 +680,9 @@ impl Paths {
       match ps {
         &PathStat::File { ref path, .. } => {
           files.push(Snapshot::store_path(py, path)?);
+        }
+        &PathStat::Link { ref path, .. } => {
+          panic!("Paths shouldn't be symlink-aware {path:?}");
         }
         &PathStat::Dir { ref path, .. } => {
           dirs.push(Snapshot::store_path(py, path)?);
@@ -919,7 +926,11 @@ impl Snapshot {
     // We rely on Context::expand_globs to track dependencies for scandirs,
     // and `context.get(DigestFile)` to track dependencies for file digests.
     let path_stats = context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
       .map_err(|e| throw(format!("{}", e)))
       .await?;
 
@@ -1261,7 +1272,7 @@ impl NodeKey {
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
-      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::ReadLink(ref s) => Some((s.0).path.as_path()),
       &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
 
       // Not FS operations:
@@ -1352,7 +1363,9 @@ impl NodeKey {
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
-      NodeKey::ReadLink(ReadLink(Link(path))) => Some(format!("Reading link: {}", path.display())),
+      NodeKey::ReadLink(ReadLink(Link { path, .. })) => {
+        Some(format!("Reading link: {}", path.display()))
+      }
       NodeKey::Scandir(Scandir(Dir(path))) => {
         Some(format!("Reading directory: {}", path.display()))
       }
@@ -1543,7 +1556,7 @@ impl Display for NodeKey {
       &NodeKey::ExecuteProcess(ref s) => {
         write!(f, "Process({})", s.process.description)
       }
-      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).0.display()),
+      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).path.display()),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {

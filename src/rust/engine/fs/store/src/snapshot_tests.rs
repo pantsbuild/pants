@@ -11,7 +11,7 @@ use testutil::make_file;
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
 use fs::{
   Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, PathStat, PosixFS, StrictGlobMatching,
+  PathGlobs, PathStat, PosixFS, StrictGlobMatching, SymlinkBehavior,
 };
 
 pub const STR: &str = "European Burmese";
@@ -559,7 +559,10 @@ pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   )
   .parse()
   .unwrap();
-  let mut v = posix_fs.expand_globs(path_globs, None).await.unwrap();
+  let mut v = posix_fs
+    .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
+    .await
+    .unwrap();
   v.sort_by(|a, b| a.path().cmp(b.path()));
   v
 }
